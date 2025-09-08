@@ -2024,24 +2024,25 @@ def show_detailed_validation_results(character: Character, validation_result: Di
         # Show free points summary for calculated characters
         print()
         print_colored("Free Points Summary:", 'cyan', True)
-        if validation_result.get("details"):
-            analysis = validation_result["details"]
-            total_expected = analysis.get("total_expected_free_points", 0)
-            total_used = analysis.get("total_free_points_used", 0)
-            remaining = analysis.get("remaining_free_points", 0)
-            print(f"Total Expected: {total_expected}")
-            print(f"Used in Allocation: {total_used}")
-            print(f"Calculated Remaining: {remaining}")
-            
-            if remaining < 0:
-                print_error(f"Character has {abs(remaining)} excess free points")
-            elif remaining > 0:
-                print_error(f"Character is missing {remaining} free points")
-        else:
-            # Fallback if no detailed analysis available
-            fp_info = validation_result.get("free_points", {})
-            for key, value in fp_info.items():
-                print(f"{key.replace('_', ' ').title()}: {value}")
+        
+        # Use the free_points section from validation result
+        fp_info = validation_result.get("free_points", {})
+        total_expected = fp_info.get("expected_total", 0)
+        total_used = fp_info.get("spent", 0) 
+        remaining = fp_info.get("difference", 0)
+        current = fp_info.get("current", 0)
+        
+        print(f"Total Expected: {total_expected}")
+        print(f"Used in Allocation: {total_used}")
+        print(f"Current Remaining: {current}")
+        print(f"Calculated Remaining: {remaining}")
+        
+        if current != remaining:
+            diff = current - remaining
+            if diff > 0:
+                print_error(f"Character has {diff} excess free points")
+            else:
+                print_error(f"Character is missing {abs(diff)} free points")
         
         # Show stat discrepancies for calculated characters
         if validation_result.get("stat_discrepancies"):

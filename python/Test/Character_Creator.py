@@ -1539,7 +1539,7 @@ class StatValidator:
             fp_info = validation_result["free_points"]
             expected_total = fp_info.get("expected_total", 0)
             spent = fp_info.get("spent", 0)
-            expected_remaining = max(0, expected_total - spent)
+            expected_remaining = expected_total - spent
         
         current_remaining = self.character.level_system.free_points
         
@@ -1549,6 +1549,12 @@ class StatValidator:
             self.character.level_system.free_points = expected_remaining
             
             return True, points_to_add, f"Added {points_to_add} missing free points (from {current_remaining} to {expected_remaining})"
+        elif expected_remaining < current_remaining:
+            # Character has excess free points - auto-correct
+            points_to_add = expected_remaining - current_remaining
+            self.character.level_system.free_points = expected_remaining
+            
+            return True, points_to_add, f"Removed {points_to_add} excess free points (from {current_remaining} to {expected_remaining})"
         else:
             # Character has correct or excess free points
             return False, 0, "No free point correction needed"
@@ -1916,7 +1922,8 @@ class StatValidator:
     
     def _validate_calculated_character(self) -> Dict[str, Any]:
         """
-        Validate a character with calculated stats (full progression validation).
+        Validate a character with calculated stats using unified progression validation.
+        Uses the same reliable logic as reverse-engineered validation but adapted for calculated characters.
         
         Returns:
             Complete validation results for calculated character
@@ -1936,96 +1943,68 @@ class StatValidator:
             "validation_type": "calculated"
         }
         
-        # Calculate expected stats from each source
-        base_stats = self._get_base_stats()
-        class_stats = self._get_class_stats()
-        profession_stats = self._get_profession_stats()
-        race_stats = self._get_race_stats() 
-        item_stats = self._get_item_stats()
-        blessing_stats = self._get_blessing_stats()
-        
-        # Calculate expected free points
-        expected_free_points = (
-            class_stats.get("free_points", 0) +
-            profession_stats.get("free_points", 0) +
-            race_stats.get("free_points", 0)
-        )
-        result["free_points"]["expected_total"] = expected_free_points
-        
-        # Calculate expected base stats (without free point allocation)
-        expected_base_stats = {}
+        # Get base stats from stat sources (not manual data)
+        base_stats = {}
         for stat in STATS:
-            expected_base_stats[stat] = (
-                base_stats.get(stat, 5) +
-                class_stats.get(stat, 0) +
-                profession_stats.get(stat, 0) +
-                race_stats.get(stat, 0) +
-                item_stats.get(stat, 0) +
-                blessing_stats.get(stat, 0)
-            )
+            sources = self.character.data_manager.get_stat_sources(stat)
+            base_stats[stat] = sources.get(StatSource.BASE, 5)
         
-        # Get actual stats and their sources
+        # Get current stats
         actual_stats = self.character.data_manager.get_all_stats()
-        stat_sources = {stat: self.character.data_manager.get_stat_sources(stat) for stat in STATS}
         
-        # Calculate free points spent
-        free_points_spent = 0
+        # Use the proven reverse engineering analysis approach
+        analysis = self.reverse_engineer_stat_allocation(base_stats, actual_stats)
+        
+        # Extract expected bonuses (uses correct race history)
+        expected_bonuses = analysis["expected_bonuses"]
+        
+        # Calculate free points information
+        result["free_points"]["expected_total"] = analysis["total_expected_free_points"]
+        result["free_points"]["spent"] = analysis["total_free_points_used"]
+        result["free_points"]["difference"] = analysis["remaining_free_points"]
+        
+        # Check for stat discrepancies using the detailed analysis
         for stat in STATS:
-            sources = stat_sources[stat]
-            if StatSource.FREE_POINTS in sources:
-                free_points_spent += sources[StatSource.FREE_POINTS]
-        
-        result["free_points"]["spent"] = free_points_spent
-        
-        # Check discrepancies for each stat
-        for stat in STATS:
-            # Expected value from all sources except free points
-            expected_base = expected_base_stats[stat]
+            stat_analysis = analysis["stat_allocations"][stat]
             
-            # Actual value
-            actual = actual_stats[stat]
-            
-            # Free points used for this stat
-            free_points_used = stat_sources[stat].get(StatSource.FREE_POINTS, 0)
-            
-            # Expected total including free points
-            expected_total = expected_base + free_points_used
-            
-            # Check if there's a discrepancy
-            if actual != expected_total:
-                diff = actual - expected_total
+            # Check for impossible allocations (negative free points required)
+            if stat_analysis["discrepancy"] < 0:
                 result["valid"] = False
                 result["stat_discrepancies"][stat] = {
-                    "expected_base": expected_base,
-                    "free_points_used": free_points_used,
-                    "expected_total": expected_total,
-                    "actual": actual,
-                    "difference": diff,
-                    "status": "over_allocated" if diff > 0 else "under_allocated"
+                    "base": stat_analysis["base"],
+                    "class_bonus": stat_analysis["class_bonus"],
+                    "profession_bonus": stat_analysis["profession_bonus"],
+                    "race_bonus": stat_analysis["race_bonus"],
+                    "expected_from_progression": stat_analysis["expected_from_progression"],
+                    "actual": stat_analysis["current"],
+                    "free_points_allocated": stat_analysis["free_points_allocated"],
+                    "impossible_requirement": abs(stat_analysis["discrepancy"]),
+                    "status": "impossible_allocation"
                 }
         
         # Check overall free points balance
-        total_free_points_received = expected_free_points
-        total_free_points_accounted = free_points_spent + self.character.level_system.free_points
-        free_points_diff = total_free_points_received - total_free_points_accounted
-        
-        result["free_points"]["difference"] = free_points_diff
-        
-        if free_points_diff != 0:
+        if analysis["remaining_free_points"] != self.character.level_system.free_points:
             result["valid"] = False
+            result["free_points"]["actual_remaining"] = self.character.level_system.free_points
+            result["free_points"]["calculated_remaining"] = analysis["remaining_free_points"]
         
-        # Store detailed information for reference
+        # Store detailed breakdown for backward compatibility
         result["details"] = {
-            "base_stats": base_stats,
-            "class_stats": class_stats,
-            "profession_stats": profession_stats,
-            "race_stats": race_stats,
-            "item_stats": item_stats,
-            "blessing_stats": blessing_stats,
-            "expected_base_stats": expected_base_stats,
-            "actual_stats": actual_stats,
-            "stat_sources": stat_sources
+            "base_stats": {stat: analysis["stat_allocations"][stat]["base"] for stat in STATS},
+            "class_stats": expected_bonuses["class"].copy(),
+            "profession_stats": expected_bonuses["profession"].copy(),
+            "race_stats": expected_bonuses["race"].copy(),
+            "item_stats": self._get_item_stats(),
+            "blessing_stats": self._get_blessing_stats(),
+            "expected_bonuses": expected_bonuses,
+            "stat_allocations": analysis["stat_allocations"],
+            "actual_stats": actual_stats
         }
+        
+        # Add free points to stat breakdowns for compatibility
+        result["details"]["class_stats"]["free_points"] = expected_bonuses["class_free_points"]
+        result["details"]["profession_stats"]["free_points"] = expected_bonuses["profession_free_points"]
+        result["details"]["race_stats"]["free_points"] = expected_bonuses["race_free_points"]
         
         # Create human-readable summary
         result["overall_summary"] = self._create_calculated_summary(result)
