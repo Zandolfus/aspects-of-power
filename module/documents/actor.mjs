@@ -99,8 +99,8 @@ export class AspectsofPowerActor extends Actor {
    * Override getRollData() that's supplied to rolls.
    */
   getRollData() {
-    // Starts off by populating the roll data with a shallow copy of `this.system`
-    const data = { ...this.system };
+    // Starts off by populating the roll data with the full source data.
+    const data = this.system.toObject();
 
     // Prepare character roll data.
     this._getCharacterRollData(data);

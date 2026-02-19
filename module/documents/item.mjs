@@ -24,8 +24,9 @@ export class AspectsofPowerItem extends Item {
    * @override
    */
   getRollData() {
-    // Starts off by populating the roll data with a shallow copy of `this.system`
-    const rollData = { ...this.system };
+    // Starts off by populating the roll data with the full source data (includes
+    // non-schema fields like `roll` stored in the database).
+    const rollData = this.system.toObject();
 
     // Quit early if there's no parent actor
     if (!this.actor) return rollData;
@@ -134,7 +135,7 @@ export class AspectsofPowerItem extends Item {
         }
         this.actor.system[rollData.roll.resource].value = this.actor.system[rollData.roll.resource].value - rollData.roll.cost;
         this.update();
-        this.actor.sheet._render();
+        this.actor.sheet.render();
         // Invoke the roll and submit it to chat.
         const roll = new Roll(rollData.formula, rollData);
         // If you need to store the value first, uncomment the next line.
@@ -231,7 +232,7 @@ export class AspectsofPowerItem extends Item {
 
         this.actor.system[rollData.roll.resource].value = this.actor.system[rollData.roll.resource].value - rollData.roll.cost;
         this.update();
-        this.actor.sheet._render();
+        this.actor.sheet.render();
         // Invoke the roll and submit it to chat.
         const roll = new Roll(rollData.formula, rollData);
         // If you need to store the value first, uncomment the next line.
