@@ -41,7 +41,7 @@ export class AspectsofPowerActorSheet extends foundry.applications.api.Handlebar
     context.actor    = this.actor;
     context.system   = this.actor.system; // live instance preserves derived fields (e.g. ability.mod)
     context.flags    = actorData.flags;
-    context.cssClass = this.options.classes.join(' ');
+    context.cssClass = this.isEditable ? 'editable' : 'locked';
     context.config = CONFIG.ASPECTSOFPOWER;
     context.items  = this.actor.items.map(i => i.toObject(false));
 
@@ -113,7 +113,7 @@ export class AspectsofPowerActorSheet extends foundry.applications.api.Handlebar
     // AppV2 stores DEFAULT_OPTIONS.tabs config but never instantiates the Tabs
     // widget — bind it manually on every render (PART HTML is replaced each time).
     const initial = this.actor.type === 'npc' ? 'description' : 'features';
-    new Tabs({ navSelector: '.sheet-tabs', contentSelector: '.sheet-body', initial })
+    new foundry.applications.ux.Tabs({ navSelector: '.sheet-tabs', contentSelector: '.sheet-body', initial })
       .bind(this.element);
 
     // Item sheet open — available regardless of edit state.

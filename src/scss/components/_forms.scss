@@ -38,7 +38,12 @@
   flex: 0;
 }
 
-.sheet-body,
+.sheet-body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+}
+
 .sheet-body .tab,
 .sheet-body .tab .editor {
   height: 100%;
