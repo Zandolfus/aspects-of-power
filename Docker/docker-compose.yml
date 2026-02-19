@@ -1,0 +1,26 @@
+services:
+  foundry:
+    image: felddy/foundryvtt:release
+    hostname: aspects-of-power-foundry
+    init: true
+    restart: unless-stopped
+    volumes:
+      - foundry_data:/data
+      - ../module:/data/Data/systems/aspects-of-power/module:ro
+      - ../templates:/data/Data/systems/aspects-of-power/templates:ro
+      - ../css:/data/Data/systems/aspects-of-power/css:ro
+      - ../lang:/data/Data/systems/aspects-of-power/lang:ro
+      - ../assets:/data/Data/systems/aspects-of-power/assets:ro
+      - ../packs:/data/Data/systems/aspects-of-power/packs:ro
+      - ../lib:/data/Data/systems/aspects-of-power/lib:ro
+      - ../system.json:/data/Data/systems/aspects-of-power/system.json:ro
+      - ../template.json:/data/Data/systems/aspects-of-power/template.json:ro
+    environment:
+      FOUNDRY_USERNAME: "${FOUNDRY_USERNAME}"
+      FOUNDRY_PASSWORD: "${FOUNDRY_PASSWORD}"
+      FOUNDRY_ADMIN_KEY: "${FOUNDRY_ADMIN_KEY}"
+    ports:
+      - "${FOUNDRY_PORT:-30000}:30000"
+
+volumes:
+  foundry_data:

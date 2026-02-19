@@ -1,0 +1,8 @@
+{
+  "permissions": {
+    "allow": [
+      "WebFetch(domain:foundryvtt.wiki)",
+      "WebFetch(domain:foundryvtt.com)"
+    ]
+  }
+}
