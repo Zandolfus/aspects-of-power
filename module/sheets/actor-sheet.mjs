@@ -38,9 +38,10 @@ export class AspectsofPowerActorSheet extends foundry.applications.api.Handlebar
     const context = await super._prepareContext(options);
     const actorData = this.document.toObject(false);
 
-    context.actor  = this.actor;
-    context.system = this.actor.system; // live instance preserves derived fields (e.g. ability.mod)
-    context.flags  = actorData.flags;
+    context.actor    = this.actor;
+    context.system   = this.actor.system; // live instance preserves derived fields (e.g. ability.mod)
+    context.flags    = actorData.flags;
+    context.cssClass = this.options.classes.join(' ');
     context.config = CONFIG.ASPECTSOFPOWER;
     context.items  = this.actor.items.map(i => i.toObject(false));
 
@@ -152,11 +153,15 @@ export class AspectsofPowerActorSheet extends foundry.applications.api.Handlebar
 
     // Drag events for macros
     if (this.actor.isOwner) {
-      const handler = ev => this._onDragStart(ev);
       this.element.querySelectorAll('li.item').forEach(li => {
         if (li.classList.contains('inventory-header')) return;
         li.setAttribute('draggable', true);
-        li.addEventListener('dragstart', handler, false);
+        li.addEventListener('dragstart', ev => {
+          const itemId = li.dataset.itemId;
+          const item   = this.actor.items.get(itemId);
+          if (!item) return;
+          ev.dataTransfer.setData('text/plain', JSON.stringify({ type: 'Item', uuid: item.uuid }));
+        }, false);
       });
     }
   }
