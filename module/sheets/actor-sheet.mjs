@@ -4,80 +4,61 @@ import {
 } from '../helpers/effects.mjs';
 
 /**
- * Extend the basic ActorSheet with some very simple modifications
- * @extends {ActorSheet}
+ * Extend ActorSheetV2 with Aspects of Power-specific behaviour.
+ * @extends {foundry.applications.sheets.ActorSheetV2}
  */
-export class AspectsofPowerActorSheet extends ActorSheet {
-  /** @override */
-  static get defaultOptions() {
-    return foundry.utils.mergeObject(super.defaultOptions, {
-      classes: ['aspects-of-power', 'sheet', 'actor'],
-      width: 800,
-      height: 600,
-      tabs: [
-        {
-          navSelector: '.sheet-tabs',
-          contentSelector: '.sheet-body',
-          initial: 'features',
-        },
-      ],
-    });
-  }
+export class AspectsofPowerActorSheet extends foundry.applications.sheets.ActorSheetV2 {
 
-  /** @override */
-  get template() {
-    return `systems/aspects-of-power/templates/actor/actor-${this.actor.type}-sheet.hbs`;
+  static DEFAULT_OPTIONS = {
+    classes: ['aspects-of-power', 'sheet', 'actor'],
+    position: { width: 800, height: 600 },
+    window: { resizable: true },
+    form: { submitOnChange: true },
+    tabs: [{ navSelector: '.sheet-tabs', contentSelector: '.sheet-body', initial: 'features' }],
+  };
+
+  // Each actor type maps to its own template file.
+  static PARTS = {
+    character: { template: 'systems/aspects-of-power/templates/actor/actor-character-sheet.hbs' },
+    npc:       { template: 'systems/aspects-of-power/templates/actor/actor-npc-sheet.hbs' },
+  };
+
+  /** Render only the part that matches this actor's type. */
+  _configureRenderOptions(options) {
+    super._configureRenderOptions(options);
+    options.parts = [this.actor.type];
   }
 
   /* -------------------------------------------- */
 
   /** @override */
-  async getData() {
-    // Retrieve the data structure from the base sheet. You can inspect or log
-    // the context variable to see the structure, but some key properties for
-    // sheets are the actor object, the data object, whether or not it's
-    // editable, the items array, and the effects array.
-    const context = super.getData();
-
-    // Use a safe clone of the actor data for further operations.
+  async _prepareContext(options) {
+    const context = await super._prepareContext(options);
     const actorData = this.document.toObject(false);
 
-    // Add the actor's data to context.data for easier access, as well as flags.
     context.system = actorData.system;
-    context.flags = actorData.flags;
-
-    // Adding a pointer to CONFIG.ASPECTSOFPOWER
+    context.flags  = actorData.flags;
     context.config = CONFIG.ASPECTSOFPOWER;
+    context.items  = this.actor.items.map(i => i.toObject(false));
 
-    // Prepare character data and items.
-    if (actorData.type == 'character') {
+    if (actorData.type === 'character') {
       this._prepareItems(context);
       this._prepareCharacterData(context);
     }
-
-    // Prepare NPC data and items.
-    if (actorData.type == 'npc') {
+    if (actorData.type === 'npc') {
       this._prepareItems(context);
     }
 
-    // Enrich biography info for display
-    // Enrichment turns text like `[[/r 1d20]]` into buttons
     context.enrichedBiography = await TextEditor.enrichHTML(
       this.actor.system.biography,
       {
-        // Whether to show secret blocks in the finished html
-        secrets: this.document.isOwner,
-        // Data to fill in for inline rolls
-        rollData: this.actor.getRollData(),
-        // Relative UUID resolution
+        secrets:    this.document.isOwner,
+        rollData:   this.actor.getRollData(),
         relativeTo: this.actor,
       }
     );
-    context.rollData = context.actor.getRollData();
-    // Prepare active effects
-    context.effects = prepareActiveEffectCategories(
-      // A generator that returns all effects stored on the actor
-      // as well as any items
+    context.rollData = this.actor.getRollData();
+    context.effects  = prepareActiveEffectCategories(
       this.actor.allApplicableEffects()
     );
 
@@ -85,99 +66,91 @@ export class AspectsofPowerActorSheet extends ActorSheet {
   }
 
   /**
-   * Character-specific context modifications
-   *
+   * Character-specific context modifications.
    * @param {object} context The context object to mutate
    */
   _prepareCharacterData(context) {
-    // This is where you can enrich character-specific editor fields
-    // or setup anything else that's specific to this type
+    // Extend here for character-specific editor fields or derived data.
   }
 
   /**
-   * Organize and classify Items for Actor sheets.
-   *
+   * Organise and classify Items for the Actor sheet.
    * @param {object} context The context object to mutate
    */
   _prepareItems(context) {
-    // Initialize containers.
-    const gear = [];
+    const gear     = [];
     const features = [];
-    const skills = {
-      "Passive": [],
-      "Active": [],
-    };
+    const skills   = { Passive: [], Active: [] };
 
-    // Iterate through items, allocating to containers
-    for (let i of context.items) {
+    for (const i of context.items) {
       i.img = i.img || Item.DEFAULT_ICON;
-      // Append to gear.
       if (i.type === 'item') {
         gear.push(i);
-      }
-      // Append to features.
-      else if (i.type === 'feature') {
+      } else if (i.type === 'feature') {
         features.push(i);
-      }
-      // Append to skills.
-      else if (i.type === 'skill') {
-        if (i.system.skillType != undefined) {
+      } else if (i.type === 'skill') {
+        if (i.system.skillType !== undefined) {
           skills[i.system.skillType].push(i);
         }
       }
     }
 
-    // Assign and return
-    context.gear = gear;
+    context.gear     = gear;
     context.features = features;
-    context.skills = skills;
+    context.skills   = skills;
   }
 
   /* -------------------------------------------- */
 
   /** @override */
-  activateListeners(html) {
-    super.activateListeners(html);
-
-    // Render the item sheet for viewing/editing prior to the editable check.
-    html.on('click', '.item-edit', (ev) => {
-      const li = $(ev.currentTarget).parents('.item');
-      const item = this.actor.items.get(li.data('itemId'));
-      item.sheet.render(true);
+  _onRender(context, options) {
+    // Item sheet open — available regardless of edit state.
+    this.element.querySelectorAll('.item-edit').forEach(el => {
+      el.addEventListener('click', ev => {
+        const li   = ev.currentTarget.closest('.item');
+        const item = this.actor.items.get(li.dataset.itemId);
+        item.sheet.render(true);
+      });
     });
 
-    // -------------------------------------------------------------
-    // Everything below here is only needed if the sheet is editable
+    // Everything below requires the sheet to be editable.
     if (!this.isEditable) return;
 
     // Add Inventory Item
-    html.on('click', '.item-create', this._onItemCreate.bind(this));
+    this.element.querySelectorAll('.item-create').forEach(el => {
+      el.addEventListener('click', this._onItemCreate.bind(this));
+    });
 
     // Delete Inventory Item
-    html.on('click', '.item-delete', (ev) => {
-      const li = $(ev.currentTarget).parents('.item');
-      const item = this.actor.items.get(li.data('itemId'));
-      item.delete();
-      li.slideUp(200, () => this.render(false));
+    this.element.querySelectorAll('.item-delete').forEach(el => {
+      el.addEventListener('click', ev => {
+        const li   = ev.currentTarget.closest('.item');
+        const item = this.actor.items.get(li.dataset.itemId);
+        item.delete();
+        li.remove();
+      });
     });
 
     // Active Effect management
-    html.on('click', '.effect-control', (ev) => {
-      const row = ev.currentTarget.closest('li');
-      const document =
-        row.dataset.parentId === this.actor.id
+    this.element.querySelectorAll('.effect-control').forEach(el => {
+      el.addEventListener('click', ev => {
+        const row      = ev.currentTarget.closest('li');
+        const document = row.dataset.parentId === this.actor.id
           ? this.actor
           : this.actor.items.get(row.dataset.parentId);
-      onManageActiveEffect(ev, document);
+        onManageActiveEffect(ev, document);
+      });
     });
 
-    // Rollable abilities.
-    html.on('click', '.rollable', this._onRoll.bind(this));
+    // Rollable abilities
+    this.element.querySelectorAll('.rollable').forEach(el => {
+      el.addEventListener('click', this._onRoll.bind(this));
+    });
 
-    // Drag events for macros.
+    // Drag events for macros
     if (this.actor.isOwner) {
-      let handler = (ev) => this._onDragStart(ev);
-      html.find('li.item').each((i, li) => {
+      const handler = ev => this._onDragStart(ev);
+      this.element.querySelectorAll('li.item').forEach(li => {
         if (li.classList.contains('inventory-header')) return;
         li.setAttribute('draggable', true);
         li.addEventListener('dragstart', handler, false);
@@ -186,30 +159,23 @@ export class AspectsofPowerActorSheet extends ActorSheet {
   }
 
   /**
-   * Handle creating a new Owned Item for the actor using initial data defined in the HTML dataset
+   * Handle creating a new Owned Item for the actor.
    * @param {Event} event   The originating click event
    * @private
    */
   async _onItemCreate(event) {
     event.preventDefault();
     const header = event.currentTarget;
-    // Get the type of item to create.
-    const type = header.dataset.type;
-    // Grab any data associated with this control.
-    const data = foundry.utils.deepClone(header.dataset);
-    // Initialize a default name.
-    const name = `New ${type.charAt(0).toUpperCase() + type.slice(1)}`;
-    // Prepare the item object.
+    const type   = header.dataset.type;
+    const data   = foundry.utils.deepClone(header.dataset);
+    const name   = `New ${type.charAt(0).toUpperCase() + type.slice(1)}`;
     const itemData = {
-      name: name,
-      type: type,
+      name,
+      type,
       system: data,
     };
-    // Remove the type from the dataset since it's in the itemData.type prop.
     delete itemData.system['type'];
-
-    // Finally, create the item!
-    return await Item.create(itemData, { parent: this.actor });
+    return Item.create(itemData, { parent: this.actor });
   }
 
   /**
@@ -222,22 +188,18 @@ export class AspectsofPowerActorSheet extends ActorSheet {
     const element = event.currentTarget;
     const dataset = element.dataset;
 
-    // Handle item rolls.
-    if (dataset.rollType) {
-      if (dataset.rollType == 'item') {
-        const itemId = element.closest('.item').dataset.itemId;
-        const item = this.actor.items.get(itemId);
-        if (item) return item.roll();
-      }
+    if (dataset.rollType === 'item') {
+      const itemId = element.closest('.item').dataset.itemId;
+      const item   = this.actor.items.get(itemId);
+      if (item) return item.roll();
     }
 
-    // Handle rolls that supply the formula directly.
     if (dataset.roll) {
-      let label = dataset.label ? `[ability] ${dataset.label}` : '';
-      let roll = new Roll(dataset.roll, this.actor.getRollData());
+      const label = dataset.label ? `[ability] ${dataset.label}` : '';
+      const roll  = new Roll(dataset.roll, this.actor.getRollData());
       roll.toMessage({
-        speaker: ChatMessage.getSpeaker({ actor: this.actor }),
-        flavor: label,
+        speaker:  ChatMessage.getSpeaker({ actor: this.actor }),
+        flavor:   label,
         rollMode: game.settings.get('core', 'rollMode'),
       });
       return roll;

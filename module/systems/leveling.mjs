@@ -374,37 +374,34 @@ export class LevelingSystem {
       <div class="level-up-dialog">
         <h3>Level Up: ${actor.name}</h3>
         <p>You have <strong>${points}</strong> free points to allocate.</p>
-        <p>Use the character sheet to manually distribute these points, or choose an allocation method:</p>
-        <div class="allocation-buttons" style="margin-top: 15px;">
-          <button type="button" class="allocate-random" style="margin-right: 10px;">Allocate Randomly</button>
-          <button type="button" class="save-for-later">Save for Later</button>
-        </div>
+        <p>Use the character sheet to manually distribute these points, or choose an allocation method below.</p>
       </div>
     `;
-    
-    const dialog = new Dialog({
-      title: "Level Up",
+
+    new foundry.applications.api.DialogV2({
+      window: { title: "Level Up" },
       content: content,
-      buttons: {
-        close: {
-          label: "Close",
-          callback: () => {}
+      buttons: [
+        {
+          action: "random",
+          label: "Allocate Randomly",
+          callback: async () => {
+            await this._allocatePointsRandomly(actor, points);
+          }
+        },
+        {
+          action: "save",
+          label: "Save for Later",
+          callback: () => {
+            ui.notifications.info(`${points} points saved for later allocation.`);
+          }
+        },
+        {
+          action: "close",
+          label: "Close"
         }
-      },
-      render: (html) => {
-        html.find('.allocate-random').click(async () => {
-          await this._allocatePointsRandomly(actor, points);
-          dialog.close();
-        });
-        
-        html.find('.save-for-later').click(() => {
-          ui.notifications.info(`${points} points saved for later allocation.`);
-          dialog.close();
-        });
-      }
-    });
-    
-    dialog.render(true);
+      ]
+    }).render(true);
   }
 
   /**

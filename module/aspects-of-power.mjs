@@ -4,6 +4,12 @@ import { AspectsofPowerItem } from './documents/item.mjs';
 // Import sheet classes.
 import { AspectsofPowerActorSheet } from './sheets/actor-sheet.mjs';
 import { AspectsofPowerItemSheet } from './sheets/item-sheet.mjs';
+// Import data models.
+import { CharacterData } from './data/actor-character.mjs';
+import { NpcData } from './data/actor-npc.mjs';
+import { ItemItemData } from './data/item-item.mjs';
+import { FeatureData } from './data/item-feature.mjs';
+import { SkillData } from './data/item-skill.mjs';
 // Import helper/utility classes and constants.
 import { preloadHandlebarsTemplates } from './helpers/templates.mjs';
 import { ASPECTSOFPOWER } from './helpers/config.mjs';
@@ -36,6 +42,17 @@ Hooks.once('init', function () {
   // Define custom Document classes
   CONFIG.Actor.documentClass = AspectsofPowerActor;
   CONFIG.Item.documentClass = AspectsofPowerItem;
+
+  // Register TypeDataModel classes — these replace template.json schema definitions
+  CONFIG.Actor.dataModels = {
+    character: CharacterData,
+    npc:       NpcData,
+  };
+  CONFIG.Item.dataModels = {
+    item:    ItemItemData,
+    feature: FeatureData,
+    skill:   SkillData,
+  };
 
   // Register sheet application classes
   Actors.unregisterSheet('core', ActorSheet);
