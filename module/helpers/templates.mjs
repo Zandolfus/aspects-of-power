@@ -4,7 +4,7 @@
  * @return {Promise}
  */
 export const preloadHandlebarsTemplates = async function () {
-  return loadTemplates([
+  return foundry.applications.handlebars.loadTemplates([
     // Actor partials.
     'systems/aspects-of-power/templates/actor/parts/actor-features.hbs',
     'systems/aspects-of-power/templates/actor/parts/actor-items.hbs',
