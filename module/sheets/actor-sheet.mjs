@@ -108,6 +108,8 @@ export class AspectsofPowerActorSheet extends foundry.applications.api.Handlebar
 
   /** @override */
   _onRender(context, options) {
+    super._onRender(context, options);
+
     // Item sheet open — available regardless of edit state.
     this.element.querySelectorAll('.item-edit').forEach(el => {
       el.addEventListener('click', ev => {

@@ -64,6 +64,8 @@ export class AspectsofPowerItemSheet extends foundry.applications.api.Handlebars
 
   /** @override */
   _onRender(context, options) {
+    super._onRender(context, options);
+
     if (!this.isEditable) return;
 
     this.element.querySelectorAll('.effect-control').forEach(el => {
