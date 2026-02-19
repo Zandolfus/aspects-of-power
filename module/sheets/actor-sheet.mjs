@@ -13,7 +13,7 @@ export class AspectsofPowerActorSheet extends foundry.applications.api.Handlebar
 
   static DEFAULT_OPTIONS = {
     classes: ['aspects-of-power', 'sheet', 'actor'],
-    position: { width: 800, height: 600 },
+    position: { width: 800, height: 800 },
     window: { resizable: true },
     form: { submitOnChange: true },
     tabs: [{ navSelector: '.sheet-tabs', contentSelector: '.sheet-body', initial: 'features' }],

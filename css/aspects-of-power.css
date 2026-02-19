@@ -234,8 +234,6 @@
   flex-wrap: wrap;
   justify-content: flex-start;
   margin-bottom: 10px;
-  max-height: 220px;
-  overflow-y: auto;
 }
 .aspects-of-power .sheet-header .profile-img {
   flex: 0 0 100px;

@@ -114,16 +114,14 @@ export class AspectsofPowerActor extends Actor {
    */
   _getCharacterRollData(data) {
     if (this.type !== 'character') return;
-    // var dice = "3d6";
-    // console.log("Dice value:", dice);
-    // var diceBonus = 1;
-    // console.log("Multiplier value:", diceBonus);
-    // var abilities = "strength";
-    // console.log("abilities value:", abilities);
+
     // Copy the ability scores to the top level, so that rolls can use
     // formulas like `@str.mod + 4`.
     if (data.abilities) {
       for (let [k, v] of Object.entries(data.abilities)) {
+        // ability.mod is derived in prepareDerivedData() and lives only on the
+        // live system instance — toObject() strips it. Restore it here.
+        v.mod = this.system.abilities[k]?.mod ?? 0;
         data[k] = foundry.utils.deepClone(v);
       }
     }
