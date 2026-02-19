@@ -67,8 +67,6 @@ export class AspectsofPowerActorSheet extends ActorSheet {
       {
         // Whether to show secret blocks in the finished html
         secrets: this.document.isOwner,
-        // Necessary in v11, can be removed in v12
-        async: true,
         // Data to fill in for inline rolls
         rollData: this.actor.getRollData(),
         // Relative UUID resolution
@@ -198,9 +196,9 @@ export class AspectsofPowerActorSheet extends ActorSheet {
     // Get the type of item to create.
     const type = header.dataset.type;
     // Grab any data associated with this control.
-    const data = duplicate(header.dataset);
+    const data = foundry.utils.deepClone(header.dataset);
     // Initialize a default name.
-    const name = `New ${type.capitalize()}`;
+    const name = `New ${type.charAt(0).toUpperCase() + type.slice(1)}`;
     // Prepare the item object.
     const itemData = {
       name: name,

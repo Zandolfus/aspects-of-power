@@ -30,8 +30,8 @@
   ],
   "version": "2.0.0",
   "compatibility": {
-    "minimum": 11,
-    "verified": "11.315"
+    "minimum": 12,
+    "verified": "13.341"
   },
   "esmodules": [
     "module/aspects-of-power.mjs"

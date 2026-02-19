@@ -37,11 +37,6 @@ Hooks.once('init', function () {
   CONFIG.Actor.documentClass = AspectsofPowerActor;
   CONFIG.Item.documentClass = AspectsofPowerItem;
 
-  // Active Effects are never copied to the Actor,
-  // but will still apply to the Actor from within the Item
-  // if the transfer property on the Active Effect is true.
-  CONFIG.ActiveEffect.legacyTransferral = false;
-
   // Register sheet application classes
   Actors.unregisterSheet('core', ActorSheet);
   Actors.registerSheet('aspects-of-power', AspectsofPowerActorSheet, {
