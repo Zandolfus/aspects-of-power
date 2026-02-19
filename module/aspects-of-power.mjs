@@ -55,13 +55,11 @@ Hooks.once('init', function () {
   };
 
   // Register sheet application classes
-  Actors.unregisterSheet('core', ActorSheet);
-  Actors.registerSheet('aspects-of-power', AspectsofPowerActorSheet, {
+  foundry.documents.collections.Actors.registerSheet('aspects-of-power', AspectsofPowerActorSheet, {
     makeDefault: true,
     label: 'ASPECTSOFPOWER.SheetLabels.Actor',
   });
-  Items.unregisterSheet('core', ItemSheet);
-  Items.registerSheet('aspects-of-power', AspectsofPowerItemSheet, {
+  foundry.documents.collections.Items.registerSheet('aspects-of-power', AspectsofPowerItemSheet, {
     makeDefault: true,
     label: 'ASPECTSOFPOWER.SheetLabels.Item',
   });
