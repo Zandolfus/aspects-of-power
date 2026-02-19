@@ -110,6 +110,12 @@ export class AspectsofPowerActorSheet extends foundry.applications.api.Handlebar
   _onRender(context, options) {
     super._onRender(context, options);
 
+    // AppV2 stores DEFAULT_OPTIONS.tabs config but never instantiates the Tabs
+    // widget — bind it manually on every render (PART HTML is replaced each time).
+    const initial = this.actor.type === 'npc' ? 'description' : 'features';
+    new Tabs({ navSelector: '.sheet-tabs', contentSelector: '.sheet-body', initial })
+      .bind(this.element);
+
     // Item sheet open — available regardless of edit state.
     this.element.querySelectorAll('.item-edit').forEach(el => {
       el.addEventListener('click', ev => {
