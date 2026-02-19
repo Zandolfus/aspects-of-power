@@ -38,6 +38,7 @@ export class AspectsofPowerActorSheet extends foundry.applications.api.Handlebar
     const context = await super._prepareContext(options);
     const actorData = this.document.toObject(false);
 
+    context.actor  = this.actor;
     context.system = this.actor.system; // live instance preserves derived fields (e.g. ability.mod)
     context.flags  = actorData.flags;
     context.config = CONFIG.ASPECTSOFPOWER;

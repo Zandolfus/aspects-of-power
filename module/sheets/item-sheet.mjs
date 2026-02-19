@@ -42,6 +42,7 @@ export class AspectsofPowerItemSheet extends foundry.applications.api.Handlebars
 
     const itemData = this.document.toObject(false);
 
+    context.item = this.item;
     context.enrichedDescription = await foundry.applications.ux.TextEditor.implementation.enrichHTML(
       this.item.system.description,
       {
@@ -51,7 +52,7 @@ export class AspectsofPowerItemSheet extends foundry.applications.api.Handlebars
       }
     );
 
-    context.system  = itemData.system;
+    context.system  = this.item.system;
     context.flags   = itemData.flags;
     context.config  = CONFIG.ASPECTSOFPOWER;
     context.effects = prepareActiveEffectCategories(this.item.effects);
