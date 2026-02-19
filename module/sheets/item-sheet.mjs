@@ -42,7 +42,7 @@ export class AspectsofPowerItemSheet extends foundry.applications.api.Handlebars
 
     const itemData = this.document.toObject(false);
 
-    context.enrichedDescription = await TextEditor.enrichHTML(
+    context.enrichedDescription = await foundry.applications.ux.TextEditor.implementation.enrichHTML(
       this.item.system.description,
       {
         secrets:    this.document.isOwner,
