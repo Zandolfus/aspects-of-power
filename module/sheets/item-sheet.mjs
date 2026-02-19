@@ -7,7 +7,9 @@ import {
  * Extend ItemSheetV2 with Aspects of Power-specific behaviour.
  * @extends {foundry.applications.sheets.ItemSheetV2}
  */
-export class AspectsofPowerItemSheet extends foundry.applications.sheets.ItemSheetV2 {
+export class AspectsofPowerItemSheet extends foundry.applications.api.HandlebarsApplicationMixin(
+  foundry.applications.sheets.ItemSheetV2
+) {
 
   static DEFAULT_OPTIONS = {
     classes: ['aspects-of-power', 'sheet', 'item'],

@@ -7,7 +7,9 @@ import {
  * Extend ActorSheetV2 with Aspects of Power-specific behaviour.
  * @extends {foundry.applications.sheets.ActorSheetV2}
  */
-export class AspectsofPowerActorSheet extends foundry.applications.sheets.ActorSheetV2 {
+export class AspectsofPowerActorSheet extends foundry.applications.api.HandlebarsApplicationMixin(
+  foundry.applications.sheets.ActorSheetV2
+) {
 
   static DEFAULT_OPTIONS = {
     classes: ['aspects-of-power', 'sheet', 'actor'],
