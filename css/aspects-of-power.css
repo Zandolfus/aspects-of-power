@@ -207,6 +207,25 @@
 .aspects-of-power .item-form {
   font-family: "Roboto", sans-serif;
 }
+/* AppV2: window-content must be a flex column so the application-part section can grow */
+.aspects-of-power .window-content {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+/* AppV2: HandlebarsApplicationMixin wraps each PART in a section[data-application-part].
+   It must fill window-content and itself be a flex column for the form inside to expand. */
+.aspects-of-power [data-application-part] {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+/* The form fills its application-part wrapper (flexcol already sets display:flex direction:column) */
+.aspects-of-power form {
+  flex: 1;
+  min-height: 0;
+}
 .aspects-of-power .sheet-header {
   flex: 0 auto;
   overflow: hidden;
