@@ -238,7 +238,11 @@
 .aspects-of-power .sheet-tabs {
   flex: 0;
 }
-.aspects-of-power .sheet-body,
+.aspects-of-power .sheet-body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+}
 .aspects-of-power .sheet-body .tab,
 .aspects-of-power .sheet-body .tab .editor {
   height: 100%;
