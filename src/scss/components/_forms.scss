@@ -44,7 +44,11 @@
   overflow-y: auto;
 }
 
-.sheet-body .tab,
+.sheet-body .tab {
+  height: 100%;
+  overflow-y: auto;
+}
+
 .sheet-body .tab .editor {
   height: 100%;
 }

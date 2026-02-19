@@ -243,7 +243,10 @@
   min-height: 0;
   overflow-y: auto;
 }
-.aspects-of-power .sheet-body .tab,
+.aspects-of-power .sheet-body .tab {
+  height: 100%;
+  overflow-y: auto;
+}
 .aspects-of-power .sheet-body .tab .editor {
   height: 100%;
 }
