@@ -112,9 +112,17 @@ export class AspectsofPowerActorSheet extends foundry.applications.api.Handlebar
 
     // AppV2 stores DEFAULT_OPTIONS.tabs config but never instantiates the Tabs
     // widget — bind it manually on every render (PART HTML is replaced each time).
-    const initial = this.actor.type === 'npc' ? 'description' : 'features';
+    // Restore the last active tab from tabGroups so submitOnChange re-renders
+    // don't reset the user back to the default tab.
+    const defaultTab = this.actor.type === 'npc' ? 'description' : 'features';
+    const initial = this.tabGroups.primary ?? defaultTab;
     new foundry.applications.ux.Tabs({ navSelector: '.sheet-tabs', contentSelector: '.sheet-body', initial })
       .bind(this.element);
+
+    // Keep tabGroups in sync when the user clicks a tab.
+    this.element.querySelectorAll('.sheet-tabs .item').forEach(el => {
+      el.addEventListener('click', () => { this.tabGroups.primary = el.dataset.tab; });
+    });
 
     // Item sheet open — available regardless of edit state.
     this.element.querySelectorAll('.item-edit').forEach(el => {

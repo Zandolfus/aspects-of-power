@@ -67,8 +67,17 @@ export class AspectsofPowerItemSheet extends foundry.applications.api.Handlebars
     super._onRender(context, options);
 
     // AppV2 doesn't auto-instantiate Tabs — bind manually on every render.
-    new foundry.applications.ux.Tabs({ navSelector: '.sheet-tabs', contentSelector: '.sheet-body', initial: 'description' })
+    // Use tabGroups.primary to restore the active tab after re-renders caused
+    // by submitOnChange, so the user isn't kicked back to 'description' after
+    // every keystroke on the Damage tab.
+    const initial = this.tabGroups.primary ?? 'description';
+    new foundry.applications.ux.Tabs({ navSelector: '.sheet-tabs', contentSelector: '.sheet-body', initial })
       .bind(this.element);
+
+    // Keep tabGroups in sync when the user clicks a tab.
+    this.element.querySelectorAll('.sheet-tabs .item').forEach(el => {
+      el.addEventListener('click', () => { this.tabGroups.primary = el.dataset.tab; });
+    });
 
     if (!this.isEditable) return;
 
