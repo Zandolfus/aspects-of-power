@@ -171,7 +171,7 @@ export class AspectsofPowerActorSheet extends foundry.applications.api.Handlebar
         btn.style.display = 'none';
         const fieldName  = contentEl.dataset.target ?? contentEl.dataset.fieldName ?? 'system.biography';
         const rawContent = foundry.utils.getProperty(this.document.toObject(), fieldName) ?? '';
-        await ProseMirrorEditor.create(contentEl, rawContent, {
+        await foundry.applications.ux.ProseMirrorEditor.create(contentEl, rawContent, {
           document:  this.document,
           fieldName: fieldName,
         });

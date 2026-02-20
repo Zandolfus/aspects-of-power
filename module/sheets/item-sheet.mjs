@@ -121,7 +121,7 @@ export class AspectsofPowerItemSheet extends foundry.applications.api.Handlebars
         btn.style.display = 'none';
         const fieldName  = contentEl.dataset.target ?? contentEl.dataset.fieldName ?? 'system.description';
         const rawContent = foundry.utils.getProperty(this.document.toObject(), fieldName) ?? '';
-        await ProseMirrorEditor.create(contentEl, rawContent, {
+        await foundry.applications.ux.ProseMirrorEditor.create(contentEl, rawContent, {
           document:  this.document,
           fieldName: fieldName,
         });
