@@ -44,6 +44,7 @@ export class AspectsofPowerItemSheet extends foundry.applications.api.Handlebars
 
     context.item     = this.item;
     context.editable = this.isEditable;
+    context.cssClass = this.isEditable ? 'editable' : 'locked';
     context.enrichedDescription = await foundry.applications.ux.TextEditor.implementation.enrichHTML(
       this.item.system.description,
       {
