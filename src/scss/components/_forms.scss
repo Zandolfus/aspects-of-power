@@ -72,23 +72,34 @@ form {
   flex: 1;
   min-height: 0;
   overflow-y: auto;
+
+  // Tabs containing an editor become a flex column so the editor fills them.
+  &:has(.editor) {
+    display: flex !important;
+    flex-direction: column !important;
+    overflow: hidden !important;
+  }
 }
 
 .sheet-body .tab .editor {
-  display: flex;
-  flex-direction: column;
-  min-height: 400px;
+  flex: 1 !important;
+  min-height: 0 !important;
+  display: flex !important;
+  flex-direction: column !important;
 
   .editor-menu {
-    flex: 0 0 auto;
+    flex: 0 0 auto !important;
   }
 
   .editor-content {
-    flex: 1;
-    min-height: 350px;
+    flex: 1 !important;
+    min-height: 0 !important;
+    overflow-y: auto !important;
+    display: block !important;
 
     .ProseMirror {
-      min-height: 350px;
+      min-height: 200px !important;
+      display: block !important;
       outline: none;
       padding: 4px 8px;
     }

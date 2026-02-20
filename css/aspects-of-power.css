@@ -268,26 +268,34 @@
   min-height: 0;
   overflow-y: auto;
 }
+/* Tabs that contain an editor need to be a flex column so the editor can fill them. */
+.aspects-of-power .sheet-body .tab:has(.editor) {
+  display: flex !important;
+  flex-direction: column !important;
+  overflow: hidden !important;
+}
+/* Editor grows to fill the tab. */
 .aspects-of-power .sheet-body .tab .editor {
-  display: flex;
-  flex-direction: column;
-  min-height: 400px;
+  flex: 1 !important;
+  min-height: 0 !important;
+  display: flex !important;
+  flex-direction: column !important;
 }
+/* Toolbar stays at its natural height. */
 .aspects-of-power .sheet-body .tab .editor .editor-menu {
-  flex: 0 0 auto;
+  flex: 0 0 auto !important;
 }
+/* Content area fills the rest and scrolls. */
 .aspects-of-power .sheet-body .tab .editor .editor-content {
   flex: 1 !important;
-  min-height: 350px !important;
-  height: auto !important;
+  min-height: 0 !important;
+  overflow-y: auto !important;
   display: block !important;
-  visibility: visible !important;
-  overflow: visible !important;
 }
+/* Editable div fills the content area. */
 .aspects-of-power .sheet-body .tab .editor .editor-content .ProseMirror {
-  min-height: 350px !important;
+  min-height: 200px !important;
   display: block !important;
-  visibility: visible !important;
   outline: none;
   padding: 4px 8px;
 }
