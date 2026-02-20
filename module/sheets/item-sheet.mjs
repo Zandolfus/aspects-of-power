@@ -121,9 +121,32 @@ export class AspectsofPowerItemSheet extends foundry.applications.api.Handlebars
         btn.style.display = 'none';
         const fieldName  = contentEl.dataset.target ?? contentEl.dataset.fieldName ?? 'system.description';
         const rawContent = foundry.utils.getProperty(this.document.toObject(), fieldName) ?? '';
-        await foundry.applications.ux.ProseMirrorEditor.create(contentEl, rawContent, {
-          document:  this.document,
-          fieldName: fieldName,
+
+        const tab = wrapper.closest('.tab');
+        console.log('[AoP Editor DEBUG] Before create:', {
+          tabH:     tab?.getBoundingClientRect().height,
+          wrapperH: wrapper.getBoundingClientRect().height,
+          wrapperClasses: wrapper.className,
+          contentElH: contentEl.getBoundingClientRect().height,
+          contentElDisplay: getComputedStyle(contentEl).display,
+        });
+
+        try {
+          await foundry.applications.ux.ProseMirrorEditor.create(contentEl, rawContent, {
+            document:  this.document,
+            fieldName: fieldName,
+          });
+        } catch (err) {
+          console.error('[AoP Editor DEBUG] ProseMirrorEditor.create failed:', err);
+          return;
+        }
+
+        const pm = contentEl.querySelector('.ProseMirror');
+        console.log('[AoP Editor DEBUG] After create:', {
+          contentElH: contentEl.getBoundingClientRect().height,
+          pmEl:     pm,
+          pmH:      pm?.getBoundingClientRect().height,
+          pmDisplay: pm ? getComputedStyle(pm).display : 'n/a',
         });
       });
     });
