@@ -106,6 +106,29 @@ export class AspectsofPowerActorSheet extends foundry.applications.api.Handlebar
 
   /* -------------------------------------------- */
 
+  /**
+   * Intercept form changes so that numeric fields are rounded and saved
+   * immediately via a targeted document.update() call, bypassing the
+   * full-form submit that can drop changes on fast re-renders.
+   * @override
+   */
+  async _onChangeForm(formConfig, event) {
+    const input = event.target;
+    if (!input?.name) return super._onChangeForm(formConfig, event);
+
+    if (input.type === 'number') {
+      const raw = Number(input.value);
+      if (!isNaN(raw) && isFinite(raw)) {
+        await this.document.update({ [input.name]: Math.round(raw) });
+        return;
+      }
+    }
+
+    return super._onChangeForm(formConfig, event);
+  }
+
+  /* -------------------------------------------- */
+
   /** @override */
   _onRender(context, options) {
     super._onRender(context, options);
