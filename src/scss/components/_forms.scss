@@ -72,44 +72,25 @@ form {
   flex: 1;
   min-height: 0;
   overflow-y: auto;
-
-  // Tabs with an editor become flex columns so the editor can fill them.
-  // !important overrides any inline display:block set by Foundry's Tabs widget.
-  &:has(.editor) {
-    display: flex !important;
-    flex-direction: column;
-    overflow: hidden;
-  }
 }
 
+// Height for .editor-container is set by JS after ProseMirrorEditor.create()
+// because the flex chain cannot propagate a definite height into nested flex children.
 .sheet-body .tab .editor {
-  flex: 1;
-  min-height: 0;
   display: flex;
   flex-direction: column;
+  height: 100%;
 
-  // Toolbar sits at the top.
   .editor-menu {
     flex: 0 0 auto;
   }
 
-  // Pre-activation: enriched HTML view.
   .editor-content {
     flex: 1;
-    min-height: 0;
     overflow-y: auto;
   }
 
-  // Post-activation: ProseMirrorEditor wraps .editor-content in .editor-container.
-  .editor-container {
-    flex: 1;
-    min-height: 0;
-    overflow-y: auto;
-  }
-
-  // The editable div (.editor-content that gains the .ProseMirror class).
   .ProseMirror {
-    min-height: 100%;
     outline: none;
     padding: 4px 8px;
   }
