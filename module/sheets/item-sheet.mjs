@@ -62,6 +62,28 @@ export class AspectsofPowerItemSheet extends foundry.applications.api.Handlebars
 
   /* -------------------------------------------- */
 
+  /**
+   * For skill items, consolidate individual system.roll.* keys into a single
+   * system.roll object so the update replaces any null parent rather than
+   * trying to write into null (which silently fails for items created before
+   * the roll SchemaField was added).
+   * @override
+   */
+  async _processSubmitData(event, form, submitData) {
+    if (this.item.type === 'skill') {
+      const rollData = {};
+      const prefix = 'system.roll.';
+      for (const key of Object.keys(submitData)) {
+        if (key.startsWith(prefix)) {
+          rollData[key.slice(prefix.length)] = submitData[key];
+          delete submitData[key];
+        }
+      }
+      if (Object.keys(rollData).length) submitData['system.roll'] = rollData;
+    }
+    return super._processSubmitData(event, form, submitData);
+  }
+
   /** @override */
   _onRender(context, options) {
     super._onRender(context, options);

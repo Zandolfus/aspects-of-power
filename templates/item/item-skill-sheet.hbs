@@ -54,11 +54,11 @@
 
           <div class='grid-span-1'>
             <label class='resource-label'>Multiplier</label>
-            <input type='text' name='system.roll.diceBonus' value='{{system.roll.diceBonus}}' data-dtype='Number' />
+            <input type='number' name='system.roll.diceBonus' value='{{system.roll.diceBonus}}' min='0' step='0.01' />
           </div>
           <div class='grid-span-1'>
               <label class='resource-label'>Resource</label>
-              <select name='system.roll.resource' data-dtype='String'>
+              <select name='system.roll.resource'>
                 <option value="mana" {{#if (eq system.roll.resource "mana")}}selected{{/if}}>Mana</option>
                 <option value="stamina" {{#if (eq system.roll.resource "stamina")}}selected{{/if}}>Stamina</option>
                 <option value="health" {{#if (eq system.roll.resource "health")}}selected{{/if}}>Health</option>
@@ -66,7 +66,7 @@
           </div>
           <div class='grid-span-1'>
             <label class='resource-label'>Cost</label>
-            <input type='text' name='system.roll.cost' value='{{system.roll.cost}}' data-dtype='Number' />
+            <input type='number' name='system.roll.cost' value='{{system.roll.cost}}' min='0' step='1' />
           </div>
           <div class='grid-span-1'>
             <label class='resource-label'>Skill Type</label>
