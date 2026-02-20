@@ -132,9 +132,9 @@ Hooks.on('renderChatMessageHTML', (message, html) => {
     btn.addEventListener('click', async () => {
       if (!game.user.isGM) return;
 
-      const actorId = btn.dataset.actorId;
-      const damage  = parseInt(btn.dataset.damage, 10);
-      const target  = game.actors.get(actorId);
+      const actorUuid = btn.dataset.actorUuid;
+      const damage    = parseInt(btn.dataset.damage, 10);
+      const target    = await fromUuid(actorUuid);
       if (!target || isNaN(damage)) return;
 
       const health    = target.system.health;

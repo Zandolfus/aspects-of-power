@@ -147,8 +147,9 @@ export class AspectsofPowerItem extends Item {
       const finalDamage  = isHit ? Math.max(0, dmgRoll.total - mitigation - toughnessMod) : 0;
       const mitigLabel   = isPhysical ? 'Armor' : 'Veil';
 
-      // Public message — shows the attack roll result but no target info.
-      await hitRoll.toMessage({ speaker, rollMode, flavor: label });
+      // Public messages: roll results only, no target information.
+      await hitRoll.toMessage({ speaker, rollMode, flavor: `${label} — Attack` });
+      await dmgRoll.toMessage({ speaker, rollMode, flavor: `${label} — Damage` });
 
       // GM-only whisper — full combat resolution with apply-damage button.
       const resultBadge = isHit
@@ -164,7 +165,7 @@ export class AspectsofPowerItem extends Item {
              <p>${mitigLabel}: −${mitigation} &nbsp;&nbsp; Toughness: −${toughnessMod}</p>
              <p><strong>Final damage: ${finalDamage}</strong></p>
              <button class="apply-damage"
-               data-actor-id="${targetActor.id}"
+               data-actor-uuid="${targetActor.uuid}"
                data-damage="${finalDamage}"
                style="margin-top:6px;width:100%;">
                Apply ${finalDamage} to ${targetActor.name}
