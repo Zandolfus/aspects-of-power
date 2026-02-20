@@ -127,7 +127,7 @@ Hooks.on('combatTurnChange', async (combat, _prior, current) => {
  * Bind the "Apply damage" button that appears in GM-whispered combat result messages.
  * Reduces the target actor's health and posts a public notification.
  */
-Hooks.on('renderChatMessage', (message, html) => {
+Hooks.on('renderChatMessageHTML', (message, html) => {
   html.querySelectorAll('.apply-damage').forEach(btn => {
     btn.addEventListener('click', async () => {
       if (!game.user.isGM) return;
