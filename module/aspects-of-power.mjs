@@ -87,6 +87,73 @@ Hooks.once('ready', function () {
 });
 
 /* -------------------------------------------- */
+/*  Stamina Regeneration — Start of Turn        */
+/* -------------------------------------------- */
+
+/**
+ * Regenerate stamina at the start of each combatant's turn.
+ * The regen rate is stored on the actor as system.staminaRegen (percentage of max).
+ * Only the GM executes the update to avoid duplicate writes.
+ */
+Hooks.on('combatTurnChange', async (combat, _prior, current) => {
+  if (!game.user.isGM) return;
+
+  const combatant = combat.combatants.get(current.combatantId);
+  if (!combatant?.actor) return;
+
+  const actor   = combatant.actor;
+  const stamina = actor.system.stamina;
+  const regenPct = actor.system.staminaRegen ?? 5;
+  const regenAmt = Math.floor(stamina.max * (regenPct / 100));
+
+  // Already at max — nothing to do.
+  if (stamina.value >= stamina.max) return;
+
+  const newValue = Math.min(stamina.max, stamina.value + regenAmt);
+  await actor.update({ 'system.stamina.value': newValue });
+
+  // Chat message for troubleshooting — remove or whisper once stable.
+  ChatMessage.create({
+    speaker: ChatMessage.getSpeaker({ actor }),
+    content: `<p><em>${actor.name} regenerates ${newValue - stamina.value} stamina (${regenPct}% of ${stamina.max}).</em></p>`,
+  });
+});
+
+/* -------------------------------------------- */
+/*  Apply Damage Button — GM Whisper            */
+/* -------------------------------------------- */
+
+/**
+ * Bind the "Apply damage" button that appears in GM-whispered combat result messages.
+ * Reduces the target actor's health and posts a public notification.
+ */
+Hooks.on('renderChatMessage', (message, html) => {
+  html.querySelectorAll('.apply-damage').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      if (!game.user.isGM) return;
+
+      const actorId = btn.dataset.actorId;
+      const damage  = parseInt(btn.dataset.damage, 10);
+      const target  = game.actors.get(actorId);
+      if (!target || isNaN(damage)) return;
+
+      const health    = target.system.health;
+      const newHealth = Math.max(0, health.value - damage);
+      await target.update({ 'system.health.value': newHealth });
+
+      ChatMessage.create({
+        content: `<p><strong>${target.name}</strong> takes <strong>${damage}</strong> damage. `
+               + `Health: ${newHealth} / ${health.max}${newHealth === 0 ? ' — <em>Incapacitated!</em>' : ''}</p>`,
+      });
+
+      // Disable the button so it can't be double-applied.
+      btn.disabled = true;
+      btn.textContent = 'Applied';
+    });
+  });
+});
+
+/* -------------------------------------------- */
 /*  Hotbar Macros                               */
 /* -------------------------------------------- */
 

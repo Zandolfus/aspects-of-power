@@ -80,6 +80,23 @@
                 <option value="wisdom_dexterity" {{#if (eq system.roll.type "wisdom_dexterity")}}selected{{/if}}>Wisdom Dexterity</option>
               </select>
           </div>
+          <div class='grid-span-1'>
+            <label class='resource-label'>Target Defense</label>
+            <select name='system.roll.targetDefense' data-dtype='String'>
+              <option value="" {{#if (eq system.roll.targetDefense "")}}selected{{/if}}>(none)</option>
+              <option value="melee" {{#if (eq system.roll.targetDefense "melee")}}selected{{/if}}>Melee</option>
+              <option value="ranged" {{#if (eq system.roll.targetDefense "ranged")}}selected{{/if}}>Ranged</option>
+              <option value="mind" {{#if (eq system.roll.targetDefense "mind")}}selected{{/if}}>Mind</option>
+              <option value="soul" {{#if (eq system.roll.targetDefense "soul")}}selected{{/if}}>Soul</option>
+            </select>
+          </div>
+          <div class='grid-span-1'>
+            <label class='resource-label'>Damage Type</label>
+            <select name='system.roll.damageType' data-dtype='String'>
+              <option value="physical" {{#if (eq system.roll.damageType "physical")}}selected{{/if}}>Physical (Armor)</option>
+              <option value="magical" {{#if (eq system.roll.damageType "magical")}}selected{{/if}}>Magical (Veil)</option>
+            </select>
+          </div>
         </div>
       </div>
       </div>

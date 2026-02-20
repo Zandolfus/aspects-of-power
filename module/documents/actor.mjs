@@ -127,7 +127,7 @@ export class AspectsofPowerActor extends Actor {
     }
 
     // Add level for easier access, or fall back to 0.
-    if (data.attributes.level) {
+    if (data.attributes?.level) {
       data.lvl = data.attributes.level.value ?? 0;
     }
   }
@@ -138,6 +138,12 @@ export class AspectsofPowerActor extends Actor {
   _getNpcRollData(data) {
     if (this.type !== 'npc') return;
 
-    // Process additional NPC data here.
+    // Restore derived ability mods (same as characters — toObject() strips them).
+    if (data.abilities) {
+      for (let [k, v] of Object.entries(data.abilities)) {
+        v.mod = this.system.abilities[k]?.mod ?? 0;
+        data[k] = foundry.utils.deepClone(v);
+      }
+    }
   }
 }

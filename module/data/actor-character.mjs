@@ -59,6 +59,10 @@ export class CharacterData extends foundry.abstract.TypeDataModel {
         mind:   defenseSchema(),
         soul:   defenseSchema(),
       }),
+
+      // Base stamina regeneration per turn (percentage of max stamina).
+      // Active effects can modify this value via system.staminaRegen.
+      staminaRegen: new fields.NumberField({ initial: 5, min: 0 }),
     };
   }
 }

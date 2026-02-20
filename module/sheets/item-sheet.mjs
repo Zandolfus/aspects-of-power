@@ -74,12 +74,14 @@ export class AspectsofPowerItemSheet extends foundry.applications.api.Handlebars
     if (this.item.type === 'skill' && event.target?.name?.startsWith('system.roll.')) {
       const form = this.element.querySelector('form');
       const rollData = {
-        dice:      form.querySelector('[name="system.roll.dice"]')?.value ?? '',
-        abilities: form.querySelector('[name="system.roll.abilities"]')?.value ?? '',
-        resource:  form.querySelector('[name="system.roll.resource"]')?.value ?? '',
-        cost:      Number(form.querySelector('[name="system.roll.cost"]')?.value) || 0,
-        type:      form.querySelector('[name="system.roll.type"]')?.value ?? '',
-        diceBonus: Number(form.querySelector('[name="system.roll.diceBonus"]')?.value) || 1,
+        dice:          form.querySelector('[name="system.roll.dice"]')?.value ?? '',
+        abilities:     form.querySelector('[name="system.roll.abilities"]')?.value ?? '',
+        resource:      form.querySelector('[name="system.roll.resource"]')?.value ?? '',
+        cost:          Number(form.querySelector('[name="system.roll.cost"]')?.value) || 0,
+        type:          form.querySelector('[name="system.roll.type"]')?.value ?? '',
+        diceBonus:     Number(form.querySelector('[name="system.roll.diceBonus"]')?.value) || 1,
+        targetDefense: form.querySelector('[name="system.roll.targetDefense"]')?.value ?? '',
+        damageType:    form.querySelector('[name="system.roll.damageType"]')?.value ?? 'physical',
       };
       await this.document.update({ 'system.roll': rollData });
       return;
