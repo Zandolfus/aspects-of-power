@@ -268,34 +268,22 @@
   min-height: 0;
   overflow-y: auto;
 }
-/* Tabs that contain an editor need to be a flex column so the editor can fill them. */
-.aspects-of-power .sheet-body .tab:has(.editor) {
-  display: flex !important;
-  flex-direction: column !important;
-  overflow: hidden !important;
-}
-/* Editor grows to fill the tab. */
+/* Editor fills its tab (tab already has a definite height from flex chain). */
 .aspects-of-power .sheet-body .tab .editor {
-  flex: 1 !important;
-  min-height: 0 !important;
-  display: flex !important;
-  flex-direction: column !important;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
 }
-/* Toolbar stays at its natural height. */
 .aspects-of-power .sheet-body .tab .editor .editor-menu {
-  flex: 0 0 auto !important;
+  flex: 0 0 auto;
 }
-/* Content area fills the rest and scrolls. */
 .aspects-of-power .sheet-body .tab .editor .editor-content {
-  flex: 1 !important;
-  min-height: 0 !important;
-  overflow-y: auto !important;
-  display: block !important;
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
 }
-/* Editable div fills the content area. */
 .aspects-of-power .sheet-body .tab .editor .editor-content .ProseMirror {
-  min-height: 200px !important;
-  display: block !important;
+  min-height: 100%;
   outline: none;
   padding: 4px 8px;
 }
