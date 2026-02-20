@@ -277,11 +277,17 @@
   flex: 0 0 auto;
 }
 .aspects-of-power .sheet-body .tab .editor .editor-content {
-  flex: 1;
-  min-height: 350px;
+  flex: 1 !important;
+  min-height: 350px !important;
+  height: auto !important;
+  display: block !important;
+  visibility: visible !important;
+  overflow: visible !important;
 }
 .aspects-of-power .sheet-body .tab .editor .editor-content .ProseMirror {
-  min-height: 350px;
+  min-height: 350px !important;
+  display: block !important;
+  visibility: visible !important;
   outline: none;
   padding: 4px 8px;
 }
