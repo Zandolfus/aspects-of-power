@@ -66,6 +66,10 @@ export class AspectsofPowerItemSheet extends foundry.applications.api.Handlebars
   _onRender(context, options) {
     super._onRender(context, options);
 
+    // AppV2 doesn't auto-instantiate Tabs — bind manually on every render.
+    new foundry.applications.ux.Tabs({ navSelector: '.sheet-tabs', contentSelector: '.sheet-body', initial: 'description' })
+      .bind(this.element);
+
     if (!this.isEditable) return;
 
     this.element.querySelectorAll('.effect-control').forEach(el => {
