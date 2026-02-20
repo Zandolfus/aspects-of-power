@@ -16,7 +16,7 @@ export class SkillData extends foundry.abstract.TypeDataModel {
         cost:      new fields.NumberField({ initial: 0, integer: true }),
         type:      new fields.StringField({ initial: '' }),
         diceBonus: new fields.NumberField({ initial: 1 }),
-      }, { nullable: true, initial: null }),
+      }),
     };
   }
 }

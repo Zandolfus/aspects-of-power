@@ -60,15 +60,6 @@ export class AspectsofPowerItem extends Item {
         content: item.system.description ?? '',
       });
     }
-    // No roll config stored (schema field missing or stripped by migration).
-    else if (!rollData.roll) {
-      ChatMessage.create({
-        speaker: speaker,
-        rollMode: rollMode,
-        flavor: label,
-        content: item.system.description ?? '',
-      });
-    }
     else if(!rollData.roll.dice) {
       ChatMessage.create({
         speaker: speaker,
