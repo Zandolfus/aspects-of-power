@@ -147,6 +147,10 @@ export class AspectsofPowerItem extends Item {
       const finalDamage  = isHit ? Math.max(0, Math.round(dmgRoll.total - mitigation - toughnessMod)) : 0;
       const mitigLabel   = isPhysical ? 'Armor' : 'Veil';
 
+      // Public rolls — players see the dice results but no target details.
+      await hitRoll.toMessage({ speaker, rollMode, flavor: `${label} — Attack` });
+      await dmgRoll.toMessage({ speaker, rollMode, flavor: `${label} — Damage` });
+
       // Build GM-only content (all numbers already rounded above).
       const resultBadge = isHit
         ? `<strong style="color:green;">HIT</strong>`
