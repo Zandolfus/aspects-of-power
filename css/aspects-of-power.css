@@ -270,6 +270,21 @@
 }
 .aspects-of-power .sheet-body .tab .editor {
   height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+.aspects-of-power .sheet-body .tab .editor .editor-menu {
+  flex: 0 0 auto;
+}
+.aspects-of-power .sheet-body .tab .editor .editor-content {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+}
+.aspects-of-power .sheet-body .tab .editor .editor-content .ProseMirror {
+  min-height: 100%;
+  outline: none;
+  padding: 4px 8px;
 }
 .aspects-of-power .tox .tox-editor-container {
   background: #fff;
