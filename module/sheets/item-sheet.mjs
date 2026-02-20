@@ -122,36 +122,9 @@ export class AspectsofPowerItemSheet extends foundry.applications.api.Handlebars
         const fieldName  = contentEl.dataset.target ?? contentEl.dataset.fieldName ?? 'system.description';
         const rawContent = foundry.utils.getProperty(this.document.toObject(), fieldName) ?? '';
 
-        const tab = wrapper.closest('.tab');
-        console.log('[AoP Editor DEBUG] Before create:', {
-          tabH:     tab?.getBoundingClientRect().height,
-          wrapperH: wrapper.getBoundingClientRect().height,
-          wrapperClasses: wrapper.className,
-          contentElH: contentEl.getBoundingClientRect().height,
-          contentElDisplay: getComputedStyle(contentEl).display,
-        });
-
-        try {
-          await foundry.applications.ux.ProseMirrorEditor.create(contentEl, rawContent, {
-            document:  this.document,
-            fieldName: fieldName,
-          });
-        } catch (err) {
-          console.error('[AoP Editor DEBUG] ProseMirrorEditor.create failed:', err);
-          return;
-        }
-
-        // Check where ProseMirror actually landed
-        const pmInContent = contentEl.querySelector('.ProseMirror');
-        const pmInWrapper = wrapper.querySelector('.ProseMirror');
-        const pmAnywhere  = document.querySelector('.ProseMirror');
-        console.log('[AoP Editor DEBUG] After create:', {
-          contentElH:       contentEl.getBoundingClientRect().height,
-          contentElHTML:    contentEl.innerHTML.slice(0, 300),
-          wrapperChildTags: Array.from(wrapper.children).map(c => c.tagName + '.' + c.className),
-          pmInContent,
-          pmInWrapper,
-          pmAnywhereH: pmAnywhere?.getBoundingClientRect().height,
+        await foundry.applications.ux.ProseMirrorEditor.create(contentEl, rawContent, {
+          document:  this.document,
+          fieldName: fieldName,
         });
       });
     });
