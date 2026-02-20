@@ -141,12 +141,17 @@ export class AspectsofPowerItemSheet extends foundry.applications.api.Handlebars
           return;
         }
 
-        const pm = contentEl.querySelector('.ProseMirror');
+        // Check where ProseMirror actually landed
+        const pmInContent = contentEl.querySelector('.ProseMirror');
+        const pmInWrapper = wrapper.querySelector('.ProseMirror');
+        const pmAnywhere  = document.querySelector('.ProseMirror');
         console.log('[AoP Editor DEBUG] After create:', {
-          contentElH: contentEl.getBoundingClientRect().height,
-          pmEl:     pm,
-          pmH:      pm?.getBoundingClientRect().height,
-          pmDisplay: pm ? getComputedStyle(pm).display : 'n/a',
+          contentElH:       contentEl.getBoundingClientRect().height,
+          contentElHTML:    contentEl.innerHTML.slice(0, 300),
+          wrapperChildTags: Array.from(wrapper.children).map(c => c.tagName + '.' + c.className),
+          pmInContent,
+          pmInWrapper,
+          pmAnywhereH: pmAnywhere?.getBoundingClientRect().height,
         });
       });
     });
