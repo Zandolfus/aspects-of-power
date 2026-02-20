@@ -135,7 +135,8 @@ export class AspectsofPowerItemSheet extends foundry.applications.api.Handlebars
           const tabEl    = wrapper.closest('[data-tab]') ?? wrapper;
           const tabRect  = tabEl.getBoundingClientRect();
           const menuRect = menuEl.getBoundingClientRect();
-          containerEl.style.width    = `${tabRect.width}px`;
+          // Set width on the wrapper so both .editor-menu and .editor-container inherit it.
+          wrapper.style.width        = `${tabRect.width}px`;
           containerEl.style.height   = `${Math.max(200, tabRect.height - menuRect.height)}px`;
           containerEl.style.overflowY = 'auto';
         }
