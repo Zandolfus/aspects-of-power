@@ -43,6 +43,9 @@ export class AspectsofPowerActor extends Actor {
       systemData.attributes.race.rank = "D";
 
     for (let [key, ability] of Object.entries(systemData.abilities)) {
+      // Ensure the stored value is always an integer before deriving the mod.
+      ability.value = Math.round(ability.value ?? 0);
+
       // Calculate the modifier using aspects rules.
       if (key === "toughness")
         ability.mod = Math.round(((6000 / (1 + Math.exp(-0.001 * (ability.value - 500)))) - 2265)*.5);
