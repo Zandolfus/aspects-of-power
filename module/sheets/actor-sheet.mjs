@@ -41,6 +41,7 @@ export class AspectsofPowerActorSheet extends foundry.applications.api.Handlebar
     context.actor    = this.actor;
     context.system   = this.actor.system; // live instance preserves derived fields (e.g. ability.mod)
     context.flags    = actorData.flags;
+    context.editable = this.isEditable;
     context.cssClass = this.isEditable ? 'editable' : 'locked';
     context.config = CONFIG.ASPECTSOFPOWER;
     context.items  = this.actor.items.map(i => i.toObject(false));
