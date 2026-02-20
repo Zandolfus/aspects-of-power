@@ -132,10 +132,11 @@ export class AspectsofPowerItemSheet extends foundry.applications.api.Handlebars
         const menuEl      = wrapper.querySelector('.editor-menu');
         const containerEl = wrapper.querySelector('.editor-container');
         if (menuEl && containerEl) {
-          const wrapperRect = wrapper.getBoundingClientRect();
-          const available   = wrapperRect.height - menuEl.getBoundingClientRect().height;
-          containerEl.style.width    = `${wrapperRect.width}px`;
-          containerEl.style.height   = `${Math.max(200, available)}px`;
+          const tabEl    = wrapper.closest('[data-tab]') ?? wrapper;
+          const tabRect  = tabEl.getBoundingClientRect();
+          const menuRect = menuEl.getBoundingClientRect();
+          containerEl.style.width    = `${tabRect.width}px`;
+          containerEl.style.height   = `${Math.max(200, tabRect.height - menuRect.height)}px`;
           containerEl.style.overflowY = 'auto';
         }
       });
