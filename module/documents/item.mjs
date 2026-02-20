@@ -147,10 +147,7 @@ export class AspectsofPowerItem extends Item {
       const finalDamage  = isHit ? Math.max(0, Math.round(dmgRoll.total - mitigation - toughnessMod)) : 0;
       const mitigLabel   = isPhysical ? 'Armor' : 'Veil';
 
-      // Blind damage roll — sender does not see it; only GMs do.
-      await dmgRoll.toMessage({ speaker, rollMode: 'blind', flavor: `${label} — Damage` });
-
-      // GM-only verdict — blind so the sending player cannot see it.
+      // Build GM-only content (all numbers already rounded above).
       const resultBadge = isHit
         ? `<strong style="color:green;">HIT</strong>`
         : `<strong style="color:red;">MISS</strong>`;
@@ -175,11 +172,16 @@ export class AspectsofPowerItem extends Item {
              <p>Attack: ${Math.round(hitRoll.total)} vs ${targetActor.name}'s ${targetDefKey} defense (${defenseValue})</p>
            </div>`;
 
-      await ChatMessage.create({
-        blind:   true,
-        whisper: ChatMessage.getWhisperRecipients('GM'),
-        content: gmContent,
-      });
+      // Route through socket so the GM client is always the message author.
+      // If the attacker IS the GM, create directly to avoid a round-trip.
+      if (game.user.isGM) {
+        await ChatMessage.create({
+          whisper: ChatMessage.getWhisperRecipients('GM'),
+          content: gmContent,
+        });
+      } else {
+        game.socket.emit('system.aspects-of-power', { type: 'gmCombatResult', content: gmContent });
+      }
 
     } else {
       // No target or no targetDefense configured — legacy two-message behavior.
