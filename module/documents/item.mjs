@@ -147,11 +147,10 @@ export class AspectsofPowerItem extends Item {
       const finalDamage  = isHit ? Math.max(0, Math.round(dmgRoll.total - mitigation - toughnessMod)) : 0;
       const mitigLabel   = isPhysical ? 'Armor' : 'Veil';
 
-      // Public message: damage roll only (players see damage, not the to-hit verdict).
-      await dmgRoll.toMessage({ speaker, rollMode, flavor: `${label} — Damage` });
+      // Blind damage roll — sender does not see it; only GMs do.
+      await dmgRoll.toMessage({ speaker, rollMode: 'blind', flavor: `${label} — Damage` });
 
-      // GM-only whisper — full combat resolution with apply-damage button.
-      // No speaker so it does not appear to originate from the player.
+      // GM-only verdict — blind so the sending player cannot see it.
       const resultBadge = isHit
         ? `<strong style="color:green;">HIT</strong>`
         : `<strong style="color:red;">MISS</strong>`;
@@ -177,6 +176,7 @@ export class AspectsofPowerItem extends Item {
            </div>`;
 
       await ChatMessage.create({
+        blind:   true,
         whisper: ChatMessage.getWhisperRecipients('GM'),
         content: gmContent,
       });
