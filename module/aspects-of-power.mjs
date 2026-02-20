@@ -142,6 +142,7 @@ Hooks.on('renderChatMessageHTML', (message, html) => {
       await target.update({ 'system.health.value': newHealth });
 
       ChatMessage.create({
+        whisper: ChatMessage.getWhisperRecipients('GM'),
         content: `<p><strong>${target.name}</strong> takes <strong>${damage}</strong> damage. `
                + `Health: ${newHealth} / ${health.max}${newHealth === 0 ? ' — <em>Incapacitated!</em>' : ''}</p>`,
       });

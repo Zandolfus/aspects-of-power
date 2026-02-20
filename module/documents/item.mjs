@@ -144,15 +144,14 @@ export class AspectsofPowerItem extends Item {
         ? (targetActor.system.defense.armor?.value ?? 0)
         : (targetActor.system.defense.veil?.value  ?? 0);
       const toughnessMod = targetActor.system.abilities?.toughness?.mod ?? 0;
-      const finalDamage  = isHit ? Math.max(0, dmgRoll.total - mitigation - toughnessMod) : 0;
+      const finalDamage  = isHit ? Math.max(0, Math.round(dmgRoll.total - mitigation - toughnessMod)) : 0;
       const mitigLabel   = isPhysical ? 'Armor' : 'Veil';
 
       // Public message: damage roll only (players see damage, not the to-hit verdict).
       await dmgRoll.toMessage({ speaker, rollMode, flavor: `${label} — Damage` });
-      // GM-only attack roll: full dice breakdown without revealing verdict in public.
-      await hitRoll.toMessage({ speaker, flavor: `${label} — Attack`, whisper: ChatMessage.getWhisperRecipients('GM') });
 
       // GM-only whisper — full combat resolution with apply-damage button.
+      // No speaker so it does not appear to originate from the player.
       const resultBadge = isHit
         ? `<strong style="color:green;">HIT</strong>`
         : `<strong style="color:red;">MISS</strong>`;
@@ -160,9 +159,9 @@ export class AspectsofPowerItem extends Item {
       const gmContent = isHit
         ? `<div class="combat-result">
              <h3>${item.name} — ${resultBadge}</h3>
-             <p>Attack: ${hitRoll.total} vs ${targetActor.name}'s ${targetDefKey} defense (${defenseValue})</p>
+             <p>Attack: ${Math.round(hitRoll.total)} vs ${targetActor.name}'s ${targetDefKey} defense (${defenseValue})</p>
              <hr>
-             <p>Raw damage: ${dmgRoll.total}</p>
+             <p>Raw damage: ${Math.round(dmgRoll.total)}</p>
              <p>${mitigLabel}: −${mitigation} &nbsp;&nbsp; Toughness: −${toughnessMod}</p>
              <p><strong>Final damage: ${finalDamage}</strong></p>
              <button class="apply-damage"
@@ -174,11 +173,10 @@ export class AspectsofPowerItem extends Item {
            </div>`
         : `<div class="combat-result">
              <h3>${item.name} — ${resultBadge}</h3>
-             <p>Attack: ${hitRoll.total} vs ${targetActor.name}'s ${targetDefKey} defense (${defenseValue})</p>
+             <p>Attack: ${Math.round(hitRoll.total)} vs ${targetActor.name}'s ${targetDefKey} defense (${defenseValue})</p>
            </div>`;
 
       await ChatMessage.create({
-        speaker,
         whisper: ChatMessage.getWhisperRecipients('GM'),
         content: gmContent,
       });
