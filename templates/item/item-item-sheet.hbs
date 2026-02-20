@@ -16,21 +16,11 @@
       <div class='grid grid-2col'>
         <div class='resource'>
           <label class='resource-label'>Quantity</label>
-          <input
-            type='text'
-            name='system.quantity'
-            value='{{system.quantity}}'
-            data-dtype='Number'
-          />
+          <input type='number' name='system.quantity' value='{{system.quantity}}' min='0'/>
         </div>
         <div class='resource'>
           <label class='resource-label'>Weight</label>
-          <input
-            type='text'
-            name='system.weight'
-            value='{{system.weight}}'
-            data-dtype='Number'
-          />
+          <input type='number' name='system.weight' value='{{system.weight}}' min='0'/>
         </div>
       </div>
     </div>

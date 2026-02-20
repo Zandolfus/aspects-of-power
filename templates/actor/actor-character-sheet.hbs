@@ -10,48 +10,45 @@
         <div class="resource flex-group-center">
           <label for="system.health.value" class="resource-label">Health</label>
           <div class="resource-content flexrow flex-center flex-between">
-            <input type="text" name="system.health.value" value="{{system.health.value}}" data-dtype="Number"/>
-            <span> / </span>
-            <input type="text" name="system.health.max" value="{{system.health.max}}" data-dtype="Number"/>
+            <input type="number" name="system.health.value" value="{{system.health.value}}" min="0"/>
+            <span> / {{system.health.max}}</span>
           </div>
         </div>
 
         <div class="resource flex-group-center">
           <label for="system.mana.value" class="resource-label">Mana</label>
           <div class="resource-content flexrow flex-center flex-between">
-            <input type="text" name="system.mana.value" value="{{system.mana.value}}" data-dtype="Number"/>
-            <span> / </span>
-            <input type="text" name="system.mana.max" value="{{system.mana.max}}" data-dtype="Number"/>
+            <input type="number" name="system.mana.value" value="{{system.mana.value}}" min="0"/>
+            <span> / {{system.mana.max}}</span>
           </div>
         </div>
 
         <div class="resource flex-group-center">
           <label for="system.stamina.value" class="resource-label">Stamina</label>
           <div class="resource-content flexrow flex-center flex-between">
-            <input type="text" name="system.stamina.value" value="{{system.stamina.value}}" data-dtype="Number"/>
-            <span> / </span>
-            <input type="text" name="system.stamina.max" value="{{system.stamina.max}}" data-dtype="Number"/>
+            <input type="number" name="system.stamina.value" value="{{system.stamina.value}}" min="0"/>
+            <span> / {{system.stamina.max}}</span>
           </div>
         </div>
 
         <div class="resource flex-group-center">
           <label for="system.attributes.class.level" class="resource-label">Class Level</label>
           <div class="resource-content flexrow flex-center flex-between">
-            <input type="text" name="system.attributes.class.level" value="{{system.attributes.class.level}}" data-dtype="Number"/>
+            <input type="number" name="system.attributes.class.level" value="{{system.attributes.class.level}}" min="0"/>
           </div>
         </div>
 
         <div class="resource flex-group-center">
           <label for="system.attributes.race.level" class="resource-label">Race Level</label>
           <div class="resource-content flexrow flex-center flex-between">
-            <input type="text" name="system.attributes.race.level" value="{{system.attributes.race.level}}" data-dtype="Number"/>
+            <input type="number" name="system.attributes.race.level" value="{{system.attributes.race.level}}" min="0"/>
           </div>
         </div>
 
         <div class="resource flex-group-center">
           <label for="system.attributes.profession.level" class="resource-label">Profession Level</label>
           <div class="resource-content flexrow flex-center flex-between">
-            <input type="text" name="system.attributes.profession.level" value="{{system.attributes.profession.level}}" data-dtype="Number"/>
+            <input type="number" name="system.attributes.profession.level" value="{{system.attributes.profession.level}}" min="0"/>
           </div>
         </div>
 
@@ -82,37 +79,37 @@
         <div class="resource flex-group-center">
           <label for="system.defense.armor.value" class="resource-label">Armor</label>
           <div class="resource-content flexrow flex-center flex-between">
-            <input type="text" name="system.defense.armor.value" value="{{system.defense.armor.value}}" data-dtype="Number" />
+            <input type="number" name="system.defense.armor.value" value="{{system.defense.armor.value}}" min="0"/>
           </div>
         </div>
         <div class="resource flex-group-center">
           <label for="system.defense.veil.value" class="resource-label">Veil</label>
           <div class="resource-content flexrow flex-center flex-between">
-            <input type="text" name="system.defense.veil.value" value="{{system.defense.veil.value}}" data-dtype="Number" />
+            <input type="number" name="system.defense.veil.value" value="{{system.defense.veil.value}}" min="0"/>
           </div>
         </div>
         <div class="resource flex-group-center">
           <label for="system.defense.melee.value" class="resource-label">Melee Defense</label>
           <div class="resource-content flexrow flex-center flex-between">
-            <input type="text" name="system.defense.melee.value" value="{{system.defense.melee.value}}" data-dtype="Number"/>
+            <span>{{system.defense.melee.value}}</span>
           </div>
         </div>
         <div class="resource flex-group-center">
           <label for="system.defense.ranged.value" class="resource-label">Ranged Defense</label>
           <div class="resource-content flexrow flex-center flex-between">
-            <input type="text" name="system.defense.ranged.value" value="{{system.defense.ranged.value}}" data-dtype="Number"/>
+            <span>{{system.defense.ranged.value}}</span>
           </div>
         </div>
         <div class="resource flex-group-center">
           <label for="system.defense.mind.value" class="resource-label">Mind Defense</label>
           <div class="resource-content flexrow flex-center flex-between">
-            <input type="text" name="system.defense.mind.value" value="{{system.defense.mind.value}}" data-dtype="Number"/>
+            <span>{{system.defense.mind.value}}</span>
           </div>
         </div>
         <div class="resource flex-group-center">
           <label for="system.defense.soul.value" class="resource-label">Soul Defense</label>
           <div class="resource-content flexrow flex-center flex-between">
-            <input type="text" name="system.defense.soul.value" value="{{system.defense.soul.value}}" data-dtype="Number"/>
+            <span>{{system.defense.soul.value}}</span>
           </div>
         </div>
       </div>
@@ -140,7 +137,7 @@
             {{#each system.abilities as |ability key|}}
             <div class="ability flexrow flex-group-center">
               <label for="system.abilities.{{key}}.value" class="resource-label rollable flexlarge align-left" data-roll="(d20/100)*@abilities.{{key}}.mod+@abilities.{{key}}.mod" data-label="{{localize (lookup @root.config.abilities key)}}">{{localize (lookup @root.config.abilities key)}}</label>
-              <input type="text" name="system.abilities.{{key}}.value" value="{{numberFormat ability.value decimals=0 sign=true}}" data-dtype="Number"/>
+              <input type="number" name="system.abilities.{{key}}.value" value="{{ability.value}}" min="0"/>
               <span class="stat-mod rollable" data-roll="(d20/100)*@abilities.{{key}}.mod+@abilities.{{key}}.mod" data-label="{{localize (lookup @root.config.abilities key)}}">{{numberFormat ability.mod decimals=0 sign=true}}</span>
             </div>
             {{/each}}
