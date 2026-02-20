@@ -160,6 +160,24 @@ export class AspectsofPowerActorSheet extends foundry.applications.api.Handlebar
     // Everything below requires the sheet to be editable.
     if (!this.isEditable) return;
 
+    // AppV2 doesn't inherit AppV1's activateEditor() — wire up ProseMirror manually.
+    this.element.querySelectorAll('.editor-edit').forEach(btn => {
+      btn.addEventListener('click', async ev => {
+        ev.preventDefault();
+        const wrapper   = btn.closest('.editor');
+        const contentEl = wrapper?.querySelector('.editor-content');
+        if (!contentEl || wrapper.classList.contains('active')) return;
+        wrapper.classList.add('active');
+        btn.style.display = 'none';
+        const fieldName  = contentEl.dataset.target ?? contentEl.dataset.fieldName ?? 'system.biography';
+        const rawContent = foundry.utils.getProperty(this.document.toObject(), fieldName) ?? '';
+        await ProseMirrorEditor.create(contentEl, rawContent, {
+          document:  this.document,
+          fieldName: fieldName,
+        });
+      });
+    });
+
     // Add Inventory Item
     this.element.querySelectorAll('.item-create').forEach(el => {
       el.addEventListener('click', this._onItemCreate.bind(this));
