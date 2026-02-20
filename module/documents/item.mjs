@@ -147,9 +147,10 @@ export class AspectsofPowerItem extends Item {
       const finalDamage  = isHit ? Math.max(0, dmgRoll.total - mitigation - toughnessMod) : 0;
       const mitigLabel   = isPhysical ? 'Armor' : 'Veil';
 
-      // Public messages: roll results only, no target information.
-      await hitRoll.toMessage({ speaker, rollMode, flavor: `${label} — Attack` });
+      // Public message: damage roll only (players see damage, not the to-hit verdict).
       await dmgRoll.toMessage({ speaker, rollMode, flavor: `${label} — Damage` });
+      // GM-only attack roll: full dice breakdown without revealing verdict in public.
+      await hitRoll.toMessage({ speaker, flavor: `${label} — Attack`, whisper: ChatMessage.getWhisperRecipients('GM') });
 
       // GM-only whisper — full combat resolution with apply-damage button.
       const resultBadge = isHit
