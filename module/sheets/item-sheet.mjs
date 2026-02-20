@@ -63,25 +63,28 @@ export class AspectsofPowerItemSheet extends foundry.applications.api.Handlebars
   /* -------------------------------------------- */
 
   /**
-   * For skill items, consolidate individual system.roll.* keys into a single
-   * system.roll object so the update replaces any null parent rather than
-   * trying to write into null (which silently fails for items created before
-   * the roll SchemaField was added).
+   * For skill items, when a roll-configuration field changes, collect all roll
+   * fields from the DOM and write them as a single system.roll object.
+   * This bypasses any null-parent issue: if _source.system.roll is null,
+   * the full-object update replaces it cleanly rather than trying to merge
+   * into null through nested dot-notation paths.
    * @override
    */
-  async _processSubmitData(event, form, submitData) {
-    if (this.item.type === 'skill') {
-      const rollData = {};
-      const prefix = 'system.roll.';
-      for (const key of Object.keys(submitData)) {
-        if (key.startsWith(prefix)) {
-          rollData[key.slice(prefix.length)] = submitData[key];
-          delete submitData[key];
-        }
-      }
-      if (Object.keys(rollData).length) submitData['system.roll'] = rollData;
+  async _onChangeForm(formConfig, event) {
+    if (this.item.type === 'skill' && event.target?.name?.startsWith('system.roll.')) {
+      const form = this.element.querySelector('form');
+      const rollData = {
+        dice:      form.querySelector('[name="system.roll.dice"]')?.value ?? '',
+        abilities: form.querySelector('[name="system.roll.abilities"]')?.value ?? '',
+        resource:  form.querySelector('[name="system.roll.resource"]')?.value ?? '',
+        cost:      Number(form.querySelector('[name="system.roll.cost"]')?.value) || 0,
+        type:      form.querySelector('[name="system.roll.type"]')?.value ?? '',
+        diceBonus: Number(form.querySelector('[name="system.roll.diceBonus"]')?.value) || 1,
+      };
+      await this.document.update({ 'system.roll': rollData });
+      return;
     }
-    return super._processSubmitData(event, form, submitData);
+    return super._onChangeForm(formConfig, event);
   }
 
   /** @override */
