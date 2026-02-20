@@ -182,8 +182,9 @@ export class AspectsofPowerActorSheet extends foundry.applications.api.Handlebar
         const menuEl      = wrapper.querySelector('.editor-menu');
         const containerEl = wrapper.querySelector('.editor-container');
         if (menuEl && containerEl) {
-          const available = wrapper.getBoundingClientRect().height
-                          - menuEl.getBoundingClientRect().height;
+          const wrapperRect = wrapper.getBoundingClientRect();
+          const available   = wrapperRect.height - menuEl.getBoundingClientRect().height;
+          containerEl.style.width    = `${wrapperRect.width}px`;
           containerEl.style.height   = `${Math.max(200, available)}px`;
           containerEl.style.overflowY = 'auto';
         }

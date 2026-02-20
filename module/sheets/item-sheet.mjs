@@ -37,7 +37,6 @@ export class AspectsofPowerItemSheet extends foundry.applications.api.Handlebars
   /** @override */
   async _prepareContext(options) {
     const context  = await super._prepareContext(options);
-    console.log('this is context', context);
     context.optionObj = CONFIG.ASPECTSOFPOWER.abilities;
 
     const itemData = this.document.toObject(false);
@@ -133,8 +132,9 @@ export class AspectsofPowerItemSheet extends foundry.applications.api.Handlebars
         const menuEl      = wrapper.querySelector('.editor-menu');
         const containerEl = wrapper.querySelector('.editor-container');
         if (menuEl && containerEl) {
-          const available = wrapper.getBoundingClientRect().height
-                          - menuEl.getBoundingClientRect().height;
+          const wrapperRect = wrapper.getBoundingClientRect();
+          const available   = wrapperRect.height - menuEl.getBoundingClientRect().height;
+          containerEl.style.width    = `${wrapperRect.width}px`;
           containerEl.style.height   = `${Math.max(200, available)}px`;
           containerEl.style.overflowY = 'auto';
         }
