@@ -125,10 +125,10 @@ export class AspectsofPowerItem extends Item {
     const dmgRoll = new Roll(dmgFormula, rollData);
     await dmgRoll.evaluate();
 
-    // ── Deduct resource cost (existing behavior) ─────────────────────────────
-    this.actor.system[rollData.roll.resource].value -= rollData.roll.cost;
-    this.update();
-    this.actor.sheet.render();
+    // ── Deduct resource cost ──────────────────────────────────────────────────
+    const resource   = rollData.roll.resource;
+    const newResVal  = Math.max(0, Math.round(rollData.roll.resourcevalue - rollData.roll.cost));
+    await this.actor.update({ [`system.${resource}.value`]: newResVal });
 
     // ── Resolve against a target if one is selected ──────────────────────────
     const targetToken  = game.user.targets.first() ?? null;
