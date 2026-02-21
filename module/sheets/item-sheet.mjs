@@ -121,7 +121,8 @@ export class AspectsofPowerItemSheet extends foundry.applications.api.Handlebars
       });
 
       const tagConfigData = {
-        healTarget:        form.querySelector('[name="system.tagConfig.healTarget"]')?.value ?? 'selected',
+        restorationTarget:   form.querySelector('[name="system.tagConfig.restorationTarget"]')?.value ?? 'selected',
+        restorationResource: form.querySelector('[name="system.tagConfig.restorationResource"]')?.value ?? 'health',
         buffEntries,
         buffDuration:      Number(form.querySelector('[name="system.tagConfig.buffDuration"]')?.value) || 1,
         buffStackable:     form.querySelector('[name="system.tagConfig.buffStackable"]')?.checked ?? false,

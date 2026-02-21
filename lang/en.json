@@ -25,12 +25,13 @@
     "Tag": {
       "label": "Tags",
       "attack": "Attack",
-      "heal": "Heal",
+      "restoration": "Restoration",
       "buff": "Buff",
       "debuff": "Debuff"
     },
     "TagConfig": {
-      "healTarget": "Heal Target",
+      "restorationTarget": "Target",
+      "restorationResource": "Resource",
       "buffAttributes": "Buff Attributes",
       "debuffAttributes": "Debuff Attributes",
       "duration": "Duration (rounds)",
@@ -44,8 +45,12 @@
     },
     "HealTarget": {
       "self": "Self",
-      "ally": "Ally",
       "selected": "Selected Target"
+    },
+    "RestorationResource": {
+      "health": "Health",
+      "mana": "Mana",
+      "stamina": "Stamina"
     },
     "Range": {
       "castingRange": "Casting Range",

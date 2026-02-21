@@ -172,17 +172,19 @@ export class AspectsofPowerItem extends Item {
   static async executeGmAction(payload) {
     switch (payload.type) {
 
-      case 'gmApplyHeal': {
+      case 'gmApplyRestoration': {
         const target = await fromUuid(payload.targetActorUuid);
         if (!target) return;
-        const health    = target.system.health;
-        const newHealth = Math.min(health.max, health.value + payload.healAmount);
-        const actualHeal = newHealth - health.value;
-        await target.update({ 'system.health.value': newHealth });
+        const resource    = payload.resource ?? 'health';
+        const pool        = target.system[resource];
+        const newValue    = Math.min(pool.max, pool.value + payload.amount);
+        const actualGain  = newValue - pool.value;
+        await target.update({ [`system.${resource}.value`]: newValue });
+        const resLabel = resource.charAt(0).toUpperCase() + resource.slice(1);
         ChatMessage.create({
           speaker: payload.speaker, rollMode: payload.rollMode,
-          content: `<p><strong>${target.name}</strong> heals for <strong>${actualHeal}</strong>. `
-                 + `Health: ${newHealth} / ${health.max}</p>`,
+          content: `<p><strong>${target.name}</strong> restores <strong>${actualGain}</strong> ${resLabel}. `
+                 + `${resLabel}: ${newValue} / ${pool.max}</p>`,
         });
         break;
       }
@@ -305,14 +307,15 @@ export class AspectsofPowerItem extends Item {
   }
 
   /**
-   * Heal tag: build payload and route through GM.
+   * Restoration tag: restore health, mana, or stamina and route through GM.
    */
-  async _handleHealTag(item, rollData, dmgRoll, speaker, rollMode, label) {
-    const healAmount = Math.round(dmgRoll.total);
-    const healTarget = this.system.tagConfig?.healTarget ?? 'selected';
+  async _handleRestorationTag(item, rollData, dmgRoll, speaker, rollMode, label) {
+    const amount   = Math.round(dmgRoll.total);
+    const target   = this.system.tagConfig?.restorationTarget ?? 'selected';
+    const resource = this.system.tagConfig?.restorationResource ?? 'health';
 
     let targetActor;
-    if (healTarget === 'self') {
+    if (target === 'self') {
       targetActor = this.actor;
     } else {
       const targetToken = game.user.targets.first() ?? null;
@@ -320,14 +323,15 @@ export class AspectsofPowerItem extends Item {
     }
 
     if (!targetActor) {
-      ChatMessage.create({ speaker, rollMode, content: `<p><em>No valid heal target.</em></p>` });
+      ChatMessage.create({ speaker, rollMode, content: `<p><em>No valid restoration target.</em></p>` });
       return;
     }
 
     await this._gmAction({
-      type: 'gmApplyHeal',
+      type: 'gmApplyRestoration',
       targetActorUuid: targetActor.uuid,
-      healAmount,
+      amount,
+      resource,
       speaker, rollMode,
     });
   }
@@ -516,8 +520,8 @@ export class AspectsofPowerItem extends Item {
         case 'attack':
           await this._handleAttackTag(item, rollData, hitRoll, dmgRoll, speaker, rollMode, label);
           break;
-        case 'heal':
-          await this._handleHealTag(item, rollData, dmgRoll, speaker, rollMode, label);
+        case 'restoration':
+          await this._handleRestorationTag(item, rollData, dmgRoll, speaker, rollMode, label);
           break;
         case 'buff':
           await this._handleBuffTag(item, rollData, dmgRoll, speaker, rollMode, label);

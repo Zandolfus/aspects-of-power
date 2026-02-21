@@ -115,13 +115,21 @@
       </div>
       {{/if}}
 
-      {{! ── Heal Tag Config ── }}
-      {{#if (includes system.tags "heal")}}
-      <div class='tag-config heal-config'>
-        <label class='resource-label'>{{localize "ASPECTSOFPOWER.TagConfig.healTarget"}}</label>
-        <select name='system.tagConfig.healTarget'>
-          {{#each config.healTargets as |label key|}}
-            <option value='{{key}}' {{#if (eq key ../system.tagConfig.healTarget)}}selected{{/if}}>
+      {{! ── Restoration Tag Config ── }}
+      {{#if (includes system.tags "restoration")}}
+      <div class='tag-config restoration-config'>
+        <label class='resource-label'>{{localize "ASPECTSOFPOWER.TagConfig.restorationTarget"}}</label>
+        <select name='system.tagConfig.restorationTarget'>
+          {{#each config.restorationTargets as |label key|}}
+            <option value='{{key}}' {{#if (eq key ../system.tagConfig.restorationTarget)}}selected{{/if}}>
+              {{localize label}}
+            </option>
+          {{/each}}
+        </select>
+        <label class='resource-label'>{{localize "ASPECTSOFPOWER.TagConfig.restorationResource"}}</label>
+        <select name='system.tagConfig.restorationResource'>
+          {{#each config.restorationResources as |label key|}}
+            <option value='{{key}}' {{#if (eq key ../system.tagConfig.restorationResource)}}selected{{/if}}>
               {{localize label}}
             </option>
           {{/each}}

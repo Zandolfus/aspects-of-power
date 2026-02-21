@@ -34,10 +34,10 @@ ASPECTSOFPOWER.abilityAbbreviations = {
  * A skill can have multiple tags (e.g. [attack, debuff]).
  */
 ASPECTSOFPOWER.skillTags = {
-  attack: 'ASPECTSOFPOWER.Tag.attack',
-  heal:   'ASPECTSOFPOWER.Tag.heal',
-  buff:   'ASPECTSOFPOWER.Tag.buff',
-  debuff: 'ASPECTSOFPOWER.Tag.debuff',
+  attack:      'ASPECTSOFPOWER.Tag.attack',
+  restoration: 'ASPECTSOFPOWER.Tag.restoration',
+  buff:        'ASPECTSOFPOWER.Tag.buff',
+  debuff:      'ASPECTSOFPOWER.Tag.debuff',
 };
 
 /**
@@ -87,10 +87,18 @@ ASPECTSOFPOWER.attributeGroups = [
 ];
 
 /**
- * Valid targets for the heal tag.
+ * Valid targets for the restoration tag.
  */
-ASPECTSOFPOWER.healTargets = {
+ASPECTSOFPOWER.restorationTargets = {
   self:     'ASPECTSOFPOWER.HealTarget.self',
-  ally:     'ASPECTSOFPOWER.HealTarget.ally',
   selected: 'ASPECTSOFPOWER.HealTarget.selected',
+};
+
+/**
+ * Resources the restoration tag can restore.
+ */
+ASPECTSOFPOWER.restorationResources = {
+  health:  'ASPECTSOFPOWER.RestorationResource.health',
+  mana:    'ASPECTSOFPOWER.RestorationResource.mana',
+  stamina: 'ASPECTSOFPOWER.RestorationResource.stamina',
 };

@@ -28,7 +28,8 @@ export class SkillData extends foundry.abstract.TypeDataModel {
       // Per-tag configuration.
       // Attack tag reuses roll.targetDefense and roll.damageType — no extra config needed.
       tagConfig: new fields.SchemaField({
-        healTarget:       new fields.StringField({ initial: 'selected' }),
+        restorationTarget:   new fields.StringField({ initial: 'selected' }),
+        restorationResource: new fields.StringField({ initial: 'health' }),
 
         // Buff: array of { attribute, value (multiplier) } pairs + duration.
         // value is a multiplier applied to the roll total (default 1 = full roll value).
