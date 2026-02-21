@@ -176,6 +176,12 @@ export class AspectsofPowerActorSheet extends foundry.applications.api.Handlebar
           fieldName: fieldName,
         });
 
+        // Collapse all dropdown <ul> elements that ProseMirror renders open by default.
+        // Inline style beats any external CSS specificity.
+        wrapper.querySelectorAll('.editor-menu .pm-dropdown > ul').forEach(ul => {
+          ul.style.display = 'none';
+        });
+
         // ProseMirrorEditor wraps the editable div in a new .editor-container sibling to
         // .editor-menu. Neither element has a definite CSS height from the flex chain, so
         // measure and set the container height explicitly.
