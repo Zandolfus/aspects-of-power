@@ -25,14 +25,26 @@ export class SkillData extends foundry.abstract.TypeDataModel {
       // Tags that define what this skill does when activated (e.g. ["attack","debuff"]).
       tags: new fields.ArrayField(new fields.StringField(), { initial: [] }),
 
-      // Per-tag configuration. Flat schema for simpler form binding.
+      // Per-tag configuration.
       // Attack tag reuses roll.targetDefense and roll.damageType — no extra config needed.
       tagConfig: new fields.SchemaField({
-        healTarget:      new fields.StringField({ initial: 'selected' }),
-        buffAttribute:   new fields.StringField({ initial: 'abilities.strength' }),
-        buffDuration:    new fields.NumberField({ initial: 1, integer: true, min: 0 }),
-        debuffAttribute: new fields.StringField({ initial: 'abilities.strength' }),
-        debuffDuration:  new fields.NumberField({ initial: 1, integer: true, min: 0 }),
+        healTarget:       new fields.StringField({ initial: 'selected' }),
+
+        // Buff: array of { attribute, value } pairs + duration.
+        buffEntries: new fields.ArrayField(new fields.SchemaField({
+          attribute: new fields.StringField({ initial: 'abilities.strength' }),
+          value:     new fields.NumberField({ initial: 0, integer: true }),
+        }), { initial: [] }),
+        buffDuration: new fields.NumberField({ initial: 1, integer: true, min: 0 }),
+
+        // Debuff: array of { attribute, value } pairs + duration + optional DoT.
+        debuffEntries: new fields.ArrayField(new fields.SchemaField({
+          attribute: new fields.StringField({ initial: 'abilities.strength' }),
+          value:     new fields.NumberField({ initial: 0, integer: true }),
+        }), { initial: [] }),
+        debuffDuration:    new fields.NumberField({ initial: 1, integer: true, min: 0 }),
+        debuffDealsDamage: new fields.BooleanField({ initial: false }),
+        debuffDamageType:  new fields.StringField({ initial: 'physical' }),
       }),
     };
   }

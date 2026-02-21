@@ -31,9 +31,16 @@
     },
     "TagConfig": {
       "healTarget": "Heal Target",
-      "buffAttribute": "Buff Attribute",
-      "debuffAttribute": "Debuff Attribute",
-      "duration": "Duration (rounds)"
+      "buffAttributes": "Buff Attributes",
+      "debuffAttributes": "Debuff Attributes",
+      "duration": "Duration (rounds)",
+      "debuffDealsDamage": "Deals Damage",
+      "debuffDamageType": "Damage Type"
+    },
+    "AttributeGroup": {
+      "abilities": "Abilities",
+      "defenses": "Defenses",
+      "mitigation": "Mitigation"
     },
     "HealTarget": {
       "self": "Self",
@@ -43,10 +50,10 @@
     "Defense": {
       "armor": "Armor",
       "veil": "Veil",
-      "melee": "Melee",
-      "ranged": "Ranged",
-      "mind": "Mind",
-      "soul": "Soul"
+      "melee": "Melee Defense",
+      "ranged": "Ranged Defense",
+      "mind": "Mind Defense",
+      "soul": "Soul Defense"
     },
     "Effect": {
       "Source": "Source",

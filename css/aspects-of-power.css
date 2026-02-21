@@ -364,6 +364,47 @@
   gap: 4px 8px;
   align-items: center;
 }
+.aspects-of-power .attribute-group {
+  grid-column: 1 / -1;
+  margin-bottom: 4px;
+}
+.aspects-of-power .attribute-group .group-label {
+  font-weight: bold;
+  font-size: 0.85em;
+  display: block;
+  margin-bottom: 2px;
+  color: #4b4a44;
+}
+.aspects-of-power .attribute-group .group-entries {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+}
+.aspects-of-power .attr-entry {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-weight: normal;
+  cursor: pointer;
+}
+.aspects-of-power .attr-entry input[type="checkbox"] {
+  margin: 0;
+}
+.aspects-of-power .attr-entry .attr-value {
+  width: 48px;
+  text-align: center;
+}
+.aspects-of-power .dot-toggle {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 4px;
+  cursor: pointer;
+}
+.aspects-of-power .dot-toggle input[type="checkbox"] {
+  margin: 0;
+}
 .aspects-of-power .resource-label {
   font-weight: bold;
 }

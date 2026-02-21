@@ -132,14 +132,25 @@
       {{! ── Buff Tag Config ── }}
       {{#if (includes system.tags "buff")}}
       <div class='tag-config buff-config'>
-        <label class='resource-label'>{{localize "ASPECTSOFPOWER.TagConfig.buffAttribute"}}</label>
-        <select name='system.tagConfig.buffAttribute'>
-          {{#each config.buffableAttributes as |label key|}}
-            <option value='{{key}}' {{#if (eq key ../system.tagConfig.buffAttribute)}}selected{{/if}}>
-              {{localize label}}
-            </option>
-          {{/each}}
-        </select>
+        <label class='resource-label'>{{localize "ASPECTSOFPOWER.TagConfig.buffAttributes"}}</label>
+        {{#each buffAttributeGroups}}
+          <div class='attribute-group'>
+            <span class='group-label'>{{this.label}}</span>
+            <div class='group-entries'>
+              {{#each this.attributes}}
+                <label class='attr-entry'>
+                  <input type='checkbox' name='system.tagConfig.buffEntries'
+                         value='{{this.key}}' {{#if this.checked}}checked{{/if}} />
+                  {{this.label}}
+                  {{#if this.checked}}
+                    <input type='number' class='attr-value' data-attr='{{this.key}}'
+                           data-target='buff' value='{{this.value}}' min='0' step='1' />
+                  {{/if}}
+                </label>
+              {{/each}}
+            </div>
+          </div>
+        {{/each}}
         <label class='resource-label'>{{localize "ASPECTSOFPOWER.TagConfig.duration"}}</label>
         <input type='number' name='system.tagConfig.buffDuration'
                value='{{system.tagConfig.buffDuration}}' min='0' step='1' />
@@ -149,14 +160,37 @@
       {{! ── Debuff Tag Config ── }}
       {{#if (includes system.tags "debuff")}}
       <div class='tag-config debuff-config'>
-        <label class='resource-label'>{{localize "ASPECTSOFPOWER.TagConfig.debuffAttribute"}}</label>
-        <select name='system.tagConfig.debuffAttribute'>
-          {{#each config.buffableAttributes as |label key|}}
-            <option value='{{key}}' {{#if (eq key ../system.tagConfig.debuffAttribute)}}selected{{/if}}>
-              {{localize label}}
-            </option>
-          {{/each}}
+        <label class='resource-label'>{{localize "ASPECTSOFPOWER.TagConfig.debuffAttributes"}}</label>
+        {{#each debuffAttributeGroups}}
+          <div class='attribute-group'>
+            <span class='group-label'>{{this.label}}</span>
+            <div class='group-entries'>
+              {{#each this.attributes}}
+                <label class='attr-entry'>
+                  <input type='checkbox' name='system.tagConfig.debuffEntries'
+                         value='{{this.key}}' {{#if this.checked}}checked{{/if}} />
+                  {{this.label}}
+                  {{#if this.checked}}
+                    <input type='number' class='attr-value' data-attr='{{this.key}}'
+                           data-target='debuff' value='{{this.value}}' min='0' step='1' />
+                  {{/if}}
+                </label>
+              {{/each}}
+            </div>
+          </div>
+        {{/each}}
+        <label class='resource-label dot-toggle'>
+          <input type='checkbox' name='system.tagConfig.debuffDealsDamage'
+                 {{#if system.tagConfig.debuffDealsDamage}}checked{{/if}} />
+          {{localize "ASPECTSOFPOWER.TagConfig.debuffDealsDamage"}}
+        </label>
+        {{#if system.tagConfig.debuffDealsDamage}}
+        <label class='resource-label'>{{localize "ASPECTSOFPOWER.TagConfig.debuffDamageType"}}</label>
+        <select name='system.tagConfig.debuffDamageType'>
+          <option value='physical' {{#if (eq system.tagConfig.debuffDamageType "physical")}}selected{{/if}}>Physical (ignores Armor)</option>
+          <option value='magical' {{#if (eq system.tagConfig.debuffDamageType "magical")}}selected{{/if}}>Magical (ignores Veil)</option>
         </select>
+        {{/if}}
         <label class='resource-label'>{{localize "ASPECTSOFPOWER.TagConfig.duration"}}</label>
         <input type='number' name='system.tagConfig.debuffDuration'
                value='{{system.tagConfig.debuffDuration}}' min='0' step='1' />

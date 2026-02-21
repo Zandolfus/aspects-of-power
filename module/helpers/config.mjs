@@ -62,6 +62,31 @@ ASPECTSOFPOWER.buffableAttributes = {
 };
 
 /**
+ * Attribute groups for the buff/debuff UI — sorted by category.
+ */
+ASPECTSOFPOWER.attributeGroups = [
+  {
+    key: 'abilities',
+    label: 'ASPECTSOFPOWER.AttributeGroup.abilities',
+    attributes: [
+      'abilities.vitality', 'abilities.endurance', 'abilities.strength',
+      'abilities.dexterity', 'abilities.toughness', 'abilities.intelligence',
+      'abilities.willpower', 'abilities.wisdom', 'abilities.perception',
+    ],
+  },
+  {
+    key: 'defense',
+    label: 'ASPECTSOFPOWER.AttributeGroup.defenses',
+    attributes: ['defense.melee', 'defense.ranged', 'defense.mind', 'defense.soul'],
+  },
+  {
+    key: 'mitigation',
+    label: 'ASPECTSOFPOWER.AttributeGroup.mitigation',
+    attributes: ['defense.armor', 'defense.veil'],
+  },
+];
+
+/**
  * Valid targets for the heal tag.
  */
 ASPECTSOFPOWER.healTargets = {

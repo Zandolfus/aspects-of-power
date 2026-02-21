@@ -58,6 +58,25 @@ export class AspectsofPowerItemSheet extends foundry.applications.api.Handlebars
     context.config  = CONFIG.ASPECTSOFPOWER;
     context.effects = prepareActiveEffectCategories(this.item.effects);
 
+    // Build grouped attribute data for buff/debuff multi-select UI.
+    if (this.item.type === 'skill') {
+      const buildGroups = (entries) => CONFIG.ASPECTSOFPOWER.attributeGroups.map(group => ({
+        key: group.key,
+        label: game.i18n.localize(group.label),
+        attributes: group.attributes.map(attrKey => {
+          const entry = (entries ?? []).find(e => e.attribute === attrKey);
+          return {
+            key: attrKey,
+            label: game.i18n.localize(CONFIG.ASPECTSOFPOWER.buffableAttributes[attrKey]),
+            checked: !!entry,
+            value: entry?.value ?? 0,
+          };
+        }),
+      }));
+      context.buffAttributeGroups  = buildGroups(this.item.system.tagConfig?.buffEntries);
+      context.debuffAttributeGroups = buildGroups(this.item.system.tagConfig?.debuffEntries);
+    }
+
     return context;
   }
 
@@ -84,12 +103,29 @@ export class AspectsofPowerItemSheet extends foundry.applications.api.Handlebars
     // Tag-specific config: collect all tagConfig fields atomically.
     if (this.item.type === 'skill' && event.target?.name?.startsWith('system.tagConfig.')) {
       const form = this.element.querySelector('form');
+
+      // Buff entries: collect checked attributes + their value inputs.
+      const buffEntries = [];
+      form.querySelectorAll('input[name="system.tagConfig.buffEntries"]:checked').forEach(cb => {
+        const valInput = form.querySelector(`.attr-value[data-attr="${cb.value}"][data-target="buff"]`);
+        buffEntries.push({ attribute: cb.value, value: Number(valInput?.value) || 0 });
+      });
+
+      // Debuff entries: same pattern.
+      const debuffEntries = [];
+      form.querySelectorAll('input[name="system.tagConfig.debuffEntries"]:checked').forEach(cb => {
+        const valInput = form.querySelector(`.attr-value[data-attr="${cb.value}"][data-target="debuff"]`);
+        debuffEntries.push({ attribute: cb.value, value: Number(valInput?.value) || 0 });
+      });
+
       const tagConfigData = {
-        healTarget:      form.querySelector('[name="system.tagConfig.healTarget"]')?.value ?? 'selected',
-        buffAttribute:   form.querySelector('[name="system.tagConfig.buffAttribute"]')?.value ?? 'abilities.strength',
-        buffDuration:    Number(form.querySelector('[name="system.tagConfig.buffDuration"]')?.value) || 1,
-        debuffAttribute: form.querySelector('[name="system.tagConfig.debuffAttribute"]')?.value ?? 'abilities.strength',
-        debuffDuration:  Number(form.querySelector('[name="system.tagConfig.debuffDuration"]')?.value) || 1,
+        healTarget:        form.querySelector('[name="system.tagConfig.healTarget"]')?.value ?? 'selected',
+        buffEntries,
+        buffDuration:      Number(form.querySelector('[name="system.tagConfig.buffDuration"]')?.value) || 1,
+        debuffEntries,
+        debuffDuration:    Number(form.querySelector('[name="system.tagConfig.debuffDuration"]')?.value) || 1,
+        debuffDealsDamage: form.querySelector('[name="system.tagConfig.debuffDealsDamage"]')?.checked ?? false,
+        debuffDamageType:  form.querySelector('[name="system.tagConfig.debuffDamageType"]')?.value ?? 'physical',
       };
       await this.document.update({ 'system.tagConfig': tagConfigData });
       return;

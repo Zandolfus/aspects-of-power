@@ -136,6 +136,47 @@ Hooks.on('combatTurnChange', async (combat, _prior, current) => {
 });
 
 /* -------------------------------------------- */
+/*  DoT Damage — Applier's Turn                 */
+/* -------------------------------------------- */
+
+/**
+ * Apply damage-over-time from debuff ActiveEffects at the start of the
+ * applier's turn. Damage bypasses armor/veil (applied directly).
+ * Only the GM executes to avoid duplicate writes.
+ */
+Hooks.on('combatTurnChange', async (combat, _prior, current) => {
+  if (!game.user.isGM) return;
+
+  const combatant = combat.combatants.get(current.combatantId);
+  if (!combatant?.actor) return;
+  const applierUuid = combatant.actor.uuid;
+
+  // Check every combatant for DoT effects placed by the current actor.
+  for (const c of combat.combatants) {
+    if (!c.actor) continue;
+    for (const effect of c.actor.effects) {
+      const flags = effect.flags?.['aspects-of-power'] ?? {};
+      if (!flags.dot || flags.applierActorUuid !== applierUuid || effect.disabled) continue;
+
+      const damage    = flags.dotDamage ?? 0;
+      if (damage <= 0) continue;
+
+      const health    = c.actor.system.health;
+      const newHealth = Math.max(0, health.value - damage);
+      await c.actor.update({ 'system.health.value': newHealth });
+
+      ChatMessage.create({
+        whisper: ChatMessage.getWhisperRecipients('GM'),
+        content: `<p><strong>${c.actor.name}</strong> takes <strong>${damage}</strong> `
+               + `${flags.dotDamageType ?? 'physical'} damage from ${effect.name} (ignores mitigation). `
+               + `Health: ${newHealth} / ${health.max}`
+               + `${newHealth === 0 ? ' &mdash; <em>Incapacitated!</em>' : ''}</p>`,
+      });
+    }
+  }
+});
+
+/* -------------------------------------------- */
 /*  Apply Damage Button — GM Whisper            */
 /* -------------------------------------------- */
 
