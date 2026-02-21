@@ -126,6 +126,9 @@ export class AspectsofPowerItemSheet extends foundry.applications.api.Handlebars
           fieldName: fieldName,
         });
 
+        // Temporary: inspect the menu structure to identify open-dropdown selectors.
+        console.log(wrapper.querySelector('.editor-menu')?.innerHTML);
+
         // ProseMirrorEditor wraps the editable div in a new .editor-container sibling to
         // .editor-menu. Neither element has a definite CSS height from the flex chain, so
         // measure and set the container height explicitly.
