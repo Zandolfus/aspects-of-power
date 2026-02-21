@@ -101,7 +101,9 @@ export class AspectsofPowerItemSheet extends foundry.applications.api.Handlebars
     }
 
     // Tag-specific config: collect all tagConfig fields atomically.
-    if (this.item.type === 'skill' && event.target?.name?.startsWith('system.tagConfig.')) {
+    // Also catch .attr-value inputs (multiplier fields) which have no name= attribute
+    // but still need to trigger a tagConfig save.
+    if (this.item.type === 'skill' && (event.target?.name?.startsWith('system.tagConfig.') || event.target?.classList?.contains('attr-value'))) {
       const form = this.element.querySelector('form');
 
       // Buff entries: collect checked attributes + their multiplier inputs.

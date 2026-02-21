@@ -185,31 +185,34 @@ Hooks.on('combatTurnChange', async (combat, _prior, current) => {
 
 /**
  * Delete ActiveEffects whose duration (in rounds) has elapsed.
- * Checks all combatants on every turn change so effects expire promptly.
+ * Effects expire at the end of the TARGET's turn — so we only check
+ * the combatant whose turn just ended (the "prior" combatant).
  * Only the GM executes to avoid duplicate deletes.
  */
-Hooks.on('combatTurnChange', async (combat, _prior, _current) => {
+Hooks.on('combatTurnChange', async (combat, prior, _current) => {
   if (!game.user.isGM) return;
+  if (!prior?.combatantId) return;
 
-  for (const c of combat.combatants) {
-    if (!c.actor) continue;
-    const toDelete = [];
-    for (const effect of c.actor.effects) {
-      const dur = effect.duration;
-      if (!dur.rounds || dur.rounds <= 0) continue;
-      const startRound = dur.startRound ?? 0;
-      if (startRound > 0 && combat.round - startRound >= dur.rounds) {
-        toDelete.push(effect.id);
-      }
+  const combatant = combat.combatants.get(prior.combatantId);
+  if (!combatant?.actor) return;
+
+  const actor = combatant.actor;
+  const toDelete = [];
+  for (const effect of actor.effects) {
+    const dur = effect.duration;
+    if (!dur.rounds || dur.rounds <= 0) continue;
+    const startRound = dur.startRound ?? 0;
+    if (startRound > 0 && combat.round - startRound >= dur.rounds) {
+      toDelete.push(effect.id);
     }
-    if (toDelete.length > 0) {
-      const names = toDelete.map(id => c.actor.effects.get(id)?.name).filter(Boolean);
-      await c.actor.deleteEmbeddedDocuments('ActiveEffect', toDelete);
-      ChatMessage.create({
-        whisper: ChatMessage.getWhisperRecipients('GM'),
-        content: `<p>Expired effects on <strong>${c.actor.name}</strong>: ${names.join(', ')}</p>`,
-      });
-    }
+  }
+  if (toDelete.length > 0) {
+    const names = toDelete.map(id => actor.effects.get(id)?.name).filter(Boolean);
+    await actor.deleteEmbeddedDocuments('ActiveEffect', toDelete);
+    ChatMessage.create({
+      whisper: ChatMessage.getWhisperRecipients('GM'),
+      content: `<p>Expired effects on <strong>${actor.name}</strong>: ${names.join(', ')}</p>`,
+    });
   }
 });
 
