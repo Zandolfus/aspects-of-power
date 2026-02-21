@@ -21,6 +21,19 @@ export class SkillData extends foundry.abstract.TypeDataModel {
         // Whether this skill deals physical damage (armor) or non-physical (veil).
         damageType:   new fields.StringField({ initial: 'physical' }),
       }),
+
+      // Tags that define what this skill does when activated (e.g. ["attack","debuff"]).
+      tags: new fields.ArrayField(new fields.StringField(), { initial: [] }),
+
+      // Per-tag configuration. Flat schema for simpler form binding.
+      // Attack tag reuses roll.targetDefense and roll.damageType — no extra config needed.
+      tagConfig: new fields.SchemaField({
+        healTarget:      new fields.StringField({ initial: 'selected' }),
+        buffAttribute:   new fields.StringField({ initial: 'abilities.strength' }),
+        buffDuration:    new fields.NumberField({ initial: 1, integer: true, min: 0 }),
+        debuffAttribute: new fields.StringField({ initial: 'abilities.strength' }),
+        debuffDuration:  new fields.NumberField({ initial: 1, integer: true, min: 0 }),
+      }),
     };
   }
 }

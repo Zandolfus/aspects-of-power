@@ -28,3 +28,44 @@ ASPECTSOFPOWER.abilityAbbreviations = {
   wisdom: 'ASPECTSOFPOWER.Ability.wisdom.abbr',
   perception: 'ASPECTSOFPOWER.Ability.perception.abbr',
 };
+
+/**
+ * Tags that define what a skill does when activated.
+ * A skill can have multiple tags (e.g. [attack, debuff]).
+ */
+ASPECTSOFPOWER.skillTags = {
+  attack: 'ASPECTSOFPOWER.Tag.attack',
+  heal:   'ASPECTSOFPOWER.Tag.heal',
+  buff:   'ASPECTSOFPOWER.Tag.buff',
+  debuff: 'ASPECTSOFPOWER.Tag.debuff',
+};
+
+/**
+ * Attributes that buffs and debuffs can target via ActiveEffects.
+ */
+ASPECTSOFPOWER.buffableAttributes = {
+  'abilities.vitality':     'ASPECTSOFPOWER.Ability.vitality.long',
+  'abilities.endurance':    'ASPECTSOFPOWER.Ability.endurance.long',
+  'abilities.strength':     'ASPECTSOFPOWER.Ability.strength.long',
+  'abilities.dexterity':    'ASPECTSOFPOWER.Ability.dexterity.long',
+  'abilities.toughness':    'ASPECTSOFPOWER.Ability.toughness.long',
+  'abilities.intelligence': 'ASPECTSOFPOWER.Ability.intelligence.long',
+  'abilities.willpower':    'ASPECTSOFPOWER.Ability.willpower.long',
+  'abilities.wisdom':       'ASPECTSOFPOWER.Ability.wisdom.long',
+  'abilities.perception':   'ASPECTSOFPOWER.Ability.perception.long',
+  'defense.armor':          'ASPECTSOFPOWER.Defense.armor',
+  'defense.veil':           'ASPECTSOFPOWER.Defense.veil',
+  'defense.melee':          'ASPECTSOFPOWER.Defense.melee',
+  'defense.ranged':         'ASPECTSOFPOWER.Defense.ranged',
+  'defense.mind':           'ASPECTSOFPOWER.Defense.mind',
+  'defense.soul':           'ASPECTSOFPOWER.Defense.soul',
+};
+
+/**
+ * Valid targets for the heal tag.
+ */
+ASPECTSOFPOWER.healTargets = {
+  self:     'ASPECTSOFPOWER.HealTarget.self',
+  ally:     'ASPECTSOFPOWER.HealTarget.ally',
+  selected: 'ASPECTSOFPOWER.HealTarget.selected',
+};

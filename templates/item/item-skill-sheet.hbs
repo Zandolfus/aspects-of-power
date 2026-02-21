@@ -30,39 +30,52 @@
 
     {{! Damage Tab }}
     <div class='tab damage' data-group='primary' data-tab='damage'>
-      {{! As you add new fields, add them in here! }}
+
+      {{! ── Tag Checkboxes ── }}
+      <div class='skill-tags'>
+        <label class='resource-label'>{{localize "ASPECTSOFPOWER.Tag.label"}}</label>
+        <div class='tag-checkboxes'>
+          {{#each config.skillTags as |label key|}}
+            <label class='tag-checkbox'>
+              <input type='checkbox' name='system.tags' value='{{key}}'
+                {{#if (includes ../system.tags key)}}checked{{/if}} />
+              {{localize label}}
+            </label>
+          {{/each}}
+        </div>
+      </div>
+
+      {{! ── Shared Roll Config (always visible) ── }}
       <div class='resource'>
-        <div class='grid grid-4col'>
-          <div class='grid grid-5col'>
-            <div class='grid-span-1'>
-              <label class='resource-label'>Ability</label>
-              <select name='system.roll.abilities' data-dtype='String'>
-                <option value="vitality" {{#if (eq system.roll.abilities "vitality")}}selected{{/if}}>Vitality</option>
-                <option value="strength" {{#if (eq system.roll.abilities "strength")}}selected{{/if}}>Strength</option>
-                <option value="dexterity" {{#if (eq system.roll.abilities "dexterity")}}selected{{/if}}>Dexterity</option>
-                <option value="toughness" {{#if (eq system.roll.abilities "toughness")}}selected{{/if}}>Toughness</option>
-                <option value="intelligence" {{#if (eq system.roll.abilities "intelligence")}}selected{{/if}}>Intelligence</option>
-                <option value="willpower" {{#if (eq system.roll.abilities "willpower")}}selected{{/if}}>Willpower</option>
-                <option value="wisdom" {{#if (eq system.roll.abilities "wisdom")}}selected{{/if}}>Wisdom</option>
-                <option value="perception" {{#if (eq system.roll.abilities "perception")}}selected{{/if}}>Perception</option>
-              </select>
-            </div>
+        <div class='grid grid-5col'>
+          <div class='grid-span-1'>
+            <label class='resource-label'>Ability</label>
+            <select name='system.roll.abilities' data-dtype='String'>
+              <option value="vitality" {{#if (eq system.roll.abilities "vitality")}}selected{{/if}}>Vitality</option>
+              <option value="strength" {{#if (eq system.roll.abilities "strength")}}selected{{/if}}>Strength</option>
+              <option value="dexterity" {{#if (eq system.roll.abilities "dexterity")}}selected{{/if}}>Dexterity</option>
+              <option value="toughness" {{#if (eq system.roll.abilities "toughness")}}selected{{/if}}>Toughness</option>
+              <option value="intelligence" {{#if (eq system.roll.abilities "intelligence")}}selected{{/if}}>Intelligence</option>
+              <option value="willpower" {{#if (eq system.roll.abilities "willpower")}}selected{{/if}}>Willpower</option>
+              <option value="wisdom" {{#if (eq system.roll.abilities "wisdom")}}selected{{/if}}>Wisdom</option>
+              <option value="perception" {{#if (eq system.roll.abilities "perception")}}selected{{/if}}>Perception</option>
+            </select>
+          </div>
           <div class='grid-span-1'>
             <label class='resource-label'>Dice</label>
             <input type='text' name='system.roll.dice' value='{{system.roll.dice}}' data-dtype='String' />
           </div>
-
           <div class='grid-span-1'>
             <label class='resource-label'>Multiplier</label>
             <input type='number' name='system.roll.diceBonus' value='{{system.roll.diceBonus}}' min='0' step='0.01' />
           </div>
           <div class='grid-span-1'>
-              <label class='resource-label'>Resource</label>
-              <select name='system.roll.resource'>
-                <option value="mana" {{#if (eq system.roll.resource "mana")}}selected{{/if}}>Mana</option>
-                <option value="stamina" {{#if (eq system.roll.resource "stamina")}}selected{{/if}}>Stamina</option>
-                <option value="health" {{#if (eq system.roll.resource "health")}}selected{{/if}}>Health</option>
-              </select>
+            <label class='resource-label'>Resource</label>
+            <select name='system.roll.resource'>
+              <option value="mana" {{#if (eq system.roll.resource "mana")}}selected{{/if}}>Mana</option>
+              <option value="stamina" {{#if (eq system.roll.resource "stamina")}}selected{{/if}}>Stamina</option>
+              <option value="health" {{#if (eq system.roll.resource "health")}}selected{{/if}}>Health</option>
+            </select>
           </div>
           <div class='grid-span-1'>
             <label class='resource-label'>Cost</label>
@@ -70,36 +83,86 @@
           </div>
           <div class='grid-span-1'>
             <label class='resource-label'>Skill Type</label>
-              <select name='system.roll.type' data-dtype='String'>
-                <option value="str_weapon" {{#if (eq system.roll.type "str_weapon")}}selected{{/if}}>Strength Weapon</option>
-                <option value="dex_weapon" {{#if (eq system.roll.type "dex_weapon")}}selected{{/if}}>Dexterity Weapon</option>
-                <option value="phys_ranged" {{#if (eq system.roll.type "phys_ranged")}}selected{{/if}}>Physical Ranged Weapon</option>
-                <option value="magic" {{#if (eq system.roll.type "magic")}}selected{{/if}}>Magic</option>
-                <option value="magic_projectile" {{#if (eq system.roll.type "magic_projectile")}}selected{{/if}}>Magic Projectile</option>
-                <option value="magic_melee" {{#if (eq system.roll.type "magic_melee")}}selected{{/if}}>Magic Melee</option>
-                <option value="wisdom_dexterity" {{#if (eq system.roll.type "wisdom_dexterity")}}selected{{/if}}>Wisdom Dexterity</option>
-              </select>
-          </div>
-          <div class='grid-span-1'>
-            <label class='resource-label'>Target Defense</label>
-            <select name='system.roll.targetDefense' data-dtype='String'>
-              <option value="" {{#if (eq system.roll.targetDefense "")}}selected{{/if}}>(none)</option>
-              <option value="melee" {{#if (eq system.roll.targetDefense "melee")}}selected{{/if}}>Melee</option>
-              <option value="ranged" {{#if (eq system.roll.targetDefense "ranged")}}selected{{/if}}>Ranged</option>
-              <option value="mind" {{#if (eq system.roll.targetDefense "mind")}}selected{{/if}}>Mind</option>
-              <option value="soul" {{#if (eq system.roll.targetDefense "soul")}}selected{{/if}}>Soul</option>
-            </select>
-          </div>
-          <div class='grid-span-1'>
-            <label class='resource-label'>Damage Type</label>
-            <select name='system.roll.damageType' data-dtype='String'>
-              <option value="physical" {{#if (eq system.roll.damageType "physical")}}selected{{/if}}>Physical (Armor)</option>
-              <option value="magical" {{#if (eq system.roll.damageType "magical")}}selected{{/if}}>Magical (Veil)</option>
+            <select name='system.roll.type' data-dtype='String'>
+              <option value="str_weapon" {{#if (eq system.roll.type "str_weapon")}}selected{{/if}}>Strength Weapon</option>
+              <option value="dex_weapon" {{#if (eq system.roll.type "dex_weapon")}}selected{{/if}}>Dexterity Weapon</option>
+              <option value="phys_ranged" {{#if (eq system.roll.type "phys_ranged")}}selected{{/if}}>Physical Ranged Weapon</option>
+              <option value="magic" {{#if (eq system.roll.type "magic")}}selected{{/if}}>Magic</option>
+              <option value="magic_projectile" {{#if (eq system.roll.type "magic_projectile")}}selected{{/if}}>Magic Projectile</option>
+              <option value="magic_melee" {{#if (eq system.roll.type "magic_melee")}}selected{{/if}}>Magic Melee</option>
+              <option value="wisdom_dexterity" {{#if (eq system.roll.type "wisdom_dexterity")}}selected{{/if}}>Wisdom Dexterity</option>
             </select>
           </div>
         </div>
       </div>
+
+      {{! ── Attack Tag Config ── }}
+      {{#if (includes system.tags "attack")}}
+      <div class='tag-config attack-config'>
+        <label class='resource-label'>Target Defense</label>
+        <select name='system.roll.targetDefense' data-dtype='String'>
+          <option value="" {{#if (eq system.roll.targetDefense "")}}selected{{/if}}>(none)</option>
+          <option value="melee" {{#if (eq system.roll.targetDefense "melee")}}selected{{/if}}>Melee</option>
+          <option value="ranged" {{#if (eq system.roll.targetDefense "ranged")}}selected{{/if}}>Ranged</option>
+          <option value="mind" {{#if (eq system.roll.targetDefense "mind")}}selected{{/if}}>Mind</option>
+          <option value="soul" {{#if (eq system.roll.targetDefense "soul")}}selected{{/if}}>Soul</option>
+        </select>
+        <label class='resource-label'>Damage Type</label>
+        <select name='system.roll.damageType' data-dtype='String'>
+          <option value="physical" {{#if (eq system.roll.damageType "physical")}}selected{{/if}}>Physical (Armor)</option>
+          <option value="magical" {{#if (eq system.roll.damageType "magical")}}selected{{/if}}>Magical (Veil)</option>
+        </select>
       </div>
+      {{/if}}
+
+      {{! ── Heal Tag Config ── }}
+      {{#if (includes system.tags "heal")}}
+      <div class='tag-config heal-config'>
+        <label class='resource-label'>{{localize "ASPECTSOFPOWER.TagConfig.healTarget"}}</label>
+        <select name='system.tagConfig.healTarget'>
+          {{#each config.healTargets as |label key|}}
+            <option value='{{key}}' {{#if (eq key ../system.tagConfig.healTarget)}}selected{{/if}}>
+              {{localize label}}
+            </option>
+          {{/each}}
+        </select>
+      </div>
+      {{/if}}
+
+      {{! ── Buff Tag Config ── }}
+      {{#if (includes system.tags "buff")}}
+      <div class='tag-config buff-config'>
+        <label class='resource-label'>{{localize "ASPECTSOFPOWER.TagConfig.buffAttribute"}}</label>
+        <select name='system.tagConfig.buffAttribute'>
+          {{#each config.buffableAttributes as |label key|}}
+            <option value='{{key}}' {{#if (eq key ../system.tagConfig.buffAttribute)}}selected{{/if}}>
+              {{localize label}}
+            </option>
+          {{/each}}
+        </select>
+        <label class='resource-label'>{{localize "ASPECTSOFPOWER.TagConfig.duration"}}</label>
+        <input type='number' name='system.tagConfig.buffDuration'
+               value='{{system.tagConfig.buffDuration}}' min='0' step='1' />
+      </div>
+      {{/if}}
+
+      {{! ── Debuff Tag Config ── }}
+      {{#if (includes system.tags "debuff")}}
+      <div class='tag-config debuff-config'>
+        <label class='resource-label'>{{localize "ASPECTSOFPOWER.TagConfig.debuffAttribute"}}</label>
+        <select name='system.tagConfig.debuffAttribute'>
+          {{#each config.buffableAttributes as |label key|}}
+            <option value='{{key}}' {{#if (eq key ../system.tagConfig.debuffAttribute)}}selected{{/if}}>
+              {{localize label}}
+            </option>
+          {{/each}}
+        </select>
+        <label class='resource-label'>{{localize "ASPECTSOFPOWER.TagConfig.duration"}}</label>
+        <input type='number' name='system.tagConfig.debuffDuration'
+               value='{{system.tagConfig.debuffDuration}}' min='0' step='1' />
+      </div>
+      {{/if}}
+
     </div>
 
     {{! Attributes Tab }}

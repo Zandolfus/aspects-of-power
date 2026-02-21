@@ -22,6 +22,32 @@
 
       }
     },
+    "Tag": {
+      "label": "Tags",
+      "attack": "Attack",
+      "heal": "Heal",
+      "buff": "Buff",
+      "debuff": "Debuff"
+    },
+    "TagConfig": {
+      "healTarget": "Heal Target",
+      "buffAttribute": "Buff Attribute",
+      "debuffAttribute": "Debuff Attribute",
+      "duration": "Duration (rounds)"
+    },
+    "HealTarget": {
+      "self": "Self",
+      "ally": "Ally",
+      "selected": "Selected Target"
+    },
+    "Defense": {
+      "armor": "Armor",
+      "veil": "Veil",
+      "melee": "Melee",
+      "ranged": "Ranged",
+      "mind": "Mind",
+      "soul": "Soul"
+    },
     "Effect": {
       "Source": "Source",
       "Toggle": "Toggle Effect",

@@ -72,6 +72,29 @@ export class AspectsofPowerItemSheet extends foundry.applications.api.Handlebars
    * @override
    */
   async _onChangeForm(formConfig, event) {
+    // Tag checkboxes: collect all checked values into an array.
+    if (this.item.type === 'skill' && event.target?.name === 'system.tags') {
+      const form = this.element.querySelector('form');
+      const checked = [...form.querySelectorAll('input[name="system.tags"]:checked')]
+        .map(el => el.value);
+      await this.document.update({ 'system.tags': checked });
+      return;
+    }
+
+    // Tag-specific config: collect all tagConfig fields atomically.
+    if (this.item.type === 'skill' && event.target?.name?.startsWith('system.tagConfig.')) {
+      const form = this.element.querySelector('form');
+      const tagConfigData = {
+        healTarget:      form.querySelector('[name="system.tagConfig.healTarget"]')?.value ?? 'selected',
+        buffAttribute:   form.querySelector('[name="system.tagConfig.buffAttribute"]')?.value ?? 'abilities.strength',
+        buffDuration:    Number(form.querySelector('[name="system.tagConfig.buffDuration"]')?.value) || 1,
+        debuffAttribute: form.querySelector('[name="system.tagConfig.debuffAttribute"]')?.value ?? 'abilities.strength',
+        debuffDuration:  Number(form.querySelector('[name="system.tagConfig.debuffDuration"]')?.value) || 1,
+      };
+      await this.document.update({ 'system.tagConfig': tagConfigData });
+      return;
+    }
+
     if (this.item.type === 'skill' && event.target?.name?.startsWith('system.roll.')) {
       const form = this.element.querySelector('form');
       const rollData = {
