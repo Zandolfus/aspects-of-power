@@ -15,6 +15,17 @@ import { preloadHandlebarsTemplates } from './helpers/templates.mjs';
 import { ASPECTSOFPOWER } from './helpers/config.mjs';
 
 /* -------------------------------------------- */
+/*  Movement Distance Tracker (per combat turn) */
+/* -------------------------------------------- */
+
+/**
+ * Tracks cumulative movement distance (in feet) per combatant per turn.
+ * Key: combatant ID, Value: total feet moved this turn.
+ * Reset at the start of each combatant's turn via combatTurnChange.
+ */
+const _movementTracker = new Map();
+
+/* -------------------------------------------- */
 /*  Init Hook                                   */
 /* -------------------------------------------- */
 
@@ -218,6 +229,198 @@ Hooks.on('combatTurnChange', async (combat, prior, _current) => {
       content: `<p>Expired effects on <strong>${actor.name}</strong>: ${names.join(', ')}</p>`,
     });
   }
+});
+
+/* -------------------------------------------- */
+/*  Casting Range Aura — Canvas Visual          */
+/* -------------------------------------------- */
+
+/**
+ * Draw a translucent circle around owned tokens whose casting range
+ * aura is toggled on. Redrawn on every token refresh (idempotent).
+ * Only visible to the token's owning player(s).
+ */
+Hooks.on('refreshToken', (token) => {
+  // Remove any existing aura graphic first (idempotent redraw).
+  if (token._castingRangeAura) {
+    token._castingRangeAura.destroy();
+    token._castingRangeAura = null;
+  }
+
+  // Guard: only draw for tokens the current user owns.
+  if (!token.document.isOwner) return;
+
+  // Guard: check the toggle flag.
+  const showRange = token.document.getFlag('aspects-of-power', 'showRange');
+  if (!showRange) return;
+
+  // Guard: need a valid actor with a derived castingRange.
+  const actor = token.document.actor;
+  if (!actor?.system?.castingRange) return;
+
+  // Convert world-unit range (feet) to canvas pixels.
+  const rangeInFeet  = actor.system.castingRange;
+  const pixelsPerFoot = canvas.grid.size / canvas.grid.distance;
+  const radiusPx     = rangeInFeet * pixelsPerFoot;
+
+  // Center the circle on the token's visual center.
+  const centerX = (token.document.width * canvas.grid.size) / 2;
+  const centerY = (token.document.height * canvas.grid.size) / 2;
+
+  const gfx = new PIXI.Graphics();
+  gfx.circle(centerX, centerY, radiusPx);
+  gfx.fill({ color: 0x4488ff, alpha: 0.1 });
+  gfx.stroke({ color: 0x4488ff, alpha: 0.5, width: 2 });
+
+  // Insert below the token image so it doesn't obscure it.
+  token.addChildAt(gfx, 0);
+  token._castingRangeAura = gfx;
+});
+
+/* -------------------------------------------- */
+/*  Token HUD — Casting Range Toggle            */
+/* -------------------------------------------- */
+
+/**
+ * Add a "Toggle Casting Range" button to the Token HUD.
+ * Only shown for tokens the user owns.
+ */
+Hooks.on('renderTokenHUD', (hud, html, data) => {
+  const tokenDoc = hud.object.document;
+  if (!tokenDoc.isOwner) return;
+  if (!tokenDoc.actor?.system?.castingRange) return;
+
+  const isActive = tokenDoc.getFlag('aspects-of-power', 'showRange') ? 'active' : '';
+  const button = document.createElement('div');
+  button.classList.add('control-icon');
+  if (isActive) button.classList.add('active');
+  button.setAttribute('data-action', 'toggle-casting-range');
+  button.setAttribute('title', 'Toggle Casting Range');
+  button.innerHTML = '<i class="fas fa-bullseye"></i>';
+
+  button.addEventListener('click', async (ev) => {
+    ev.preventDefault();
+    const current = tokenDoc.getFlag('aspects-of-power', 'showRange');
+    await tokenDoc.setFlag('aspects-of-power', 'showRange', !current);
+    button.classList.toggle('active');
+  });
+
+  // Append to the right-side column of the HUD.
+  const rightCol = html.querySelector('.col.right') ?? html.querySelector('.right');
+  if (rightCol) rightCol.appendChild(button);
+});
+
+/* -------------------------------------------- */
+/*  Movement Tracker Reset — Start of Turn      */
+/* -------------------------------------------- */
+
+/**
+ * Clear cumulative movement distance when a new turn starts.
+ * Runs on every client so the preUpdateToken guard works locally.
+ */
+Hooks.on('combatTurnChange', () => {
+  _movementTracker.clear();
+});
+
+/**
+ * Clean up the movement tracker when combat ends.
+ */
+Hooks.on('deleteCombat', () => {
+  _movementTracker.clear();
+});
+
+/* -------------------------------------------- */
+/*  Stamina-based Movement Cost & Limits        */
+/* -------------------------------------------- */
+
+/**
+ * Intercept token movement to enforce stamina costs and maximum range.
+ *
+ * Walk zone:   1 stamina per 5 ft, up to walkRange ft
+ * Sprint zone: 3 stamina per 5 ft, from walkRange to 2*walkRange ft
+ * Beyond 2*walkRange: movement blocked.
+ *
+ * Only applies during active combat. GM moves are exempt.
+ */
+Hooks.on('preUpdateToken', (tokenDoc, changes, options, userId) => {
+  // Only process position changes.
+  if (!('x' in changes) && !('y' in changes)) return;
+
+  // Only the user who initiated the move should evaluate this.
+  if (game.user.id !== userId) return;
+
+  // Exempt: no active combat.
+  const combat = game.combat;
+  if (!combat?.started) return;
+
+  // Exempt: the mover is a GM.
+  if (game.user.isGM) return;
+
+  // Identify the combatant for this token.
+  const combatant = combat.combatants.find(
+    c => c.tokenId === tokenDoc.id && c.sceneId === tokenDoc.parent?.id
+  );
+  if (!combatant) return;
+
+  const actor = tokenDoc.actor;
+  if (!actor?.system) return;
+
+  const walkRange = actor.system.walkRange;
+  if (!walkRange || walkRange <= 0) return;
+
+  const maxRange = 2 * walkRange;
+  const stamina  = actor.system.stamina;
+
+  // Calculate the distance of this move in feet.
+  const oldX = tokenDoc.x;
+  const oldY = tokenDoc.y;
+  const newX = changes.x ?? oldX;
+  const newY = changes.y ?? oldY;
+
+  const dx = newX - oldX;
+  const dy = newY - oldY;
+  const distancePx   = Math.sqrt(dx * dx + dy * dy);
+  const pixelsPerFoot = canvas.grid.size / canvas.grid.distance;
+  const moveFeet     = distancePx / pixelsPerFoot;
+
+  // Snap to 5ft increments.
+  const moveSnapped = Math.round(moveFeet / 5) * 5;
+  if (moveSnapped <= 0) return;
+
+  // Cumulative distance this turn.
+  const prevDistance  = _movementTracker.get(combatant.id) ?? 0;
+  const totalDistance = prevDistance + moveSnapped;
+
+  // Check max range.
+  if (totalDistance > maxRange) {
+    ui.notifications.warn(`Maximum movement distance exceeded! (${Math.round(maxRange)} ft max)`);
+    return false;
+  }
+
+  // Calculate stamina cost for the segments in this move.
+  let staminaCost = 0;
+  for (let ft = prevDistance + 5; ft <= totalDistance; ft += 5) {
+    staminaCost += (ft <= walkRange) ? 1 : 3;
+  }
+
+  // Check sufficient stamina.
+  if (staminaCost > stamina.value) {
+    ui.notifications.warn('Insufficient stamina to move!');
+    return false;
+  }
+
+  // Update tracker synchronously, deduct stamina asynchronously.
+  _movementTracker.set(combatant.id, totalDistance);
+
+  const newStamina = stamina.value - staminaCost;
+  Promise.resolve().then(async () => {
+    await actor.update({ 'system.stamina.value': newStamina });
+    ChatMessage.create({
+      speaker: ChatMessage.getSpeaker({ actor }),
+      content: `<p><em>${actor.name} spends ${staminaCost} stamina on movement (${moveSnapped} ft). `
+             + `Stamina: ${newStamina}/${stamina.max}</em></p>`,
+    });
+  });
 });
 
 /* -------------------------------------------- */

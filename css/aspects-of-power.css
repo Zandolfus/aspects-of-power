@@ -524,3 +524,9 @@
 .aspects-of-power .effects .item .effect-controls {
   border: none;
 }
+/* Casting range toggle in Token HUD */
+.control-icon[data-action="toggle-casting-range"].active {
+  color: #4488ff;
+  border-color: #4488ff;
+  box-shadow: 0 0 6px #4488ff;
+}

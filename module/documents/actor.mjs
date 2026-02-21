@@ -65,6 +65,11 @@ export class AspectsofPowerActor extends Actor {
     systemData.defense.mind.value = Math.round((systemData.abilities.intelligence.mod + systemData.abilities.wisdom.mod*.3)*1.1);
     systemData.defense.soul.value =  Math.round((systemData.abilities.wisdom.mod + systemData.abilities.willpower.mod*.3)*1.1);
 
+    // Casting range (feet) and movement ranges (feet).
+    systemData.castingRange = 40 + (systemData.abilities.perception.mod / 10);
+    systemData.walkRange    = 35 + (systemData.abilities.endurance.mod / 10);
+    systemData.sprintRange  = 2 * systemData.walkRange;
+
     // Make separate methods for each Actor type (character, npc, etc.) to keep
     // things organized.
     this._prepareCharacterData(actorData);

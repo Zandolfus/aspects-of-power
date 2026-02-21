@@ -47,6 +47,16 @@
       "ally": "Ally",
       "selected": "Selected Target"
     },
+    "Range": {
+      "castingRange": "Casting Range",
+      "walkRange": "Walk Range",
+      "sprintRange": "Sprint Range",
+      "toggleCastingRange": "Toggle Casting Range"
+    },
+    "Movement": {
+      "insufficientStamina": "Insufficient stamina to move!",
+      "maxDistanceExceeded": "Maximum movement distance exceeded!"
+    },
     "Defense": {
       "armor": "Armor",
       "veil": "Veil",
