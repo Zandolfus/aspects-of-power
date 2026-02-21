@@ -268,12 +268,23 @@ Hooks.on('refreshToken', (token) => {
   const centerY = (token.document.height * canvas.grid.size) / 2;
 
   const gfx = new PIXI.Graphics();
-  gfx.circle(centerX, centerY, radiusPx);
-  gfx.fill({ color: 0x4488ff, alpha: 0.1 });
-  gfx.stroke({ color: 0x4488ff, alpha: 0.5, width: 2 });
 
-  // Insert below the token image so it doesn't obscure it.
-  token.addChildAt(gfx, 0);
+  // PIXI v7 (beginFill/drawCircle) vs v8 (circle/fill) — detect which API is available.
+  if (typeof gfx.drawCircle === 'function') {
+    // PIXI v7 style
+    gfx.beginFill(0x4488ff, 0.1);
+    gfx.lineStyle(2, 0x4488ff, 0.5);
+    gfx.drawCircle(centerX, centerY, radiusPx);
+    gfx.endFill();
+  } else {
+    // PIXI v8 style
+    gfx.circle(centerX, centerY, radiusPx);
+    gfx.fill({ color: 0x4488ff, alpha: 0.1 });
+    gfx.stroke({ color: 0x4488ff, alpha: 0.5, width: 2 });
+  }
+
+  // Add on top of the token's children so the circle is visible.
+  token.addChild(gfx);
   token._castingRangeAura = gfx;
 });
 
