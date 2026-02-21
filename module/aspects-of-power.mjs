@@ -87,7 +87,11 @@ Handlebars.registerHelper('includes', function (array, value) {
 
 Hooks.once('ready', function () {
   // Wait to register hotbar drop hook on ready so that modules could register earlier if they want to
-  Hooks.on('hotbarDrop', (bar, data, slot) => createItemMacro(data, slot));
+  Hooks.on('hotbarDrop', (bar, data, slot) => {
+    if (data.type !== 'Item') return;
+    createItemMacro(data, slot);   // fire-and-forget async
+    return false;                  // prevent Foundry's default (which opens the sheet)
+  });
 
   // Socket listener: only the active GM executes mutations so that
   // players can buff/debuff/heal actors they don't own.
