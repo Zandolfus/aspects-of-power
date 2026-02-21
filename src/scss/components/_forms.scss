@@ -102,6 +102,28 @@ form {
     .pm-dropdown.open > ul {
       display: block;
     }
+
+    .pm-dropdown > ul li {
+      position: relative;
+      list-style: none;
+    }
+
+    .pm-dropdown > ul li > ul {
+      display: none;
+      position: absolute;
+      z-index: 101;
+      top: 0;
+      left: 100%;
+      background: #fff;
+      border: 1px solid #999;
+      list-style: none;
+      padding: 4px 0;
+      min-width: 150px;
+    }
+
+    .pm-dropdown > ul li:hover > ul {
+      display: block;
+    }
   }
 
   .editor-content {

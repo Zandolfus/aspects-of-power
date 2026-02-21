@@ -295,6 +295,25 @@
 .aspects-of-power .sheet-body .tab .editor .editor-menu .pm-dropdown.open > ul {
   display: block;
 }
+.aspects-of-power .sheet-body .tab .editor .editor-menu .pm-dropdown > ul li {
+  position: relative;
+  list-style: none;
+}
+.aspects-of-power .sheet-body .tab .editor .editor-menu .pm-dropdown > ul li > ul {
+  display: none;
+  position: absolute;
+  z-index: 101;
+  top: 0;
+  left: 100%;
+  background: #fff;
+  border: 1px solid #999;
+  list-style: none;
+  padding: 4px 0;
+  min-width: 150px;
+}
+.aspects-of-power .sheet-body .tab .editor .editor-menu .pm-dropdown > ul li:hover > ul {
+  display: block;
+}
 .aspects-of-power .sheet-body .tab .editor .editor-content {
   flex: 1;
   overflow-y: auto;
