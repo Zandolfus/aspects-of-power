@@ -30,17 +30,18 @@ export class SkillData extends foundry.abstract.TypeDataModel {
       tagConfig: new fields.SchemaField({
         healTarget:       new fields.StringField({ initial: 'selected' }),
 
-        // Buff: array of { attribute, value } pairs + duration.
+        // Buff: array of { attribute, value (multiplier) } pairs + duration.
+        // value is a multiplier applied to the roll total (default 1 = full roll value).
         buffEntries: new fields.ArrayField(new fields.SchemaField({
           attribute: new fields.StringField({ initial: 'abilities.strength' }),
-          value:     new fields.NumberField({ initial: 0, integer: true }),
+          value:     new fields.NumberField({ initial: 1, min: 0 }),
         }), { initial: [] }),
         buffDuration: new fields.NumberField({ initial: 1, integer: true, min: 0 }),
 
-        // Debuff: array of { attribute, value } pairs + duration + optional DoT.
+        // Debuff: array of { attribute, value (multiplier) } pairs + duration + optional DoT.
         debuffEntries: new fields.ArrayField(new fields.SchemaField({
           attribute: new fields.StringField({ initial: 'abilities.strength' }),
-          value:     new fields.NumberField({ initial: 0, integer: true }),
+          value:     new fields.NumberField({ initial: 1, min: 0 }),
         }), { initial: [] }),
         debuffDuration:    new fields.NumberField({ initial: 1, integer: true, min: 0 }),
         debuffDealsDamage: new fields.BooleanField({ initial: false }),

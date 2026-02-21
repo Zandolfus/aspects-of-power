@@ -143,8 +143,9 @@
                          value='{{this.key}}' {{#if this.checked}}checked{{/if}} />
                   {{this.label}}
                   {{#if this.checked}}
+                    <span class='multiplier-label'>&times;</span>
                     <input type='number' class='attr-value' data-attr='{{this.key}}'
-                           data-target='buff' value='{{this.value}}' min='0' step='1' />
+                           data-target='buff' value='{{this.value}}' min='0' step='0.1' />
                   {{/if}}
                 </label>
               {{/each}}
@@ -171,8 +172,9 @@
                          value='{{this.key}}' {{#if this.checked}}checked{{/if}} />
                   {{this.label}}
                   {{#if this.checked}}
+                    <span class='multiplier-label'>&times;</span>
                     <input type='number' class='attr-value' data-attr='{{this.key}}'
-                           data-target='debuff' value='{{this.value}}' min='0' step='1' />
+                           data-target='debuff' value='{{this.value}}' min='0' step='0.1' />
                   {{/if}}
                 </label>
               {{/each}}

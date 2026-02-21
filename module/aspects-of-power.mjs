@@ -89,15 +89,18 @@ Hooks.once('ready', function () {
   // Wait to register hotbar drop hook on ready so that modules could register earlier if they want to
   Hooks.on('hotbarDrop', (bar, data, slot) => createItemMacro(data, slot));
 
-  // Socket listener: only the active GM creates combat-result messages so that
-  // the originating player is never the message author and can never see them.
+  // Socket listener: only the active GM executes mutations so that
+  // players can buff/debuff/heal actors they don't own.
   game.socket.on('system.aspects-of-power', async (payload) => {
     if (game.users.activeGM !== game.user) return;
+
     if (payload.type === 'gmCombatResult') {
       await ChatMessage.create({
         whisper: ChatMessage.getWhisperRecipients('GM'),
         content: payload.content,
       });
+    } else if (['gmApplyBuff', 'gmApplyDebuff', 'gmApplyHeal'].includes(payload.type)) {
+      await AspectsofPowerItem.executeGmAction(payload);
     }
   });
 });

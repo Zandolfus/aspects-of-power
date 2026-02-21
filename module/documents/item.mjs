@@ -154,11 +154,129 @@ export class AspectsofPowerItem extends Item {
   }
 
   /**
-   * Heal tag: apply the roll total as healing to the target.
+   * Route a payload to the GM for execution. If the current user IS the GM,
+   * execute directly; otherwise send via socket.
+   */
+  async _gmAction(payload) {
+    if (game.user.isGM) {
+      await AspectsofPowerItem.executeGmAction(payload);
+    } else {
+      game.socket.emit('system.aspects-of-power', payload);
+    }
+  }
+
+  /**
+   * Execute a GM-routed action. Called directly by the GM or via socket handler.
+   * @param {object} payload
+   */
+  static async executeGmAction(payload) {
+    switch (payload.type) {
+
+      case 'gmApplyHeal': {
+        const target = await fromUuid(payload.targetActorUuid);
+        if (!target) return;
+        const health    = target.system.health;
+        const newHealth = Math.min(health.max, health.value + payload.healAmount);
+        const actualHeal = newHealth - health.value;
+        await target.update({ 'system.health.value': newHealth });
+        ChatMessage.create({
+          speaker: payload.speaker, rollMode: payload.rollMode,
+          content: `<p><strong>${target.name}</strong> heals for <strong>${actualHeal}</strong>. `
+                 + `Health: ${newHealth} / ${health.max}</p>`,
+        });
+        break;
+      }
+
+      case 'gmApplyBuff': {
+        const target = await fromUuid(payload.targetActorUuid);
+        if (!target) return;
+        const existing = target.effects.find(
+          e => e.origin === payload.originUuid && e.name === payload.effectName
+        );
+        const newTotal = payload.changes.reduce((sum, c) => sum + Number(c.value), 0);
+
+        if (existing) {
+          if (existing.disabled) {
+            await existing.update({
+              disabled: false,
+              changes: payload.changes,
+              'duration.rounds': payload.duration,
+            });
+          } else {
+            const currentTotal = (existing.changes ?? []).reduce((sum, c) => sum + Number(c.value), 0);
+            if (newTotal > currentTotal) {
+              await existing.update({ changes: payload.changes, 'duration.rounds': payload.duration });
+              ChatMessage.create({ speaker: payload.speaker, rollMode: payload.rollMode,
+                content: `<p>Buff on <strong>${target.name}</strong> upgraded (total +${newTotal}, was +${currentTotal}).</p>`,
+              });
+            } else {
+              ChatMessage.create({ speaker: payload.speaker, rollMode: payload.rollMode,
+                content: `<p>Existing buff on <strong>${target.name}</strong> is stronger (+${currentTotal}). No change.</p>`,
+              });
+            }
+            return;
+          }
+        } else {
+          await target.createEmbeddedDocuments('ActiveEffect', [{
+            name:   payload.effectName,
+            img:    payload.img,
+            origin: payload.originUuid,
+            'duration.rounds': payload.duration,
+            disabled: false,
+            changes: payload.changes,
+          }]);
+        }
+
+        const summary = payload.changes.map(c => {
+          const attr = c.key.replace('system.', '').replace('.value', '');
+          return `${attr} +${c.value}`;
+        }).join(', ');
+        ChatMessage.create({ speaker: payload.speaker, rollMode: payload.rollMode,
+          content: `<p><strong>${target.name}</strong> buffed: ${summary} for ${payload.duration} rounds.</p>`,
+        });
+        break;
+      }
+
+      case 'gmApplyDebuff': {
+        const target = await fromUuid(payload.targetActorUuid);
+        if (!target) return;
+
+        // Create the stacking ActiveEffect.
+        if (payload.effectData) {
+          await target.createEmbeddedDocuments('ActiveEffect', [payload.effectData]);
+        }
+
+        // Immediate DoT damage (bypasses armor/veil).
+        if (payload.dotDamage > 0) {
+          const health    = target.system.health;
+          const newHealth = Math.max(0, health.value - payload.dotDamage);
+          await target.update({ 'system.health.value': newHealth });
+          ChatMessage.create({
+            whisper: ChatMessage.getWhisperRecipients('GM'),
+            content: `<p><strong>${target.name}</strong> takes <strong>${payload.dotDamage}</strong> `
+                   + `${payload.dotDamageType} damage from ${payload.effectName} (ignores mitigation). `
+                   + `Health: ${newHealth} / ${health.max}`
+                   + `${newHealth === 0 ? ' &mdash; <em>Incapacitated!</em>' : ''}</p>`,
+          });
+        }
+
+        // Chat summary for stat changes.
+        if (payload.statSummary) {
+          ChatMessage.create({ speaker: payload.speaker, rollMode: payload.rollMode,
+            content: `<p><strong>${target.name}</strong> debuffed: ${payload.statSummary} for ${payload.duration} rounds.</p>`,
+          });
+        }
+        break;
+      }
+    }
+  }
+
+  /**
+   * Heal tag: build payload and route through GM.
    */
   async _handleHealTag(item, rollData, dmgRoll, speaker, rollMode, label) {
-    const healAmount  = Math.round(dmgRoll.total);
-    const healTarget  = this.system.tagConfig?.healTarget ?? 'selected';
+    const healAmount = Math.round(dmgRoll.total);
+    const healTarget = this.system.tagConfig?.healTarget ?? 'selected';
 
     let targetActor;
     if (healTarget === 'self') {
@@ -173,21 +291,17 @@ export class AspectsofPowerItem extends Item {
       return;
     }
 
-    const health     = targetActor.system.health;
-    const newHealth  = Math.min(health.max, health.value + healAmount);
-    const actualHeal = newHealth - health.value;
-    await targetActor.update({ 'system.health.value': newHealth });
-
-    ChatMessage.create({
+    await this._gmAction({
+      type: 'gmApplyHeal',
+      targetActorUuid: targetActor.uuid,
+      healAmount,
       speaker, rollMode,
-      content: `<p><strong>${targetActor.name}</strong> heals for <strong>${actualHeal}</strong>. `
-             + `Health: ${newHealth} / ${health.max}</p>`,
     });
   }
 
   /**
-   * Buff tag: create or update a multi-attribute ActiveEffect on the target.
-   * If the effect already exists and is active, keep the higher total (no stacking).
+   * Buff tag: build payload and route through GM.
+   * Values are roll-based: rollTotal * entry.value (multiplier, default 1).
    */
   async _handleBuffTag(item, rollData, dmgRoll, speaker, rollMode, label) {
     const targetToken = game.user.targets.first() ?? null;
@@ -197,59 +311,34 @@ export class AspectsofPowerItem extends Item {
       return;
     }
 
-    const entries    = this.system.tagConfig?.buffEntries ?? [];
-    const duration   = this.system.tagConfig?.buffDuration ?? 1;
-    const effectName = `${item.name} (Buff)`;
-    const originUuid = this.uuid;
+    const entries  = this.system.tagConfig?.buffEntries ?? [];
+    const duration = this.system.tagConfig?.buffDuration ?? 1;
+    const rollTotal = Math.round(dmgRoll.total);
 
     if (entries.length === 0) return;
 
     const changes = entries.map(e => ({
       key:   `system.${e.attribute}.value`,
       mode:  CONST.ACTIVE_EFFECT_MODES.ADD,
-      value: e.value,
+      value: Math.round(rollTotal * (e.value || 1)),
     }));
-    const newTotal = changes.reduce((sum, c) => sum + Number(c.value), 0);
 
-    const existing = targetActor.effects.find(e => e.origin === originUuid && e.name === effectName);
-
-    if (existing) {
-      if (existing.disabled) {
-        await existing.update({ disabled: false, changes, 'duration.rounds': duration });
-      } else {
-        const currentTotal = (existing.changes ?? []).reduce((sum, c) => sum + Number(c.value), 0);
-        if (newTotal > currentTotal) {
-          await existing.update({ changes, 'duration.rounds': duration });
-          ChatMessage.create({ speaker, rollMode,
-            content: `<p>Buff on <strong>${targetActor.name}</strong> upgraded (total +${newTotal}, was +${currentTotal}).</p>`,
-          });
-        } else {
-          ChatMessage.create({ speaker, rollMode,
-            content: `<p>Existing buff on <strong>${targetActor.name}</strong> is stronger (+${currentTotal}). No change.</p>`,
-          });
-        }
-        return;
-      }
-    } else {
-      await targetActor.createEmbeddedDocuments('ActiveEffect', [{
-        name:   effectName,
-        img:    item.img ?? 'icons/svg/aura.svg',
-        origin: originUuid,
-        'duration.rounds': duration,
-        disabled: false,
-        changes,
-      }]);
-    }
-
-    const summary = entries.map(e => `${e.attribute} +${e.value}`).join(', ');
-    ChatMessage.create({ speaker, rollMode,
-      content: `<p><strong>${targetActor.name}</strong> buffed: ${summary} for ${duration} rounds.</p>`,
+    await this._gmAction({
+      type: 'gmApplyBuff',
+      targetActorUuid: targetActor.uuid,
+      effectName: `${item.name} (Buff)`,
+      originUuid: this.uuid,
+      changes,
+      duration,
+      img: item.img ?? 'icons/svg/aura.svg',
+      speaker, rollMode,
     });
   }
 
   /**
-   * Debuff tag: always creates a new stacking ActiveEffect on the target.
-   * Optionally deals unmitigated damage on application (DoT stored in effect flags).
+   * Debuff tag: build payload and route through GM.
+   * Stat values are roll-based: rollTotal * entry.value (multiplier, default 1).
+   * DoT damage = raw roll total, bypasses mitigation.
    */
   async _handleDebuffTag(item, rollData, dmgRoll, speaker, rollMode, label) {
     const targetToken = game.user.targets.first() ?? null;
@@ -259,22 +348,22 @@ export class AspectsofPowerItem extends Item {
       return;
     }
 
-    const entries    = this.system.tagConfig?.debuffEntries ?? [];
-    const duration   = this.system.tagConfig?.debuffDuration ?? 1;
-    const dealsDmg   = this.system.tagConfig?.debuffDealsDamage ?? false;
-    const dmgType    = this.system.tagConfig?.debuffDamageType ?? 'physical';
-    const effectName = `${item.name} (Debuff)`;
+    const entries   = this.system.tagConfig?.debuffEntries ?? [];
+    const duration  = this.system.tagConfig?.debuffDuration ?? 1;
+    const dealsDmg  = this.system.tagConfig?.debuffDealsDamage ?? false;
+    const dmgType   = this.system.tagConfig?.debuffDamageType ?? 'physical';
+    const rollTotal = Math.round(dmgRoll.total);
 
-    // Build stat-reduction changes.
+    // Build stat-reduction changes (roll-based).
     const changes = entries.map(e => ({
       key:   `system.${e.attribute}.value`,
       mode:  CONST.ACTIVE_EFFECT_MODES.ADD,
-      value: -e.value,
+      value: -Math.round(rollTotal * (e.value || 1)),
     }));
 
     // Build effect data with optional DoT flags.
     const effectData = {
-      name:   effectName,
+      name:   `${item.name} (Debuff)`,
       img:    item.img ?? 'icons/svg/downgrade.svg',
       origin: this.uuid,
       'duration.rounds': duration,
@@ -286,41 +375,28 @@ export class AspectsofPowerItem extends Item {
       effectData.flags = {
         'aspects-of-power': {
           dot: true,
-          dotDamage: Math.round(dmgRoll.total),
+          dotDamage: rollTotal,
           dotDamageType: dmgType,
           applierActorUuid: this.actor.uuid,
         },
       };
     }
 
-    // Create the stacking effect (debuffs always stack).
-    if (changes.length > 0 || dealsDmg) {
-      await targetActor.createEmbeddedDocuments('ActiveEffect', [effectData]);
-    }
+    const statSummary = entries.length > 0
+      ? entries.map(e => `${e.attribute} -${Math.round(rollTotal * (e.value || 1))}`).join(', ')
+      : null;
 
-    // Immediate DoT damage on application (bypasses armor/veil).
-    if (dealsDmg) {
-      const dotDamage = Math.round(dmgRoll.total);
-      const health    = targetActor.system.health;
-      const newHealth = Math.max(0, health.value - dotDamage);
-      await targetActor.update({ 'system.health.value': newHealth });
-
-      ChatMessage.create({
-        whisper: ChatMessage.getWhisperRecipients('GM'),
-        content: `<p><strong>${targetActor.name}</strong> takes <strong>${dotDamage}</strong> `
-               + `${dmgType} damage from ${item.name} (ignores mitigation). `
-               + `Health: ${newHealth} / ${health.max}`
-               + `${newHealth === 0 ? ' &mdash; <em>Incapacitated!</em>' : ''}</p>`,
-      });
-    }
-
-    // Chat summary for stat changes.
-    if (entries.length > 0) {
-      const summary = entries.map(e => `${e.attribute} -${e.value}`).join(', ');
-      ChatMessage.create({ speaker, rollMode,
-        content: `<p><strong>${targetActor.name}</strong> debuffed: ${summary} for ${duration} rounds.</p>`,
-      });
-    }
+    await this._gmAction({
+      type: 'gmApplyDebuff',
+      targetActorUuid: targetActor.uuid,
+      effectName: `${item.name} (Debuff)`,
+      effectData: (changes.length > 0 || dealsDmg) ? effectData : null,
+      dotDamage: dealsDmg ? rollTotal : 0,
+      dotDamageType: dmgType,
+      duration,
+      statSummary,
+      speaker, rollMode,
+    });
   }
 
   /* ------------------------------------------------------------------ */

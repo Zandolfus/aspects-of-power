@@ -104,18 +104,18 @@ export class AspectsofPowerItemSheet extends foundry.applications.api.Handlebars
     if (this.item.type === 'skill' && event.target?.name?.startsWith('system.tagConfig.')) {
       const form = this.element.querySelector('form');
 
-      // Buff entries: collect checked attributes + their value inputs.
+      // Buff entries: collect checked attributes + their multiplier inputs.
       const buffEntries = [];
       form.querySelectorAll('input[name="system.tagConfig.buffEntries"]:checked').forEach(cb => {
         const valInput = form.querySelector(`.attr-value[data-attr="${cb.value}"][data-target="buff"]`);
-        buffEntries.push({ attribute: cb.value, value: Number(valInput?.value) || 0 });
+        buffEntries.push({ attribute: cb.value, value: Number(valInput?.value) || 1 });
       });
 
       // Debuff entries: same pattern.
       const debuffEntries = [];
       form.querySelectorAll('input[name="system.tagConfig.debuffEntries"]:checked').forEach(cb => {
         const valInput = form.querySelector(`.attr-value[data-attr="${cb.value}"][data-target="debuff"]`);
-        debuffEntries.push({ attribute: cb.value, value: Number(valInput?.value) || 0 });
+        debuffEntries.push({ attribute: cb.value, value: Number(valInput?.value) || 1 });
       });
 
       const tagConfigData = {

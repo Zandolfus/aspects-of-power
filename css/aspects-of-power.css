@@ -390,6 +390,10 @@
 .aspects-of-power .attr-entry input[type="checkbox"] {
   margin: 0;
 }
+.aspects-of-power .attr-entry .multiplier-label {
+  font-size: 0.85em;
+  color: #666;
+}
 .aspects-of-power .attr-entry .attr-value {
   width: 48px;
   text-align: center;
