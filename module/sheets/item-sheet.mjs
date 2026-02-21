@@ -126,6 +126,29 @@ export class AspectsofPowerItemSheet extends foundry.applications.api.Handlebars
           fieldName: fieldName,
         });
 
+        // Foundry has no CSS to hide .pm-dropdown > ul and its #onActivate does not touch
+        // display, so we manage dropdown visibility entirely. CSS positions the <ul>
+        // absolutely; JS hides it initially and toggles on click.
+        wrapper.querySelectorAll('.editor-menu .pm-dropdown').forEach(btn => {
+          const ul = btn.querySelector(':scope > ul');
+          if (!ul) return;
+          ul.style.display = 'none';
+          btn.addEventListener('click', ev => {
+            if (ul.contains(ev.target)) return; // let item-action clicks through
+            ev.stopPropagation();
+            const isOpen = ul.style.display === 'block';
+            wrapper.querySelectorAll('.editor-menu .pm-dropdown > ul').forEach(u => {
+              u.style.display = 'none';
+            });
+            if (!isOpen) ul.style.display = 'block';
+          });
+        });
+        document.addEventListener('click', () => {
+          wrapper.querySelectorAll('.editor-menu .pm-dropdown > ul').forEach(ul => {
+            ul.style.display = 'none';
+          });
+        });
+
         // ProseMirrorEditor wraps the editable div in a new .editor-container sibling to
         // .editor-menu. Neither element has a definite CSS height from the flex chain, so
         // measure and set the container height explicitly.
