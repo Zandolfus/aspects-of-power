@@ -86,6 +86,10 @@ form {
     display: flex;
     position: relative;
 
+    .pm-dropdown {
+      position: relative;
+    }
+
     .pm-dropdown > ul {
       display: none;
       position: absolute;

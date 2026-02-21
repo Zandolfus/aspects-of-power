@@ -280,6 +280,9 @@
   display: flex;
   position: relative;
 }
+.aspects-of-power .sheet-body .tab .editor .editor-menu .pm-dropdown {
+  position: relative;
+}
 .aspects-of-power .sheet-body .tab .editor .editor-menu .pm-dropdown > ul {
   display: none;
   position: absolute;

@@ -176,10 +176,30 @@ export class AspectsofPowerActorSheet extends foundry.applications.api.Handlebar
           fieldName: fieldName,
         });
 
-        // Collapse all dropdown <ul> elements that ProseMirror renders open by default.
-        // Inline style beats any external CSS specificity.
-        wrapper.querySelectorAll('.editor-menu .pm-dropdown > ul').forEach(ul => {
+        // Foundry renders .pm-dropdown > ul as always-visible in the DOM.
+        // We take over dropdown toggling entirely: hide initially via inline style, then
+        // wire click-to-toggle. stopPropagation prevents Foundry's own handlers from
+        // interfering. Clicks originating inside the <ul> (menu item actions) are passed
+        // through so Foundry's _onAction handler can process them.
+        wrapper.querySelectorAll('.editor-menu .pm-dropdown').forEach(btn => {
+          const ul = btn.querySelector(':scope > ul');
+          if (!ul) return;
           ul.style.display = 'none';
+          btn.addEventListener('click', ev => {
+            if (ul.contains(ev.target)) return; // let item-action clicks through
+            ev.stopPropagation();
+            const isOpen = ul.style.display === 'block';
+            wrapper.querySelectorAll('.editor-menu .pm-dropdown > ul').forEach(u => {
+              u.style.display = 'none';
+            });
+            if (!isOpen) ul.style.display = 'block';
+          });
+        });
+        // Close all dropdowns when clicking outside the menu.
+        document.addEventListener('click', () => {
+          wrapper.querySelectorAll('.editor-menu .pm-dropdown > ul').forEach(ul => {
+            ul.style.display = 'none';
+          });
         });
 
         // ProseMirrorEditor wraps the editable div in a new .editor-container sibling to
