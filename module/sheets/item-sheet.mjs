@@ -122,6 +122,7 @@ export class AspectsofPowerItemSheet extends foundry.applications.api.Handlebars
         healTarget:        form.querySelector('[name="system.tagConfig.healTarget"]')?.value ?? 'selected',
         buffEntries,
         buffDuration:      Number(form.querySelector('[name="system.tagConfig.buffDuration"]')?.value) || 1,
+        buffStackable:     form.querySelector('[name="system.tagConfig.buffStackable"]')?.checked ?? false,
         debuffEntries,
         debuffDuration:    Number(form.querySelector('[name="system.tagConfig.debuffDuration"]')?.value) || 1,
         debuffDealsDamage: form.querySelector('[name="system.tagConfig.debuffDealsDamage"]')?.checked ?? false,

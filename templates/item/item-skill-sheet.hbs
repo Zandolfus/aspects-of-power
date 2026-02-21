@@ -152,6 +152,11 @@
             </div>
           </div>
         {{/each}}
+        <label class='resource-label dot-toggle'>
+          <input type='checkbox' name='system.tagConfig.buffStackable'
+                 {{#if system.tagConfig.buffStackable}}checked{{/if}} />
+          Stackable
+        </label>
         <label class='resource-label'>{{localize "ASPECTSOFPOWER.TagConfig.duration"}}</label>
         <input type='number' name='system.tagConfig.buffDuration'
                value='{{system.tagConfig.buffDuration}}' min='0' step='1' />

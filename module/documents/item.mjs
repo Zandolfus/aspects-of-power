@@ -190,41 +190,69 @@ export class AspectsofPowerItem extends Item {
       case 'gmApplyBuff': {
         const target = await fromUuid(payload.targetActorUuid);
         if (!target) return;
-        const existing = target.effects.find(
-          e => e.origin === payload.originUuid && e.name === payload.effectName
-        );
+        const combat = game.combat;
+        const startRound = combat?.round ?? 0;
+        const startTurn  = combat?.turn ?? 0;
         const newTotal = payload.changes.reduce((sum, c) => sum + Number(c.value), 0);
 
-        if (existing) {
-          if (existing.disabled) {
-            await existing.update({
-              disabled: false,
-              changes: payload.changes,
-              'duration.rounds': payload.duration,
-            });
-          } else {
-            const currentTotal = (existing.changes ?? []).reduce((sum, c) => sum + Number(c.value), 0);
-            if (newTotal > currentTotal) {
-              await existing.update({ changes: payload.changes, 'duration.rounds': payload.duration });
-              ChatMessage.create({ speaker: payload.speaker, rollMode: payload.rollMode,
-                content: `<p>Buff on <strong>${target.name}</strong> upgraded (total +${newTotal}, was +${currentTotal}).</p>`,
-              });
-            } else {
-              ChatMessage.create({ speaker: payload.speaker, rollMode: payload.rollMode,
-                content: `<p>Existing buff on <strong>${target.name}</strong> is stronger (+${currentTotal}). No change.</p>`,
-              });
-            }
-            return;
-          }
-        } else {
+        if (payload.stackable) {
+          // Stackable: always create a new effect (like debuffs).
           await target.createEmbeddedDocuments('ActiveEffect', [{
             name:   payload.effectName,
             img:    payload.img,
             origin: payload.originUuid,
             'duration.rounds': payload.duration,
+            'duration.startRound': startRound,
+            'duration.startTurn': startTurn,
             disabled: false,
             changes: payload.changes,
           }]);
+        } else {
+          // Non-stackable: keep higher total.
+          const existing = target.effects.find(
+            e => e.origin === payload.originUuid && e.name === payload.effectName
+          );
+
+          if (existing) {
+            if (existing.disabled) {
+              await existing.update({
+                disabled: false,
+                changes: payload.changes,
+                'duration.rounds': payload.duration,
+                'duration.startRound': startRound,
+                'duration.startTurn': startTurn,
+              });
+            } else {
+              const currentTotal = (existing.changes ?? []).reduce((sum, c) => sum + Number(c.value), 0);
+              if (newTotal > currentTotal) {
+                await existing.update({
+                  changes: payload.changes,
+                  'duration.rounds': payload.duration,
+                  'duration.startRound': startRound,
+                  'duration.startTurn': startTurn,
+                });
+                ChatMessage.create({ speaker: payload.speaker, rollMode: payload.rollMode,
+                  content: `<p>Buff on <strong>${target.name}</strong> upgraded (total +${newTotal}, was +${currentTotal}).</p>`,
+                });
+              } else {
+                ChatMessage.create({ speaker: payload.speaker, rollMode: payload.rollMode,
+                  content: `<p>Existing buff on <strong>${target.name}</strong> is stronger (+${currentTotal}). No change.</p>`,
+                });
+              }
+              return;
+            }
+          } else {
+            await target.createEmbeddedDocuments('ActiveEffect', [{
+              name:   payload.effectName,
+              img:    payload.img,
+              origin: payload.originUuid,
+              'duration.rounds': payload.duration,
+              'duration.startRound': startRound,
+              'duration.startTurn': startTurn,
+              disabled: false,
+              changes: payload.changes,
+            }]);
+          }
         }
 
         const summary = payload.changes.map(c => {
@@ -241,8 +269,13 @@ export class AspectsofPowerItem extends Item {
         const target = await fromUuid(payload.targetActorUuid);
         if (!target) return;
 
-        // Create the stacking ActiveEffect.
+        // Create the stacking ActiveEffect (set startRound for expiry tracking).
         if (payload.effectData) {
+          const combat = game.combat;
+          if (combat) {
+            payload.effectData['duration.startRound'] = combat.round;
+            payload.effectData['duration.startTurn'] = combat.turn;
+          }
           await target.createEmbeddedDocuments('ActiveEffect', [payload.effectData]);
         }
 
@@ -330,6 +363,7 @@ export class AspectsofPowerItem extends Item {
       originUuid: this.uuid,
       changes,
       duration,
+      stackable: this.system.tagConfig?.buffStackable ?? false,
       img: item.img ?? 'icons/svg/aura.svg',
       speaker, rollMode,
     });

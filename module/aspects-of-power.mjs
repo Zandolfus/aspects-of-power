@@ -180,6 +180,40 @@ Hooks.on('combatTurnChange', async (combat, _prior, current) => {
 });
 
 /* -------------------------------------------- */
+/*  Effect Expiry — Duration Tracking           */
+/* -------------------------------------------- */
+
+/**
+ * Delete ActiveEffects whose duration (in rounds) has elapsed.
+ * Checks all combatants on every turn change so effects expire promptly.
+ * Only the GM executes to avoid duplicate deletes.
+ */
+Hooks.on('combatTurnChange', async (combat, _prior, _current) => {
+  if (!game.user.isGM) return;
+
+  for (const c of combat.combatants) {
+    if (!c.actor) continue;
+    const toDelete = [];
+    for (const effect of c.actor.effects) {
+      const dur = effect.duration;
+      if (!dur.rounds || dur.rounds <= 0) continue;
+      const startRound = dur.startRound ?? 0;
+      if (startRound > 0 && combat.round - startRound >= dur.rounds) {
+        toDelete.push(effect.id);
+      }
+    }
+    if (toDelete.length > 0) {
+      const names = toDelete.map(id => c.actor.effects.get(id)?.name).filter(Boolean);
+      await c.actor.deleteEmbeddedDocuments('ActiveEffect', toDelete);
+      ChatMessage.create({
+        whisper: ChatMessage.getWhisperRecipients('GM'),
+        content: `<p>Expired effects on <strong>${c.actor.name}</strong>: ${names.join(', ')}</p>`,
+      });
+    }
+  }
+});
+
+/* -------------------------------------------- */
 /*  Apply Damage Button — GM Whisper            */
 /* -------------------------------------------- */
 

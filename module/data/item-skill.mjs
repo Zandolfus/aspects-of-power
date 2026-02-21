@@ -36,7 +36,8 @@ export class SkillData extends foundry.abstract.TypeDataModel {
           attribute: new fields.StringField({ initial: 'abilities.strength' }),
           value:     new fields.NumberField({ initial: 1, min: 0 }),
         }), { initial: [] }),
-        buffDuration: new fields.NumberField({ initial: 1, integer: true, min: 0 }),
+        buffDuration:  new fields.NumberField({ initial: 1, integer: true, min: 0 }),
+        buffStackable: new fields.BooleanField({ initial: false }),
 
         // Debuff: array of { attribute, value (multiplier) } pairs + duration + optional DoT.
         debuffEntries: new fields.ArrayField(new fields.SchemaField({
