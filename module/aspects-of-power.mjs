@@ -270,8 +270,9 @@ async function createItemMacro(data, slot) {
       'You can only create macro buttons for owned Items'
     );
   }
-  // If it is, retrieve it based on the uuid.
-  const item = await Item.fromDropData(data);
+  // Retrieve the item by UUID.
+  const item = await fromUuid(data.uuid);
+  if (!item) return;
 
   // Create the macro command using the uuid.
   const command = `game.aspectsofpower.rollItemMacro("${data.uuid}");`;
@@ -292,27 +293,16 @@ async function createItemMacro(data, slot) {
 }
 
 /**
- * Create a Macro from an Item drop.
- * Get an existing item macro if one exists, otherwise create a new one.
+ * Roll an Item macro from a hotbar slot.
  * @param {string} itemUuid
  */
-function rollItemMacro(itemUuid) {
-  // Reconstruct the drop data so that we can load the item.
-  const dropData = {
-    type: 'Item',
-    uuid: itemUuid,
-  };
-  // Load the item from the uuid.
-  Item.fromDropData(dropData).then((item) => {
-    // Determine if the item loaded and if it's an owned item.
-    if (!item || !item.parent) {
-      const itemName = item?.name ?? itemUuid;
-      return ui.notifications.warn(
-        `Could not find item ${itemName}. You may need to delete and recreate this macro.`
-      );
-    }
-
-    // Trigger the item roll
-    item.roll();
-  });
+async function rollItemMacro(itemUuid) {
+  const item = await fromUuid(itemUuid);
+  if (!item || !item.parent) {
+    const itemName = item?.name ?? itemUuid;
+    return ui.notifications.warn(
+      `Could not find item ${itemName}. You may need to delete and recreate this macro.`
+    );
+  }
+  item.roll();
 }
