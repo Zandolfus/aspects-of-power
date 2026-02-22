@@ -105,12 +105,11 @@ export class AspectsofPowerItem extends Item {
   async _handleAttackTag(item, rollData, hitRoll, dmgRoll, speaker, rollMode, label, targetTokenOverride = null) {
     const targetToken  = targetTokenOverride ?? game.user.targets.first() ?? null;
     const targetActor  = targetToken?.actor ?? null;
+    if (!targetActor) return;
+
     const targetDefKey = rollData.roll.targetDefense;
-
-    if (!targetActor || !targetDefKey || !hitRoll) return;
-
-    const defenseValue = targetActor.system.defense[targetDefKey]?.value ?? 0;
-    const isHit        = hitRoll.total >= defenseValue;
+    const defenseValue = targetDefKey ? (targetActor.system.defense[targetDefKey]?.value ?? 0) : 0;
+    const isHit        = hitRoll ? hitRoll.total >= defenseValue : true;
     const isPhysical   = rollData.roll.damageType === 'physical';
     const mitigation   = isPhysical
       ? (targetActor.system.defense.armor?.value ?? 0)
@@ -123,10 +122,14 @@ export class AspectsofPowerItem extends Item {
       ? `<strong style="color:green;">HIT</strong>`
       : `<strong style="color:red;">MISS</strong>`;
 
+    const hitLine = hitRoll && targetDefKey
+      ? `<p>Attack: ${Math.round(hitRoll.total)} vs ${targetActor.name}'s ${targetDefKey} defense (${defenseValue})</p>`
+      : '';
+
     const gmContent = isHit
       ? `<div class="combat-result">
            <h3>${item.name} — ${resultBadge}</h3>
-           <p>Attack: ${Math.round(hitRoll.total)} vs ${targetActor.name}'s ${targetDefKey} defense (${defenseValue})</p>
+           ${hitLine}
            <hr>
            <p>Raw damage: ${Math.round(dmgRoll.total)}</p>
            <p>${mitigLabel}: −${mitigation} &nbsp;&nbsp; Toughness: −${toughnessMod}</p>
@@ -140,7 +143,7 @@ export class AspectsofPowerItem extends Item {
          </div>`
       : `<div class="combat-result">
            <h3>${item.name} — ${resultBadge}</h3>
-           <p>Attack: ${Math.round(hitRoll.total)} vs ${targetActor.name}'s ${targetDefKey} defense (${defenseValue})</p>
+           ${hitLine}
          </div>`;
 
     if (game.user.isGM) {
