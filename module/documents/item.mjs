@@ -99,9 +99,8 @@ export class AspectsofPowerItem extends Item {
   /* ------------------------------------------------------------------ */
 
   /**
-   * Attack tag: resolve hit vs target defense, calculate mitigated damage.
-   * Single-target: posts a GM-whispered result with an Apply Damage button.
-   * AOE (targetTokenOverride): auto-applies damage via GM action.
+   * Attack tag: resolve hit vs target defense, calculate mitigated damage,
+   * and post a GM-whispered combat result with an Apply Damage button.
    */
   async _handleAttackTag(item, rollData, hitRoll, dmgRoll, speaker, rollMode, label, targetTokenOverride = null) {
     const targetToken  = targetTokenOverride ?? game.user.targets.first() ?? null;
@@ -124,45 +123,6 @@ export class AspectsofPowerItem extends Item {
       ? `<strong style="color:green;">HIT</strong>`
       : `<strong style="color:red;">MISS</strong>`;
 
-    // AOE: auto-apply damage through GM action (no manual button).
-    if (targetTokenOverride) {
-      const gmContent = isHit
-        ? `<div class="combat-result">
-             <h3>${item.name} — ${resultBadge}</h3>
-             <p>Attack: ${Math.round(hitRoll.total)} vs ${targetActor.name}'s ${targetDefKey} defense (${defenseValue})</p>
-             <hr>
-             <p>Raw damage: ${Math.round(dmgRoll.total)}</p>
-             <p>${mitigLabel}: −${mitigation} &nbsp;&nbsp; Toughness: −${toughnessMod}</p>
-             <p><strong>Final damage: ${finalDamage}</strong></p>
-           </div>`
-        : `<div class="combat-result">
-             <h3>${item.name} — ${resultBadge}</h3>
-             <p>Attack: ${Math.round(hitRoll.total)} vs ${targetActor.name}'s ${targetDefKey} defense (${defenseValue})</p>
-           </div>`;
-
-      // Post combat result to chat.
-      if (game.user.isGM) {
-        await ChatMessage.create({
-          whisper: ChatMessage.getWhisperRecipients('GM'),
-          content: gmContent,
-        });
-      } else {
-        game.socket.emit('system.aspects-of-power', { type: 'gmCombatResult', content: gmContent });
-      }
-
-      // Auto-apply damage via GM action.
-      if (isHit && finalDamage > 0) {
-        await this._gmAction({
-          type: 'gmApplyAttackDamage',
-          targetActorUuid: targetActor.uuid,
-          damage: finalDamage,
-          speaker, rollMode,
-        });
-      }
-      return;
-    }
-
-    // Single-target: GM-whispered result with Apply Damage button.
     const gmContent = isHit
       ? `<div class="combat-result">
            <h3>${item.name} — ${resultBadge}</h3>
@@ -211,22 +171,6 @@ export class AspectsofPowerItem extends Item {
    */
   static async executeGmAction(payload) {
     switch (payload.type) {
-
-      case 'gmApplyAttackDamage': {
-        const target = await fromUuid(payload.targetActorUuid);
-        if (!target) return;
-        const damage    = payload.damage ?? 0;
-        const health    = target.system.health;
-        const newHealth = Math.max(0, health.value - damage);
-        await target.update({ 'system.health.value': newHealth });
-        ChatMessage.create({
-          whisper: ChatMessage.getWhisperRecipients('GM'),
-          content: `<p><strong>${target.name}</strong> takes <strong>${damage}</strong> damage. `
-                 + `Health: ${newHealth} / ${health.max}`
-                 + `${newHealth === 0 ? ' &mdash; <em>Incapacitated!</em>' : ''}</p>`,
-        });
-        break;
-      }
 
       case 'gmApplyRestoration': {
         const target = await fromUuid(payload.targetActorUuid);
