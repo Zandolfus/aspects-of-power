@@ -117,14 +117,22 @@ export class AspectsofPowerItemSheet extends foundry.applications.api.Handlebars
     // AOE config: collect all aoe fields atomically.
     if (this.item.type === 'skill' && event.target?.name?.startsWith('system.aoe.')) {
       const form = this.element.querySelector('form');
+      // When shape changes, conditional inputs (width/angle/diameter) may not
+      // yet exist in the DOM. Fall back to the currently stored value so we
+      // don't reset fields the user already configured.
+      const stored = this.item.system.aoe;
+      const readNum = (name, fallback) => {
+        const el = form.querySelector(`[name="${name}"]`);
+        return el ? Number(el.value) : fallback;
+      };
       const aoeData = {
         enabled:          form.querySelector('[name="system.aoe.enabled"]')?.checked ?? false,
-        shape:            form.querySelector('[name="system.aoe.shape"]')?.value ?? 'circle',
-        diameter:         Number(form.querySelector('[name="system.aoe.diameter"]')?.value) || 10,
-        width:            Number(form.querySelector('[name="system.aoe.width"]')?.value) || 5,
-        angle:            Number(form.querySelector('[name="system.aoe.angle"]')?.value) || 53,
+        shape:            form.querySelector('[name="system.aoe.shape"]')?.value ?? stored.shape ?? 'circle',
+        diameter:         readNum('system.aoe.diameter', stored.diameter ?? 10),
+        width:            readNum('system.aoe.width', stored.width ?? 5),
+        angle:            readNum('system.aoe.angle', stored.angle ?? 53),
         targetingMode:    form.querySelector('[name="system.aoe.targetingMode"]')?.value ?? 'all',
-        templateDuration: Number(form.querySelector('[name="system.aoe.templateDuration"]')?.value) || 0,
+        templateDuration: readNum('system.aoe.templateDuration', stored.templateDuration ?? 0),
       };
       await this.document.update({ 'system.aoe': aoeData });
       return;
