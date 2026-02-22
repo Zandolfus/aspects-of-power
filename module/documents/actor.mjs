@@ -59,19 +59,26 @@ export class AspectsofPowerActor extends Actor {
     systemData.mana.max = systemData.abilities.willpower.mod;
     systemData.stamina.max = systemData.abilities.endurance.mod;
 
-    // Defense values: compute base from ability mods, then preserve any
-    // ActiveEffect contributions (effects are applied before prepareDerivedData,
-    // so the current .value holds the effect delta since the source initial is 0).
-    const meleeEffects  = systemData.defense.melee.value;
-    const rangedEffects = systemData.defense.ranged.value;
-    const mindEffects   = systemData.defense.mind.value;
-    const soulEffects   = systemData.defense.soul.value;
+    // Defense values: compute base from ability mods, then add any
+    // ActiveEffect contributions by explicitly summing effect changes.
+    // (We can't use the current .value because submitOnChange may have
+    // saved computed values back to the database.)
+    const effectBonus = (key) => {
+      let sum = 0;
+      for (const e of this.allApplicableEffects()) {
+        if (e.disabled) continue;
+        for (const c of e.changes) {
+          if (c.key === key) sum += Number(c.value) || 0;
+        }
+      }
+      return sum;
+    };
 
-    systemData.defense.melee.value  = Math.round((systemData.abilities.dexterity.mod + systemData.abilities.strength.mod*.3)*1.1) + meleeEffects;
+    systemData.defense.melee.value  = Math.round((systemData.abilities.dexterity.mod + systemData.abilities.strength.mod*.3)*1.1) + effectBonus('system.defense.melee.value');
     //consider if perception should have greater impact at greater ranges
-    systemData.defense.ranged.value = Math.round((systemData.abilities.dexterity.mod*.3 + systemData.abilities.perception.mod)*1.1) + rangedEffects;
-    systemData.defense.mind.value   = Math.round((systemData.abilities.intelligence.mod + systemData.abilities.wisdom.mod*.3)*1.1) + mindEffects;
-    systemData.defense.soul.value   = Math.round((systemData.abilities.wisdom.mod + systemData.abilities.willpower.mod*.3)*1.1) + soulEffects;
+    systemData.defense.ranged.value = Math.round((systemData.abilities.dexterity.mod*.3 + systemData.abilities.perception.mod)*1.1) + effectBonus('system.defense.ranged.value');
+    systemData.defense.mind.value   = Math.round((systemData.abilities.intelligence.mod + systemData.abilities.wisdom.mod*.3)*1.1) + effectBonus('system.defense.mind.value');
+    systemData.defense.soul.value   = Math.round((systemData.abilities.wisdom.mod + systemData.abilities.willpower.mod*.3)*1.1) + effectBonus('system.defense.soul.value');
 
     // Casting range (feet) and movement ranges (feet).
     systemData.castingRange = 40 + (systemData.abilities.perception.mod / 10);
