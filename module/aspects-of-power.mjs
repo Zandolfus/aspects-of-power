@@ -120,7 +120,7 @@ Hooks.once('ready', function () {
         whisper: ChatMessage.getWhisperRecipients('GM'),
         content: payload.content,
       });
-    } else if (['gmApplyBuff', 'gmApplyDebuff', 'gmApplyRestoration'].includes(payload.type)) {
+    } else if (['gmApplyAttackDamage', 'gmApplyBuff', 'gmApplyDebuff', 'gmApplyRestoration'].includes(payload.type)) {
       await AspectsofPowerItem.executeGmAction(payload);
     }
   });
