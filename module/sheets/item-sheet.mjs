@@ -91,6 +91,13 @@ export class AspectsofPowerItemSheet extends foundry.applications.api.Handlebars
    * @override
    */
   async _onChangeForm(formConfig, event) {
+    // Top-level document fields (e.g. name): update directly so the full-form
+    // processor doesn't choke on complex skill fields.
+    if (event.target?.name && !event.target.name.startsWith('system.') && !event.target.classList?.contains('attr-value')) {
+      await this.document.update({ [event.target.name]: event.target.value });
+      return;
+    }
+
     // Tag checkboxes: collect all checked values into an array.
     if (this.item.type === 'skill' && event.target?.name === 'system.tags') {
       const form = this.element.querySelector('form');

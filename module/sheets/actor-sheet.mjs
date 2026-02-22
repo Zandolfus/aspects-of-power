@@ -271,7 +271,7 @@ export class AspectsofPowerActorSheet extends foundry.applications.api.Handlebar
     event.preventDefault();
     const header = event.currentTarget;
     const type   = header.dataset.type;
-    const data   = foundry.utils.deepClone(header.dataset);
+    const data   = { ...header.dataset };
     const name   = `New ${type.charAt(0).toUpperCase() + type.slice(1)}`;
     const itemData = {
       name,
