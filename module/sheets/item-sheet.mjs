@@ -114,27 +114,19 @@ export class AspectsofPowerItemSheet extends foundry.applications.api.Handlebars
       return;
     }
 
-    // AOE config: collect all aoe fields atomically.
+    // AOE config: update individual fields via dot-notation so conditional
+    // DOM elements (width/angle that only appear for certain shapes) don't
+    // clobber each other.
     if (this.item.type === 'skill' && event.target?.name?.startsWith('system.aoe.')) {
-      const form = this.element.querySelector('form');
-      // When shape changes, conditional inputs (width/angle/diameter) may not
-      // yet exist in the DOM. Fall back to the currently stored value so we
-      // don't reset fields the user already configured.
-      const stored = this.item.system.aoe;
-      const readNum = (name, fallback) => {
-        const el = form.querySelector(`[name="${name}"]`);
-        return el ? Number(el.value) : fallback;
-      };
-      const aoeData = {
-        enabled:          form.querySelector('[name="system.aoe.enabled"]')?.checked ?? false,
-        shape:            form.querySelector('[name="system.aoe.shape"]')?.value ?? stored.shape ?? 'circle',
-        diameter:         readNum('system.aoe.diameter', stored.diameter ?? 10),
-        width:            readNum('system.aoe.width', stored.width ?? 5),
-        angle:            readNum('system.aoe.angle', stored.angle ?? 53),
-        targetingMode:    form.querySelector('[name="system.aoe.targetingMode"]')?.value ?? 'all',
-        templateDuration: readNum('system.aoe.templateDuration', stored.templateDuration ?? 0),
-      };
-      await this.document.update({ 'system.aoe': aoeData });
+      let value;
+      if (event.target.type === 'checkbox') {
+        value = event.target.checked;
+      } else if (event.target.type === 'number') {
+        value = Number(event.target.value);
+      } else {
+        value = event.target.value;
+      }
+      await this.document.update({ [event.target.name]: value });
       return;
     }
 
