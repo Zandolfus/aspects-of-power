@@ -249,7 +249,11 @@
     <div class='tab attributes' data-group='primary' data-tab='attributes'>
       {{! As you add new fields, add them in here! }}
       <div class='resource'>
-        <input type='text' name='system.skillType' value='{{system.skillType}}' data-dtype='String' />
+        <label class='resource-label'>Skill Type</label>
+        <select name='system.skillType'>
+          <option value='Passive' {{#if (eq system.skillType "Passive")}}selected{{/if}}>Passive</option>
+          <option value='Active' {{#if (eq system.skillType "Active")}}selected{{/if}}>Active</option>
+        </select>
       </div>
     </div>
   </section>
