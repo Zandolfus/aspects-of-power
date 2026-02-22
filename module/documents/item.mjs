@@ -613,8 +613,8 @@ export class AspectsofPowerItem extends Item {
     const label    = `[${item.type}] ${item.name}`;
     const tags     = this.system.tags ?? [];
 
-    // No formula set → post description only (passive / display skill).
-    if (!this.system.formula) {
+    // Passive skills → post description only (no roll).
+    if (this.system.skillType === 'Passive') {
       ChatMessage.create({
         speaker,
         rollMode,
