@@ -557,21 +557,22 @@ export class AspectsofPowerItem extends Item {
     const casterToken = this.actor.getActiveTokens()?.[0] ?? null;
     const casterDisp = casterToken?.document?.disposition ?? CONST.TOKEN_DISPOSITIONS.NEUTRAL;
 
-    const templateObject = templateDoc.object;
-    if (!templateObject) return [];
-
     const templateX = templateDoc.x;
     const templateY = templateDoc.y;
+    // Use manual circle check — templateDoc.object.shape may not be
+    // initialised yet right after createEmbeddedDocuments.
+    const radiusPx = templateDoc.distance * (canvas.grid.size / canvas.grid.distance);
+    const radiusSq = radiusPx * radiusPx;
     const qualifying = [];
 
     for (const token of canvas.tokens.placeables) {
       if (token.document.hidden) continue;
 
-      // Containment test in template-local coordinates.
+      // Distance from template center to token center.
       const center = token.center;
-      const localX = center.x - templateX;
-      const localY = center.y - templateY;
-      if (!templateObject.shape.contains(localX, localY)) continue;
+      const dx = center.x - templateX;
+      const dy = center.y - templateY;
+      if (dx * dx + dy * dy > radiusSq) continue;
 
       // Disposition filter.
       if (targetingMode === 'enemies') {
