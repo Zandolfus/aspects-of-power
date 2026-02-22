@@ -102,8 +102,8 @@ export class AspectsofPowerItem extends Item {
    * Attack tag: resolve hit vs target defense, calculate mitigated damage,
    * and post a GM-whispered combat result with an Apply Damage button.
    */
-  async _handleAttackTag(item, rollData, hitRoll, dmgRoll, speaker, rollMode, label) {
-    const targetToken  = game.user.targets.first() ?? null;
+  async _handleAttackTag(item, rollData, hitRoll, dmgRoll, speaker, rollMode, label, targetTokenOverride = null) {
+    const targetToken  = targetTokenOverride ?? game.user.targets.first() ?? null;
     const targetActor  = targetToken?.actor ?? null;
     const targetDefKey = rollData.roll.targetDefense;
 
@@ -309,16 +309,16 @@ export class AspectsofPowerItem extends Item {
   /**
    * Restoration tag: restore health, mana, or stamina and route through GM.
    */
-  async _handleRestorationTag(item, rollData, dmgRoll, speaker, rollMode, label) {
+  async _handleRestorationTag(item, rollData, dmgRoll, speaker, rollMode, label, targetTokenOverride = null) {
     const amount   = Math.round(dmgRoll.total);
     const target   = this.system.tagConfig?.restorationTarget ?? 'selected';
     const resource = this.system.tagConfig?.restorationResource ?? 'health';
 
     let targetActor;
-    if (target === 'self') {
+    if (target === 'self' && !targetTokenOverride) {
       targetActor = this.actor;
     } else {
-      const targetToken = game.user.targets.first() ?? null;
+      const targetToken = targetTokenOverride ?? game.user.targets.first() ?? null;
       targetActor = targetToken?.actor ?? null;
     }
 
@@ -340,8 +340,8 @@ export class AspectsofPowerItem extends Item {
    * Buff tag: build payload and route through GM.
    * Values are roll-based: rollTotal * entry.value (multiplier, default 1).
    */
-  async _handleBuffTag(item, rollData, dmgRoll, speaker, rollMode, label) {
-    const targetToken = game.user.targets.first() ?? null;
+  async _handleBuffTag(item, rollData, dmgRoll, speaker, rollMode, label, targetTokenOverride = null) {
+    const targetToken = targetTokenOverride ?? game.user.targets.first() ?? null;
     const targetActor = targetToken?.actor ?? null;
     if (!targetActor) {
       ChatMessage.create({ speaker, rollMode, content: `<p><em>No target for buff.</em></p>` });
@@ -378,8 +378,8 @@ export class AspectsofPowerItem extends Item {
    * Stat values are roll-based: rollTotal * entry.value (multiplier, default 1).
    * DoT damage = raw roll total, bypasses mitigation.
    */
-  async _handleDebuffTag(item, rollData, dmgRoll, speaker, rollMode, label) {
-    const targetToken = game.user.targets.first() ?? null;
+  async _handleDebuffTag(item, rollData, dmgRoll, speaker, rollMode, label, targetTokenOverride = null) {
+    const targetToken = targetTokenOverride ?? game.user.targets.first() ?? null;
     const targetActor = targetToken?.actor ?? null;
     if (!targetActor) {
       ChatMessage.create({ speaker, rollMode, content: `<p><em>No target for debuff.</em></p>` });
@@ -438,6 +438,159 @@ export class AspectsofPowerItem extends Item {
   }
 
   /* ------------------------------------------------------------------ */
+  /*  AOE helpers                                                        */
+  /* ------------------------------------------------------------------ */
+
+  /**
+   * Determine the template fill color based on the skill's tags.
+   * Attack/debuff → red, restoration/buff → green, fallback → blue.
+   */
+  _getAoeColor() {
+    const tags = this.system.tags ?? [];
+    if (tags.includes('attack') || tags.includes('debuff')) return '#ff4444';
+    if (tags.includes('restoration') || tags.includes('buff')) return '#44ff44';
+    return '#4488ff';
+  }
+
+  /**
+   * Interactively place a circle MeasuredTemplate for an AOE skill.
+   * Shows a preview following the cursor. Left-click places (if within
+   * casting range), right-click or ESC cancels.
+   *
+   * @param {Token} casterToken  The caster's canvas token.
+   * @returns {Promise<MeasuredTemplateDocument|null>}
+   */
+  async _placeAoeTemplate(casterToken) {
+    const aoe = this.system.aoe;
+    const radiusFt = aoe.diameter / 2;
+    const castingRange = this.actor.system.castingRange ?? 0;
+    const pixelsPerFoot = canvas.grid.size / canvas.grid.distance;
+    const castingRangePx = castingRange * pixelsPerFoot;
+    const fillColor = this._getAoeColor();
+
+    // Create a preview template (not persisted).
+    const templateData = { t: 'circle', distance: radiusFt, x: 0, y: 0, fillColor };
+    const templateDoc = new MeasuredTemplateDocument(templateData, { parent: canvas.scene });
+    const template = new CONFIG.MeasuredTemplate.objectClass(templateDoc);
+    template.draw();
+    template.layer.activate();
+    template.layer.preview.addChild(template);
+
+    let resolved = false;
+
+    return new Promise((resolve) => {
+      const onPointerMove = (event) => {
+        const pos = event.data?.getLocalPosition(canvas.app.stage)
+                    ?? canvas.mousePosition ?? { x: 0, y: 0 };
+        template.document.updateSource({ x: pos.x, y: pos.y });
+        template.refresh();
+      };
+
+      const onPointerDown = async (event) => {
+        if (resolved) return;
+        const pos = event.data?.getLocalPosition(canvas.app.stage)
+                    ?? canvas.mousePosition ?? { x: 0, y: 0 };
+
+        // Range validation.
+        const cc = casterToken.center;
+        const dist = Math.sqrt((pos.x - cc.x) ** 2 + (pos.y - cc.y) ** 2);
+        if (dist > castingRangePx) {
+          ui.notifications.warn(game.i18n.localize('ASPECTSOFPOWER.AOE.outOfRange'));
+          return;
+        }
+
+        resolved = true;
+        cleanup();
+
+        const [created] = await canvas.scene.createEmbeddedDocuments('MeasuredTemplate', [{
+          t: 'circle', distance: radiusFt, x: pos.x, y: pos.y, fillColor,
+          flags: {
+            'aspects-of-power': {
+              aoe: true,
+              casterActorUuid: this.actor.uuid,
+              skillItemUuid: this.uuid,
+              templateDuration: aoe.templateDuration,
+              placedRound: game.combat?.round ?? 0,
+            },
+          },
+        }]);
+        resolve(created);
+      };
+
+      const onCancel = (event) => {
+        if (resolved) return;
+        resolved = true;
+        cleanup();
+        ui.notifications.info(game.i18n.localize('ASPECTSOFPOWER.AOE.placementCancelled'));
+        resolve(null);
+      };
+
+      const onKeyDown = (event) => {
+        if (event.key === 'Escape') onCancel(event);
+      };
+
+      const cleanup = () => {
+        template.layer.preview.removeChild(template);
+        template.destroy();
+        canvas.stage.off('pointermove', onPointerMove);
+        canvas.stage.off('pointerdown', onPointerDown);
+        canvas.stage.off('rightdown', onCancel);
+        document.removeEventListener('keydown', onKeyDown);
+      };
+
+      canvas.stage.on('pointermove', onPointerMove);
+      canvas.stage.on('pointerdown', onPointerDown);
+      canvas.stage.on('rightdown', onCancel);
+      document.addEventListener('keydown', onKeyDown);
+    });
+  }
+
+  /**
+   * Find all tokens within a placed MeasuredTemplate, filtered by the
+   * skill's AOE targeting mode (all / enemies / allies).
+   *
+   * @param {MeasuredTemplateDocument} templateDoc
+   * @returns {Token[]}
+   */
+  _getAoeTargets(templateDoc) {
+    const targetingMode = this.system.aoe.targetingMode ?? 'all';
+    const casterToken = this.actor.getActiveTokens()?.[0] ?? null;
+    const casterDisp = casterToken?.document?.disposition ?? CONST.TOKEN_DISPOSITIONS.NEUTRAL;
+
+    const templateObject = templateDoc.object;
+    if (!templateObject) return [];
+
+    const templateX = templateDoc.x;
+    const templateY = templateDoc.y;
+    const qualifying = [];
+
+    for (const token of canvas.tokens.placeables) {
+      if (token.document.hidden) continue;
+
+      // Containment test in template-local coordinates.
+      const center = token.center;
+      const localX = center.x - templateX;
+      const localY = center.y - templateY;
+      if (!templateObject.shape.contains(localX, localY)) continue;
+
+      // Disposition filter.
+      if (targetingMode === 'enemies') {
+        if (casterDisp === CONST.TOKEN_DISPOSITIONS.FRIENDLY
+            && token.document.disposition !== CONST.TOKEN_DISPOSITIONS.HOSTILE) continue;
+        if (casterDisp === CONST.TOKEN_DISPOSITIONS.HOSTILE
+            && token.document.disposition !== CONST.TOKEN_DISPOSITIONS.FRIENDLY) continue;
+        if (casterDisp === CONST.TOKEN_DISPOSITIONS.NEUTRAL) continue;
+      } else if (targetingMode === 'allies') {
+        if (token.document.disposition !== casterDisp) continue;
+      }
+
+      qualifying.push(token);
+    }
+
+    return qualifying;
+  }
+
+  /* ------------------------------------------------------------------ */
   /*  Main roll dispatcher                                               */
   /* ------------------------------------------------------------------ */
 
@@ -486,20 +639,82 @@ export class AspectsofPowerItem extends Item {
     const dmgRoll = new Roll(dmgFormula, rollData);
     await dmgRoll.evaluate();
 
-    // ── Deduct resource cost ────────────────────────────────────────────
     const resource  = rollData.roll.resource;
     const newResVal = Math.max(0, Math.round(rollData.roll.resourcevalue - rollData.roll.cost));
+
+    // ── AOE branch: place template, detect targets, then deduct cost ──
+    const isAoe = this.system.aoe?.enabled && tags.length > 0;
+    if (isAoe) {
+      const casterToken = this.actor.getActiveTokens()?.[0];
+      if (!casterToken) {
+        ChatMessage.create({ speaker, rollMode, content: '<p><em>No token found on canvas for AOE placement.</em></p>' });
+        return dmgRoll;
+      }
+
+      // Interactive placement — cancelled means no cost.
+      const templateDoc = await this._placeAoeTemplate(casterToken);
+      if (!templateDoc) return dmgRoll;
+
+      // Detect qualifying tokens.
+      const targets = this._getAoeTargets(templateDoc);
+      if (targets.length === 0) {
+        ui.notifications.warn(game.i18n.localize('ASPECTSOFPOWER.AOE.noTokensInArea'));
+      }
+
+      // Post roll results to chat.
+      if (hitRoll) await hitRoll.toMessage({ speaker, rollMode, flavor: `${label} — To Hit` });
+      await dmgRoll.toMessage({ speaker, rollMode, flavor: `${label} — Roll` });
+
+      // Announce targets.
+      if (targets.length > 0) {
+        const targetNames = targets.map(t => t.document.name).join(', ');
+        ChatMessage.create({
+          speaker, rollMode,
+          content: `<div class="aoe-result"><p><strong>AOE:</strong> ${targets.length} target(s) — ${targetNames}</p></div>`,
+        });
+      }
+
+      // Dispatch each tag to each qualifying token.
+      for (const tag of tags) {
+        for (const targetToken of targets) {
+          switch (tag) {
+            case 'attack':
+              await this._handleAttackTag(item, rollData, hitRoll, dmgRoll, speaker, rollMode, label, targetToken);
+              break;
+            case 'restoration':
+              await this._handleRestorationTag(item, rollData, dmgRoll, speaker, rollMode, label, targetToken);
+              break;
+            case 'buff':
+              await this._handleBuffTag(item, rollData, dmgRoll, speaker, rollMode, label, targetToken);
+              break;
+            case 'debuff':
+              await this._handleDebuffTag(item, rollData, dmgRoll, speaker, rollMode, label, targetToken);
+              break;
+          }
+        }
+      }
+
+      // Deduct resource cost AFTER effects are applied.
+      await this.actor.update({ [`system.${resource}.value`]: newResVal });
+
+      // Remove instantaneous templates (duration = 0).
+      if ((this.system.aoe.templateDuration ?? 0) === 0) {
+        await canvas.scene.deleteEmbeddedDocuments('MeasuredTemplate', [templateDoc.id]);
+      }
+
+      return dmgRoll;
+    }
+
+    // ── Deduct resource cost (non-AOE) ──────────────────────────────────
     await this.actor.update({ [`system.${resource}.value`]: newResVal });
 
     // ── Legacy behavior for tagless skills ──────────────────────────────
     if (tags.length === 0) {
-      // Backwards-compatible: same two-message output as before tags existed.
       const targetToken  = game.user.targets.first() ?? null;
       const targetActor  = targetToken?.actor ?? null;
       const targetDefKey = rollData.roll.targetDefense;
 
       if (targetActor && targetDefKey && hitRoll) {
-        // Full attack resolution (identical to old code).
         await this._handleAttackTag(item, rollData, hitRoll, dmgRoll, speaker, rollMode, label);
         await hitRoll.toMessage({ speaker, rollMode, flavor: `${label} — Attack` });
         await dmgRoll.toMessage({ speaker, rollMode, flavor: `${label} — Damage` });
@@ -514,7 +729,7 @@ export class AspectsofPowerItem extends Item {
     if (hitRoll) await hitRoll.toMessage({ speaker, rollMode, flavor: `${label} — To Hit` });
     await dmgRoll.toMessage({ speaker, rollMode, flavor: `${label} — Roll` });
 
-    // ── Dispatch to each tag handler ────────────────────────────────────
+    // ── Dispatch to each tag handler (single-target) ─────────────────────
     for (const tag of tags) {
       switch (tag) {
         case 'attack':

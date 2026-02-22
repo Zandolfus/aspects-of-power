@@ -25,6 +25,14 @@ export class SkillData extends foundry.abstract.TypeDataModel {
       // Tags that define what this skill does when activated (e.g. ["attack","debuff"]).
       tags: new fields.ArrayField(new fields.StringField(), { initial: [] }),
 
+      // AOE modifier — applies to all active tags when enabled.
+      aoe: new fields.SchemaField({
+        enabled:          new fields.BooleanField({ initial: false }),
+        diameter:         new fields.NumberField({ initial: 10, min: 5, integer: true }),
+        targetingMode:    new fields.StringField({ initial: 'all' }),
+        templateDuration: new fields.NumberField({ initial: 0, min: 0, integer: true }),
+      }),
+
       // Per-tag configuration.
       // Attack tag reuses roll.targetDefense and roll.damageType — no extra config needed.
       tagConfig: new fields.SchemaField({

@@ -45,6 +45,37 @@
         </div>
       </div>
 
+      {{! ── AOE Modifier ── }}
+      {{#if system.tags.length}}
+      <div class='tag-config aoe-config'>
+        <label class='resource-label aoe-toggle'>
+          <input type='checkbox' name='system.aoe.enabled'
+                 {{#if system.aoe.enabled}}checked{{/if}} />
+          {{localize "ASPECTSOFPOWER.AOE.enabled"}}
+        </label>
+
+        {{#if system.aoe.enabled}}
+        <label class='resource-label'>{{localize "ASPECTSOFPOWER.AOE.diameter"}}</label>
+        <input type='number' name='system.aoe.diameter'
+               value='{{system.aoe.diameter}}' min='5' step='5' />
+
+        <label class='resource-label'>{{localize "ASPECTSOFPOWER.AOE.targetingMode"}}</label>
+        <select name='system.aoe.targetingMode'>
+          {{#each config.aoeTargetingModes as |label key|}}
+            <option value='{{key}}' {{#if (eq key ../system.aoe.targetingMode)}}selected{{/if}}>
+              {{localize label}}
+            </option>
+          {{/each}}
+        </select>
+
+        <label class='resource-label'>{{localize "ASPECTSOFPOWER.AOE.templateDuration"}}</label>
+        <input type='number' name='system.aoe.templateDuration'
+               value='{{system.aoe.templateDuration}}' min='0' step='1' />
+        <span class='hint'>{{localize "ASPECTSOFPOWER.AOE.templateDurationHint"}}</span>
+        {{/if}}
+      </div>
+      {{/if}}
+
       {{! ── Shared Roll Config (always visible) ── }}
       <div class='resource'>
         <div class='grid grid-5col'>

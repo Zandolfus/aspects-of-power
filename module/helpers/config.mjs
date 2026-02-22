@@ -102,3 +102,12 @@ ASPECTSOFPOWER.restorationResources = {
   mana:    'ASPECTSOFPOWER.RestorationResource.mana',
   stamina: 'ASPECTSOFPOWER.RestorationResource.stamina',
 };
+
+/**
+ * AOE targeting modes — determines which tokens in the area are affected.
+ */
+ASPECTSOFPOWER.aoeTargetingModes = {
+  all:     'ASPECTSOFPOWER.AOE.targetingAll',
+  enemies: 'ASPECTSOFPOWER.AOE.targetingEnemies',
+  allies:  'ASPECTSOFPOWER.AOE.targetingAllies',
+};

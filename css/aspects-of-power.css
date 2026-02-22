@@ -530,3 +530,26 @@
   border-color: #4488ff;
   box-shadow: 0 0 6px #4488ff;
 }
+
+/* AOE config section on skill sheet */
+.aspects-of-power .aoe-config {
+  margin-top: 8px;
+  padding: 6px 8px;
+  background: rgba(68, 136, 255, 0.05);
+  border: 1px solid rgba(68, 136, 255, 0.3);
+  border-radius: 3px;
+}
+.aspects-of-power .aoe-config .aoe-toggle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+}
+.aspects-of-power .aoe-config .aoe-toggle input[type="checkbox"] {
+  margin: 0;
+}
+.aspects-of-power .aoe-config .hint {
+  font-size: 0.8em;
+  color: #888;
+  font-style: italic;
+}

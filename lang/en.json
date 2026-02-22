@@ -62,6 +62,19 @@
       "insufficientStamina": "Insufficient stamina to move!",
       "maxDistanceExceeded": "Maximum movement distance exceeded!"
     },
+    "AOE": {
+      "enabled": "Area of Effect",
+      "diameter": "Diameter (ft)",
+      "targetingMode": "Targeting",
+      "templateDuration": "Template Duration (rounds)",
+      "templateDurationHint": "0 = removed after effects applied",
+      "targetingAll": "All",
+      "targetingEnemies": "Enemies",
+      "targetingAllies": "Allies",
+      "outOfRange": "Template center must be within casting range!",
+      "placementCancelled": "AOE placement cancelled.",
+      "noTokensInArea": "No qualifying tokens found in the area."
+    },
     "Defense": {
       "armor": "Armor",
       "veil": "Veil",

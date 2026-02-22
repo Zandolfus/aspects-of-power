@@ -232,6 +232,40 @@ Hooks.on('combatTurnChange', async (combat, prior, _current) => {
 });
 
 /* -------------------------------------------- */
+/*  AOE Template Expiry — Duration Tracking     */
+/* -------------------------------------------- */
+
+/**
+ * Delete AOE MeasuredTemplates whose duration (in rounds) has elapsed.
+ * Only the GM executes to avoid duplicate deletes.
+ */
+Hooks.on('combatTurnChange', async (combat, prior, _current) => {
+  if (!game.user.isGM) return;
+
+  const toDelete = [];
+  for (const templateDoc of canvas.scene.templates) {
+    const flags = templateDoc.flags?.['aspects-of-power'] ?? {};
+    if (!flags.aoe) continue;
+
+    const duration = flags.templateDuration ?? 0;
+    if (duration <= 0) continue;
+
+    const placedRound = flags.placedRound ?? 0;
+    if (placedRound > 0 && combat.round - placedRound >= duration) {
+      toDelete.push(templateDoc.id);
+    }
+  }
+
+  if (toDelete.length > 0) {
+    await canvas.scene.deleteEmbeddedDocuments('MeasuredTemplate', toDelete);
+    ChatMessage.create({
+      whisper: ChatMessage.getWhisperRecipients('GM'),
+      content: `<p>Expired ${toDelete.length} AOE template(s).</p>`,
+    });
+  }
+});
+
+/* -------------------------------------------- */
 /*  Casting Range Aura — Canvas Visual          */
 /* -------------------------------------------- */
 

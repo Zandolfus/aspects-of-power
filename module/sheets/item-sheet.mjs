@@ -100,6 +100,19 @@ export class AspectsofPowerItemSheet extends foundry.applications.api.Handlebars
       return;
     }
 
+    // AOE config: collect all aoe fields atomically.
+    if (this.item.type === 'skill' && event.target?.name?.startsWith('system.aoe.')) {
+      const form = this.element.querySelector('form');
+      const aoeData = {
+        enabled:          form.querySelector('[name="system.aoe.enabled"]')?.checked ?? false,
+        diameter:         Number(form.querySelector('[name="system.aoe.diameter"]')?.value) || 10,
+        targetingMode:    form.querySelector('[name="system.aoe.targetingMode"]')?.value ?? 'all',
+        templateDuration: Number(form.querySelector('[name="system.aoe.templateDuration"]')?.value) || 0,
+      };
+      await this.document.update({ 'system.aoe': aoeData });
+      return;
+    }
+
     // Tag-specific config: collect all tagConfig fields atomically.
     // Also catch .attr-value inputs (multiplier fields) which have no name= attribute
     // but still need to trigger a tagConfig save.
