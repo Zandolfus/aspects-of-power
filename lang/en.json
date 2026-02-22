@@ -71,9 +71,17 @@
       "targetingAll": "All",
       "targetingEnemies": "Enemies",
       "targetingAllies": "Allies",
-      "outOfRange": "Template center must be within casting range!",
+      "outOfRange": "Template must be within casting range!",
       "placementCancelled": "AOE placement cancelled.",
-      "noTokensInArea": "No qualifying tokens found in the area."
+      "noTokensInArea": "No qualifying tokens found in the area.",
+      "shape": "Shape",
+      "shapeCircle": "Circle",
+      "shapeCone": "Cone",
+      "shapeRay": "Ray",
+      "shapeRect": "Rectangle",
+      "length": "Length (ft)",
+      "width": "Width (ft)",
+      "angle": "Angle (°)"
     },
     "Defense": {
       "armor": "Armor",

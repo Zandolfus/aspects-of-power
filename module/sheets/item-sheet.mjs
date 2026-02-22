@@ -119,7 +119,10 @@ export class AspectsofPowerItemSheet extends foundry.applications.api.Handlebars
       const form = this.element.querySelector('form');
       const aoeData = {
         enabled:          form.querySelector('[name="system.aoe.enabled"]')?.checked ?? false,
+        shape:            form.querySelector('[name="system.aoe.shape"]')?.value ?? 'circle',
         diameter:         Number(form.querySelector('[name="system.aoe.diameter"]')?.value) || 10,
+        width:            Number(form.querySelector('[name="system.aoe.width"]')?.value) || 5,
+        angle:            Number(form.querySelector('[name="system.aoe.angle"]')?.value) || 53,
         targetingMode:    form.querySelector('[name="system.aoe.targetingMode"]')?.value ?? 'all',
         templateDuration: Number(form.querySelector('[name="system.aoe.templateDuration"]')?.value) || 0,
       };

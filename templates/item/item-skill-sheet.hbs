@@ -55,9 +55,51 @@
         </label>
 
         {{#if system.aoe.enabled}}
-        <label class='resource-label'>{{localize "ASPECTSOFPOWER.AOE.diameter"}}</label>
-        <input type='number' name='system.aoe.diameter'
-               value='{{system.aoe.diameter}}' min='5' step='5' />
+        <label class='resource-label'>{{localize "ASPECTSOFPOWER.AOE.shape"}}</label>
+        <select name='system.aoe.shape'>
+          {{#each config.aoeShapes as |label key|}}
+            <option value='{{key}}' {{#if (eq key ../system.aoe.shape)}}selected{{/if}}>
+              {{localize label}}
+            </option>
+          {{/each}}
+        </select>
+
+        {{! Circle: diameter }}
+        {{#if (eq system.aoe.shape "circle")}}
+          <label class='resource-label'>{{localize "ASPECTSOFPOWER.AOE.diameter"}}</label>
+          <input type='number' name='system.aoe.diameter'
+                 value='{{system.aoe.diameter}}' min='5' step='5' />
+        {{/if}}
+
+        {{! Cone: length + angle }}
+        {{#if (eq system.aoe.shape "cone")}}
+          <label class='resource-label'>{{localize "ASPECTSOFPOWER.AOE.length"}}</label>
+          <input type='number' name='system.aoe.diameter'
+                 value='{{system.aoe.diameter}}' min='5' step='5' />
+          <label class='resource-label'>{{localize "ASPECTSOFPOWER.AOE.angle"}}</label>
+          <input type='number' name='system.aoe.angle'
+                 value='{{system.aoe.angle}}' min='1' max='360' step='1' />
+        {{/if}}
+
+        {{! Ray: length + width }}
+        {{#if (eq system.aoe.shape "ray")}}
+          <label class='resource-label'>{{localize "ASPECTSOFPOWER.AOE.length"}}</label>
+          <input type='number' name='system.aoe.diameter'
+                 value='{{system.aoe.diameter}}' min='5' step='5' />
+          <label class='resource-label'>{{localize "ASPECTSOFPOWER.AOE.width"}}</label>
+          <input type='number' name='system.aoe.width'
+                 value='{{system.aoe.width}}' min='5' step='5' />
+        {{/if}}
+
+        {{! Rectangle: length + width }}
+        {{#if (eq system.aoe.shape "rect")}}
+          <label class='resource-label'>{{localize "ASPECTSOFPOWER.AOE.length"}}</label>
+          <input type='number' name='system.aoe.diameter'
+                 value='{{system.aoe.diameter}}' min='5' step='5' />
+          <label class='resource-label'>{{localize "ASPECTSOFPOWER.AOE.width"}}</label>
+          <input type='number' name='system.aoe.width'
+                 value='{{system.aoe.width}}' min='5' step='5' />
+        {{/if}}
 
         <label class='resource-label'>{{localize "ASPECTSOFPOWER.AOE.targetingMode"}}</label>
         <select name='system.aoe.targetingMode'>

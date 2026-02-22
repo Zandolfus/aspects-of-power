@@ -111,3 +111,13 @@ ASPECTSOFPOWER.aoeTargetingModes = {
   enemies: 'ASPECTSOFPOWER.AOE.targetingEnemies',
   allies:  'ASPECTSOFPOWER.AOE.targetingAllies',
 };
+
+/**
+ * AOE template shapes.
+ */
+ASPECTSOFPOWER.aoeShapes = {
+  circle: 'ASPECTSOFPOWER.AOE.shapeCircle',
+  cone:   'ASPECTSOFPOWER.AOE.shapeCone',
+  ray:    'ASPECTSOFPOWER.AOE.shapeRay',
+  rect:   'ASPECTSOFPOWER.AOE.shapeRect',
+};

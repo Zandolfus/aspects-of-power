@@ -28,7 +28,10 @@ export class SkillData extends foundry.abstract.TypeDataModel {
       // AOE modifier — applies to all active tags when enabled.
       aoe: new fields.SchemaField({
         enabled:          new fields.BooleanField({ initial: false }),
+        shape:            new fields.StringField({ initial: 'circle' }),
         diameter:         new fields.NumberField({ initial: 10, min: 5, integer: true }),
+        width:            new fields.NumberField({ initial: 5, min: 5, integer: true }),
+        angle:            new fields.NumberField({ initial: 53, min: 1, max: 360 }),
         targetingMode:    new fields.StringField({ initial: 'all' }),
         templateDuration: new fields.NumberField({ initial: 0, min: 0, integer: true }),
       }),
