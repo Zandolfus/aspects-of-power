@@ -536,6 +536,8 @@ export class AspectsofPowerItem extends Item {
         canvas.stage.off('pointerdown', onPointerDown);
         canvas.stage.off('rightdown', onCancel);
         document.removeEventListener('keydown', onKeyDown);
+        // Return to token controls from the measurement layer.
+        canvas.tokens.activate();
       };
 
       canvas.stage.on('pointermove', onPointerMove);
