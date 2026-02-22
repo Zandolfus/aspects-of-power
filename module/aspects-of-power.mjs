@@ -25,6 +25,12 @@ import { ASPECTSOFPOWER } from './helpers/config.mjs';
  */
 const _movementTracker = new Map();
 
+/**
+ * Tracks how many movement actions a combatant has used this turn (max 3).
+ * Each token drag counts as one movement action.
+ */
+const _moveActionTracker = new Map();
+
 /* -------------------------------------------- */
 /*  Init Hook                                   */
 /* -------------------------------------------- */
@@ -365,6 +371,7 @@ Hooks.on('renderTokenHUD', (hud, html, data) => {
  */
 Hooks.on('combatTurnChange', () => {
   _movementTracker.clear();
+  _moveActionTracker.clear();
 });
 
 /**
@@ -372,6 +379,7 @@ Hooks.on('combatTurnChange', () => {
  */
 Hooks.on('deleteCombat', () => {
   _movementTracker.clear();
+  _moveActionTracker.clear();
 });
 
 /* -------------------------------------------- */
@@ -379,11 +387,14 @@ Hooks.on('deleteCombat', () => {
 /* -------------------------------------------- */
 
 /**
- * Intercept token movement to enforce stamina costs and maximum range.
+ * Intercept token movement to enforce stamina costs, maximum range, and
+ * a 3-action-per-turn movement limit.
  *
- * Walk zone:   1 stamina per 5 ft, up to walkRange ft
- * Sprint zone: 3 stamina per 5 ft, from walkRange to 2*walkRange ft
- * Beyond 2*walkRange: movement blocked.
+ * Each token drag counts as one movement action (max 3 per turn).
+ * Per action:
+ *   Walk zone:   1 stamina per 5 ft, up to walkRange ft
+ *   Sprint zone: 3 stamina per 5 ft, from walkRange to sprintRange ft
+ *   Beyond sprintRange: movement blocked.
  *
  * Only applies during active combat. GM moves are exempt.
  */
@@ -413,8 +424,15 @@ Hooks.on('preUpdateToken', (tokenDoc, changes, options, userId) => {
   const walkRange = actor.system.walkRange;
   if (!walkRange || walkRange <= 0) return;
 
-  const maxRange = 2 * walkRange;
-  const stamina  = actor.system.stamina;
+  const sprintRange = actor.system.sprintRange;
+  const stamina     = actor.system.stamina;
+
+  // Check movement actions remaining (max 3 per turn).
+  const actionsUsed = _moveActionTracker.get(combatant.id) ?? 0;
+  if (actionsUsed >= 3) {
+    ui.notifications.warn('No movement actions remaining this turn! (3/3 used)');
+    return false;
+  }
 
   // Calculate the distance of this move in feet.
   const oldX = tokenDoc.x;
@@ -432,19 +450,17 @@ Hooks.on('preUpdateToken', (tokenDoc, changes, options, userId) => {
   const moveSnapped = Math.round(moveFeet / 5) * 5;
   if (moveSnapped <= 0) return;
 
-  // Cumulative distance this turn.
-  const prevDistance  = _movementTracker.get(combatant.id) ?? 0;
-  const totalDistance = prevDistance + moveSnapped;
-
-  // Check max range.
-  if (totalDistance > maxRange) {
-    ui.notifications.warn(`Maximum movement distance exceeded! (${Math.round(maxRange)} ft max)`);
+  // Per-action distance cap (single move can't exceed sprintRange).
+  if (moveSnapped > sprintRange) {
+    ui.notifications.warn(`Maximum movement distance exceeded! (${Math.round(sprintRange)} ft max per action)`);
     return false;
   }
 
-  // Calculate stamina cost for the segments in this move.
+  // Calculate stamina cost for this action's distance.
+  // Walk zone: 0 → walkRange at 1 stamina/5ft.
+  // Sprint zone: walkRange → sprintRange at 3 stamina/5ft.
   let staminaCost = 0;
-  for (let ft = prevDistance + 5; ft <= totalDistance; ft += 5) {
+  for (let ft = 5; ft <= moveSnapped; ft += 5) {
     staminaCost += (ft <= walkRange) ? 1 : 3;
   }
 
@@ -454,15 +470,20 @@ Hooks.on('preUpdateToken', (tokenDoc, changes, options, userId) => {
     return false;
   }
 
-  // Update tracker synchronously, deduct stamina asynchronously.
-  _movementTracker.set(combatant.id, totalDistance);
+  // Update trackers synchronously, deduct stamina asynchronously.
+  const actionNum = actionsUsed + 1;
+  _moveActionTracker.set(combatant.id, actionNum);
+
+  const prevDistance  = _movementTracker.get(combatant.id) ?? 0;
+  _movementTracker.set(combatant.id, prevDistance + moveSnapped);
 
   const newStamina = stamina.value - staminaCost;
   Promise.resolve().then(async () => {
     await actor.update({ 'system.stamina.value': newStamina });
     ChatMessage.create({
       speaker: ChatMessage.getSpeaker({ actor }),
-      content: `<p><em>${actor.name} spends ${staminaCost} stamina on movement (${moveSnapped} ft). `
+      content: `<p><em>${actor.name} spends ${staminaCost} stamina on movement `
+             + `(${moveSnapped} ft, action ${actionNum}/3). `
              + `Stamina: ${newStamina}/${stamina.max}</em></p>`,
     });
   });
