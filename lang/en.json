@@ -81,7 +81,8 @@
       "shapeRect": "Rectangle",
       "length": "Length (ft)",
       "width": "Width (ft)",
-      "angle": "Angle (°)"
+      "angle": "Angle (°)",
+      "size": "Size (ft)"
     },
     "Defense": {
       "armor": "Armor",

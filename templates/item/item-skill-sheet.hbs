@@ -91,14 +91,11 @@
                  value='{{system.aoe.width}}' min='5' step='5' />
         {{/if}}
 
-        {{! Rectangle: length + width }}
+        {{! Rectangle (square): side length — Foundry rect is always a square }}
         {{#if (eq system.aoe.shape "rect")}}
-          <label class='resource-label'>{{localize "ASPECTSOFPOWER.AOE.length"}}</label>
+          <label class='resource-label'>{{localize "ASPECTSOFPOWER.AOE.size"}}</label>
           <input type='number' name='system.aoe.diameter'
                  value='{{system.aoe.diameter}}' min='5' step='5' />
-          <label class='resource-label'>{{localize "ASPECTSOFPOWER.AOE.width"}}</label>
-          <input type='number' name='system.aoe.width'
-                 value='{{system.aoe.width}}' min='5' step='5' />
         {{/if}}
 
         <label class='resource-label'>{{localize "ASPECTSOFPOWER.AOE.targetingMode"}}</label>

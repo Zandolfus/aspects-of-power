@@ -2,7 +2,9 @@
   "permissions": {
     "allow": [
       "WebFetch(domain:foundryvtt.wiki)",
-      "WebFetch(domain:foundryvtt.com)"
+      "WebFetch(domain:foundryvtt.com)",
+      "WebFetch(domain:github.com)",
+      "WebFetch(domain:raw.githubusercontent.com)"
     ]
   }
 }

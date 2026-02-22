@@ -462,6 +462,10 @@ export class AspectsofPowerItem extends Item {
    * Circle/Rect: preview follows cursor, click to place center.
    * Cone/Ray: origin locked to caster, mouse aims direction, click to confirm.
    *
+   * Rect uses Foundry's native rect type: distance = diagonal of the square
+   * (Math.hypot(size, size)), direction = 45° for grid alignment. Origin is
+   * the top-left corner, offset so the click is the center.
+   *
    * @param {Token} casterToken  The caster's canvas token.
    * @returns {Promise<MeasuredTemplateDocument|null>}
    */
@@ -481,6 +485,10 @@ export class AspectsofPowerItem extends Item {
       return null;
     }
 
+    // Rect centering: origin is a corner, so offset by half the side length.
+    const rectSidePx = aoe.diameter * pixelsPerFoot;
+    const rectHalfPx = rectSidePx / 2;
+
     // Build shape-specific preview template data.
     let previewData;
     if (shape === 'circle') {
@@ -490,8 +498,8 @@ export class AspectsofPowerItem extends Item {
     } else if (shape === 'ray') {
       previewData = { t: 'ray', distance: aoe.diameter, width: aoe.width, direction: 0, x: cc.x, y: cc.y, fillColor };
     } else {
-      // rect: preview centered on cursor (offset applied in move handler).
-      previewData = { t: 'rect', distance: aoe.diameter, width: aoe.width, direction: 0, x: 0, y: 0, fillColor };
+      // rect: Foundry rect = square. distance = diagonal, direction = 45° for grid alignment.
+      previewData = { t: 'rect', distance: Math.hypot(aoe.diameter, aoe.diameter), direction: 45, x: 0, y: 0, fillColor };
     }
 
     const templateDoc = new MeasuredTemplateDocument(previewData, { parent: canvas.scene });
@@ -514,10 +522,8 @@ export class AspectsofPowerItem extends Item {
           const direction = Math.toDegrees(Math.atan2(dy, dx));
           template.document.updateSource({ direction });
         } else if (shape === 'rect') {
-          // Rectangle: center on cursor by offsetting origin.
-          const halfLenPx = (aoe.diameter * pixelsPerFoot) / 2;
-          const halfWidPx = (aoe.width * pixelsPerFoot) / 2;
-          template.document.updateSource({ x: pos.x - halfLenPx, y: pos.y - halfWidPx });
+          // Rectangle: center the square on cursor (offset origin by half side).
+          template.document.updateSource({ x: pos.x - rectHalfPx, y: pos.y - rectHalfPx });
         } else {
           // Circle: center on cursor.
           template.document.updateSource({ x: pos.x, y: pos.y });
@@ -542,27 +548,19 @@ export class AspectsofPowerItem extends Item {
         resolved = true;
         cleanup();
 
-        // Build final persisted template data.
-        let finalData;
-        if (shape === 'circle') {
-          finalData = { t: 'circle', distance: aoe.diameter / 2, x: pos.x, y: pos.y, fillColor };
-        } else if (shape === 'cone') {
+        // Finalize position on the preview document, then export via toObject().
+        if (isDirected) {
           const dx = pos.x - cc.x;
           const dy = pos.y - cc.y;
-          const direction = Math.toDegrees(Math.atan2(dy, dx));
-          finalData = { t: 'cone', distance: aoe.diameter, angle: aoe.angle, direction, x: cc.x, y: cc.y, fillColor };
-        } else if (shape === 'ray') {
-          const dx = pos.x - cc.x;
-          const dy = pos.y - cc.y;
-          const direction = Math.toDegrees(Math.atan2(dy, dx));
-          finalData = { t: 'ray', distance: aoe.diameter, width: aoe.width, direction, x: cc.x, y: cc.y, fillColor };
+          template.document.updateSource({ direction: Math.toDegrees(Math.atan2(dy, dx)) });
+        } else if (shape === 'rect') {
+          template.document.updateSource({ x: pos.x - rectHalfPx, y: pos.y - rectHalfPx });
         } else {
-          // rect: center on click position.
-          const halfLenPx = (aoe.diameter * pixelsPerFoot) / 2;
-          const halfWidPx = (aoe.width * pixelsPerFoot) / 2;
-          finalData = { t: 'rect', distance: aoe.diameter, width: aoe.width, direction: 0, x: pos.x - halfLenPx, y: pos.y - halfWidPx, fillColor };
+          template.document.updateSource({ x: pos.x, y: pos.y });
         }
 
+        // Export the fully-configured preview as a plain object for persistence.
+        const finalData = template.document.toObject();
         finalData.flags = {
           'aspects-of-power': {
             aoe: true,
@@ -574,7 +572,7 @@ export class AspectsofPowerItem extends Item {
         };
 
         const [created] = await canvas.scene.createEmbeddedDocuments('MeasuredTemplate', [finalData]);
-        // Brief delay so the template object renders and its shape is available for target detection.
+        // Brief delay so the template object renders and testPoint() is available.
         await new Promise(r => setTimeout(r, 50));
         resolve(created);
       };
@@ -611,7 +609,7 @@ export class AspectsofPowerItem extends Item {
   /**
    * Find all tokens within a placed MeasuredTemplate, filtered by the
    * skill's AOE targeting mode (all / enemies / allies).
-   * Uses Foundry's built-in shape.contains() for all template types.
+   * Uses Foundry v13's testPoint() for containment testing across all shapes.
    *
    * @param {MeasuredTemplateDocument} templateDoc
    * @returns {Token[]}
@@ -621,28 +619,31 @@ export class AspectsofPowerItem extends Item {
     const casterToken = this.actor.getActiveTokens()?.[0] ?? null;
     const casterDisp = casterToken?.document?.disposition ?? CONST.TOKEN_DISPOSITIONS.NEUTRAL;
 
-    // Get the rendered template object for shape containment testing.
+    // Get the rendered template object for containment testing.
     const templateObject = canvas.templates.get(templateDoc.id)
                          ?? templateDoc.object;
-    const shape = templateObject?.shape;
-    const pixelsPerFoot = canvas.grid.size / canvas.grid.distance;
     const qualifying = [];
 
     for (const token of canvas.tokens.placeables) {
       if (token.document.hidden) continue;
 
-      // Convert token center to template-local coordinates for shape.contains().
       const center = token.center;
-      const localX = center.x - templateDoc.x;
-      const localY = center.y - templateDoc.y;
 
-      // Use Foundry's shape containment if available, else fall back to circle math.
-      if (shape) {
-        if (!shape.contains(localX, localY)) continue;
+      // Use Foundry v13's testPoint (canvas-space coords) for all template types.
+      if (templateObject?.testPoint) {
+        if (!templateObject.testPoint(center)) continue;
       } else {
-        // Fallback: circle distance check (for backward compatibility).
-        const radiusPx = templateDoc.distance * pixelsPerFoot;
-        if (localX * localX + localY * localY > radiusPx * radiusPx) continue;
+        // Fallback: manual check using shape.contains (template-local coords).
+        const shape = templateObject?.shape;
+        const localX = center.x - templateDoc.x;
+        const localY = center.y - templateDoc.y;
+        if (shape) {
+          if (!shape.contains(localX, localY)) continue;
+        } else {
+          const pixelsPerFoot = canvas.grid.size / canvas.grid.distance;
+          const radiusPx = templateDoc.distance * pixelsPerFoot;
+          if (localX * localX + localY * localY > radiusPx * radiusPx) continue;
+        }
       }
 
       // Disposition filter.
