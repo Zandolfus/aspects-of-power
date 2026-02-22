@@ -98,6 +98,13 @@ export class AspectsofPowerItemSheet extends foundry.applications.api.Handlebars
       return;
     }
 
+    // Simple system fields (e.g. skillType, description): update directly
+    // so the full-form processor doesn't choke on complex skill fields.
+    if (this.item.type === 'skill' && event.target?.name === 'system.skillType') {
+      await this.document.update({ [event.target.name]: event.target.value });
+      return;
+    }
+
     // Tag checkboxes: collect all checked values into an array.
     if (this.item.type === 'skill' && event.target?.name === 'system.tags') {
       const form = this.element.querySelector('form');
