@@ -268,69 +268,6 @@
   min-height: 0;
   overflow-y: auto;
 }
-/* Editor layout. Height is set on .editor-container via JS after ProseMirrorEditor.create()
-   because the flex chain cannot propagate a definite height to deeply nested flex children. */
-.aspects-of-power .sheet-body .tab .editor {
-  display: flex;
-  flex-direction: column;
-  height: 100%;
-}
-.aspects-of-power .sheet-body .tab .editor .editor-menu {
-  flex: 0 0 auto;
-  display: flex;
-  position: relative;
-}
-.aspects-of-power .sheet-body .tab .editor .editor-menu .pm-dropdown {
-  position: relative;
-}
-.aspects-of-power .sheet-body .tab .editor .editor-menu .pm-dropdown > ul {
-  display: none;
-  position: absolute;
-  z-index: 100;
-  top: 100%;
-  left: 0;
-  background: #fff;
-  border: 1px solid #999;
-  list-style: none;
-  padding: 4px 0;
-  min-width: 150px;
-}
-.aspects-of-power .sheet-body .tab .editor .editor-menu .pm-dropdown.open > ul {
-  display: block;
-}
-.aspects-of-power .sheet-body .tab .editor .editor-menu .pm-dropdown > ul li {
-  position: relative;
-  list-style: none;
-}
-.aspects-of-power .sheet-body .tab .editor .editor-menu .pm-dropdown > ul li > ul {
-  display: none;
-  position: absolute;
-  z-index: 101;
-  top: 0;
-  left: 100%;
-  background: #fff;
-  border: 1px solid #999;
-  list-style: none;
-  padding: 4px 0;
-  min-width: 150px;
-}
-.aspects-of-power .sheet-body .tab .editor .editor-menu .pm-dropdown > ul li:hover > ul {
-  display: block;
-}
-.aspects-of-power .sheet-body .tab .editor .editor-content {
-  flex: 1;
-  overflow-y: auto;
-}
-.aspects-of-power .sheet-body .tab .editor .ProseMirror {
-  outline: none;
-  padding: 4px 8px;
-}
-.aspects-of-power .tox .tox-editor-container {
-  background: #fff;
-}
-.aspects-of-power .tox .tox-edit-area {
-  padding: 0 8px;
-}
 /* Skill tag UI */
 .aspects-of-power .skill-tags {
   margin-bottom: 8px;

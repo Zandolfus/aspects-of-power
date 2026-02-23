@@ -160,62 +160,6 @@ export class AspectsofPowerActorSheet extends foundry.applications.api.Handlebar
     // Everything below requires the sheet to be editable.
     if (!this.isEditable) return;
 
-    // AppV2 doesn't inherit AppV1's activateEditor() — wire up ProseMirror manually.
-    this.element.querySelectorAll('.editor-edit').forEach(btn => {
-      btn.addEventListener('click', async ev => {
-        ev.preventDefault();
-        const wrapper   = btn.closest('.editor');
-        const contentEl = wrapper?.querySelector('.editor-content');
-        if (!contentEl || wrapper.classList.contains('active')) return;
-        wrapper.classList.add('active');
-        btn.style.display = 'none';
-        const fieldName  = contentEl.dataset.target ?? contentEl.dataset.fieldName ?? 'system.biography';
-        const rawContent = foundry.utils.getProperty(this.document.toObject(), fieldName) ?? '';
-        await foundry.applications.ux.ProseMirrorEditor.create(contentEl, rawContent, {
-          document:  this.document,
-          fieldName: fieldName,
-        });
-
-        // Foundry has no CSS to hide .pm-dropdown > ul and its #onActivate does not touch
-        // display, so we manage dropdown visibility entirely. CSS positions the <ul>
-        // absolutely; JS hides it initially and toggles on click.
-        wrapper.querySelectorAll('.editor-menu .pm-dropdown').forEach(btn => {
-          const ul = btn.querySelector(':scope > ul');
-          if (!ul) return;
-          ul.style.display = 'none';
-          btn.addEventListener('click', ev => {
-            if (ul.contains(ev.target)) return; // let item-action clicks through
-            ev.stopPropagation();
-            const isOpen = ul.style.display === 'block';
-            wrapper.querySelectorAll('.editor-menu .pm-dropdown > ul').forEach(u => {
-              u.style.display = 'none';
-            });
-            if (!isOpen) ul.style.display = 'block';
-          });
-        });
-        document.addEventListener('click', () => {
-          wrapper.querySelectorAll('.editor-menu .pm-dropdown > ul').forEach(ul => {
-            ul.style.display = 'none';
-          });
-        });
-
-        // ProseMirrorEditor wraps the editable div in a new .editor-container sibling to
-        // .editor-menu. Neither element has a definite CSS height from the flex chain, so
-        // measure and set the container height explicitly.
-        const menuEl      = wrapper.querySelector('.editor-menu');
-        const containerEl = wrapper.querySelector('.editor-container');
-        if (menuEl && containerEl) {
-          const tabEl    = wrapper.closest('[data-tab]') ?? wrapper;
-          const tabRect  = tabEl.getBoundingClientRect();
-          const menuRect = menuEl.getBoundingClientRect();
-          // Set width on the wrapper so both .editor-menu and .editor-container inherit it.
-          wrapper.style.width        = `${tabRect.width}px`;
-          containerEl.style.height   = `${Math.max(200, tabRect.height - menuRect.height)}px`;
-          containerEl.style.overflowY = 'auto';
-        }
-      });
-    });
-
     // Add Inventory Item
     this.element.querySelectorAll('.item-create').forEach(el => {
       el.addEventListener('click', this._onItemCreate.bind(this));
