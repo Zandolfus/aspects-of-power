@@ -202,6 +202,23 @@ export class AspectsofPowerItemSheet extends foundry.applications.api.Handlebars
 
     if (!this.isEditable) return;
 
+    // Activate ProseMirror when the edit button is clicked.
+    this.element.querySelectorAll('.editor-edit').forEach(btn => {
+      btn.addEventListener('click', async ev => {
+        ev.preventDefault();
+        const wrapper   = btn.closest('.editor');
+        const contentEl = wrapper?.querySelector('.editor-content');
+        if (!contentEl || wrapper.classList.contains('active')) return;
+        wrapper.classList.add('active');
+        btn.style.display = 'none';
+        const fieldName  = contentEl.dataset.target ?? contentEl.dataset.fieldName;
+        const rawContent = foundry.utils.getProperty(this.document.toObject(), fieldName) ?? '';
+        await foundry.applications.ux.ProseMirrorEditor.create(contentEl, rawContent, {
+          document: this.document, fieldName,
+        });
+      });
+    });
+
     this.element.querySelectorAll('.effect-control').forEach(el => {
       el.addEventListener('click', ev => onManageActiveEffect(ev, this.item));
     });
