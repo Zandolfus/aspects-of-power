@@ -74,19 +74,19 @@ export class AspectsofPowerActor extends Actor {
     for (const [key, ability] of Object.entries(systemData.abilities)) {
       const base = Math.round(this._source.system.abilities[key].value ?? 0);
       const c = contributions[key];
-      const calculated = base + c.blessing + c.title + c.other;
+      const calculated = Math.round(base + c.blessing + c.title + c.other);
       ability.breakdown = {
         base,
-        blessingBonus: c.blessing,
-        titleBonus: c.title,
-        otherBonus: c.other,
+        blessingBonus: Math.round(c.blessing),
+        titleBonus: Math.round(c.title),
+        otherBonus: Math.round(c.other),
         calculated,
-        equipmentBonusRaw: c.equipment,
+        equipmentBonusRaw: Math.round(c.equipment),
       };
     }
 
     // Equipment caps: 30% per stat, 20% of total calculated.
-    const totalCalculated = abilityKeys.reduce((sum, k) => sum + systemData.abilities[k].breakdown.calculated, 0);
+    const totalCalculated = Math.round(abilityKeys.reduce((sum, k) => sum + systemData.abilities[k].breakdown.calculated, 0));
     const globalCap = Math.floor(totalCalculated * 0.20);
 
     for (const ability of Object.values(systemData.abilities)) {
@@ -107,7 +107,7 @@ export class AspectsofPowerActor extends Actor {
     // Final values and modifiers (overrides AE-modified value with capped total).
     for (const [key, ability] of Object.entries(systemData.abilities)) {
       const b = ability.breakdown;
-      b.final = b.calculated + b.equipmentCapped;
+      b.final = Math.round(b.calculated + b.equipmentCapped);
       ability.value = b.final;
       ability.mod = sigmoidMod(b.final, key);
       b.finalMod = ability.mod;
@@ -145,8 +145,8 @@ export class AspectsofPowerActor extends Actor {
     systemData.defense.soul.value   = Math.round((systemData.abilities.wisdom.mod + systemData.abilities.willpower.mod*.3)*1.1) + effectBonus('system.defense.soul.value');
 
     // Casting range (feet) and movement ranges (feet).
-    systemData.castingRange = 40 + (systemData.abilities.perception.mod / 10);
-    systemData.walkRange    = 35 + (systemData.abilities.endurance.mod / 10);
+    systemData.castingRange = Math.round(40 + (systemData.abilities.perception.mod / 10));
+    systemData.walkRange    = Math.round(35 + (systemData.abilities.endurance.mod / 10));
     systemData.sprintRange  = 2 * systemData.walkRange;
 
     // Make separate methods for each Actor type (character, npc, etc.) to keep
