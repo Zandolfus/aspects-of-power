@@ -74,12 +74,14 @@ export class AspectsofPowerActor extends Actor {
     for (const [key, ability] of Object.entries(systemData.abilities)) {
       const base = Math.round(this._source.system.abilities[key].value ?? 0);
       const c = contributions[key];
-      const calculated = Math.round(base + c.blessing + c.title + c.other);
+      const effectBonus = Math.round(c.blessing + c.title + c.other);
+      const calculated = Math.round(base + effectBonus);
       ability.breakdown = {
         base,
         blessingBonus: Math.round(c.blessing),
         titleBonus: Math.round(c.title),
         otherBonus: Math.round(c.other),
+        effectBonus,
         calculated,
         equipmentBonusRaw: Math.round(c.equipment),
       };

@@ -113,26 +113,6 @@
           </div>
         </div>
       </div>
-      <div class="resources grid grid-3col">
-        <div class="resource flex-group-center">
-          <label class="resource-label">Casting Range</label>
-          <div class="resource-content flexrow flex-center flex-between">
-            <span>{{numberFormat system.castingRange decimals=0}} ft</span>
-          </div>
-        </div>
-        <div class="resource flex-group-center">
-          <label class="resource-label">Walk Range</label>
-          <div class="resource-content flexrow flex-center flex-between">
-            <span>{{numberFormat system.walkRange decimals=0}} ft</span>
-          </div>
-        </div>
-        <div class="resource flex-group-center">
-          <label class="resource-label">Sprint Range</label>
-          <div class="resource-content flexrow flex-center flex-between">
-            <span>{{numberFormat system.sprintRange decimals=0}} ft</span>
-          </div>
-        </div>
-      </div>
     </div>
   </header>
 
@@ -190,6 +170,7 @@
           <span class="stat-col">{{localize "ASPECTSOFPOWER.Stats.calculated"}}</span>
           <span class="stat-col">{{localize "ASPECTSOFPOWER.Stats.equipmentBonus"}}</span>
           <span class="stat-col">{{localize "ASPECTSOFPOWER.Stats.equipmentCap"}}</span>
+          <span class="stat-col">{{localize "ASPECTSOFPOWER.Stats.effectBonus"}}</span>
           <span class="stat-col">{{localize "ASPECTSOFPOWER.Stats.withEquipment"}}</span>
           <span class="stat-col">{{localize "ASPECTSOFPOWER.Stats.finalMod"}}</span>
         </div>
@@ -217,6 +198,7 @@
               <span class="stat-col">{{ability.breakdown.equipmentCapped}}</span>
             {{/if}}
             <span class="stat-col">{{ability.breakdown.perStatCap}}</span>
+            <span class="stat-col">{{ability.breakdown.effectBonus}}</span>
             <span class="stat-col stat-total"><strong>{{ability.breakdown.final}}</strong></span>
             <span class="stat-col stat-mod rollable"
                   data-roll="(d20/100)*@abilities.{{key}}.mod+@abilities.{{key}}.mod"
@@ -225,6 +207,19 @@
             </span>
           </div>
           {{/each}}
+        </div>
+
+        {{!-- Ranges --}}
+        <div class="stats-ranges flexrow">
+          <span class="range-item">
+            <strong>{{localize "ASPECTSOFPOWER.Range.castingRange"}}:</strong> {{system.castingRange}} ft
+          </span>
+          <span class="range-item">
+            <strong>{{localize "ASPECTSOFPOWER.Range.walkRange"}}:</strong> {{system.walkRange}} ft
+          </span>
+          <span class="range-item">
+            <strong>{{localize "ASPECTSOFPOWER.Range.sprintRange"}}:</strong> {{system.sprintRange}} ft
+          </span>
         </div>
 
       </div>

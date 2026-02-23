@@ -567,3 +567,12 @@
 .aspects-of-power .stat-row .stat-mod {
   font-weight: bold;
 }
+.aspects-of-power .stats-ranges {
+  gap: 16px;
+  padding: 6px 8px;
+  margin-top: 8px;
+  background: rgba(0, 0, 0, 0.03);
+  border: 1px solid #c9c7b8;
+  border-radius: 3px;
+  font-size: 13px;
+}
