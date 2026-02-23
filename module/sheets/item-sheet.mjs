@@ -202,6 +202,11 @@ export class AspectsofPowerItemSheet extends foundry.applications.api.Handlebars
 
     if (!this.isEditable) return;
 
+    // <prose-mirror> fires a custom "save" event; update the document directly.
+    this.element.querySelectorAll('prose-mirror').forEach(el => {
+      el.addEventListener('save', () => this.document.update({ [el.name]: el.value }));
+    });
+
     this.element.querySelectorAll('.effect-control').forEach(el => {
       el.addEventListener('click', ev => onManageActiveEffect(ev, this.item));
     });

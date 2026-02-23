@@ -160,6 +160,11 @@ export class AspectsofPowerActorSheet extends foundry.applications.api.Handlebar
     // Everything below requires the sheet to be editable.
     if (!this.isEditable) return;
 
+    // <prose-mirror> fires a custom "save" event; update the document directly.
+    this.element.querySelectorAll('prose-mirror').forEach(el => {
+      el.addEventListener('save', () => this.document.update({ [el.name]: el.value }));
+    });
+
     // Add Inventory Item
     this.element.querySelectorAll('.item-create').forEach(el => {
       el.addEventListener('click', this._onItemCreate.bind(this));
