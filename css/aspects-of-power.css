@@ -268,13 +268,6 @@
   min-height: 0;
   overflow-y: auto;
 }
-/* ProseMirror dropdown menus — hidden by default, shown via .open class */
-.aspects-of-power .pm-dropdown > ul {
-  display: none;
-}
-.aspects-of-power .pm-dropdown.open > ul {
-  display: block;
-}
 /* Skill tag UI */
 .aspects-of-power .skill-tags {
   margin-bottom: 8px;

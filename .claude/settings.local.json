@@ -4,7 +4,11 @@
       "WebFetch(domain:foundryvtt.wiki)",
       "WebFetch(domain:foundryvtt.com)",
       "WebFetch(domain:github.com)",
-      "WebFetch(domain:raw.githubusercontent.com)"
+      "WebFetch(domain:raw.githubusercontent.com)",
+      "Bash(cd:*)",
+      "Bash(gh search code:*)",
+      "Bash(gh api:*)",
+      "Bash(where:*)"
     ]
   }
 }
