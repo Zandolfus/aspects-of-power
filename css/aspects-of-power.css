@@ -493,7 +493,7 @@
   font-style: italic;
 }
 
-/* Stats breakdown table */
+/* Stats breakdown */
 .aspects-of-power .stats-breakdown {
   padding: 0 4px;
 }
@@ -507,45 +507,63 @@
   font-size: 0.85em;
   color: #4b4a44;
 }
-.aspects-of-power .stats-table {
-  width: 100%;
-  border-collapse: collapse;
-  font-size: 13px;
-}
-.aspects-of-power .stats-table th,
-.aspects-of-power .stats-table td {
-  text-align: center;
-  padding: 3px 4px;
-  border-bottom: 1px solid #c9c7b8;
-}
-.aspects-of-power .stats-table th {
+.aspects-of-power .stat-header {
   background: rgba(0, 0, 0, 0.05);
+  border: 2px groove #eeede0;
+  padding: 2px 0;
+  margin-bottom: 2px;
   font-weight: bold;
   font-size: 12px;
   text-transform: uppercase;
+  align-items: center;
 }
-.aspects-of-power .stats-table .row-label {
+.aspects-of-power .stat-header .stat-col-name {
+  flex: 2;
+  padding-left: 5px;
+  text-align: left;
+}
+.aspects-of-power .stat-header .stat-col {
+  flex: 1;
+  text-align: center;
+}
+.aspects-of-power .stat-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.aspects-of-power .stat-row {
+  align-items: center;
+  padding: 1px 0;
+  border-bottom: 1px solid #c9c7b8;
+  font-size: 13px;
+}
+.aspects-of-power .stat-row:last-child {
+  border-bottom: none;
+}
+.aspects-of-power .stat-row .stat-col-name {
+  flex: 2;
+  padding-left: 5px;
   text-align: left;
   font-weight: bold;
-  white-space: nowrap;
-  padding-right: 8px;
-  width: 1%;
 }
-.aspects-of-power .stats-table .stat-input {
+.aspects-of-power .stat-row .stat-col {
+  flex: 1;
+  text-align: center;
+}
+.aspects-of-power .stat-row .stat-input {
   width: 48px;
   text-align: center;
-  margin: 0 auto;
 }
-.aspects-of-power .stats-table .capped {
+.aspects-of-power .stat-row .capped {
   color: #cc4400;
 }
-.aspects-of-power .stats-table .raw-value {
+.aspects-of-power .stat-row .raw-value {
   font-size: 0.8em;
   color: #999;
 }
-.aspects-of-power .stats-table .total-row td {
-  border-top: 2px solid #4b4a44;
+.aspects-of-power .stat-row .stat-total {
+  font-size: 14px;
 }
-.aspects-of-power .stats-table .mod-row td {
+.aspects-of-power .stat-row .stat-mod {
   font-weight: bold;
 }

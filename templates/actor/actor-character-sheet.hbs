@@ -183,83 +183,50 @@
           <span>{{localize "ASPECTSOFPOWER.Stats.equipmentUsed"}}: {{statsSummary.totalEquipCapped}} / {{statsSummary.totalEquipRaw}}</span>
         </div>
 
-        <table class="stats-table">
-          <thead>
-            <tr>
-              <th class="row-label"></th>
-              {{#each system.abilities as |ability key|}}
-                <th>{{localize (lookup @root.config.abilityAbbreviations key)}}</th>
-              {{/each}}
-            </tr>
-          </thead>
-          <tbody>
+        {{!-- Column headers --}}
+        <div class="stat-header flexrow">
+          <span class="stat-col-name">{{localize "ASPECTSOFPOWER.AttributeGroup.abilities"}}</span>
+          <span class="stat-col">{{localize "ASPECTSOFPOWER.Stats.base"}}</span>
+          <span class="stat-col">{{localize "ASPECTSOFPOWER.Stats.calculated"}}</span>
+          <span class="stat-col">{{localize "ASPECTSOFPOWER.Stats.equipmentBonus"}}</span>
+          <span class="stat-col">{{localize "ASPECTSOFPOWER.Stats.equipmentCap"}}</span>
+          <span class="stat-col">{{localize "ASPECTSOFPOWER.Stats.withEquipment"}}</span>
+          <span class="stat-col">{{localize "ASPECTSOFPOWER.Stats.finalMod"}}</span>
+        </div>
 
-            {{!-- Base stats (editable) --}}
-            <tr class="stat-row base-row">
-              <td class="row-label">{{localize "ASPECTSOFPOWER.Stats.base"}}</td>
-              {{#each system.abilities as |ability key|}}
-                <td>
-                  <input type="number" name="system.abilities.{{key}}.value"
-                         value="{{ability.breakdown.base}}" min="0" class="stat-input"/>
-                </td>
-              {{/each}}
-            </tr>
+        {{!-- One row per ability --}}
+        <div class="stat-list">
+          {{#each system.abilities as |ability key|}}
+          <div class="stat-row flexrow">
+            <label class="stat-col-name rollable"
+                   data-roll="(d20/100)*@abilities.{{key}}.mod+@abilities.{{key}}.mod"
+                   data-label="{{localize (lookup @root.config.abilities key)}}">
+              {{localize (lookup @root.config.abilities key)}}
+            </label>
+            <span class="stat-col">
+              <input type="number" name="system.abilities.{{key}}.value"
+                     value="{{ability.breakdown.base}}" min="0" class="stat-input"/>
+            </span>
+            <span class="stat-col">{{ability.breakdown.calculated}}</span>
+            {{#if (gt ability.breakdown.equipmentBonusRaw ability.breakdown.equipmentCapped)}}
+              <span class="stat-col capped">
+                {{ability.breakdown.equipmentCapped}}
+                <span class="raw-value">({{ability.breakdown.equipmentBonusRaw}})</span>
+              </span>
+            {{else}}
+              <span class="stat-col">{{ability.breakdown.equipmentCapped}}</span>
+            {{/if}}
+            <span class="stat-col">{{ability.breakdown.perStatCap}}</span>
+            <span class="stat-col stat-total"><strong>{{ability.breakdown.final}}</strong></span>
+            <span class="stat-col stat-mod rollable"
+                  data-roll="(d20/100)*@abilities.{{key}}.mod+@abilities.{{key}}.mod"
+                  data-label="{{localize (lookup @root.config.abilities key)}}">
+              {{numberFormat ability.breakdown.finalMod decimals=0 sign=true}}
+            </span>
+          </div>
+          {{/each}}
+        </div>
 
-            {{!-- Calculated stats (base + blessings + titles + other) --}}
-            <tr class="stat-row calculated-row">
-              <td class="row-label">{{localize "ASPECTSOFPOWER.Stats.calculated"}}</td>
-              {{#each system.abilities as |ability key|}}
-                <td>{{ability.breakdown.calculated}}</td>
-              {{/each}}
-            </tr>
-
-            {{!-- Equipment bonus (capped, raw shown if different) --}}
-            <tr class="stat-row equipment-row">
-              <td class="row-label">{{localize "ASPECTSOFPOWER.Stats.equipmentBonus"}}</td>
-              {{#each system.abilities as |ability key|}}
-                {{#if (gt ability.breakdown.equipmentBonusRaw ability.breakdown.equipmentCapped)}}
-                  <td class="capped">
-                    {{ability.breakdown.equipmentCapped}}
-                    <span class="raw-value">({{ability.breakdown.equipmentBonusRaw}})</span>
-                  </td>
-                {{else}}
-                  <td>{{ability.breakdown.equipmentCapped}}</td>
-                {{/if}}
-              {{/each}}
-            </tr>
-
-            {{!-- Equipment cap per stat --}}
-            <tr class="stat-row cap-row">
-              <td class="row-label">{{localize "ASPECTSOFPOWER.Stats.equipmentCap"}}</td>
-              {{#each system.abilities as |ability key|}}
-                <td>{{ability.breakdown.perStatCap}}</td>
-              {{/each}}
-            </tr>
-
-            {{!-- Total (calculated + capped equipment) --}}
-            <tr class="stat-row total-row">
-              <td class="row-label">{{localize "ASPECTSOFPOWER.Stats.withEquipment"}}</td>
-              {{#each system.abilities as |ability key|}}
-                <td><strong>{{ability.breakdown.final}}</strong></td>
-              {{/each}}
-            </tr>
-
-            {{!-- Final modifier (rollable) --}}
-            <tr class="stat-row mod-row">
-              <td class="row-label">{{localize "ASPECTSOFPOWER.Stats.finalMod"}}</td>
-              {{#each system.abilities as |ability key|}}
-                <td>
-                  <span class="stat-mod rollable"
-                        data-roll="(d20/100)*@abilities.{{key}}.mod+@abilities.{{key}}.mod"
-                        data-label="{{localize (lookup @root.config.abilities key)}}">
-                    {{numberFormat ability.breakdown.finalMod decimals=0 sign=true}}
-                  </span>
-                </td>
-              {{/each}}
-            </tr>
-
-          </tbody>
-        </table>
       </div>
     </div>
 
