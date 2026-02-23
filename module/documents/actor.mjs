@@ -74,15 +74,14 @@ export class AspectsofPowerActor extends Actor {
     for (const [key, ability] of Object.entries(systemData.abilities)) {
       const base = Math.round(this._source.system.abilities[key].value ?? 0);
       const c = contributions[key];
-      const effectBonus = Math.round(c.blessing + c.title + c.other);
-      const calculated = Math.round(base + effectBonus);
+      const calculated = Math.round(base + c.blessing + c.title);
+      const effectBonus = Math.round(c.other);
       ability.breakdown = {
         base,
         blessingBonus: Math.round(c.blessing),
         titleBonus: Math.round(c.title),
-        otherBonus: Math.round(c.other),
-        effectBonus,
         calculated,
+        effectBonus,
         equipmentBonusRaw: Math.round(c.equipment),
       };
     }
@@ -109,7 +108,7 @@ export class AspectsofPowerActor extends Actor {
     // Final values and modifiers (overrides AE-modified value with capped total).
     for (const [key, ability] of Object.entries(systemData.abilities)) {
       const b = ability.breakdown;
-      b.final = Math.round(b.calculated + b.equipmentCapped);
+      b.final = Math.round(b.calculated + b.equipmentCapped + b.effectBonus);
       ability.value = b.final;
       ability.mod = sigmoidMod(b.final, key);
       b.finalMod = ability.mod;
