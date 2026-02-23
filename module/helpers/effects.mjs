@@ -11,7 +11,9 @@ export function onManageActiveEffect(event, owner) {
     ? owner.effects.get(li.dataset.effectId)
     : null;
   switch (a.dataset.action) {
-    case 'create':
+    case 'create': {
+      const sectionType = li.dataset.effectType;
+      const isCategory = (sectionType === 'blessing' || sectionType === 'title');
       return owner.createEmbeddedDocuments('ActiveEffect', [
         {
           name: game.i18n.format('DOCUMENT.New', {
@@ -20,10 +22,12 @@ export function onManageActiveEffect(event, owner) {
           img: 'icons/svg/aura.svg',
           origin: owner.uuid,
           'duration.rounds':
-            li.dataset.effectType === 'temporary' ? 1 : undefined,
-          disabled: li.dataset.effectType === 'inactive',
+            sectionType === 'temporary' ? 1 : undefined,
+          disabled: sectionType === 'inactive',
+          flags: isCategory ? { aspectsofpower: { effectCategory: sectionType } } : {},
         },
       ]);
+    }
     case 'edit':
       return effect.sheet.render(true);
     case 'delete':
@@ -41,6 +45,16 @@ export function onManageActiveEffect(event, owner) {
 export function prepareActiveEffectCategories(effects) {
   // Define effect header categories
   const categories = {
+    blessing: {
+      type: 'blessing',
+      label: game.i18n.localize('ASPECTSOFPOWER.Effect.Blessing'),
+      effects: [],
+    },
+    title: {
+      type: 'title',
+      label: game.i18n.localize('ASPECTSOFPOWER.Effect.Title'),
+      effects: [],
+    },
     temporary: {
       type: 'temporary',
       label: game.i18n.localize('ASPECTSOFPOWER.Effect.Temporary'),
@@ -60,7 +74,10 @@ export function prepareActiveEffectCategories(effects) {
 
   // Iterate over active effects, classifying them into categories
   for (let e of effects) {
-    if (e.disabled) categories.inactive.effects.push(e);
+    const cat = e.flags?.aspectsofpower?.effectCategory;
+    if (cat === 'blessing') categories.blessing.effects.push(e);
+    else if (cat === 'title') categories.title.effects.push(e);
+    else if (e.disabled) categories.inactive.effects.push(e);
     else if (e.isTemporary) categories.temporary.effects.push(e);
     else categories.passive.effects.push(e);
   }

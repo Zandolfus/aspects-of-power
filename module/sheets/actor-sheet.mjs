@@ -75,7 +75,7 @@ export class AspectsofPowerActorSheet extends foundry.applications.api.Handlebar
    * @param {object} context The context object to mutate
    */
   _prepareCharacterData(context) {
-    // Extend here for character-specific editor fields or derived data.
+    context.statsSummary = context.system.statsSummary;
   }
 
   /**

@@ -492,3 +492,60 @@
   color: #888;
   font-style: italic;
 }
+
+/* Stats breakdown table */
+.aspects-of-power .stats-breakdown {
+  padding: 0 4px;
+}
+.aspects-of-power .stats-summary {
+  gap: 16px;
+  padding: 4px 8px;
+  margin-bottom: 8px;
+  background: rgba(0, 0, 0, 0.03);
+  border: 1px solid #c9c7b8;
+  border-radius: 3px;
+  font-size: 0.85em;
+  color: #4b4a44;
+}
+.aspects-of-power .stats-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+.aspects-of-power .stats-table th,
+.aspects-of-power .stats-table td {
+  text-align: center;
+  padding: 3px 4px;
+  border-bottom: 1px solid #c9c7b8;
+}
+.aspects-of-power .stats-table th {
+  background: rgba(0, 0, 0, 0.05);
+  font-weight: bold;
+  font-size: 12px;
+  text-transform: uppercase;
+}
+.aspects-of-power .stats-table .row-label {
+  text-align: left;
+  font-weight: bold;
+  white-space: nowrap;
+  padding-right: 8px;
+  width: 1%;
+}
+.aspects-of-power .stats-table .stat-input {
+  width: 48px;
+  text-align: center;
+  margin: 0 auto;
+}
+.aspects-of-power .stats-table .capped {
+  color: #cc4400;
+}
+.aspects-of-power .stats-table .raw-value {
+  font-size: 0.8em;
+  color: #999;
+}
+.aspects-of-power .stats-table .total-row td {
+  border-top: 2px solid #4b4a44;
+}
+.aspects-of-power .stats-table .mod-row td {
+  font-weight: bold;
+}

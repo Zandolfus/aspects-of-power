@@ -92,9 +92,23 @@
       "mind": "Mind Defense",
       "soul": "Soul Defense"
     },
+    "Stats": {
+      "tabLabel": "Stats",
+      "base": "Base",
+      "calculated": "Calculated",
+      "equipmentBonus": "Equipment",
+      "equipmentCap": "Equip Cap (30%)",
+      "withEquipment": "Total",
+      "finalMod": "Modifier",
+      "totalCalculated": "Total Calculated",
+      "globalEquipCap": "Global Equip Cap (20%)",
+      "equipmentUsed": "Equipment Used"
+    },
     "Effect": {
       "Source": "Source",
       "Toggle": "Toggle Effect",
+      "Blessing": "Blessings",
+      "Title": "Titles",
       "Temporary": "Temporary Effects",
       "Passive": "Passive Effects",
       "Inactive": "Inactive Effects"

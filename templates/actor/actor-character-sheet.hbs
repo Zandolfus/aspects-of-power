@@ -139,6 +139,7 @@
   {{!-- Sheet Tab Navigation --}}
   <nav class="sheet-tabs tabs" data-group="primary">
     <a class="item" data-tab="features">Features</a>
+    <a class="item" data-tab="stats">Stats</a>
     <a class="item" data-tab="description">Description</a>
     <a class="item" data-tab="items">Items</a>
     <a class="item" data-tab="skills">Skills</a>
@@ -169,6 +170,11 @@
         </section>
 
       </section>
+    </div>
+
+    {{!-- Stats Tab --}}
+    <div class="tab stats" data-group="primary" data-tab="stats">
+      {{> "systems/aspects-of-power/templates/actor/parts/actor-stats.hbs"}}
     </div>
 
     {{!-- Biography Tab --}}

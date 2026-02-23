@@ -29,40 +29,105 @@ export class AspectsofPowerActor extends Actor {
    */
   prepareDerivedData() {
     const actorData = this;
-    const itemData = this.item;
     const systemData = actorData.system;
-    const flags = actorData.flags.aspectsofpower || {};
 
+    // --- Race rank ---
     if (systemData.attributes.race.level <= 9)
       systemData.attributes.race.rank = "G";
     else if (systemData.attributes.race.level <= 24)
       systemData.attributes.race.rank = "F";
-    else if (systemData.attributes.race.level <= 99) 
+    else if (systemData.attributes.race.level <= 99)
       systemData.attributes.race.rank = "E";
     else if (systemData.attributes.race.level <= 199)
       systemData.attributes.race.rank = "D";
 
-    for (let [key, ability] of Object.entries(systemData.abilities)) {
-      // Ensure the stored value is always an integer before deriving the mod.
-      ability.value = Math.round(ability.value ?? 0);
-
-      // Calculate the modifier using aspects rules.
+    // Sigmoid modifier formula.
+    const sigmoidMod = (value, key) => {
       if (key === "toughness")
-        ability.mod = Math.round(((6000 / (1 + Math.exp(-0.001 * (ability.value - 500)))) - 2265)*.5);
-      else if (systemData.attributes.race.rank == "E" && key === "vitality")
-        ability.mod = Math.round(((6000 / (1 + Math.exp(-0.001 * (ability.value - 500)))) - 2265)*1.25);
-
+        return Math.round(((6000 / (1 + Math.exp(-0.001 * (value - 500)))) - 2265) * 0.5);
+      else if (systemData.attributes.race.rank === "E" && key === "vitality")
+        return Math.round(((6000 / (1 + Math.exp(-0.001 * (value - 500)))) - 2265) * 1.25);
       else
-        ability.mod = Math.round((6000 / (1 + Math.exp(-0.001 * (ability.value - 500)))) - 2265);
+        return Math.round((6000 / (1 + Math.exp(-0.001 * (value - 500)))) - 2265);
+    };
+
+    // --- Stat breakdown: classify effect contributions by source ---
+    const abilityKeys = Object.keys(systemData.abilities);
+    const contributions = {};
+    for (const key of abilityKeys) {
+      contributions[key] = { equipment: 0, blessing: 0, title: 0, other: 0 };
     }
+    for (const e of this.allApplicableEffects()) {
+      if (e.disabled) continue;
+      for (const c of e.changes) {
+        const match = c.key.match(/^system\.abilities\.(\w+)\.value$/);
+        if (!match || !contributions[match[1]]) continue;
+        const val = Number(c.value) || 0;
+        if (e.flags?.aspectsofpower?.effectType === 'equipment')        contributions[match[1]].equipment += val;
+        else if (e.flags?.aspectsofpower?.effectCategory === 'blessing') contributions[match[1]].blessing += val;
+        else if (e.flags?.aspectsofpower?.effectCategory === 'title')    contributions[match[1]].title += val;
+        else                                                              contributions[match[1]].other += val;
+      }
+    }
+
+    // Per-ability breakdown.
+    for (const [key, ability] of Object.entries(systemData.abilities)) {
+      const base = Math.round(this._source.system.abilities[key].value ?? 0);
+      const c = contributions[key];
+      const calculated = base + c.blessing + c.title + c.other;
+      ability.breakdown = {
+        base,
+        blessingBonus: c.blessing,
+        titleBonus: c.title,
+        otherBonus: c.other,
+        calculated,
+        equipmentBonusRaw: c.equipment,
+      };
+    }
+
+    // Equipment caps: 30% per stat, 20% of total calculated.
+    const totalCalculated = abilityKeys.reduce((sum, k) => sum + systemData.abilities[k].breakdown.calculated, 0);
+    const globalCap = Math.floor(totalCalculated * 0.20);
+
+    for (const ability of Object.values(systemData.abilities)) {
+      const b = ability.breakdown;
+      b.perStatCap = Math.floor(b.calculated * 0.30);
+      b.equipmentCapped = Math.min(b.equipmentBonusRaw, b.perStatCap);
+    }
+
+    let totalEquip = abilityKeys.reduce((sum, k) => sum + systemData.abilities[k].breakdown.equipmentCapped, 0);
+    if (totalEquip > globalCap && totalEquip > 0) {
+      const ratio = globalCap / totalEquip;
+      for (const ability of Object.values(systemData.abilities)) {
+        ability.breakdown.equipmentCapped = Math.floor(ability.breakdown.equipmentCapped * ratio);
+      }
+      totalEquip = abilityKeys.reduce((sum, k) => sum + systemData.abilities[k].breakdown.equipmentCapped, 0);
+    }
+
+    // Final values and modifiers (overrides AE-modified value with capped total).
+    for (const [key, ability] of Object.entries(systemData.abilities)) {
+      const b = ability.breakdown;
+      b.final = b.calculated + b.equipmentCapped;
+      ability.value = b.final;
+      ability.mod = sigmoidMod(b.final, key);
+      b.finalMod = ability.mod;
+    }
+
+    // Summary for the stats tab.
+    systemData.statsSummary = {
+      totalCalculated,
+      globalCap,
+      totalEquipRaw: abilityKeys.reduce((sum, k) => sum + systemData.abilities[k].breakdown.equipmentBonusRaw, 0),
+      totalEquipCapped: totalEquip,
+    };
+
+    // --- Resource maxima ---
     systemData.health.max = systemData.abilities.vitality.mod;
     systemData.mana.max = systemData.abilities.willpower.mod;
     systemData.stamina.max = systemData.abilities.endurance.mod;
 
     // Defense values: compute base from ability mods, then add any
     // ActiveEffect contributions by explicitly summing effect changes.
-    // (We can't use the current .value because submitOnChange may have
-    // saved computed values back to the database.)
     const effectBonus = (key) => {
       let sum = 0;
       for (const e of this.allApplicableEffects()) {
@@ -75,7 +140,6 @@ export class AspectsofPowerActor extends Actor {
     };
 
     systemData.defense.melee.value  = Math.round((systemData.abilities.dexterity.mod + systemData.abilities.strength.mod*.3)*1.1) + effectBonus('system.defense.melee.value');
-    //consider if perception should have greater impact at greater ranges
     systemData.defense.ranged.value = Math.round((systemData.abilities.dexterity.mod*.3 + systemData.abilities.perception.mod)*1.1) + effectBonus('system.defense.ranged.value');
     systemData.defense.mind.value   = Math.round((systemData.abilities.intelligence.mod + systemData.abilities.wisdom.mod*.3)*1.1) + effectBonus('system.defense.mind.value');
     systemData.defense.soul.value   = Math.round((systemData.abilities.wisdom.mod + systemData.abilities.willpower.mod*.3)*1.1) + effectBonus('system.defense.soul.value');
