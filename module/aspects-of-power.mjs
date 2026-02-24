@@ -516,6 +516,9 @@ Hooks.on('renderChatMessageHTML', (message, html) => {
       const newHealth = Math.max(0, health.value - damage);
       await target.update({ 'system.health.value': newHealth });
 
+      // Degrade durability on all equipped armor pieces.
+      await EquipmentSystem.degradeDurability(target, damage);
+
       ChatMessage.create({
         whisper: ChatMessage.getWhisperRecipients('GM'),
         content: `<p><strong>${target.name}</strong> takes <strong>${damage}</strong> damage. `
