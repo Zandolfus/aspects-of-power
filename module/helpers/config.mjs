@@ -150,7 +150,8 @@ ASPECTSOFPOWER.rarities = {
   uncommon:  { label: 'ASPECTSOFPOWER.Equip.Rarity.uncommon',  augments: 2, color: '#1eff00' },
   rare:      { label: 'ASPECTSOFPOWER.Equip.Rarity.rare',      augments: 3, color: '#0070dd' },
   epic:      { label: 'ASPECTSOFPOWER.Equip.Rarity.epic',      augments: 4, color: '#a335ee' },
-  legendary: { label: 'ASPECTSOFPOWER.Equip.Rarity.legendary', augments: 5, color: '#ff8000' },
-  mythic:    { label: 'ASPECTSOFPOWER.Equip.Rarity.mythic',    augments: 6, color: '#e6cc80' },
-  divine:    { label: 'ASPECTSOFPOWER.Equip.Rarity.divine',    augments: 7, color: '#ff4444' },
+  ancient:   { label: 'ASPECTSOFPOWER.Equip.Rarity.ancient',   augments: 5, color: '#c4a882' },
+  legendary: { label: 'ASPECTSOFPOWER.Equip.Rarity.legendary', augments: 6, color: '#ff8000' },
+  mythic:    { label: 'ASPECTSOFPOWER.Equip.Rarity.mythic',    augments: 7, color: '#e6cc80' },
+  divine:    { label: 'ASPECTSOFPOWER.Equip.Rarity.divine',    augments: 8, color: '#ff4444' },
 };
