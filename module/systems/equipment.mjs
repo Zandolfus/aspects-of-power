@@ -279,9 +279,11 @@ export class EquipmentSystem {
   static async degradeDurability(actor, totalDamage, damageType = 'physical') {
     if (!actor || totalDamage <= 0) return;
 
-    // Filter to equipped items that provide the relevant defense and have durability remaining.
+    // Filter to equipped non-weapon items that provide the relevant defense and have durability remaining.
+    // Weapons (hands slot) are excluded — they degrade via their own damage-limit mechanic.
     const eligible = actor.items.filter(i => {
       if (i.type !== 'item' || !i.system.equipped || !i.system.slot) return false;
+      if (i.system.slot === 'hands') return false;
       if (i.system.durability.max <= 0 || i.system.durability.value <= 0) return false;
       if (damageType === 'magical') return (i.system.veilBonus ?? 0) > 0;
       return (i.system.armorBonus ?? 0) > 0; // physical (default)
@@ -301,6 +303,32 @@ export class EquipmentSystem {
         await this._removeItemEffects(item);
         ui.notifications.warn(`${item.name} has broken!`);
       }
+    }
+  }
+
+  /**
+   * Degrade a weapon's durability when raw damage exceeds its damage limit.
+   * Damage limit = 3 × weapon progress. Durability loss = rawDamage − limit.
+   * @param {Item} weapon      The weapon item (must be in the 'hands' slot).
+   * @param {number} rawDamage The unmitigated damage dealt by the attack.
+   */
+  static async degradeWeaponOnAttack(weapon, rawDamage) {
+    if (!weapon || weapon.type !== 'item') return;
+    if (weapon.system.slot !== 'hands') return;
+    if (weapon.system.durability.max <= 0 || weapon.system.durability.value <= 0) return;
+
+    const damageLimit = 3 * (weapon.system.progress ?? 0);
+    if (rawDamage <= damageLimit) return;
+
+    const excess = Math.round(rawDamage - damageLimit);
+    const newValue = Math.max(0, weapon.system.durability.value - excess);
+    await weapon.update({ 'system.durability.value': newValue });
+
+    if (newValue <= 0) {
+      await this._removeItemEffects(weapon);
+      ui.notifications.warn(`${weapon.name} has broken from overuse!`);
+    } else {
+      ui.notifications.warn(`${weapon.name} lost ${excess} durability (exceeded damage limit of ${damageLimit}).`);
     }
   }
 

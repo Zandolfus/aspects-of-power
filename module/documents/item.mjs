@@ -765,6 +765,14 @@ export class AspectsofPowerItem extends Item {
     const resource  = rollData.roll.resource;
     const newResVal = Math.max(0, Math.round(rollData.roll.resourcevalue - rollData.roll.cost));
 
+    // ── Weapon durability: degrade if raw damage exceeds the weapon's limit ──
+    if (tags.includes('attack') && this.system.requiredEquipment) {
+      const weapon = this.actor.items.get(this.system.requiredEquipment);
+      if (weapon) {
+        await EquipmentSystem.degradeWeaponOnAttack(weapon, dmgRoll.total);
+      }
+    }
+
     // ── AOE branch: place template, detect targets, then deduct cost ──
     const isAoe = this.system.aoe?.enabled && tags.length > 0;
     if (isAoe) {
