@@ -30,6 +30,14 @@ ASPECTSOFPOWER.abilityAbbreviations = {
 };
 
 /**
+ * Skill categories — top-level grouping that determines available tags.
+ */
+ASPECTSOFPOWER.skillCategories = {
+  combat:     'ASPECTSOFPOWER.SkillCategory.combat',
+  profession: 'ASPECTSOFPOWER.SkillCategory.profession',
+};
+
+/**
  * Tags that define what a skill does when activated.
  * A skill can have multiple tags (e.g. [attack, debuff]).
  */
@@ -38,6 +46,21 @@ ASPECTSOFPOWER.skillTags = {
   restoration: 'ASPECTSOFPOWER.Tag.restoration',
   buff:        'ASPECTSOFPOWER.Tag.buff',
   debuff:      'ASPECTSOFPOWER.Tag.debuff',
+  repair:      'ASPECTSOFPOWER.Tag.repair',
+};
+
+/**
+ * Tags available per skill category.
+ */
+ASPECTSOFPOWER.combatTags = {
+  attack:      'ASPECTSOFPOWER.Tag.attack',
+  restoration: 'ASPECTSOFPOWER.Tag.restoration',
+  buff:        'ASPECTSOFPOWER.Tag.buff',
+  debuff:      'ASPECTSOFPOWER.Tag.debuff',
+};
+
+ASPECTSOFPOWER.professionTags = {
+  repair:      'ASPECTSOFPOWER.Tag.repair',
 };
 
 /**

@@ -220,6 +220,46 @@ export class EquipmentSystem {
     ui.notifications.info(`Repaired ${item.name} (+${newValue - dur.value} durability).`);
   }
 
+  /**
+   * Distribute a repair amount equally across all equipped gear on an actor.
+   * Items already at max durability are skipped; only damaged items receive repair.
+   * If an item was broken (0 durability) and gets repaired, its effects are re-synced.
+   * @param {Actor} actor    The actor whose gear to repair.
+   * @param {number} amount  The total repair amount to distribute.
+   * @returns {Promise<number>} The total durability actually restored.
+   */
+  static async repairAllEquipped(actor, amount) {
+    if (!actor || amount <= 0) return 0;
+
+    const damaged = actor.items.filter(
+      i => i.type === 'item' && i.system.equipped && i.system.slot
+        && i.system.durability.max > 0
+        && i.system.durability.value < i.system.durability.max
+    );
+
+    if (damaged.length === 0) return 0;
+
+    const perPiece = amount / damaged.length;
+    let totalRestored = 0;
+
+    for (const item of damaged) {
+      const dur = item.system.durability;
+      const wasBroken = dur.value <= 0;
+      const newValue = Math.min(dur.max, Math.round(dur.value + perPiece));
+      const restored = newValue - dur.value;
+      totalRestored += restored;
+
+      await item.update({ 'system.durability.value': newValue });
+
+      // If the item was broken and is now functional, re-sync its equipment effects.
+      if (wasBroken && newValue > 0) {
+        await this._syncEffects(item);
+      }
+    }
+
+    return totalRestored;
+  }
+
   /* -------------------------------------------------- */
   /*  Durability Degradation                            */
   /* -------------------------------------------------- */

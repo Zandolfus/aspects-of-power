@@ -1,3 +1,5 @@
+import { EquipmentSystem } from '../systems/equipment.mjs';
+
 /**
  * Extend the basic Item with some very simple modifications.
  * @extends {Item}
@@ -270,6 +272,18 @@ export class AspectsofPowerItem extends Item {
         break;
       }
 
+      case 'gmApplyRepair': {
+        const target = await fromUuid(payload.targetActorUuid);
+        if (!target) return;
+        const restored = await EquipmentSystem.repairAllEquipped(target, payload.amount);
+        ChatMessage.create({
+          speaker: payload.speaker, rollMode: payload.rollMode,
+          content: `<p><strong>${payload.skillName}</strong> repairs <strong>${target.name}</strong>'s equipment `
+                 + `(+${restored} durability distributed across equipped gear).</p>`,
+        });
+        break;
+      }
+
       case 'gmApplyDebuff': {
         const target = await fromUuid(payload.targetActorUuid);
         if (!target) return;
@@ -440,6 +454,36 @@ export class AspectsofPowerItem extends Item {
     });
   }
 
+  /**
+   * Repair tag: distribute repair amount across a target's equipped gear.
+   * Targets the selected token (or self if no target). Routes through GM.
+   */
+  async _handleRepairTag(item, rollData, dmgRoll, speaker, rollMode, label, targetTokenOverride = null) {
+    const amount = Math.round(dmgRoll.total);
+
+    let targetActor;
+    const targetToken = targetTokenOverride ?? game.user.targets.first() ?? null;
+    targetActor = targetToken?.actor ?? null;
+
+    // Fall back to self if no target selected.
+    if (!targetActor && !targetTokenOverride) {
+      targetActor = this.actor;
+    }
+
+    if (!targetActor) {
+      ChatMessage.create({ speaker, rollMode, content: `<p><em>No valid repair target.</em></p>` });
+      return;
+    }
+
+    await this._gmAction({
+      type: 'gmApplyRepair',
+      targetActorUuid: targetActor.uuid,
+      amount,
+      skillName: item.name,
+      speaker, rollMode,
+    });
+  }
+
   /* ------------------------------------------------------------------ */
   /*  AOE helpers                                                        */
   /* ------------------------------------------------------------------ */
@@ -451,7 +495,7 @@ export class AspectsofPowerItem extends Item {
   _getAoeColor() {
     const tags = this.system.tags ?? [];
     if (tags.includes('attack') || tags.includes('debuff')) return '#ff4444';
-    if (tags.includes('restoration') || tags.includes('buff')) return '#44ff44';
+    if (tags.includes('restoration') || tags.includes('buff') || tags.includes('repair')) return '#44ff44';
     return '#4488ff';
   }
 
@@ -763,6 +807,9 @@ export class AspectsofPowerItem extends Item {
             case 'debuff':
               await this._handleDebuffTag(item, rollData, dmgRoll, speaker, rollMode, label, targetToken);
               break;
+            case 'repair':
+              await this._handleRepairTag(item, rollData, dmgRoll, speaker, rollMode, label, targetToken);
+              break;
           }
         }
       }
@@ -816,6 +863,9 @@ export class AspectsofPowerItem extends Item {
           break;
         case 'debuff':
           await this._handleDebuffTag(item, rollData, dmgRoll, speaker, rollMode, label);
+          break;
+        case 'repair':
+          await this._handleRepairTag(item, rollData, dmgRoll, speaker, rollMode, label);
           break;
       }
     }

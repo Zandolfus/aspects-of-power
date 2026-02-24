@@ -26,17 +26,39 @@
     {{! Damage Tab }}
     <div class='tab damage' data-group='primary' data-tab='damage'>
 
-      {{! ── Tag Checkboxes ── }}
+      {{! ── Skill Category ── }}
+      <div class='skill-category'>
+        <label class='resource-label'>{{localize "ASPECTSOFPOWER.SkillCategory.label"}}</label>
+        <select name='system.skillCategory'>
+          {{#each config.skillCategories as |label key|}}
+            <option value='{{key}}' {{#if (eq key ../system.skillCategory)}}selected{{/if}}>
+              {{localize label}}
+            </option>
+          {{/each}}
+        </select>
+      </div>
+
+      {{! ── Tag Checkboxes (filtered by category) ── }}
       <div class='skill-tags'>
         <label class='resource-label'>{{localize "ASPECTSOFPOWER.Tag.label"}}</label>
         <div class='tag-checkboxes'>
-          {{#each config.skillTags as |label key|}}
-            <label class='tag-checkbox'>
-              <input type='checkbox' name='system.tags' value='{{key}}'
-                {{#if (includes ../system.tags key)}}checked{{/if}} />
-              {{localize label}}
-            </label>
-          {{/each}}
+          {{#if (eq system.skillCategory "profession")}}
+            {{#each config.professionTags as |label key|}}
+              <label class='tag-checkbox'>
+                <input type='checkbox' name='system.tags' value='{{key}}'
+                  {{#if (includes ../system.tags key)}}checked{{/if}} />
+                {{localize label}}
+              </label>
+            {{/each}}
+          {{else}}
+            {{#each config.combatTags as |label key|}}
+              <label class='tag-checkbox'>
+                <input type='checkbox' name='system.tags' value='{{key}}'
+                  {{#if (includes ../system.tags key)}}checked{{/if}} />
+                {{localize label}}
+              </label>
+            {{/each}}
+          {{/if}}
         </div>
       </div>
 
@@ -281,7 +303,16 @@
 
     {{! Attributes Tab }}
     <div class='tab attributes' data-group='primary' data-tab='attributes'>
-      {{! As you add new fields, add them in here! }}
+      <div class='resource'>
+        <label class='resource-label'>{{localize "ASPECTSOFPOWER.SkillCategory.label"}}</label>
+        <select name='system.skillCategory'>
+          {{#each config.skillCategories as |label key|}}
+            <option value='{{key}}' {{#if (eq key ../system.skillCategory)}}selected{{/if}}>
+              {{localize label}}
+            </option>
+          {{/each}}
+        </select>
+      </div>
       <div class='resource'>
         <label class='resource-label'>Skill Type</label>
         <select name='system.skillType'>

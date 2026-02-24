@@ -22,12 +22,18 @@
 
       }
     },
+    "SkillCategory": {
+      "label": "Skill Category",
+      "combat": "Combat",
+      "profession": "Profession"
+    },
     "Tag": {
       "label": "Tags",
       "attack": "Attack",
       "restoration": "Restoration",
       "buff": "Buff",
-      "debuff": "Debuff"
+      "debuff": "Debuff",
+      "repair": "Repair"
     },
     "TagConfig": {
       "restorationTarget": "Target",

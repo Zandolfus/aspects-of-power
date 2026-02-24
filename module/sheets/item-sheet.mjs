@@ -115,6 +115,15 @@ export class AspectsofPowerItemSheet extends foundry.applications.api.Handlebars
       return;
     }
 
+    // Skill category change: update category and clear tags (available tags differ per category).
+    if (this.item.type === 'skill' && event.target?.name === 'system.skillCategory') {
+      await this.document.update({
+        'system.skillCategory': event.target.value,
+        'system.tags': [],
+      });
+      return;
+    }
+
     // Tag checkboxes: collect all checked values into an array.
     if (this.item.type === 'skill' && event.target?.name === 'system.tags') {
       const form = this.element.querySelector('form');

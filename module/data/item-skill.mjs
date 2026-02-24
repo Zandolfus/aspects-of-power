@@ -7,6 +7,7 @@ export class SkillData extends foundry.abstract.TypeDataModel {
   static defineSchema() {
     return {
       description: new fields.HTMLField({ initial: '' }),
+      skillCategory: new fields.StringField({ initial: 'combat' }),
       skillType:   new fields.StringField({ initial: 'Passive' }),
       formula:     new fields.StringField({ initial: '' }),
       roll: new fields.SchemaField({
