@@ -11,6 +11,7 @@ export class EquipmentSystem {
   static initialize() {
     Hooks.on('updateItem', this._onItemUpdate.bind(this));
     Hooks.on('deleteItem', this._onItemDelete.bind(this));
+    Hooks.on('createItem', this._onItemCreate.bind(this));
   }
 
   /* -------------------------------------------------- */
@@ -95,8 +96,9 @@ export class EquipmentSystem {
     // Remove old effects from this item.
     await this._removeItemEffects(item);
 
-    // If not equipped, nothing more to do.
+    // If not equipped or broken (0 durability), nothing more to do.
     if (!item.system.equipped) return;
+    if (item.system.durability.value <= 0 && item.system.durability.max > 0) return;
 
     // Build the changes array from stat bonuses + armor/veil.
     const changes = [];
@@ -219,6 +221,42 @@ export class EquipmentSystem {
   }
 
   /* -------------------------------------------------- */
+  /*  Durability Degradation                            */
+  /* -------------------------------------------------- */
+
+  /**
+   * Distribute durability damage equally across all equipped armor pieces
+   * on an actor. Each piece loses the same amount; if a piece breaks (hits 0),
+   * its equipment effects are removed.
+   * @param {Actor} actor          The actor taking durability damage.
+   * @param {number} totalDamage   The total durability damage to distribute.
+   */
+  static async degradeDurability(actor, totalDamage) {
+    if (!actor || totalDamage <= 0) return;
+
+    // Gather all equipped items that have durability remaining.
+    const equippedArmor = actor.items.filter(
+      i => i.type === 'item' && i.system.equipped && i.system.slot && i.system.durability.max > 0 && i.system.durability.value > 0
+    );
+
+    if (equippedArmor.length === 0) return;
+
+    // Equal split across all pieces.
+    const perPiece = totalDamage / equippedArmor.length;
+
+    for (const item of equippedArmor) {
+      const newValue = Math.max(0, Math.round(item.system.durability.value - perPiece));
+      await item.update({ 'system.durability.value': newValue });
+
+      // If the item just broke, remove its effects.
+      if (newValue <= 0) {
+        await this._removeItemEffects(item);
+        ui.notifications.warn(`${item.name} has broken!`);
+      }
+    }
+  }
+
+  /* -------------------------------------------------- */
   /*  Hook Handlers                                     */
   /* -------------------------------------------------- */
 
@@ -231,9 +269,31 @@ export class EquipmentSystem {
     const sys = updateData.system;
     if (!sys) return;
 
+    // Progress changed — derive durability.max from progress.
+    if (sys.progress !== undefined) {
+      const newMax = item.system.progress;
+      const updates = { 'system.durability.max': newMax };
+      // If current durability exceeds new max, clamp it.
+      if (item.system.durability.value > newMax) {
+        updates['system.durability.value'] = newMax;
+      }
+      item.update(updates);
+      return;
+    }
+
     // Equipped state changed — sync effects.
     if (sys.equipped !== undefined) {
       this._syncEffects(item);
+      return;
+    }
+
+    // Durability changed — if it hit 0, remove effects; if restored from 0, re-sync.
+    if (sys.durability?.value !== undefined && item.system.equipped) {
+      if (item.system.durability.value <= 0) {
+        this._removeItemEffects(item);
+      } else {
+        this._syncEffects(item);
+      }
       return;
     }
 
@@ -250,5 +310,24 @@ export class EquipmentSystem {
     if (!item.parent || item.type !== 'item') return;
     if (!item.system.equipped) return;
     this._removeItemEffects(item);
+  }
+
+  /**
+   * When a new item is created, derive durability.max from progress
+   * and auto-set augmentSlots from rarity.
+   */
+  static _onItemCreate(item, _options, _userId) {
+    if (item.type !== 'item') return;
+    const updates = {};
+    const progress = item.system.progress ?? 0;
+    if (item.system.durability.max !== progress) {
+      updates['system.durability.max'] = progress;
+      updates['system.durability.value'] = progress;
+    }
+    const augSlots = CONFIG.ASPECTSOFPOWER.rarities[item.system.rarity]?.augments ?? 0;
+    if (item.system.augmentSlots !== augSlots) {
+      updates['system.augmentSlots'] = augSlots;
+    }
+    if (Object.keys(updates).length > 0) item.update(updates);
   }
 }

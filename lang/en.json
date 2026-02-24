@@ -122,6 +122,7 @@
       "unequipped": "Unequipped",
       "slot": "Slot",
       "rarity": "Rarity",
+      "progress": "Progress",
       "durability": "Durability",
       "twoHanded": "Two-Handed",
       "weight": "Weight",

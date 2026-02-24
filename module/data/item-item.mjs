@@ -17,9 +17,12 @@ export class ItemItemData extends foundry.abstract.TypeDataModel {
       rarity:      new fields.StringField({ initial: 'common' }),
       twoHanded:   new fields.BooleanField({ initial: false }),
 
+      // Progress determines derived values (durability max, stats in the future).
+      progress:    new fields.NumberField({ initial: 0, min: 0, integer: true }),
+
       durability: new fields.SchemaField({
-        value: new fields.NumberField({ initial: 100, min: 0, integer: true }),
-        max:   new fields.NumberField({ initial: 100, min: 1, integer: true }),
+        value: new fields.NumberField({ initial: 0, min: 0, integer: true }),
+        max:   new fields.NumberField({ initial: 0, min: 0, integer: true }),
       }),
 
       // Stat bonuses — array of { ability, value } pairs.

@@ -93,13 +93,18 @@
           </label>
         {{/if}}
 
-        {{!-- Durability --}}
+        {{!-- Progress --}}
+        <div class="equip-field">
+          <label>{{localize "ASPECTSOFPOWER.Equip.progress"}}</label>
+          <input type="number" name="system.progress" value="{{system.progress}}" min="0" />
+        </div>
+
+        {{!-- Durability (derived from progress) --}}
         <div class="equip-field">
           <label>{{localize "ASPECTSOFPOWER.Equip.durability"}}</label>
           <div class="durability-inputs flexrow">
             <input type="number" name="system.durability.value" value="{{system.durability.value}}" min="0" />
-            <span>/</span>
-            <input type="number" name="system.durability.max" value="{{system.durability.max}}" min="1" />
+            <span>/ {{system.durability.max}}</span>
           </div>
         </div>
 

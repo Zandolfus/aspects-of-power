@@ -183,7 +183,8 @@ export class AspectsofPowerItemSheet extends foundry.applications.api.Handlebars
       if (name === 'system.slot' || name === 'system.twoHanded' || name === 'system.isRepairKit'
           || name === 'system.repairAmount'
           || name === 'system.armorBonus' || name === 'system.veilBonus'
-          || name === 'system.durability.value' || name === 'system.durability.max'
+          || name === 'system.durability.value'
+          || name === 'system.progress'
           || name === 'system.quantity' || name === 'system.weight') {
         let value;
         if (event.target.type === 'checkbox') value = event.target.checked;
