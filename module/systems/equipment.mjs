@@ -265,26 +265,30 @@ export class EquipmentSystem {
   /* -------------------------------------------------- */
 
   /**
-   * Distribute durability damage equally across all equipped armor pieces
-   * on an actor. Each piece loses the same amount; if a piece breaks (hits 0),
-   * its equipment effects are removed.
+   * Distribute durability damage across equipped items that provide the
+   * relevant defense type. Physical attacks degrade items with armorBonus > 0;
+   * magical attacks degrade items with veilBonus > 0.
    * @param {Actor} actor          The actor taking durability damage.
    * @param {number} totalDamage   The total durability damage to distribute.
+   * @param {string} damageType    'physical' or 'magical' — determines which items are affected.
    */
-  static async degradeDurability(actor, totalDamage) {
+  static async degradeDurability(actor, totalDamage, damageType = 'physical') {
     if (!actor || totalDamage <= 0) return;
 
-    // Gather all equipped items that have durability remaining.
-    const equippedArmor = actor.items.filter(
-      i => i.type === 'item' && i.system.equipped && i.system.slot && i.system.durability.max > 0 && i.system.durability.value > 0
-    );
+    // Filter to equipped items that provide the relevant defense and have durability remaining.
+    const eligible = actor.items.filter(i => {
+      if (i.type !== 'item' || !i.system.equipped || !i.system.slot) return false;
+      if (i.system.durability.max <= 0 || i.system.durability.value <= 0) return false;
+      if (damageType === 'magical') return (i.system.veilBonus ?? 0) > 0;
+      return (i.system.armorBonus ?? 0) > 0; // physical (default)
+    });
 
-    if (equippedArmor.length === 0) return;
+    if (eligible.length === 0) return;
 
-    // Equal split across all pieces.
-    const perPiece = totalDamage / equippedArmor.length;
+    // Equal split across qualifying pieces.
+    const perPiece = totalDamage / eligible.length;
 
-    for (const item of equippedArmor) {
+    for (const item of eligible) {
       const newValue = Math.max(0, Math.round(item.system.durability.value - perPiece));
       await item.update({ 'system.durability.value': newValue });
 

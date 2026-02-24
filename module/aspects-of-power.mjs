@@ -507,17 +507,18 @@ Hooks.on('renderChatMessageHTML', (message, html) => {
     btn.addEventListener('click', async () => {
       if (!game.user.isGM) return;
 
-      const actorUuid = btn.dataset.actorUuid;
-      const damage    = parseInt(btn.dataset.damage, 10);
-      const target    = await fromUuid(actorUuid);
+      const actorUuid  = btn.dataset.actorUuid;
+      const damage     = parseInt(btn.dataset.damage, 10);
+      const damageType = btn.dataset.damageType || 'physical';
+      const target     = await fromUuid(actorUuid);
       if (!target || isNaN(damage)) return;
 
       const health    = target.system.health;
       const newHealth = Math.max(0, health.value - damage);
       await target.update({ 'system.health.value': newHealth });
 
-      // Degrade durability on all equipped armor pieces.
-      await EquipmentSystem.degradeDurability(target, damage);
+      // Degrade durability on equipped items that provide the relevant defense.
+      await EquipmentSystem.degradeDurability(target, damage, damageType);
 
       ChatMessage.create({
         whisper: ChatMessage.getWhisperRecipients('GM'),
