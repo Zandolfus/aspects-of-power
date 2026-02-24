@@ -132,6 +132,45 @@ Hooks.once('ready', function () {
 });
 
 /* -------------------------------------------- */
+/*  ActiveEffect Config — Attribute Key Dropdown */
+/* -------------------------------------------- */
+
+/**
+ * Replace the free-text "Attribute Key" input in the built-in ActiveEffect
+ * config sheet with a <select> dropdown populated from buffableAttributes.
+ */
+Hooks.on('renderActiveEffectConfig', (app, element, _options) => {
+  const el = element instanceof HTMLElement ? element : element[0];
+  if (!el) return;
+  const keyInputs = el.querySelectorAll('input[name^="changes."][name$=".key"]');
+  if (!keyInputs.length) return;
+
+  const attrs = CONFIG.ASPECTSOFPOWER.buffableAttributes;
+  keyInputs.forEach(input => {
+    const select = document.createElement('select');
+    select.name = input.name;
+    select.className = input.className;
+
+    // Blank option for unset rows
+    const emptyOpt = document.createElement('option');
+    emptyOpt.value = '';
+    emptyOpt.textContent = '\u2014 Select \u2014';
+    select.appendChild(emptyOpt);
+
+    for (const [attrKey, label] of Object.entries(attrs)) {
+      const fullKey = `system.${attrKey}.value`;
+      const opt = document.createElement('option');
+      opt.value = fullKey;
+      opt.textContent = game.i18n.localize(label);
+      if (input.value === fullKey) opt.selected = true;
+      select.appendChild(opt);
+    }
+
+    input.replaceWith(select);
+  });
+});
+
+/* -------------------------------------------- */
 /*  Stamina Regeneration — Start of Turn        */
 /* -------------------------------------------- */
 
