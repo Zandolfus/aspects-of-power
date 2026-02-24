@@ -45,14 +45,14 @@ export function onManageActiveEffect(event, owner) {
 export function prepareActiveEffectCategories(effects) {
   // Define effect header categories
   const categories = {
-    blessing: {
-      type: 'blessing',
-      label: game.i18n.localize('ASPECTSOFPOWER.Effect.Blessing'),
-      effects: [],
-    },
     title: {
       type: 'title',
       label: game.i18n.localize('ASPECTSOFPOWER.Effect.Title'),
+      effects: [],
+    },
+    blessing: {
+      type: 'blessing',
+      label: game.i18n.localize('ASPECTSOFPOWER.Effect.Blessing'),
       effects: [],
     },
     temporary: {

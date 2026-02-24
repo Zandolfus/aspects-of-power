@@ -52,10 +52,11 @@ export class AspectsofPowerActor extends Actor {
     };
 
     // --- Stat breakdown: classify effect contributions by source ---
+    // Titles are additive to base; blessings MULTIPLY (base + titles).
     const abilityKeys = Object.keys(systemData.abilities);
     const contributions = {};
     for (const key of abilityKeys) {
-      contributions[key] = { equipment: 0, blessing: 0, title: 0, other: 0 };
+      contributions[key] = { equipment: 0, blessingAdd: 0, blessingMultiplier: 1, title: 0, other: 0 };
     }
     for (const e of this.allApplicableEffects()) {
       if (e.disabled) continue;
@@ -63,23 +64,29 @@ export class AspectsofPowerActor extends Actor {
         const match = c.key.match(/^system\.abilities\.(\w+)\.value$/);
         if (!match || !contributions[match[1]]) continue;
         const val = Number(c.value) || 0;
-        if (e.flags?.aspectsofpower?.effectType === 'equipment')        contributions[match[1]].equipment += val;
-        else if (e.flags?.aspectsofpower?.effectCategory === 'blessing') contributions[match[1]].blessing += val;
-        else if (e.flags?.aspectsofpower?.effectCategory === 'title')    contributions[match[1]].title += val;
-        else                                                              contributions[match[1]].other += val;
+        const k = match[1];
+        if (e.flags?.aspectsofpower?.effectType === 'equipment')        contributions[k].equipment += val;
+        else if (e.flags?.aspectsofpower?.effectCategory === 'blessing') {
+          if (c.mode === 1) contributions[k].blessingMultiplier *= val; // MULTIPLY
+          else              contributions[k].blessingAdd += val;        // ADD
+        }
+        else if (e.flags?.aspectsofpower?.effectCategory === 'title')    contributions[k].title += val;
+        else                                                              contributions[k].other += val;
       }
     }
 
-    // Per-ability breakdown.
+    // Per-ability breakdown: base → +titles → ×blessings → +equipment → +other.
     for (const [key, ability] of Object.entries(systemData.abilities)) {
       const base = Math.round(this._source.system.abilities[key].value ?? 0);
       const c = contributions[key];
-      const calculated = Math.round(base + c.blessing + c.title);
+      const afterTitles = base + c.title;
+      const calculated = Math.round(afterTitles * c.blessingMultiplier) + Math.round(c.blessingAdd);
       const effectBonus = Math.round(c.other);
       ability.breakdown = {
         base,
-        blessingBonus: Math.round(c.blessing),
         titleBonus: Math.round(c.title),
+        blessingMultiplier: c.blessingMultiplier,
+        blessingAdd: Math.round(c.blessingAdd),
         calculated,
         effectBonus,
         equipmentBonusRaw: Math.round(c.equipment),
