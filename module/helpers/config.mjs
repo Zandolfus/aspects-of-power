@@ -188,3 +188,15 @@ ASPECTSOFPOWER.rarities = {
   mythic:    { label: 'ASPECTSOFPOWER.Equip.Rarity.mythic',    augments: 7, color: '#e6cc80' },
   divine:    { label: 'ASPECTSOFPOWER.Equip.Rarity.divine',    augments: 8, color: '#ff4444' },
 };
+
+/**
+ * User-friendly operation labels for inline blessing/title effect editing.
+ * Maps to ActiveEffect change modes internally.
+ */
+ASPECTSOFPOWER.effectOperations = {
+  add:      'ASPECTSOFPOWER.Effect.Op.add',
+  subtract: 'ASPECTSOFPOWER.Effect.Op.subtract',
+  multiply: 'ASPECTSOFPOWER.Effect.Op.multiply',
+  divide:   'ASPECTSOFPOWER.Effect.Op.divide',
+  override: 'ASPECTSOFPOWER.Effect.Op.override',
+};

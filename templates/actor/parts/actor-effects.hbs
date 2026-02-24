@@ -32,6 +32,46 @@
           </a>
         </div>
       </li>
+
+      {{!-- Inline stat change rows for blessings and titles --}}
+      {{#if effect.changeRows}}
+        <li class="effect-changes-section" data-effect-id="{{effect.id}}">
+          <div class="effect-changes-wrapper">
+            <div class="effect-changes-header flexrow">
+              <span class="effect-changes-label">{{localize "ASPECTSOFPOWER.Effect.StatChanges"}}</span>
+              <a class="effect-change-add" data-effect-id="{{effect.id}}" title="{{localize 'ASPECTSOFPOWER.Effect.AddChange'}}">
+                <i class="fas fa-plus"></i>
+              </a>
+            </div>
+            <div class="effect-changes-list">
+              {{#each effect.changeRows as |row|}}
+                <div class="effect-change-row flexrow" data-index="{{row.index}}" data-effect-id="{{@../effect.id}}">
+                  <select class="effect-change-attribute" data-index="{{row.index}}">
+                    {{#each @root.config.buffableAttributes as |label attrKey|}}
+                      <option value="{{attrKey}}" {{#if (eq attrKey row.attribute)}}selected{{/if}}>
+                        {{localize label}}
+                      </option>
+                    {{/each}}
+                  </select>
+                  <select class="effect-change-operation" data-index="{{row.index}}">
+                    {{#each @root.config.effectOperations as |label opKey|}}
+                      <option value="{{opKey}}" {{#if (eq opKey row.operation)}}selected{{/if}}>
+                        {{localize label}}
+                      </option>
+                    {{/each}}
+                  </select>
+                  <input type="number" class="effect-change-value" data-index="{{row.index}}"
+                         value="{{row.displayValue}}" step="any" />
+                  <a class="effect-change-delete" data-index="{{row.index}}" data-effect-id="{{@../effect.id}}" title="Remove">
+                    <i class="fas fa-trash"></i>
+                  </a>
+                </div>
+              {{/each}}
+            </div>
+          </div>
+        </li>
+      {{/if}}
+
     {{/each}}
     </ol>
   {{/each}}

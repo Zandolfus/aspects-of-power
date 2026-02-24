@@ -126,7 +126,16 @@
       "Title": "Titles",
       "Temporary": "Temporary Effects",
       "Passive": "Passive Effects",
-      "Inactive": "Inactive Effects"
+      "Inactive": "Inactive Effects",
+      "StatChanges": "Stat Changes",
+      "AddChange": "Add Stat Change",
+      "Op": {
+        "add": "Add",
+        "subtract": "Subtract",
+        "multiply": "Multiply",
+        "divide": "Divide",
+        "override": "Override"
+      }
     },
     "Equip": {
       "tabLabel": "Equipment",
