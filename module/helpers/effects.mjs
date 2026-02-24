@@ -77,9 +77,11 @@ export function prepareActiveEffectCategories(effects) {
     const cat = e.flags?.aspectsofpower?.effectCategory;
     if (cat === 'blessing') {
       e.changeRows = _parseChangesForUI(e);
+      e.showChanges = true;
       categories.blessing.effects.push(e);
     } else if (cat === 'title') {
       e.changeRows = _parseChangesForUI(e);
+      e.showChanges = true;
       categories.title.effects.push(e);
     } else if (e.disabled) categories.inactive.effects.push(e);
     else if (e.isTemporary) categories.temporary.effects.push(e);

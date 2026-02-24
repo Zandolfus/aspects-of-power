@@ -868,48 +868,40 @@
   list-style: none;
 }
 .aspects-of-power .effect-changes-wrapper {
-  margin: 0 0 4px 35px;
-  padding: 4px 8px;
+  margin-top: 8px;
+  padding: 6px 8px;
   background: rgba(0, 0, 0, 0.03);
   border: 1px solid #c9c7b8;
   border-radius: 3px;
-  border-top: none;
 }
 .aspects-of-power .effect-changes-header {
   justify-content: space-between;
   align-items: center;
   margin-bottom: 4px;
 }
-.aspects-of-power .effect-changes-header .effect-changes-label {
-  font-size: 11px;
-  font-weight: bold;
-  color: #4b4a44;
-  text-transform: uppercase;
+.aspects-of-power .effect-changes-header h4 {
+  margin: 0;
+  font-size: 12px;
 }
 .aspects-of-power .effect-changes-header a {
   cursor: pointer;
-  font-size: 11px;
 }
 .aspects-of-power .effect-change-row {
   align-items: center;
-  gap: 4px;
-  margin-bottom: 3px;
+  gap: 6px;
+  margin-bottom: 4px;
 }
 .aspects-of-power .effect-change-row select.effect-change-attribute {
   flex: 2;
-  font-size: 11px;
 }
 .aspects-of-power .effect-change-row select.effect-change-operation {
   flex: 1;
-  font-size: 11px;
 }
 .aspects-of-power .effect-change-row input.effect-change-value {
-  width: 52px;
+  width: 56px;
   text-align: center;
-  font-size: 11px;
 }
 .aspects-of-power .effect-change-row a {
   cursor: pointer;
   color: #888;
-  font-size: 11px;
 }
