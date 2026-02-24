@@ -576,3 +576,285 @@
   border-radius: 3px;
   font-size: 13px;
 }
+
+/* ============================== */
+/* Equipment Tab                  */
+/* ============================== */
+.aspects-of-power .equipment-tab {
+  padding: 0 4px;
+}
+
+/* Carrying capacity summary */
+.aspects-of-power .carry-summary {
+  align-items: center;
+  gap: 12px;
+  padding: 4px 8px;
+  margin-bottom: 8px;
+  background: rgba(0, 0, 0, 0.03);
+  border: 1px solid #c9c7b8;
+  border-radius: 3px;
+  font-size: 13px;
+}
+.aspects-of-power .carry-label {
+  flex: 0 0 auto;
+  white-space: nowrap;
+}
+.aspects-of-power .encumbered-warn {
+  color: #cc4400;
+  font-weight: bold;
+  margin-left: 6px;
+}
+.aspects-of-power .carry-bar-outer {
+  flex: 1;
+  height: 10px;
+  background: #ddd;
+  border-radius: 5px;
+  overflow: hidden;
+}
+.aspects-of-power .carry-bar-inner {
+  height: 100%;
+  background: #4caf50;
+  border-radius: 5px;
+  transition: width 0.3s;
+}
+.aspects-of-power .carry-bar-inner.over-capacity {
+  background: #cc4400;
+}
+
+/* Slot groups */
+.aspects-of-power .equip-slots {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 6px;
+  margin-bottom: 10px;
+}
+.aspects-of-power .slot-group {
+  border: 1px solid #c9c7b8;
+  border-radius: 3px;
+  padding: 4px 6px;
+  background: rgba(0, 0, 0, 0.02);
+}
+.aspects-of-power .slot-header {
+  justify-content: space-between;
+  align-items: center;
+  font-size: 12px;
+  margin-bottom: 2px;
+  padding-bottom: 2px;
+  border-bottom: 1px solid #c9c7b8;
+}
+.aspects-of-power .slot-count {
+  color: #888;
+  font-size: 11px;
+}
+.aspects-of-power .slot-empty {
+  color: #bbb;
+  font-style: italic;
+  font-size: 12px;
+  text-align: center;
+  padding: 2px 0;
+}
+
+/* Equipped item row */
+.aspects-of-power .equipped-item {
+  align-items: center;
+  padding: 1px 0;
+  font-size: 12px;
+  gap: 4px;
+}
+.aspects-of-power .equipped-item .item-image img {
+  width: 24px;
+  height: 24px;
+  border: none;
+}
+.aspects-of-power .equipped-item .item-name {
+  flex: 1;
+  overflow: hidden;
+}
+.aspects-of-power .equip-item-name {
+  margin: 0;
+  font-size: 12px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.aspects-of-power .equipped-item .item-controls {
+  display: flex;
+  gap: 6px;
+  flex: 0 0 auto;
+}
+.aspects-of-power .equipped-item .item-controls a {
+  cursor: pointer;
+  font-size: 11px;
+}
+
+/* Durability bar (inline) */
+.aspects-of-power .durability-display {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex: 0 0 auto;
+}
+.aspects-of-power .durability-bar-outer {
+  width: 40px;
+  height: 6px;
+  background: #ddd;
+  border-radius: 3px;
+  overflow: hidden;
+}
+.aspects-of-power .durability-bar-inner {
+  height: 100%;
+  background: #4caf50;
+  border-radius: 3px;
+}
+.aspects-of-power .durability-text {
+  font-size: 10px;
+  color: #888;
+  white-space: nowrap;
+}
+
+/* Unequipped gear section */
+.aspects-of-power .unequipped-section {
+  margin-top: 4px;
+}
+.aspects-of-power .unequipped-section .items-header {
+  height: 28px;
+  margin: 2px 0;
+  padding: 0;
+  align-items: center;
+  background: rgba(0, 0, 0, 0.05);
+  border: 2px groove #eeede0;
+  font-weight: bold;
+  font-size: 12px;
+}
+.aspects-of-power .unequipped-section .items-header .item-name {
+  padding-left: 5px;
+  text-align: left;
+}
+.aspects-of-power .unequipped-item {
+  align-items: center;
+  padding: 1px 2px;
+  border-bottom: 1px solid #c9c7b8;
+  font-size: 13px;
+}
+.aspects-of-power .unequipped-item:last-child {
+  border-bottom: none;
+}
+.aspects-of-power .unequipped-item .item-name {
+  flex: 2;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  overflow: hidden;
+}
+.aspects-of-power .unequipped-item .item-name h4 {
+  margin: 0;
+  white-space: nowrap;
+  overflow: hidden;
+}
+.aspects-of-power .unequipped-item .item-image img {
+  width: 24px;
+  height: 24px;
+  border: none;
+}
+.aspects-of-power .unequipped-item .item-controls {
+  display: flex;
+  gap: 6px;
+  flex: 0 0 auto;
+}
+.aspects-of-power .unequipped-item .item-controls a {
+  cursor: pointer;
+  font-size: 12px;
+}
+.aspects-of-power .equip-col-weight,
+.aspects-of-power .equip-col-qty {
+  flex: 0 0 50px;
+  text-align: center;
+  font-size: 12px;
+}
+
+/* ============================== */
+/* Item Sheet: Equipment Config   */
+/* ============================== */
+.aspects-of-power .equipment-config {
+  padding: 6px 8px;
+}
+.aspects-of-power .equip-field {
+  margin-bottom: 6px;
+}
+.aspects-of-power .equip-field label {
+  font-weight: bold;
+  font-size: 12px;
+  display: block;
+  margin-bottom: 2px;
+}
+.aspects-of-power .repair-kit-toggle,
+.aspects-of-power .two-handed-toggle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  font-weight: bold;
+  font-size: 12px;
+  margin-bottom: 6px;
+}
+.aspects-of-power .repair-kit-toggle input,
+.aspects-of-power .two-handed-toggle input {
+  margin: 0;
+}
+.aspects-of-power .durability-inputs {
+  align-items: center;
+  gap: 4px;
+}
+.aspects-of-power .durability-inputs input {
+  width: 56px;
+  text-align: center;
+}
+.aspects-of-power .rarity-select {
+  font-weight: bold;
+}
+.aspects-of-power .equip-section {
+  margin-top: 8px;
+  padding: 6px 8px;
+  background: rgba(0, 0, 0, 0.03);
+  border: 1px solid #c9c7b8;
+  border-radius: 3px;
+}
+.aspects-of-power .equip-section h4 {
+  margin: 0 0 4px;
+  font-size: 12px;
+}
+.aspects-of-power .equip-section-header {
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 4px;
+}
+.aspects-of-power .equip-section-header a {
+  cursor: pointer;
+}
+.aspects-of-power .stat-bonus-row {
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 4px;
+}
+.aspects-of-power .stat-bonus-row select {
+  flex: 1;
+}
+.aspects-of-power .stat-bonus-row input {
+  width: 56px;
+  text-align: center;
+}
+.aspects-of-power .stat-bonus-row a {
+  cursor: pointer;
+  color: #888;
+}
+.aspects-of-power .augment-row {
+  gap: 6px;
+  margin-bottom: 4px;
+  align-items: center;
+}
+.aspects-of-power .augment-row .augment-name {
+  flex: 1;
+}
+.aspects-of-power .augment-row .augment-bonus {
+  flex: 1;
+}

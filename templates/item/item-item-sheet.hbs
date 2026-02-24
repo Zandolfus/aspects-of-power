@@ -15,11 +15,11 @@
         /></h1>
       <div class='grid grid-2col'>
         <div class='resource'>
-          <label class='resource-label'>Quantity</label>
+          <label class='resource-label'>{{localize "ASPECTSOFPOWER.Equip.quantity"}}</label>
           <input type='number' name='system.quantity' value='{{system.quantity}}' min='0'/>
         </div>
         <div class='resource'>
-          <label class='resource-label'>Weight</label>
+          <label class='resource-label'>{{localize "ASPECTSOFPOWER.Equip.weight"}}</label>
           <input type='number' name='system.weight' value='{{system.weight}}' min='0'/>
         </div>
       </div>
@@ -29,6 +29,7 @@
   {{! Sheet Tab Navigation }}
   <nav class='sheet-tabs tabs' data-group='primary'>
     <a class='item' data-tab='description'>Description</a>
+    <a class='item' data-tab='equipment'>{{localize "ASPECTSOFPOWER.Equip.tabLabel"}}</a>
     <a class='item' data-tab='attributes'>Attributes</a>
   </nav>
 
@@ -40,6 +41,122 @@
       <prose-mirror name="system.description" value="{{system.description}}" compact>
         {{{enrichedDescription}}}
       </prose-mirror>
+    </div>
+
+    {{! Equipment Tab }}
+    <div class='tab equipment-config' data-group='primary' data-tab='equipment'>
+
+      {{!-- Repair Kit Toggle --}}
+      <label class="equip-field repair-kit-toggle">
+        <input type="checkbox" name="system.isRepairKit" {{checked system.isRepairKit}} />
+        {{localize "ASPECTSOFPOWER.Equip.repairKit"}}
+      </label>
+
+      {{#if system.isRepairKit}}
+        <div class="equip-field">
+          <label>{{localize "ASPECTSOFPOWER.Equip.repairAmount"}}</label>
+          <input type="number" name="system.repairAmount" value="{{system.repairAmount}}" min="0" />
+        </div>
+      {{else}}
+
+        {{!-- Slot --}}
+        <div class="equip-field">
+          <label>{{localize "ASPECTSOFPOWER.Equip.slot"}}</label>
+          <select name="system.slot">
+            <option value="">—</option>
+            {{#each @root.config.equipmentSlots as |slotDef slotKey|}}
+              <option value="{{slotKey}}" {{#if (eq slotKey @root.system.slot)}}selected{{/if}}>
+                {{localize slotDef.label}}
+              </option>
+            {{/each}}
+          </select>
+        </div>
+
+        {{!-- Rarity --}}
+        <div class="equip-field">
+          <label>{{localize "ASPECTSOFPOWER.Equip.rarity"}}</label>
+          <select name="system.rarity" class="rarity-select">
+            {{#each @root.config.rarities as |rarDef rarKey|}}
+              <option value="{{rarKey}}" {{#if (eq rarKey @root.system.rarity)}}selected{{/if}}
+                      style="color: {{rarDef.color}}">
+                {{localize rarDef.label}}
+              </option>
+            {{/each}}
+          </select>
+        </div>
+
+        {{!-- Two-Handed (only for hands slot) --}}
+        {{#if (eq system.slot "hands")}}
+          <label class="equip-field two-handed-toggle">
+            <input type="checkbox" name="system.twoHanded" {{checked system.twoHanded}} />
+            {{localize "ASPECTSOFPOWER.Equip.twoHanded"}}
+          </label>
+        {{/if}}
+
+        {{!-- Durability --}}
+        <div class="equip-field">
+          <label>{{localize "ASPECTSOFPOWER.Equip.durability"}}</label>
+          <div class="durability-inputs flexrow">
+            <input type="number" name="system.durability.value" value="{{system.durability.value}}" min="0" />
+            <span>/</span>
+            <input type="number" name="system.durability.max" value="{{system.durability.max}}" min="1" />
+          </div>
+        </div>
+
+        {{!-- Armor / Veil Bonuses --}}
+        <div class="grid grid-2col">
+          <div class="equip-field">
+            <label>{{localize "ASPECTSOFPOWER.Equip.armorBonus"}}</label>
+            <input type="number" name="system.armorBonus" value="{{system.armorBonus}}" min="0" />
+          </div>
+          <div class="equip-field">
+            <label>{{localize "ASPECTSOFPOWER.Equip.veilBonus"}}</label>
+            <input type="number" name="system.veilBonus" value="{{system.veilBonus}}" min="0" />
+          </div>
+        </div>
+
+        {{!-- Stat Bonuses --}}
+        <div class="equip-section">
+          <div class="equip-section-header flexrow">
+            <h4>{{localize "ASPECTSOFPOWER.Equip.statBonuses"}}</h4>
+            <a class="stat-bonus-add" title="Add Stat Bonus"><i class="fas fa-plus"></i></a>
+          </div>
+          <div class="stat-bonus-list">
+            {{#each system.statBonuses as |bonus idx|}}
+              <div class="stat-bonus-row flexrow" data-index="{{idx}}">
+                <select class="stat-bonus-ability" data-index="{{idx}}">
+                  {{#each @root.config.abilities as |label aKey|}}
+                    <option value="{{aKey}}" {{#if (eq aKey bonus.ability)}}selected{{/if}}>
+                      {{localize label}}
+                    </option>
+                  {{/each}}
+                </select>
+                <input type="number" class="stat-bonus-value" data-index="{{idx}}"
+                       value="{{bonus.value}}" />
+                <a class="stat-bonus-delete" data-index="{{idx}}" title="Remove">
+                  <i class="fas fa-trash"></i>
+                </a>
+              </div>
+            {{/each}}
+          </div>
+        </div>
+
+        {{!-- Augments --}}
+        <div class="equip-section">
+          <h4>{{localize "ASPECTSOFPOWER.Equip.augments"}} ({{system.augmentSlots}})</h4>
+          <div class="augment-list">
+            {{#each augmentRows as |aug idx|}}
+              <div class="augment-row flexrow" data-index="{{idx}}">
+                <input type="text" class="augment-name" data-index="{{idx}}"
+                       value="{{aug.name}}" placeholder="Name" />
+                <input type="text" class="augment-bonus" data-index="{{idx}}"
+                       value="{{aug.bonus}}" placeholder="Bonus" />
+              </div>
+            {{/each}}
+          </div>
+        </div>
+
+      {{/if}}
     </div>
 
     {{! Attributes Tab }}
@@ -56,7 +173,7 @@
             </a>
           </div>
         </li>
-        
+
         <ol class="item-list">
           {{#each section.effects as |effect|}}
           <li class="item effect flexrow" data-effect-id="{{effect.id}}" data-parent-id="{{effect.parent.id}}">

@@ -58,6 +58,16 @@ export class AspectsofPowerItemSheet extends foundry.applications.api.Handlebars
     context.config  = CONFIG.ASPECTSOFPOWER;
     context.effects = prepareActiveEffectCategories(this.item.effects);
 
+    // Prepare augment rows for item-type items (pad to augmentSlots count).
+    if (this.item.type === 'item') {
+      const slots = this.item.system.augmentSlots ?? 0;
+      const existing = this.item.system.augments ?? [];
+      context.augmentRows = [];
+      for (let i = 0; i < slots; i++) {
+        context.augmentRows.push(existing[i] ?? { name: '', bonus: '' });
+      }
+    }
+
     // Build grouped attribute data for buff/debuff multi-select UI.
     if (this.item.type === 'skill') {
       const buildGroups = (entries) => CONFIG.ASPECTSOFPOWER.attributeGroups.map(group => ({
@@ -165,6 +175,42 @@ export class AspectsofPowerItemSheet extends foundry.applications.api.Handlebars
       return;
     }
 
+    // --- Equipment item fields ---
+    if (this.item.type === 'item') {
+      const name = event.target?.name;
+
+      // Simple equipment fields: direct update.
+      if (name === 'system.slot' || name === 'system.twoHanded' || name === 'system.isRepairKit'
+          || name === 'system.repairAmount'
+          || name === 'system.armorBonus' || name === 'system.veilBonus'
+          || name === 'system.durability.value' || name === 'system.durability.max'
+          || name === 'system.quantity' || name === 'system.weight') {
+        let value;
+        if (event.target.type === 'checkbox') value = event.target.checked;
+        else if (event.target.type === 'number') value = Number(event.target.value);
+        else value = event.target.value;
+        await this.document.update({ [name]: value });
+        return;
+      }
+
+      // Rarity change: update rarity + auto-set augmentSlots from config.
+      if (name === 'system.rarity') {
+        const rarity = event.target.value;
+        const augSlots = CONFIG.ASPECTSOFPOWER.rarities[rarity]?.augments ?? 0;
+        await this.document.update({ 'system.rarity': rarity, 'system.augmentSlots': augSlots });
+        return;
+      }
+
+      // Stat bonus or augment fields: collect from DOM.
+      if (event.target?.classList?.contains('stat-bonus-ability')
+          || event.target?.classList?.contains('stat-bonus-value')
+          || event.target?.classList?.contains('augment-name')
+          || event.target?.classList?.contains('augment-bonus')) {
+        this._saveEquipmentArrays();
+        return;
+      }
+    }
+
     if (this.item.type === 'skill' && event.target?.name?.startsWith('system.roll.')) {
       const form = this.element.querySelector('form');
       const rollData = {
@@ -181,6 +227,31 @@ export class AspectsofPowerItemSheet extends foundry.applications.api.Handlebars
       return;
     }
     return super._onChangeForm(formConfig, event);
+  }
+
+  /**
+   * Collect stat bonus and augment arrays from the DOM and save them.
+   */
+  async _saveEquipmentArrays() {
+    const form = this.element.querySelector('form');
+
+    // Stat bonuses.
+    const statBonuses = [];
+    form.querySelectorAll('.stat-bonus-row').forEach(row => {
+      const ability = row.querySelector('.stat-bonus-ability')?.value ?? 'strength';
+      const value = Number(row.querySelector('.stat-bonus-value')?.value) || 0;
+      statBonuses.push({ ability, value });
+    });
+
+    // Augments.
+    const augments = [];
+    form.querySelectorAll('.augment-row').forEach(row => {
+      const name = row.querySelector('.augment-name')?.value ?? '';
+      const bonus = row.querySelector('.augment-bonus')?.value ?? '';
+      augments.push({ name, bonus });
+    });
+
+    await this.document.update({ 'system.statBonuses': statBonuses, 'system.augments': augments });
   }
 
   /** @override */
@@ -209,6 +280,21 @@ export class AspectsofPowerItemSheet extends foundry.applications.api.Handlebars
 
     this.element.querySelectorAll('.effect-control').forEach(el => {
       el.addEventListener('click', ev => onManageActiveEffect(ev, this.item));
+    });
+
+    // --- Equipment: Add / Delete stat bonus rows ---
+    this.element.querySelector('.stat-bonus-add')?.addEventListener('click', async () => {
+      const bonuses = [...(this.item.system.statBonuses ?? []), { ability: 'strength', value: 0 }];
+      await this.document.update({ 'system.statBonuses': bonuses });
+    });
+
+    this.element.querySelectorAll('.stat-bonus-delete').forEach(el => {
+      el.addEventListener('click', async () => {
+        const idx = Number(el.dataset.index);
+        const bonuses = [...(this.item.system.statBonuses ?? [])];
+        bonuses.splice(idx, 1);
+        await this.document.update({ 'system.statBonuses': bonuses });
+      });
     });
   }
 }

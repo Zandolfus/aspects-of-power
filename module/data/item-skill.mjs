@@ -25,6 +25,9 @@ export class SkillData extends foundry.abstract.TypeDataModel {
       // Tags that define what this skill does when activated (e.g. ["attack","debuff"]).
       tags: new fields.ArrayField(new fields.StringField(), { initial: [] }),
 
+      // ID of the item that must be equipped to use this skill. Empty = no requirement.
+      requiredEquipment: new fields.StringField({ initial: '' }),
+
       // AOE modifier — applies to all active tags when enabled.
       aoe: new fields.SchemaField({
         enabled:          new fields.BooleanField({ initial: false }),

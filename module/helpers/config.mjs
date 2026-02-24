@@ -121,3 +121,36 @@ ASPECTSOFPOWER.aoeShapes = {
   ray:    'ASPECTSOFPOWER.AOE.shapeRay',
   rect:   'ASPECTSOFPOWER.AOE.shapeRect',
 };
+
+/**
+ * Equipment slot definitions — key is the slot ID, max is how many items
+ * can occupy that slot simultaneously.
+ */
+ASPECTSOFPOWER.equipmentSlots = {
+  chest:    { label: 'ASPECTSOFPOWER.Equip.Slot.chest',    max: 1 },
+  legs:     { label: 'ASPECTSOFPOWER.Equip.Slot.legs',     max: 1 },
+  head:     { label: 'ASPECTSOFPOWER.Equip.Slot.head',     max: 1 },
+  bracers:  { label: 'ASPECTSOFPOWER.Equip.Slot.bracers',  max: 1 },
+  boots:    { label: 'ASPECTSOFPOWER.Equip.Slot.boots',    max: 1 },
+  gloves:   { label: 'ASPECTSOFPOWER.Equip.Slot.gloves',   max: 1 },
+  back:     { label: 'ASPECTSOFPOWER.Equip.Slot.back',     max: 1 },
+  necklace: { label: 'ASPECTSOFPOWER.Equip.Slot.necklace', max: 1 },
+  bracelet: { label: 'ASPECTSOFPOWER.Equip.Slot.bracelet', max: 2 },
+  ring:     { label: 'ASPECTSOFPOWER.Equip.Slot.ring',     max: 10 },
+  earring:  { label: 'ASPECTSOFPOWER.Equip.Slot.earring',  max: 1 },
+  hands:    { label: 'ASPECTSOFPOWER.Equip.Slot.hands',    max: 2 },
+};
+
+/**
+ * Rarity tiers — determines augment slot count and display color.
+ */
+ASPECTSOFPOWER.rarities = {
+  inferior:  { label: 'ASPECTSOFPOWER.Equip.Rarity.inferior',  augments: 0, color: '#888888' },
+  common:    { label: 'ASPECTSOFPOWER.Equip.Rarity.common',    augments: 1, color: '#ffffff' },
+  uncommon:  { label: 'ASPECTSOFPOWER.Equip.Rarity.uncommon',  augments: 2, color: '#1eff00' },
+  rare:      { label: 'ASPECTSOFPOWER.Equip.Rarity.rare',      augments: 3, color: '#0070dd' },
+  epic:      { label: 'ASPECTSOFPOWER.Equip.Rarity.epic',      augments: 4, color: '#a335ee' },
+  legendary: { label: 'ASPECTSOFPOWER.Equip.Rarity.legendary', augments: 5, color: '#ff8000' },
+  mythic:    { label: 'ASPECTSOFPOWER.Equip.Rarity.mythic',    augments: 6, color: '#e6cc80' },
+  divine:    { label: 'ASPECTSOFPOWER.Equip.Rarity.divine',    augments: 7, color: '#ff4444' },
+};

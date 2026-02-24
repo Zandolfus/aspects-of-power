@@ -13,6 +13,8 @@ import { SkillData } from './data/item-skill.mjs';
 // Import helper/utility classes and constants.
 import { preloadHandlebarsTemplates } from './helpers/templates.mjs';
 import { ASPECTSOFPOWER } from './helpers/config.mjs';
+// Import systems.
+import { EquipmentSystem } from './systems/equipment.mjs';
 
 /* -------------------------------------------- */
 /*  Movement Distance Tracker (per combat turn) */
@@ -80,6 +82,9 @@ Hooks.once('init', function () {
     makeDefault: true,
     label: 'ASPECTSOFPOWER.SheetLabels.Item',
   });
+
+  // Initialize the equipment system hooks.
+  EquipmentSystem.initialize();
 
   // Preload Handlebars templates.
   return preloadHandlebarsTemplates();

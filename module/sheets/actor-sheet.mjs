@@ -2,6 +2,7 @@ import {
   onManageActiveEffect,
   prepareActiveEffectCategories,
 } from '../helpers/effects.mjs';
+import { EquipmentSystem } from '../systems/equipment.mjs';
 
 /**
  * Extend ActorSheetV2 with Aspects of Power-specific behaviour.
@@ -90,6 +91,11 @@ export class AspectsofPowerActorSheet extends foundry.applications.api.Handlebar
     for (const i of context.items) {
       i.img = i.img || Item.DEFAULT_ICON;
       if (i.type === 'item') {
+        // Add rarity color and durability percent for templates.
+        const rarityDef = CONFIG.ASPECTSOFPOWER.rarities[i.system.rarity];
+        i.rarityColor = rarityDef?.color ?? '#ffffff';
+        const dur = i.system.durability;
+        i.durabilityPercent = dur?.max > 0 ? Math.round((dur.value / dur.max) * 100) : 100;
         gear.push(i);
       } else if (i.type === 'feature') {
         features.push(i);
@@ -103,6 +109,29 @@ export class AspectsofPowerActorSheet extends foundry.applications.api.Handlebar
     context.gear     = gear;
     context.features = features;
     context.skills   = skills;
+
+    // Equipment slot summary for the Equipment tab.
+    context.equipmentSlots = {};
+    for (const [slotKey, slotDef] of Object.entries(CONFIG.ASPECTSOFPOWER.equipmentSlots)) {
+      context.equipmentSlots[slotKey] = {
+        label: game.i18n.localize(slotDef.label),
+        max: slotDef.max,
+        items: [],
+      };
+    }
+    context.unequippedGear = [];
+
+    for (const i of gear) {
+      if (i.system.equipped && i.system.slot && context.equipmentSlots[i.system.slot]) {
+        context.equipmentSlots[i.system.slot].items.push(i);
+      } else {
+        context.unequippedGear.push(i);
+      }
+    }
+
+    // Carry bar percentage (clamped to 100 for display).
+    const cap = context.system.carryCapacity || 1;
+    context.carryPercent = Math.min(100, Math.round((context.system.carryWeight / cap) * 100));
   }
 
   /* -------------------------------------------- */
@@ -194,6 +223,35 @@ export class AspectsofPowerActorSheet extends foundry.applications.api.Handlebar
     // Rollable abilities
     this.element.querySelectorAll('.rollable').forEach(el => {
       el.addEventListener('click', this._onRoll.bind(this));
+    });
+
+    // Equip / Unequip toggle
+    this.element.querySelectorAll('.equip-toggle').forEach(el => {
+      el.addEventListener('click', async ev => {
+        const itemId = ev.currentTarget.closest('.item').dataset.itemId;
+        const item = this.actor.items.get(itemId);
+        if (!item) return;
+        if (item.system.equipped) {
+          await EquipmentSystem.unequip(item);
+        } else {
+          await EquipmentSystem.equip(item);
+        }
+      });
+    });
+
+    // Repair item
+    this.element.querySelectorAll('.repair-item').forEach(el => {
+      el.addEventListener('click', async ev => {
+        const itemId = ev.currentTarget.closest('.item').dataset.itemId;
+        const item = this.actor.items.get(itemId);
+        if (!item) return;
+        const kit = this.actor.items.find(i => i.type === 'item' && i.system.isRepairKit && i.system.quantity > 0);
+        if (!kit) {
+          ui.notifications.warn(game.i18n.localize('ASPECTSOFPOWER.Equip.noRepairKits'));
+          return;
+        }
+        await EquipmentSystem.repair(item, kit);
+      });
     });
 
     // Drag events for macros

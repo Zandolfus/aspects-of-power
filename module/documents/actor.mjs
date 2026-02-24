@@ -150,6 +150,15 @@ export class AspectsofPowerActor extends Actor {
     systemData.walkRange    = Math.round(35 + (systemData.abilities.endurance.mod / 10));
     systemData.sprintRange  = 2 * systemData.walkRange;
 
+    // --- Carrying capacity ---
+    systemData.carryCapacity = Math.round(50 + systemData.abilities.strength.mod + systemData.abilities.endurance.mod * 0.5);
+    systemData.carryWeight = 0;
+    for (const item of this.items) {
+      systemData.carryWeight += (item.system.weight ?? 0) * (item.system.quantity ?? 1);
+    }
+    systemData.carryWeight = Math.round(systemData.carryWeight * 10) / 10;
+    systemData.encumbered = systemData.carryWeight > systemData.carryCapacity;
+
     // Make separate methods for each Actor type (character, npc, etc.) to keep
     // things organized.
     this._prepareCharacterData(actorData);
