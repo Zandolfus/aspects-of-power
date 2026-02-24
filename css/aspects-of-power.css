@@ -374,7 +374,7 @@
   padding: 0;
   overflow-y: auto;
   scrollbar-width: thin;
-  color: #444;
+  color: inherit;
 }
 .aspects-of-power .items-list .item-list {
   list-style: none;

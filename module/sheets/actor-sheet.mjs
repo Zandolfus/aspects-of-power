@@ -86,7 +86,7 @@ export class AspectsofPowerActorSheet extends foundry.applications.api.Handlebar
   _prepareItems(context) {
     const gear     = [];
     const features = [];
-    const skills   = { Passive: [], Active: [] };
+    const skills   = { Active: [], Passive: [] };
 
     for (const i of context.items) {
       i.img = i.img || Item.DEFAULT_ICON;
