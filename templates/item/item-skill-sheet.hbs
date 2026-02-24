@@ -299,6 +299,22 @@
       </div>
       {{/if}}
 
+      {{! ── Repair Tag Config ── }}
+      {{#if (includes system.tags "repair")}}
+      <div class='tag-config repair-config'>
+        <label class='resource-label'>{{localize "ASPECTSOFPOWER.TagConfig.repairMaterials"}}</label>
+        <div class='tag-checkboxes'>
+          {{#each config.materialTypes as |label key|}}
+            <label class='tag-checkbox'>
+              <input type='checkbox' name='system.tagConfig.repairMaterials' value='{{key}}'
+                {{#if (includes ../system.tagConfig.repairMaterials key)}}checked{{/if}} />
+              {{localize label}}
+            </label>
+          {{/each}}
+        </div>
+      </div>
+      {{/if}}
+
     </div>
 
     {{! Attributes Tab }}

@@ -146,6 +146,16 @@ ASPECTSOFPOWER.aoeShapes = {
 };
 
 /**
+ * Material types for equipment — determines which repair skills can target them.
+ */
+ASPECTSOFPOWER.materialTypes = {
+  metal:   'ASPECTSOFPOWER.Material.metal',
+  leather: 'ASPECTSOFPOWER.Material.leather',
+  cloth:   'ASPECTSOFPOWER.Material.cloth',
+  jewelry: 'ASPECTSOFPOWER.Material.jewelry',
+};
+
+/**
  * Equipment slot definitions — key is the slot ID, max is how many items
  * can occupy that slot simultaneously.
  */

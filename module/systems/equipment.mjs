@@ -221,21 +221,25 @@ export class EquipmentSystem {
   }
 
   /**
-   * Distribute a repair amount equally across all equipped gear on an actor.
+   * Distribute a repair amount equally across all equipped gear on an actor
+   * that matches the given material types.
    * Items already at max durability are skipped; only damaged items receive repair.
    * If an item was broken (0 durability) and gets repaired, its effects are re-synced.
-   * @param {Actor} actor    The actor whose gear to repair.
-   * @param {number} amount  The total repair amount to distribute.
+   * @param {Actor} actor              The actor whose gear to repair.
+   * @param {number} amount            The total repair amount to distribute.
+   * @param {string[]} [materials=[]]  Material types the repair skill can handle. Empty = all.
    * @returns {Promise<number>} The total durability actually restored.
    */
-  static async repairAllEquipped(actor, amount) {
+  static async repairAllEquipped(actor, amount, materials = []) {
     if (!actor || amount <= 0) return 0;
 
-    const damaged = actor.items.filter(
-      i => i.type === 'item' && i.system.equipped && i.system.slot
-        && i.system.durability.max > 0
-        && i.system.durability.value < i.system.durability.max
-    );
+    const damaged = actor.items.filter(i => {
+      if (i.type !== 'item' || !i.system.equipped || !i.system.slot) return false;
+      if (i.system.durability.max <= 0 || i.system.durability.value >= i.system.durability.max) return false;
+      // If the skill specifies materials, only repair matching items.
+      if (materials.length > 0 && !materials.includes(i.system.material)) return false;
+      return true;
+    });
 
     if (damaged.length === 0) return 0;
 

@@ -42,7 +42,15 @@
       "debuffAttributes": "Debuff Attributes",
       "duration": "Duration (rounds)",
       "debuffDealsDamage": "Deals Damage",
-      "debuffDamageType": "Damage Type"
+      "debuffDamageType": "Damage Type",
+      "repairMaterials": "Repair Materials"
+    },
+    "Material": {
+      "label": "Material",
+      "metal": "Metal",
+      "leather": "Leather",
+      "cloth": "Cloth",
+      "jewelry": "Jewelry"
     },
     "AttributeGroup": {
       "abilities": "Abilities",

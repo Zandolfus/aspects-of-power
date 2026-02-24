@@ -179,6 +179,10 @@ export class AspectsofPowerItemSheet extends foundry.applications.api.Handlebars
         debuffDuration:    Number(form.querySelector('[name="system.tagConfig.debuffDuration"]')?.value) || 1,
         debuffDealsDamage: form.querySelector('[name="system.tagConfig.debuffDealsDamage"]')?.checked ?? false,
         debuffDamageType:  form.querySelector('[name="system.tagConfig.debuffDamageType"]')?.value ?? 'physical',
+
+        // Repair: collect checked material types.
+        repairMaterials: [...form.querySelectorAll('input[name="system.tagConfig.repairMaterials"]:checked')]
+          .map(el => el.value),
       };
       await this.document.update({ 'system.tagConfig': tagConfigData });
       return;
@@ -190,7 +194,7 @@ export class AspectsofPowerItemSheet extends foundry.applications.api.Handlebars
 
       // Simple equipment fields: direct update.
       if (name === 'system.slot' || name === 'system.twoHanded' || name === 'system.isRepairKit'
-          || name === 'system.repairAmount'
+          || name === 'system.repairAmount' || name === 'system.material'
           || name === 'system.armorBonus' || name === 'system.veilBonus'
           || name === 'system.durability.value'
           || name === 'system.progress'

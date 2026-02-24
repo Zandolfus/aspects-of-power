@@ -63,6 +63,9 @@ export class SkillData extends foundry.abstract.TypeDataModel {
         debuffDuration:    new fields.NumberField({ initial: 1, integer: true, min: 0 }),
         debuffDealsDamage: new fields.BooleanField({ initial: false }),
         debuffDamageType:  new fields.StringField({ initial: 'physical' }),
+
+        // Repair: which material types this skill can repair.
+        repairMaterials: new fields.ArrayField(new fields.StringField(), { initial: [] }),
       }),
     };
   }

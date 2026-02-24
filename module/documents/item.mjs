@@ -276,11 +276,15 @@ export class AspectsofPowerItem extends Item {
       case 'gmApplyRepair': {
         const target = await fromUuid(payload.targetActorUuid);
         if (!target) return;
-        const restored = await EquipmentSystem.repairAllEquipped(target, payload.amount);
+        const materials = payload.materials ?? [];
+        const restored = await EquipmentSystem.repairAllEquipped(target, payload.amount, materials);
+        const matLabel = materials.length > 0
+          ? materials.map(m => game.i18n.localize(CONFIG.ASPECTSOFPOWER.materialTypes[m] ?? m)).join(', ')
+          : 'all';
         ChatMessage.create({
           speaker: payload.speaker, rollMode: payload.rollMode,
-          content: `<p><strong>${payload.skillName}</strong> repairs <strong>${target.name}</strong>'s equipment `
-                 + `(+${restored} durability distributed across equipped gear).</p>`,
+          content: `<p><strong>${payload.skillName}</strong> repairs <strong>${target.name}</strong>'s ${matLabel} equipment `
+                 + `(+${restored} durability distributed across matching gear).</p>`,
         });
         break;
       }
@@ -480,6 +484,7 @@ export class AspectsofPowerItem extends Item {
       type: 'gmApplyRepair',
       targetActorUuid: targetActor.uuid,
       amount,
+      materials: this.system.tagConfig?.repairMaterials ?? [],
       skillName: item.name,
       speaker, rollMode,
     });

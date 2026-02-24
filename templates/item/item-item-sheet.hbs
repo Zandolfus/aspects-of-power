@@ -85,6 +85,19 @@
           </select>
         </div>
 
+        {{!-- Material Type --}}
+        <div class="equip-field">
+          <label>{{localize "ASPECTSOFPOWER.Material.label"}}</label>
+          <select name="system.material">
+            <option value="">—</option>
+            {{#each @root.config.materialTypes as |label matKey|}}
+              <option value="{{matKey}}" {{#if (eq matKey @root.system.material)}}selected{{/if}}>
+                {{localize label}}
+              </option>
+            {{/each}}
+          </select>
+        </div>
+
         {{!-- Two-Handed (only for hands slot) --}}
         {{#if (eq system.slot "hands")}}
           <label class="equip-field two-handed-toggle">

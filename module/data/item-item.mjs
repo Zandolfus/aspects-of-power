@@ -17,6 +17,9 @@ export class ItemItemData extends foundry.abstract.TypeDataModel {
       rarity:      new fields.StringField({ initial: 'common' }),
       twoHanded:   new fields.BooleanField({ initial: false }),
 
+      // Material type — determines which repair skills can target this item.
+      material:    new fields.StringField({ initial: '' }),
+
       // Progress determines derived values (durability max, stats in the future).
       progress:    new fields.NumberField({ initial: 0, min: 0, integer: true }),
 
