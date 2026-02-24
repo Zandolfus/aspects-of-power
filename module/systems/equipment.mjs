@@ -340,6 +340,9 @@ export class EquipmentSystem {
    * React to item updates — sync equipment effects when relevant fields change.
    */
   static _onItemUpdate(item, updateData, _options, _userId) {
+    // Only process on the client that initiated the update to prevent
+    // multiple clients each creating duplicate ActiveEffects.
+    if (game.userId !== _userId) return;
     if (!item.parent || item.type !== 'item') return;
 
     const sys = updateData.system;
@@ -383,6 +386,7 @@ export class EquipmentSystem {
    * Clean up equipment ActiveEffects when an item is deleted.
    */
   static _onItemDelete(item, _options, _userId) {
+    if (game.userId !== _userId) return;
     if (!item.parent || item.type !== 'item') return;
     if (!item.system.equipped) return;
     this._removeItemEffects(item);
@@ -393,6 +397,7 @@ export class EquipmentSystem {
    * and auto-set augmentSlots from rarity.
    */
   static _onItemCreate(item, _options, _userId) {
+    if (game.userId !== _userId) return;
     if (item.type !== 'item') return;
     const updates = {};
     const progress = item.system.progress ?? 0;
