@@ -274,6 +274,17 @@ export class AspectsofPowerItemSheet extends foundry.applications.api.Handlebars
 
     if (!this.isEditable) return;
 
+    // Profile image — open FilePicker on click (AppV2 doesn't auto-wire data-edit).
+    this.element.querySelectorAll('[data-edit="img"]').forEach(el => {
+      el.addEventListener('click', () => {
+        new FilePicker({
+          type: 'image',
+          current: this.document.img,
+          callback: path => this.document.update({ img: path }),
+        }).browse();
+      });
+    });
+
     // <prose-mirror> fires a custom "save" event; update the document directly.
     this.element.querySelectorAll('prose-mirror').forEach(el => {
       el.addEventListener('save', () => this.document.update({ [el.name]: el.value }));
