@@ -231,42 +231,6 @@ export class AspectsofPowerActorSheet extends foundry.applications.api.Handlebar
       });
     });
 
-    // --- Blessing/Title inline stat change: Add row ---
-    this.element.querySelectorAll('.effect-change-add').forEach(el => {
-      el.addEventListener('click', async () => {
-        const effect = this.actor.effects.get(el.dataset.effectId);
-        if (!effect) return;
-        const changes = [...effect.changes];
-        changes.push({
-          key: 'system.abilities.vitality.value',
-          mode: 2, // ADD
-          value: '0',
-          priority: 20,
-        });
-        await effect.update({ changes });
-      });
-    });
-
-    // --- Blessing/Title inline stat change: Delete row ---
-    this.element.querySelectorAll('.effect-change-delete').forEach(el => {
-      el.addEventListener('click', async () => {
-        const effect = this.actor.effects.get(el.dataset.effectId);
-        if (!effect) return;
-        const idx = Number(el.dataset.index);
-        const changes = [...effect.changes];
-        changes.splice(idx, 1);
-        await effect.update({ changes });
-      });
-    });
-
-    // --- Blessing/Title inline stat change: field updates ---
-    this.element.querySelectorAll('.effect-change-attribute, .effect-change-operation, .effect-change-value').forEach(el => {
-      el.addEventListener('change', () => {
-        const row = el.closest('.effect-change-row');
-        if (row?.dataset.effectId) this._saveEffectChanges(row.dataset.effectId);
-      });
-    });
-
     // Rollable abilities
     this.element.querySelectorAll('.rollable').forEach(el => {
       el.addEventListener('click', this._onRoll.bind(this));
@@ -316,61 +280,6 @@ export class AspectsofPowerActorSheet extends foundry.applications.api.Handlebar
     }
   }
 
-  /**
-   * Collect all inline stat change rows for a given effect from the DOM
-   * and save them back to the effect's changes array.
-   * @param {string} effectId  The effect document ID.
-   */
-  async _saveEffectChanges(effectId) {
-    const effect = this.actor.effects.get(effectId);
-    if (!effect) return;
-
-    const section = this.element.querySelector(
-      `.effect-changes-section[data-effect-id="${effectId}"]`
-    );
-    if (!section) return;
-
-    const changes = [];
-    section.querySelectorAll('.effect-change-row').forEach(row => {
-      const attribute = row.querySelector('.effect-change-attribute')?.value ?? 'abilities.vitality';
-      const operation = row.querySelector('.effect-change-operation')?.value ?? 'add';
-      const inputVal  = Number(row.querySelector('.effect-change-value')?.value) || 0;
-
-      let mode, value;
-      switch (operation) {
-        case 'subtract':
-          mode = 2; // ADD
-          value = String(-Math.abs(inputVal));
-          break;
-        case 'multiply':
-          mode = 1; // MULTIPLY
-          value = String(inputVal);
-          break;
-        case 'divide':
-          mode = 1; // MULTIPLY
-          value = inputVal !== 0 ? String(Math.round((1 / inputVal) * 10000) / 10000) : '1';
-          break;
-        case 'override':
-          mode = 5; // OVERRIDE
-          value = String(inputVal);
-          break;
-        case 'add':
-        default:
-          mode = 2; // ADD
-          value = String(Math.abs(inputVal));
-          break;
-      }
-
-      changes.push({
-        key: `system.${attribute}.value`,
-        mode,
-        value,
-        priority: 20,
-      });
-    });
-
-    await effect.update({ changes });
-  }
 
   /**
    * Handle creating a new Owned Item for the actor.
