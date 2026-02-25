@@ -1,6 +1,6 @@
 <ol class='items-list'>
   {{#each skills as |skills skillType|}}
-    <li class='item flexrow items-header'>
+    <li class='item flexrow items-header skill-type-{{toLowerCase skillType}}'>
       <div class='item-name'>
         {{localize 'ASPECTSOFPOWER.Item.Skill.skillType' type=skillType}}
       </div>
