@@ -128,6 +128,13 @@
       "Passive": "Passive Effects",
       "Inactive": "Inactive Effects"
     },
+    "Chain": {
+      "label": "Skill Chains",
+      "add": "Add Chain",
+      "always": "Always",
+      "onHit": "On Hit",
+      "onMiss": "On Miss"
+    },
     "Equip": {
       "tabLabel": "Equipment",
       "equip": "Equip",

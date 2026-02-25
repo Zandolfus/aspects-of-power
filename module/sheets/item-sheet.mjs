@@ -85,6 +85,21 @@ export class AspectsofPowerItemSheet extends foundry.applications.api.Handlebars
       }));
       context.buffAttributeGroups  = buildGroups(this.item.system.tagConfig?.buffEntries);
       context.debuffAttributeGroups = buildGroups(this.item.system.tagConfig?.debuffEntries);
+
+      // Chained skills: list of other Active skills on the parent actor for the dropdown.
+      if (this.item.actor) {
+        context.availableChainSkills = this.item.actor.items
+          .filter(i => i.type === 'skill' && i.id !== this.item.id && i.system.skillType === 'Active')
+          .map(i => ({ id: i.id, name: i.name }));
+      } else {
+        context.availableChainSkills = [];
+      }
+      context.chainedSkills = (this.item.system.chainedSkills ?? []).map((entry, index) => ({
+        index,
+        skillId: entry.skillId,
+        skillName: this.item.actor?.items.get(entry.skillId)?.name ?? '(unknown)',
+        trigger: entry.trigger,
+      }));
     }
 
     return context;
@@ -225,6 +240,22 @@ export class AspectsofPowerItemSheet extends foundry.applications.api.Handlebars
       }
     }
 
+    // Chain config: collect chain entries when any chain select changes.
+    if (this.item.type === 'skill' && (
+      event.target?.classList?.contains('chain-skill-select') ||
+      event.target?.classList?.contains('chain-trigger-select')
+    )) {
+      const form = this.element.querySelector('form');
+      const chainEntries = [];
+      form.querySelectorAll('.chain-entry').forEach(row => {
+        const skillId = row.querySelector('.chain-skill-select')?.value ?? '';
+        const trigger = row.querySelector('.chain-trigger-select')?.value ?? 'always';
+        if (skillId) chainEntries.push({ skillId, trigger });
+      });
+      await this.document.update({ 'system.chainedSkills': chainEntries });
+      return;
+    }
+
     if (this.item.type === 'skill' && event.target?.name?.startsWith('system.roll.')) {
       const form = this.element.querySelector('form');
       const rollData = {
@@ -319,6 +350,21 @@ export class AspectsofPowerItemSheet extends foundry.applications.api.Handlebars
         const bonuses = [...(this.item.system.statBonuses ?? [])];
         bonuses.splice(idx, 1);
         await this.document.update({ 'system.statBonuses': bonuses });
+      });
+    });
+
+    // --- Skill Chaining: Add / Delete chain entries ---
+    this.element.querySelector('.chain-add')?.addEventListener('click', async () => {
+      const chains = [...(this.item.system.chainedSkills ?? []), { skillId: '', trigger: 'always' }];
+      await this.document.update({ 'system.chainedSkills': chains });
+    });
+
+    this.element.querySelectorAll('.chain-delete').forEach(el => {
+      el.addEventListener('click', async () => {
+        const idx = Number(el.dataset.chainIndex);
+        const chains = [...(this.item.system.chainedSkills ?? [])];
+        chains.splice(idx, 1);
+        await this.document.update({ 'system.chainedSkills': chains });
       });
     });
   }

@@ -157,6 +157,8 @@ export class AspectsofPowerItem extends Item {
     } else {
       game.socket.emit('system.aspects-of-power', { type: 'gmCombatResult', content: gmContent });
     }
+
+    return { isHit };
   }
 
   /**
@@ -806,12 +808,15 @@ export class AspectsofPowerItem extends Item {
       }
 
       // Dispatch each tag to each qualifying token.
+      const hitResults = new Map();
       for (const tag of tags) {
         for (const targetToken of targets) {
           switch (tag) {
-            case 'attack':
-              await this._handleAttackTag(item, rollData, hitRoll, dmgRoll, speaker, rollMode, label, targetToken);
+            case 'attack': {
+              const result = await this._handleAttackTag(item, rollData, hitRoll, dmgRoll, speaker, rollMode, label, targetToken);
+              if (result) hitResults.set(targetToken, result.isHit);
               break;
+            }
             case 'restoration':
               await this._handleRestorationTag(item, rollData, dmgRoll, speaker, rollMode, label, targetToken);
               break;
@@ -827,6 +832,9 @@ export class AspectsofPowerItem extends Item {
           }
         }
       }
+
+      // Execute chained skills after all parent tags have resolved.
+      await this._executeChainedSkills(hitResults, targets, speaker, rollMode);
 
       // Deduct resource cost AFTER effects are applied.
       await this.actor.update({ [`system.${resource}.value`]: newResVal });
@@ -864,11 +872,14 @@ export class AspectsofPowerItem extends Item {
     await dmgRoll.toMessage({ speaker, rollMode, flavor: `${label} — Roll` });
 
     // ── Dispatch to each tag handler (single-target) ─────────────────────
+    const hitResults = new Map();
     for (const tag of tags) {
       switch (tag) {
-        case 'attack':
-          await this._handleAttackTag(item, rollData, hitRoll, dmgRoll, speaker, rollMode, label);
+        case 'attack': {
+          const result = await this._handleAttackTag(item, rollData, hitRoll, dmgRoll, speaker, rollMode, label);
+          if (result) hitResults.set(null, result.isHit);
           break;
+        }
         case 'restoration':
           await this._handleRestorationTag(item, rollData, dmgRoll, speaker, rollMode, label);
           break;
@@ -884,6 +895,82 @@ export class AspectsofPowerItem extends Item {
       }
     }
 
+    // Execute chained skills after all parent tags have resolved.
+    await this._executeChainedSkills(hitResults, null, speaker, rollMode);
+
     return dmgRoll;
+  }
+
+  /**
+   * Execute chained skills after the parent skill's tags have resolved.
+   * Each chained skill runs its own rolls and tag handlers, but:
+   *   - Resource cost is skipped (chain is "free").
+   *   - The chained skill does NOT trigger its own chains (no recursion).
+   *   - The chained skill targets the same token(s) as the parent.
+   *
+   * @param {Map<Token|null, boolean>} hitResults  Per-target hit results from parent.
+   * @param {Token[]|null} aoeTargets              AOE targets array, or null for single-target.
+   * @param {object} speaker                       Chat speaker data.
+   * @param {string} rollMode                      Roll mode setting.
+   * @private
+   */
+  async _executeChainedSkills(hitResults, aoeTargets, speaker, rollMode) {
+    const chains = this.system.chainedSkills ?? [];
+    if (chains.length === 0) return;
+
+    for (const chain of chains) {
+      if (!chain.skillId) continue;
+
+      const chainedItem = this.actor.items.get(chain.skillId);
+      if (!chainedItem || chainedItem.type !== 'skill') continue;
+      if (chainedItem.system.skillType === 'Passive') continue;
+
+      // Determine target list: AOE targets or [null] (single-target uses game.user.targets).
+      const targets = aoeTargets ?? [null];
+
+      for (const targetToken of targets) {
+        // Evaluate trigger condition per-target.
+        const wasHit = hitResults.get(targetToken) ?? hitResults.get(null);
+        if (chain.trigger === 'on-hit' && wasHit !== true) continue;
+        if (chain.trigger === 'on-miss' && wasHit !== false) continue;
+
+        // Build the chained skill's own rolls.
+        const chainRollData = chainedItem.getRollData();
+        const chainLabel = `[chain] ${chainedItem.name}`;
+        const { hitFormula: cHitF, dmgFormula: cDmgF } = chainedItem._buildRollFormulas(chainRollData);
+
+        const cHitRoll = cHitF ? new Roll(cHitF, chainRollData) : null;
+        if (cHitRoll) await cHitRoll.evaluate();
+
+        const cDmgRoll = new Roll(cDmgF, chainRollData);
+        await cDmgRoll.evaluate();
+
+        // Post chained skill rolls to chat.
+        if (cHitRoll) await cHitRoll.toMessage({ speaker, rollMode, flavor: `${chainLabel} — To Hit` });
+        await cDmgRoll.toMessage({ speaker, rollMode, flavor: `${chainLabel} — Roll` });
+
+        // Dispatch each of the chained skill's own tags.
+        const chainTags = chainedItem.system.tags ?? [];
+        for (const tag of chainTags) {
+          switch (tag) {
+            case 'attack':
+              await chainedItem._handleAttackTag(chainedItem, chainRollData, cHitRoll, cDmgRoll, speaker, rollMode, chainLabel, targetToken);
+              break;
+            case 'restoration':
+              await chainedItem._handleRestorationTag(chainedItem, chainRollData, cDmgRoll, speaker, rollMode, chainLabel, targetToken);
+              break;
+            case 'buff':
+              await chainedItem._handleBuffTag(chainedItem, chainRollData, cDmgRoll, speaker, rollMode, chainLabel, targetToken);
+              break;
+            case 'debuff':
+              await chainedItem._handleDebuffTag(chainedItem, chainRollData, cDmgRoll, speaker, rollMode, chainLabel, targetToken);
+              break;
+            case 'repair':
+              await chainedItem._handleRepairTag(chainedItem, chainRollData, cDmgRoll, speaker, rollMode, chainLabel, targetToken);
+              break;
+          }
+        }
+      }
+    }
   }
 }

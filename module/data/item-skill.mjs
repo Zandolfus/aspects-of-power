@@ -29,6 +29,12 @@ export class SkillData extends foundry.abstract.TypeDataModel {
       // ID of the item that must be equipped to use this skill. Empty = no requirement.
       requiredEquipment: new fields.StringField({ initial: '' }),
 
+      // Skill chaining: other skills on the same actor that auto-trigger after this skill.
+      chainedSkills: new fields.ArrayField(new fields.SchemaField({
+        skillId:  new fields.StringField({ initial: '' }),
+        trigger:  new fields.StringField({ initial: 'always' }), // 'always', 'on-hit', 'on-miss'
+      }), { initial: [] }),
+
       // AOE modifier — applies to all active tags when enabled.
       aoe: new fields.SchemaField({
         enabled:          new fields.BooleanField({ initial: false }),

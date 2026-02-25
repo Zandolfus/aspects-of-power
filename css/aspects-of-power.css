@@ -860,3 +860,31 @@
 .aspects-of-power .augment-row .augment-bonus {
   flex: 1;
 }
+
+/* ============================== */
+/* Skill Chain Config             */
+/* ============================== */
+.aspects-of-power .chain-config {
+  margin-top: 8px;
+}
+.aspects-of-power .chain-entry {
+  gap: 6px;
+  align-items: center;
+  margin-bottom: 4px;
+}
+.aspects-of-power .chain-entry .chain-skill-select {
+  flex: 1;
+}
+.aspects-of-power .chain-entry .chain-trigger-select {
+  flex: 0 0 100px;
+}
+.aspects-of-power .chain-entry a {
+  cursor: pointer;
+  color: #888;
+}
+.aspects-of-power .chain-add {
+  cursor: pointer;
+  font-size: 12px;
+  margin-top: 4px;
+  display: inline-block;
+}

@@ -315,6 +315,46 @@
       </div>
       {{/if}}
 
+      {{! ── Skill Chain Config ── }}
+      {{#if system.tags.length}}
+      <div class='tag-config chain-config'>
+        <label class='resource-label' style='grid-column: 1 / -1;'>
+          {{localize "ASPECTSOFPOWER.Chain.label"}}
+        </label>
+
+        {{#each chainedSkills}}
+        <div class='chain-entry flexrow' data-chain-index='{{this.index}}'>
+          <select class='chain-skill-select' data-chain-index='{{this.index}}'>
+            <option value=''>-- Select Skill --</option>
+            {{#each ../availableChainSkills}}
+              <option value='{{this.id}}' {{#if (eq this.id ../skillId)}}selected{{/if}}>
+                {{this.name}}
+              </option>
+            {{/each}}
+          </select>
+          <select class='chain-trigger-select' data-chain-index='{{this.index}}'>
+            <option value='always' {{#if (eq this.trigger "always")}}selected{{/if}}>
+              {{localize "ASPECTSOFPOWER.Chain.always"}}
+            </option>
+            <option value='on-hit' {{#if (eq this.trigger "on-hit")}}selected{{/if}}>
+              {{localize "ASPECTSOFPOWER.Chain.onHit"}}
+            </option>
+            <option value='on-miss' {{#if (eq this.trigger "on-miss")}}selected{{/if}}>
+              {{localize "ASPECTSOFPOWER.Chain.onMiss"}}
+            </option>
+          </select>
+          <a class='chain-delete' data-chain-index='{{this.index}}' title='Remove'>
+            <i class='fas fa-trash'></i>
+          </a>
+        </div>
+        {{/each}}
+
+        <a class='chain-add' title='{{localize "ASPECTSOFPOWER.Chain.add"}}'>
+          <i class='fas fa-plus'></i> {{localize "ASPECTSOFPOWER.Chain.add"}}
+        </a>
+      </div>
+      {{/if}}
+
     </div>
 
     {{! Attributes Tab }}
