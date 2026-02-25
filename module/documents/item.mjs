@@ -305,15 +305,17 @@ export class AspectsofPowerItem extends Item {
           await target.createEmbeddedDocuments('ActiveEffect', [payload.effectData]);
         }
 
-        // Immediate DoT damage (bypasses armor/veil).
+        // Immediate DoT damage (bypasses armor/veil but not toughness).
         if (payload.dotDamage > 0) {
+          const toughnessMod = target.system.abilities?.toughness?.mod ?? 0;
+          const mitigated = Math.max(0, payload.dotDamage - toughnessMod);
           const health    = target.system.health;
-          const newHealth = Math.max(0, health.value - payload.dotDamage);
+          const newHealth = Math.max(0, health.value - mitigated);
           await target.update({ 'system.health.value': newHealth });
           ChatMessage.create({
             whisper: ChatMessage.getWhisperRecipients('GM'),
-            content: `<p><strong>${target.name}</strong> takes <strong>${payload.dotDamage}</strong> `
-                   + `${payload.dotDamageType} damage from ${payload.effectName} (ignores mitigation). `
+            content: `<p><strong>${target.name}</strong> takes <strong>${mitigated}</strong> `
+                   + `${payload.dotDamageType} damage from ${payload.effectName} (Toughness: −${toughnessMod}). `
                    + `Health: ${newHealth} / ${health.max}`
                    + `${newHealth === 0 ? ' &mdash; <em>Incapacitated!</em>' : ''}</p>`,
           });

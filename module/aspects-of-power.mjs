@@ -226,17 +226,19 @@ Hooks.on('combatTurnChange', async (combat, _prior, current) => {
       const flags = effect.flags?.['aspects-of-power'] ?? {};
       if (!flags.dot || flags.applierActorUuid !== applierUuid || effect.disabled) continue;
 
-      const damage    = flags.dotDamage ?? 0;
-      if (damage <= 0) continue;
+      const rawDamage = flags.dotDamage ?? 0;
+      if (rawDamage <= 0) continue;
 
-      const health    = c.actor.system.health;
+      const toughnessMod = c.actor.system.abilities?.toughness?.mod ?? 0;
+      const damage  = Math.max(0, rawDamage - toughnessMod);
+      const health  = c.actor.system.health;
       const newHealth = Math.max(0, health.value - damage);
       await c.actor.update({ 'system.health.value': newHealth });
 
       ChatMessage.create({
         whisper: ChatMessage.getWhisperRecipients('GM'),
         content: `<p><strong>${c.actor.name}</strong> takes <strong>${damage}</strong> `
-               + `${flags.dotDamageType ?? 'physical'} damage from ${effect.name} (ignores mitigation). `
+               + `${flags.dotDamageType ?? 'physical'} damage from ${effect.name} (Toughness: −${toughnessMod}). `
                + `Health: ${newHealth} / ${health.max}`
                + `${newHealth === 0 ? ' &mdash; <em>Incapacitated!</em>' : ''}</p>`,
       });
