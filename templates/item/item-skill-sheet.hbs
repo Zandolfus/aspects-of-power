@@ -282,6 +282,11 @@
           </div>
         {{/each}}
         <label class='resource-label dot-toggle'>
+          <input type='checkbox' name='system.tagConfig.debuffStackable'
+                 {{#if system.tagConfig.debuffStackable}}checked{{/if}} />
+          Stackable
+        </label>
+        <label class='resource-label dot-toggle'>
           <input type='checkbox' name='system.tagConfig.debuffDealsDamage'
                  {{#if system.tagConfig.debuffDealsDamage}}checked{{/if}} />
           {{localize "ASPECTSOFPOWER.TagConfig.debuffDealsDamage"}}

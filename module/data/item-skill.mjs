@@ -67,6 +67,7 @@ export class SkillData extends foundry.abstract.TypeDataModel {
           value:     new fields.NumberField({ initial: 1, min: 0 }),
         }), { initial: [] }),
         debuffDuration:    new fields.NumberField({ initial: 1, integer: true, min: 0 }),
+        debuffStackable:   new fields.BooleanField({ initial: false }),
         debuffDealsDamage: new fields.BooleanField({ initial: false }),
         debuffDamageType:  new fields.StringField({ initial: 'physical' }),
 

@@ -203,54 +203,63 @@ export class AspectsofPowerItem extends Item {
         const combat = game.combat;
         const startRound = combat?.round ?? 0;
         const startTurn  = combat?.turn ?? 0;
-        const newTotal = payload.changes.reduce((sum, c) => sum + Number(c.value), 0);
 
-        if (payload.stackable) {
-          // Stackable: always create a new effect (like debuffs).
-          await target.createEmbeddedDocuments('ActiveEffect', [{
-            name:   payload.effectName,
-            img:    payload.img,
-            origin: payload.originUuid,
-            'duration.rounds': payload.duration,
-            'duration.startRound': startRound,
-            'duration.startTurn': startTurn,
-            disabled: false,
-            changes: payload.changes,
-          }]);
-        } else {
-          // Non-stackable: keep higher total.
-          const existing = target.effects.find(
-            e => e.origin === payload.originUuid && e.name === payload.effectName
-          );
+        const existing = target.effects.find(
+          e => e.origin === payload.originUuid && e.name === payload.effectName
+        );
 
-          if (existing) {
-            if (existing.disabled) {
+        if (existing && !existing.disabled) {
+          if (payload.stackable) {
+            // Stackable: merge new values into the existing effect's changes.
+            const merged = [...(existing.changes ?? [])].map(c => ({ ...c }));
+            for (const incoming of payload.changes) {
+              const match = merged.find(m => m.key === incoming.key && m.mode === incoming.mode);
+              if (match) {
+                match.value = Number(match.value) + Number(incoming.value);
+              } else {
+                merged.push({ ...incoming });
+              }
+            }
+            await existing.update({
+              changes: merged,
+              'duration.rounds': payload.duration,
+              'duration.startRound': startRound,
+              'duration.startTurn': startTurn,
+            });
+            const mergedTotal = merged.reduce((sum, c) => sum + Number(c.value), 0);
+            ChatMessage.create({ speaker: payload.speaker, rollMode: payload.rollMode,
+              content: `<p>Buff on <strong>${target.name}</strong> stacked (total +${mergedTotal}) for ${payload.duration} rounds.</p>`,
+            });
+          } else {
+            // Non-stackable: keep higher total.
+            const newTotal = payload.changes.reduce((sum, c) => sum + Number(c.value), 0);
+            const currentTotal = (existing.changes ?? []).reduce((sum, c) => sum + Number(c.value), 0);
+            if (newTotal > currentTotal) {
               await existing.update({
-                disabled: false,
                 changes: payload.changes,
                 'duration.rounds': payload.duration,
                 'duration.startRound': startRound,
                 'duration.startTurn': startTurn,
               });
+              ChatMessage.create({ speaker: payload.speaker, rollMode: payload.rollMode,
+                content: `<p>Buff on <strong>${target.name}</strong> upgraded (total +${newTotal}, was +${currentTotal}).</p>`,
+              });
             } else {
-              const currentTotal = (existing.changes ?? []).reduce((sum, c) => sum + Number(c.value), 0);
-              if (newTotal > currentTotal) {
-                await existing.update({
-                  changes: payload.changes,
-                  'duration.rounds': payload.duration,
-                  'duration.startRound': startRound,
-                  'duration.startTurn': startTurn,
-                });
-                ChatMessage.create({ speaker: payload.speaker, rollMode: payload.rollMode,
-                  content: `<p>Buff on <strong>${target.name}</strong> upgraded (total +${newTotal}, was +${currentTotal}).</p>`,
-                });
-              } else {
-                ChatMessage.create({ speaker: payload.speaker, rollMode: payload.rollMode,
-                  content: `<p>Existing buff on <strong>${target.name}</strong> is stronger (+${currentTotal}). No change.</p>`,
-                });
-              }
-              return;
+              ChatMessage.create({ speaker: payload.speaker, rollMode: payload.rollMode,
+                content: `<p>Existing buff on <strong>${target.name}</strong> is stronger (+${currentTotal}). No change.</p>`,
+              });
             }
+          }
+        } else {
+          // No existing active effect (or disabled) — create new.
+          if (existing?.disabled) {
+            await existing.update({
+              disabled: false,
+              changes: payload.changes,
+              'duration.rounds': payload.duration,
+              'duration.startRound': startRound,
+              'duration.startTurn': startTurn,
+            });
           } else {
             await target.createEmbeddedDocuments('ActiveEffect', [{
               name:   payload.effectName,
@@ -263,15 +272,14 @@ export class AspectsofPowerItem extends Item {
               changes: payload.changes,
             }]);
           }
+          const summary = payload.changes.map(c => {
+            const attr = c.key.replace('system.', '').replace('.value', '');
+            return `${attr} +${c.value}`;
+          }).join(', ');
+          ChatMessage.create({ speaker: payload.speaker, rollMode: payload.rollMode,
+            content: `<p><strong>${target.name}</strong> buffed: ${summary} for ${payload.duration} rounds.</p>`,
+          });
         }
-
-        const summary = payload.changes.map(c => {
-          const attr = c.key.replace('system.', '').replace('.value', '');
-          return `${attr} +${c.value}`;
-        }).join(', ');
-        ChatMessage.create({ speaker: payload.speaker, rollMode: payload.rollMode,
-          content: `<p><strong>${target.name}</strong> buffed: ${summary} for ${payload.duration} rounds.</p>`,
-        });
         break;
       }
 
@@ -294,15 +302,61 @@ export class AspectsofPowerItem extends Item {
       case 'gmApplyDebuff': {
         const target = await fromUuid(payload.targetActorUuid);
         if (!target) return;
+        const combat = game.combat;
+        const startRound = combat?.round ?? 0;
+        const startTurn  = combat?.turn ?? 0;
 
-        // Create the stacking ActiveEffect (set startRound for expiry tracking).
+        // Stackable debuffs: merge into existing effect with same origin + name.
         if (payload.effectData) {
-          const combat = game.combat;
-          if (combat) {
-            payload.effectData['duration.startRound'] = combat.round;
-            payload.effectData['duration.startTurn'] = combat.turn;
+          const existing = payload.stackable
+            ? target.effects.find(e => e.origin === payload.originUuid && e.name === payload.effectName && !e.disabled)
+            : null;
+
+          if (existing) {
+            // Merge stat changes: add incoming values to matching keys.
+            const merged = [...(existing.changes ?? [])].map(c => ({ ...c }));
+            for (const incoming of (payload.effectData.changes ?? [])) {
+              const match = merged.find(m => m.key === incoming.key && m.mode === incoming.mode);
+              if (match) {
+                match.value = Number(match.value) + Number(incoming.value);
+              } else {
+                merged.push({ ...incoming });
+              }
+            }
+
+            // Merge DoT flags: add incoming damage to existing.
+            const updateData = {
+              changes: merged,
+              'duration.rounds': payload.duration,
+              'duration.startRound': startRound,
+              'duration.startTurn': startTurn,
+            };
+            if (payload.effectData.flags?.['aspects-of-power']?.dot) {
+              const existingDot = existing.flags?.['aspects-of-power']?.dotDamage ?? 0;
+              const incomingDot = payload.effectData.flags['aspects-of-power'].dotDamage ?? 0;
+              updateData['flags.aspects-of-power.dot'] = true;
+              updateData['flags.aspects-of-power.dotDamage'] = existingDot + incomingDot;
+              updateData['flags.aspects-of-power.dotDamageType'] = payload.effectData.flags['aspects-of-power'].dotDamageType;
+              updateData['flags.aspects-of-power.applierActorUuid'] = payload.effectData.flags['aspects-of-power'].applierActorUuid;
+            }
+
+            await existing.update(updateData);
+            const mergedTotal = merged.reduce((sum, c) => sum + Math.abs(Number(c.value)), 0);
+            ChatMessage.create({ speaker: payload.speaker, rollMode: payload.rollMode,
+              content: `<p>Debuff on <strong>${target.name}</strong> stacked (total -${mergedTotal}) for ${payload.duration} rounds.</p>`,
+            });
+          } else {
+            // No existing — create new effect.
+            payload.effectData['duration.startRound'] = startRound;
+            payload.effectData['duration.startTurn'] = startTurn;
+            await target.createEmbeddedDocuments('ActiveEffect', [payload.effectData]);
+
+            if (payload.statSummary) {
+              ChatMessage.create({ speaker: payload.speaker, rollMode: payload.rollMode,
+                content: `<p><strong>${target.name}</strong> debuffed: ${payload.statSummary} for ${payload.duration} rounds.</p>`,
+              });
+            }
           }
-          await target.createEmbeddedDocuments('ActiveEffect', [payload.effectData]);
         }
 
         // Immediate DoT damage (bypasses armor/veil but not toughness).
@@ -318,13 +372,6 @@ export class AspectsofPowerItem extends Item {
                    + `${payload.dotDamageType} damage from ${payload.effectName} (Toughness: −${toughnessMod}). `
                    + `Health: ${newHealth} / ${health.max}`
                    + `${newHealth === 0 ? ' &mdash; <em>Incapacitated!</em>' : ''}</p>`,
-          });
-        }
-
-        // Chat summary for stat changes.
-        if (payload.statSummary) {
-          ChatMessage.create({ speaker: payload.speaker, rollMode: payload.rollMode,
-            content: `<p><strong>${target.name}</strong> debuffed: ${payload.statSummary} for ${payload.duration} rounds.</p>`,
           });
         }
         break;
@@ -454,6 +501,8 @@ export class AspectsofPowerItem extends Item {
       type: 'gmApplyDebuff',
       targetActorUuid: targetActor.uuid,
       effectName: `${item.name} (Debuff)`,
+      originUuid: this.uuid,
+      stackable: this.system.tagConfig?.debuffStackable ?? false,
       effectData: (changes.length > 0 || dealsDmg) ? effectData : null,
       dotDamage: dealsDmg ? rollTotal : 0,
       dotDamageType: dmgType,
