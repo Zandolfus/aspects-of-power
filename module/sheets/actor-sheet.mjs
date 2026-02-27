@@ -50,7 +50,7 @@ export class AspectsofPowerActorSheet extends foundry.applications.api.Handlebar
 
     if (actorData.type === 'character') {
       this._prepareItems(context);
-      this._prepareCharacterData(context);
+      await this._prepareCharacterData(context);
     }
     if (actorData.type === 'npc') {
       this._prepareItems(context);
@@ -76,7 +76,7 @@ export class AspectsofPowerActorSheet extends foundry.applications.api.Handlebar
    * Character-specific context modifications.
    * @param {object} context The context object to mutate
    */
-  _prepareCharacterData(context) {
+  async _prepareCharacterData(context) {
     context.statsSummary = context.system.statsSummary;
 
     // Levelling: template references (resolved from stored UUID).
@@ -84,7 +84,7 @@ export class AspectsofPowerActorSheet extends foundry.applications.api.Handlebar
     context.templateRefs = {};
     for (const type of types) {
       const attr = context.system.attributes[type];
-      const templateItem = attr.templateId ? fromUuidSync(attr.templateId) : null;
+      const templateItem = attr.templateId ? await fromUuid(attr.templateId) : null;
       context.templateRefs[type] = {
         templateId: attr.templateId,
         templateName: templateItem?.name ?? '',
