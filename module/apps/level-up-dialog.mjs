@@ -69,7 +69,7 @@ export class LevelUpDialog extends foundry.applications.api.HandlebarsApplicatio
         gains,
         freePointsGained,
       };
-    });
+    }));
 
     context.selectedType = this.selectedType;
     context.currentFreePoints = sys.freePoints ?? 0;
