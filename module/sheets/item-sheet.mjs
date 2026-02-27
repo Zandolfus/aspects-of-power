@@ -105,8 +105,8 @@ export class AspectsofPowerItemSheet extends foundry.applications.api.Handlebars
       }));
     }
 
-    // Race / Class / Profession template items: build rank gains rows for the sheet.
-    if (['race', 'class', 'profession'].includes(this.item.type)) {
+    // Race template items: build rank gains rows (multi-rank).
+    if (this.item.type === 'race') {
       const tiers = CONFIG.ASPECTSOFPOWER.rankTiers;
       const abilityKeys = Object.keys(CONFIG.ASPECTSOFPOWER.abilities);
       context.rankGainsRows = Object.entries(tiers).map(([tierKey, tierDef]) => ({
@@ -121,6 +121,28 @@ export class AspectsofPowerItemSheet extends foundry.applications.api.Handlebars
           value: this.item.system.rankGains?.[tierKey]?.[aKey] ?? 0,
           fieldName: `system.rankGains.${tierKey}.${aKey}`,
         })),
+      }));
+    }
+
+    // Class template items: single rank with one set of gains.
+    if (this.item.type === 'class') {
+      const abilityKeys = Object.keys(CONFIG.ASPECTSOFPOWER.abilities);
+      context.classGainFields = abilityKeys.map(aKey => ({
+        key: aKey,
+        label: game.i18n.localize(CONFIG.ASPECTSOFPOWER.abilities[aKey]),
+        value: this.item.system.gains?.[aKey] ?? 0,
+        fieldName: `system.gains.${aKey}`,
+      }));
+    }
+
+    // Profession template items: single rank with one set of gains.
+    if (this.item.type === 'profession') {
+      const abilityKeys = Object.keys(CONFIG.ASPECTSOFPOWER.abilities);
+      context.professionGainFields = abilityKeys.map(aKey => ({
+        key: aKey,
+        label: game.i18n.localize(CONFIG.ASPECTSOFPOWER.abilities[aKey]),
+        value: this.item.system.gains?.[aKey] ?? 0,
+        fieldName: `system.gains.${aKey}`,
       }));
     }
 

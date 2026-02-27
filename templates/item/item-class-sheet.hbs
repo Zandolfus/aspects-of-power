@@ -5,13 +5,21 @@
     <img class="profile-img" src="{{item.img}}" data-edit="img" title="{{item.name}}" height="100" width="100"/>
     <div class="header-fields">
       <h1 class="charname"><input name="name" type="text" value="{{item.name}}" placeholder="Class Name"/></h1>
+      <div class="flexrow">
+        <label class="resource-label">Rank</label>
+        <select name="system.rank">
+          {{#each config.rankTiers as |tier key|}}
+            <option value="{{key}}" {{#if (eq key @root.system.rank)}}selected{{/if}}>{{key}}</option>
+          {{/each}}
+        </select>
+      </div>
     </div>
   </header>
 
   {{!-- Tabs --}}
   <nav class="sheet-tabs tabs" data-group="primary">
     <a class="item" data-tab="description">Description</a>
-    <a class="item" data-tab="rankGains">Rank Gains</a>
+    <a class="item" data-tab="gains">Stat Gains</a>
     <a class="item" data-tab="effects">Effects</a>
   </nav>
 
@@ -23,25 +31,23 @@
       </prose-mirror>
     </div>
 
-    {{!-- Rank Gains --}}
-    <div class="tab rank-gains" data-group="primary" data-tab="rankGains">
-      {{#each rankGainsRows as |tier|}}
-        <div class="rank-tier-section">
-          <h3 class="rank-tier-header">Rank {{tier.tierLabel}} <span class="tier-range">(Levels {{tier.tierRange}})</span></h3>
-          <div class="rank-gains-row flexrow">
-            {{#each tier.abilities as |ab|}}
-              <div class="rank-gain-field">
-                <label>{{ab.label}}</label>
-                <input type="number" name="{{ab.fieldName}}" value="{{ab.value}}" />
-              </div>
-            {{/each}}
-            <div class="rank-gain-field free-points-field">
-              <label>Free Pts</label>
-              <input type="number" name="{{tier.freePointsFieldName}}" value="{{tier.freePoints}}" min="0" />
+    {{!-- Stat Gains (single rank) --}}
+    <div class="tab rank-gains" data-group="primary" data-tab="gains">
+      <div class="rank-tier-section">
+        <h3 class="rank-tier-header">Per-Level Gains <span class="tier-range">(Rank {{system.rank}})</span></h3>
+        <div class="rank-gains-row flexrow">
+          {{#each classGainFields as |ab|}}
+            <div class="rank-gain-field">
+              <label>{{ab.label}}</label>
+              <input type="number" name="{{ab.fieldName}}" value="{{ab.value}}" />
             </div>
+          {{/each}}
+          <div class="rank-gain-field free-points-field">
+            <label>Free Pts</label>
+            <input type="number" name="system.freePointsPerLevel" value="{{system.freePointsPerLevel}}" min="0" />
           </div>
         </div>
-      {{/each}}
+      </div>
     </div>
 
     {{!-- Effects --}}

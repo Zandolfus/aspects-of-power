@@ -45,8 +45,15 @@ export class LevelUpDialog extends foundry.applications.api.HandlebarsApplicatio
       let gains = null;
       let freePointsGained = 0;
       if (templateItem) {
-        gains = templateItem.system.rankGains?.[nextRank] ?? {};
-        freePointsGained = templateItem.system.freePointsPerLevel?.[nextRank] ?? 0;
+        if (['class', 'profession'].includes(type)) {
+          // Class/profession items are rank-specific: single gains object + single free points value.
+          gains = templateItem.system.gains ?? {};
+          freePointsGained = templateItem.system.freePointsPerLevel ?? 0;
+        } else {
+          // Race items have per-rank gains.
+          gains = templateItem.system.rankGains?.[nextRank] ?? {};
+          freePointsGained = templateItem.system.freePointsPerLevel?.[nextRank] ?? 0;
+        }
       }
 
       return {
@@ -148,8 +155,14 @@ export class LevelUpDialog extends foundry.applications.api.HandlebarsApplicatio
     const nextLevel = attr.level + 1;
     const nextRank = CONFIG.ASPECTSOFPOWER.getRankForLevel(nextLevel);
     const currentRank = CONFIG.ASPECTSOFPOWER.getRankForLevel(attr.level);
-    const gains = templateItem.system.rankGains?.[nextRank] ?? {};
-    const freePointsGained = templateItem.system.freePointsPerLevel?.[nextRank] ?? 0;
+    let gains, freePointsGained;
+    if (['class', 'profession'].includes(this.selectedType)) {
+      gains = templateItem.system.gains ?? {};
+      freePointsGained = templateItem.system.freePointsPerLevel ?? 0;
+    } else {
+      gains = templateItem.system.rankGains?.[nextRank] ?? {};
+      freePointsGained = templateItem.system.freePointsPerLevel?.[nextRank] ?? 0;
+    }
 
     // Validate allocation.
     const totalFree = (sys.freePoints ?? 0) + freePointsGained;
