@@ -95,7 +95,7 @@
       "cr": 0
     },
   "Item": {
-    "types": ["item", "feature", "skill"],
+    "types": ["item", "feature", "skill", "race", "class", "profession"],
     "templates": {
       "base": {
         "description": ""
@@ -114,6 +114,15 @@
       "templates": ["base"],
       "skillType": "Passive",
       "formula": "123"
+    },
+    "race": {
+      "templates": ["base"]
+    },
+    "class": {
+      "templates": ["base"]
+    },
+    "profession": {
+      "templates": ["base"]
     }
   }
 }
