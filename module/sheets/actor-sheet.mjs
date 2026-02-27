@@ -79,10 +79,9 @@ export class AspectsofPowerActorSheet extends foundry.applications.api.Handlebar
   _prepareCharacterData(context) {
     context.statsSummary = context.system.statsSummary;
 
-    // Levelling: template references and available templates for dropdowns.
+    // Levelling: template references (resolved from stored templateId).
     const types = ['race', 'class', 'profession'];
     context.templateRefs = {};
-    context.availableTemplates = {};
     for (const type of types) {
       const attr = context.system.attributes[type];
       const templateItem = attr.templateId ? game.items.get(attr.templateId) : null;
@@ -91,9 +90,6 @@ export class AspectsofPowerActorSheet extends foundry.applications.api.Handlebar
         templateName: templateItem?.name ?? '',
         hasTemplate: !!templateItem,
       };
-      context.availableTemplates[type] = game.items
-        .filter(i => i.type === type)
-        .map(i => ({ id: i.id, name: i.name }));
     }
     context.freePoints = context.system.freePoints ?? 0;
     context.isGM = game.user.isGM;
@@ -107,7 +103,6 @@ export class AspectsofPowerActorSheet extends foundry.applications.api.Handlebar
     const gear           = [];
     const features       = [];
     const skills         = { Active: [], Passive: [] };
-    const templateGrants = [];
 
     for (const i of context.items) {
       i.img = i.img || Item.DEFAULT_ICON;
@@ -124,18 +119,12 @@ export class AspectsofPowerActorSheet extends foundry.applications.api.Handlebar
         if (i.system.skillType !== undefined) {
           skills[i.system.skillType].push(i);
         }
-      } else if (i.type === 'templateGrant') {
-        const templateItem = i.system.templateId ? game.items.get(i.system.templateId) : null;
-        i.grantTemplateLabel = templateItem?.name ?? '(none)';
-        i.grantTypeLabel = game.i18n.localize(CONFIG.ASPECTSOFPOWER.levelTypes[i.system.grantType] ?? 'class');
-        templateGrants.push(i);
       }
     }
 
     context.gear           = gear;
     context.features       = features;
     context.skills         = skills;
-    context.templateGrants = templateGrants;
 
     // Equipment slot summary for the Equipment tab.
     context.equipmentSlots = {};
@@ -297,47 +286,22 @@ export class AspectsofPowerActorSheet extends foundry.applications.api.Handlebar
       new LevelUpDialog(this.actor).render(true);
     });
 
-    // Template selector dropdowns (GM only).
-    this.element.querySelectorAll('.template-select').forEach(el => {
-      el.addEventListener('change', async () => {
-        const type = el.dataset.type;
-        const templateId = el.value;
-        const templateItem = templateId ? game.items.get(templateId) : null;
-        const updates = {
-          [`system.attributes.${type}.templateId`]: templateId,
-        };
-        if (templateItem) {
-          updates[`system.attributes.${type}.name`] = templateItem.name;
-        }
-        await this.document.update(updates);
+    // Template link — click to open the source template item sheet.
+    this.element.querySelectorAll('.template-link').forEach(el => {
+      el.addEventListener('click', () => {
+        const templateId = el.dataset.templateId;
+        const item = game.items.get(templateId);
+        if (item) item.sheet.render(true);
       });
     });
 
-    // Use template grant item (consume it).
-    this.element.querySelectorAll('.use-grant-item').forEach(el => {
+    // Clear template assignment (GM only).
+    this.element.querySelectorAll('.template-clear').forEach(el => {
       el.addEventListener('click', async () => {
-        const itemId = el.closest('.item')?.dataset.itemId;
-        const grantItem = this.actor.items.get(itemId);
-        if (!grantItem || grantItem.type !== 'templateGrant') return;
-
-        const grantType = grantItem.system.grantType;
-        const templateId = grantItem.system.templateId;
-        const templateItem = templateId ? game.items.get(templateId) : null;
-        if (!templateItem) {
-          ui.notifications.warn(game.i18n.localize('ASPECTSOFPOWER.Level.noTemplate'));
-          return;
-        }
-
+        const type = el.dataset.type;
         await this.actor.update({
-          [`system.attributes.${grantType}.templateId`]: templateId,
-          [`system.attributes.${grantType}.name`]: templateItem.name,
-        });
-        await grantItem.delete();
-
-        const typeLabel = game.i18n.localize(CONFIG.ASPECTSOFPOWER.levelTypes[grantType]);
-        ChatMessage.create({
-          speaker: ChatMessage.getSpeaker({ actor: this.actor }),
-          content: `<p><strong>${this.actor.name}</strong> ${game.i18n.localize('ASPECTSOFPOWER.Level.grantConsumed')} ${typeLabel}: <strong>${templateItem.name}</strong></p>`,
+          [`system.attributes.${type}.templateId`]: '',
+          [`system.attributes.${type}.name`]: '',
         });
       });
     });
@@ -376,6 +340,34 @@ export class AspectsofPowerActorSheet extends foundry.applications.api.Handlebar
     };
     delete itemData.system['type'];
     return Item.create(itemData, { parent: this.actor });
+  }
+
+  /**
+   * Intercept item drops to handle race/class/profession template assignment.
+   * Dropping one of these item types assigns it as the actor's template
+   * instead of adding it to the inventory. GM-only.
+   * @override
+   */
+  async _onDropItem(event, data) {
+    const item = await Item.implementation.fromDropData(data);
+    if (!item) return;
+
+    if (['race', 'class', 'profession'].includes(item.type)) {
+      if (!game.user.isGM) {
+        ui.notifications.warn('Only the GM can assign templates.');
+        return;
+      }
+      const type = item.type;
+      await this.actor.update({
+        [`system.attributes.${type}.templateId`]: item.id,
+        [`system.attributes.${type}.name`]: item.name,
+      });
+      const typeLabel = game.i18n.localize(CONFIG.ASPECTSOFPOWER.levelTypes[type]);
+      ui.notifications.info(`${this.actor.name}: ${typeLabel} ${game.i18n.localize('ASPECTSOFPOWER.Level.templateAssigned')} ${item.name}`);
+      return;
+    }
+
+    return super._onDropItem(event, data);
   }
 
   /**

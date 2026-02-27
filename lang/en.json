@@ -167,8 +167,7 @@
       "template": "Template",
       "free": "Free",
       "total": "Total",
-      "useGrant": "Use",
-      "grantConsumed": "gained"
+      "templateAssigned": "template set to"
     },
     "Equip": {
       "tabLabel": "Equipment",
@@ -236,8 +235,7 @@
       "skill": "Skill",
       "race": "Race",
       "class": "Class",
-      "profession": "Profession",
-      "templateGrant": "Template Grant"
+      "profession": "Profession"
     }
   }
 }

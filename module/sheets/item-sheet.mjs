@@ -27,7 +27,6 @@ export class AspectsofPowerItemSheet extends foundry.applications.api.Handlebars
     race:          { template: 'systems/aspects-of-power/templates/item/item-race-sheet.hbs' },
     class:         { template: 'systems/aspects-of-power/templates/item/item-class-sheet.hbs' },
     profession:    { template: 'systems/aspects-of-power/templates/item/item-profession-sheet.hbs' },
-    templateGrant: { template: 'systems/aspects-of-power/templates/item/item-template-grant-sheet.hbs' },
   };
 
   /** Render only the part that matches this item's type. */
@@ -123,15 +122,6 @@ export class AspectsofPowerItemSheet extends foundry.applications.api.Handlebars
           fieldName: `system.rankGains.${tierKey}.${aKey}`,
         })),
       }));
-    }
-
-    // Template Grant items: build list of available templates filtered by grant type.
-    if (this.item.type === 'templateGrant') {
-      const grantType = this.item.system.grantType ?? 'class';
-      context.grantTypeChoices = CONFIG.ASPECTSOFPOWER.levelTypes;
-      context.availableGrantTemplates = game.items
-        .filter(i => i.type === grantType)
-        .map(i => ({ id: i.id, name: i.name }));
     }
 
     return context;

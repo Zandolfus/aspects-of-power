@@ -13,7 +13,6 @@ import { SkillData } from './data/item-skill.mjs';
 import { RaceData } from './data/item-race.mjs';
 import { ClassData } from './data/item-class.mjs';
 import { ProfessionData } from './data/item-profession.mjs';
-import { TemplateGrantData } from './data/item-template-grant.mjs';
 // Import helper/utility classes and constants.
 import { preloadHandlebarsTemplates } from './helpers/templates.mjs';
 import { ASPECTSOFPOWER } from './helpers/config.mjs';
@@ -78,7 +77,6 @@ Hooks.once('init', function () {
     race:          RaceData,
     class:         ClassData,
     profession:    ProfessionData,
-    templateGrant: TemplateGrantData,
   };
 
   // Register sheet application classes
