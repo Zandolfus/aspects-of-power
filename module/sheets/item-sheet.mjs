@@ -21,12 +21,12 @@ export class AspectsofPowerItemSheet extends foundry.applications.api.Handlebars
 
   // Each item type maps to its own template file.
   static PARTS = {
-    item:          { template: 'systems/aspects-of-power/templates/item/item-item-sheet.hbs' },
-    feature:       { template: 'systems/aspects-of-power/templates/item/item-feature-sheet.hbs' },
-    skill:         { template: 'systems/aspects-of-power/templates/item/item-skill-sheet.hbs' },
-    race:          { template: 'systems/aspects-of-power/templates/item/item-race-sheet.hbs' },
-    class:         { template: 'systems/aspects-of-power/templates/item/item-class-sheet.hbs' },
-    profession:    { template: 'systems/aspects-of-power/templates/item/item-profession-sheet.hbs' },
+    item:          { template: 'systems/aspects-of-power/templates/item/item-item-sheet.hbs', scrollable: ['.sheet-body'] },
+    feature:       { template: 'systems/aspects-of-power/templates/item/item-feature-sheet.hbs', scrollable: ['.sheet-body'] },
+    skill:         { template: 'systems/aspects-of-power/templates/item/item-skill-sheet.hbs', scrollable: ['.sheet-body'] },
+    race:          { template: 'systems/aspects-of-power/templates/item/item-race-sheet.hbs', scrollable: ['.sheet-body'] },
+    class:         { template: 'systems/aspects-of-power/templates/item/item-class-sheet.hbs', scrollable: ['.sheet-body'] },
+    profession:    { template: 'systems/aspects-of-power/templates/item/item-profession-sheet.hbs', scrollable: ['.sheet-body'] },
   };
 
   /** Render only the part that matches this item's type. */

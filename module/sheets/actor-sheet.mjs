@@ -23,8 +23,8 @@ export class AspectsofPowerActorSheet extends foundry.applications.api.Handlebar
 
   // Each actor type maps to its own template file.
   static PARTS = {
-    character: { template: 'systems/aspects-of-power/templates/actor/actor-character-sheet.hbs' },
-    npc:       { template: 'systems/aspects-of-power/templates/actor/actor-npc-sheet.hbs' },
+    character: { template: 'systems/aspects-of-power/templates/actor/actor-character-sheet.hbs', scrollable: ['.sheet-body'] },
+    npc:       { template: 'systems/aspects-of-power/templates/actor/actor-npc-sheet.hbs', scrollable: ['.sheet-body'] },
   };
 
   /** Render only the part that matches this actor's type. */
