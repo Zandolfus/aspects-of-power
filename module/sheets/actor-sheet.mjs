@@ -83,10 +83,14 @@ export class AspectsofPowerActorSheet extends foundry.applications.api.Handlebar
     const types = ['race', 'class', 'profession'];
     context.templateRefs = {};
     for (const type of types) {
-      const attr = context.system.attributes[type];
-      const templateItem = attr.templateId ? await fromUuid(attr.templateId) : null;
+      const attr = context.system.attributes?.[type];
+      let templateItem = null;
+      if (attr?.templateId) {
+        try { templateItem = await fromUuid(attr.templateId); }
+        catch (e) { console.warn(`AoP | Failed to resolve ${type} template UUID:`, attr.templateId, e); }
+      }
       context.templateRefs[type] = {
-        templateId: attr.templateId,
+        templateId: attr?.templateId ?? '',
         templateName: templateItem?.name ?? '',
         hasTemplate: !!templateItem,
       };
