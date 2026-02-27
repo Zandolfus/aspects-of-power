@@ -179,6 +179,12 @@ export class AspectsofPowerActorSheet extends foundry.applications.api.Handlebar
 
   /* -------------------------------------------- */
 
+  /** @override – save scroll position before DOM replacement. */
+  _preRender(context, options) {
+    this._savedScrollTop = this.element?.querySelector('.sheet-body')?.scrollTop ?? 0;
+    return super._preRender(context, options);
+  }
+
   /** @override */
   _onRender(context, options) {
     super._onRender(context, options);
@@ -191,6 +197,11 @@ export class AspectsofPowerActorSheet extends foundry.applications.api.Handlebar
     const initial = this.tabGroups.primary ?? defaultTab;
     new foundry.applications.ux.Tabs({ navSelector: '.sheet-tabs', contentSelector: '.sheet-body', initial })
       .bind(this.element);
+
+    // Restore scroll AFTER Tabs.bind() — Tabs changes layout (shows/hides tabs)
+    // which can reset scroll position.
+    const body = this.element?.querySelector('.sheet-body');
+    if (body && this._savedScrollTop) body.scrollTop = this._savedScrollTop;
 
     // Keep tabGroups in sync when the user clicks a tab.
     this.element.querySelectorAll('.sheet-tabs .item').forEach(el => {

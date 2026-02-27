@@ -344,6 +344,12 @@ export class AspectsofPowerItemSheet extends foundry.applications.api.Handlebars
     await this.document.update({ 'system.statBonuses': statBonuses, 'system.augments': augments });
   }
 
+  /** @override – save scroll position before DOM replacement. */
+  _preRender(context, options) {
+    this._savedScrollTop = this.element?.querySelector('.sheet-body')?.scrollTop ?? 0;
+    return super._preRender(context, options);
+  }
+
   /** @override */
   _onRender(context, options) {
     super._onRender(context, options);
@@ -355,6 +361,11 @@ export class AspectsofPowerItemSheet extends foundry.applications.api.Handlebars
     const initial = this.tabGroups.primary ?? 'description';
     new foundry.applications.ux.Tabs({ navSelector: '.sheet-tabs', contentSelector: '.sheet-body', initial })
       .bind(this.element);
+
+    // Restore scroll AFTER Tabs.bind() — Tabs changes layout (shows/hides tabs)
+    // which can reset scroll position.
+    const body = this.element?.querySelector('.sheet-body');
+    if (body && this._savedScrollTop) body.scrollTop = this._savedScrollTop;
 
     // Keep tabGroups in sync when the user clicks a tab.
     this.element.querySelectorAll('.sheet-tabs .item').forEach(el => {
