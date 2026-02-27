@@ -260,13 +260,11 @@
 .aspects-of-power .sheet-body {
   flex: 1;
   min-height: 0;
-  display: flex;
-  flex-direction: column;
+  overflow-y: auto;
 }
 .aspects-of-power .sheet-body .tab {
   flex: 1;
   min-height: 0;
-  overflow-y: auto;
 }
 /* Skill tag UI */
 .aspects-of-power .skill-tags {
