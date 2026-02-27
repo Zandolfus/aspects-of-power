@@ -84,6 +84,7 @@ export class LevelUpDialog extends foundry.applications.api.HandlebarsApplicatio
       context.totalFreePoints = (sys.freePoints ?? 0) + (sel?.freePointsGained ?? 0);
       context.allocatedPoints = Object.values(this.allocation).reduce((s, v) => s + v, 0);
       context.remainingPoints = context.totalFreePoints - context.allocatedPoints;
+      context.allPointsAllocated = context.remainingPoints === 0;
 
       // Build stat gain rows for the preview table.
       context.gainRows = abilityKeys.map(key => {
@@ -169,6 +170,10 @@ export class LevelUpDialog extends foundry.applications.api.HandlebarsApplicatio
     const allocated = Object.values(this.allocation).reduce((s, v) => s + v, 0);
     if (allocated > totalFree) {
       ui.notifications.warn('Too many free points allocated!');
+      return;
+    }
+    if (allocated < totalFree) {
+      ui.notifications.warn('You must allocate all free points before confirming.');
       return;
     }
 

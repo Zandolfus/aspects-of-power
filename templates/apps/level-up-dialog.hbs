@@ -69,7 +69,7 @@
 
       <div class="level-up-actions flexrow">
         <button type="button" class="level-up-back">{{localize "ASPECTSOFPOWER.Level.back"}}</button>
-        <button type="button" class="level-up-confirm" {{#if (lt remainingPoints 0)}}disabled{{/if}}>
+        <button type="button" class="level-up-confirm" {{#unless allPointsAllocated}}disabled{{/unless}}>
           {{localize "ASPECTSOFPOWER.Level.confirm"}}
         </button>
       </div>
