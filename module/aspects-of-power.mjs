@@ -110,6 +110,47 @@ Handlebars.registerHelper('includes', function (array, value) {
 });
 
 /* -------------------------------------------- */
+/*  Compendium — Auto-type Create Button        */
+/* -------------------------------------------- */
+
+/**
+ * Override the "Create Entry" button in our template compendiums so it
+ * creates the correct item type (race/class/profession) without showing
+ * the generic type-selection dialog.
+ */
+Hooks.on('renderCompendium', (app, html) => {
+  const el = html instanceof HTMLElement ? html : html[0];
+  if (!el) return;
+
+  const packId = app.collection?.collection;
+  if (!packId) return;
+
+  const typeMap = {
+    'aspects-of-power.races': 'race',
+    'aspects-of-power.classes': 'class',
+    'aspects-of-power.professions': 'profession',
+  };
+  const itemType = typeMap[packId];
+  if (!itemType) return;
+
+  const btn = el.querySelector('[data-action="createEntry"]') ?? el.querySelector('.create-entry');
+  if (!btn) return;
+
+  // Clone to strip existing listeners, then add our own.
+  const newBtn = btn.cloneNode(true);
+  btn.replaceWith(newBtn);
+  newBtn.addEventListener('click', async (ev) => {
+    ev.preventDefault();
+    const label = game.i18n.localize(CONFIG.ASPECTSOFPOWER.levelTypes[itemType]);
+    const item = await Item.create(
+      { name: `New ${label}`, type: itemType },
+      { pack: packId }
+    );
+    item?.sheet?.render(true);
+  });
+});
+
+/* -------------------------------------------- */
 /*  Ready Hook                                  */
 /* -------------------------------------------- */
 
