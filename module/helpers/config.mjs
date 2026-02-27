@@ -188,3 +188,42 @@ ASPECTSOFPOWER.rarities = {
   mythic:    { label: 'ASPECTSOFPOWER.Equip.Rarity.mythic',    augments: 7, color: '#e6cc80' },
   divine:    { label: 'ASPECTSOFPOWER.Equip.Rarity.divine',    augments: 8, color: '#ff4444' },
 };
+
+/* -------------------------------------------- */
+/*  Rank Tiers & Levelling                       */
+/* -------------------------------------------- */
+
+/**
+ * Rank tiers — maps rank letter to its level range.
+ */
+ASPECTSOFPOWER.rankTiers = {
+  G: { label: 'ASPECTSOFPOWER.Rank.G', min: 0,   max: 9 },
+  F: { label: 'ASPECTSOFPOWER.Rank.F', min: 10,  max: 24 },
+  E: { label: 'ASPECTSOFPOWER.Rank.E', min: 25,  max: 99 },
+  D: { label: 'ASPECTSOFPOWER.Rank.D', min: 100, max: 199 },
+  C: { label: 'ASPECTSOFPOWER.Rank.C', min: 200, max: 299 },
+  B: { label: 'ASPECTSOFPOWER.Rank.B', min: 300, max: 399 },
+  A: { label: 'ASPECTSOFPOWER.Rank.A', min: 400, max: 499 },
+  S: { label: 'ASPECTSOFPOWER.Rank.S', min: 500, max: Infinity },
+};
+
+/**
+ * Determine rank letter from a level value.
+ * @param {number} level
+ * @returns {string}
+ */
+ASPECTSOFPOWER.getRankForLevel = function(level) {
+  for (const [rank, tier] of Object.entries(ASPECTSOFPOWER.rankTiers)) {
+    if (level >= tier.min && level <= tier.max) return rank;
+  }
+  return 'G';
+};
+
+/**
+ * Level type labels for race/class/profession.
+ */
+ASPECTSOFPOWER.levelTypes = {
+  race:       'ASPECTSOFPOWER.Level.race',
+  class:      'ASPECTSOFPOWER.Level.class',
+  profession: 'ASPECTSOFPOWER.Level.profession',
+};

@@ -888,3 +888,163 @@
   margin-top: 4px;
   display: inline-block;
 }
+
+/* -------------------------------------------- */
+/*  Rank Gains (template item sheets)            */
+/* -------------------------------------------- */
+
+.aspects-of-power .rank-tier-section {
+  margin-bottom: 12px;
+  padding: 6px;
+  border: 1px solid #444;
+  border-radius: 4px;
+}
+.aspects-of-power .rank-tier-header {
+  margin: 0 0 6px 0;
+  font-size: 14px;
+}
+.aspects-of-power .rank-tier-header .tier-range {
+  font-weight: normal;
+  font-size: 12px;
+  color: #888;
+}
+.aspects-of-power .rank-gains-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+.aspects-of-power .rank-gain-field {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  flex: 1 1 0;
+  min-width: 42px;
+}
+.aspects-of-power .rank-gain-field label {
+  font-size: 10px;
+  white-space: nowrap;
+}
+.aspects-of-power .rank-gain-field input {
+  width: 42px;
+  text-align: center;
+}
+.aspects-of-power .free-points-field input {
+  border-color: #4488ff;
+}
+
+/* -------------------------------------------- */
+/*  Level-Up Dialog                              */
+/* -------------------------------------------- */
+
+.level-up-dialog {
+  padding: 8px;
+}
+.level-up-dialog .level-type-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 8px 0;
+}
+.level-up-dialog .level-type-option {
+  padding: 8px;
+  border: 1px solid #555;
+  border-radius: 4px;
+  cursor: pointer;
+}
+.level-up-dialog .level-type-option:hover:not(.disabled) {
+  border-color: #4488ff;
+  background: rgba(68, 136, 255, 0.1);
+}
+.level-up-dialog .level-type-option.disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.level-up-dialog .level-type-select {
+  cursor: pointer;
+  margin: 0;
+}
+.level-up-dialog .level-type-select.no-click {
+  cursor: not-allowed;
+}
+.level-up-dialog .level-type-detail {
+  font-size: 12px;
+  color: #888;
+}
+.level-up-dialog .rank-change-notice {
+  padding: 6px;
+  margin: 6px 0;
+  background: rgba(255, 200, 0, 0.15);
+  border: 1px solid #cc9900;
+  border-radius: 4px;
+  text-align: center;
+}
+.level-up-dialog .stat-gains-table {
+  margin: 8px 0;
+}
+.level-up-dialog .gains-header {
+  font-weight: bold;
+  font-size: 12px;
+  border-bottom: 1px solid #555;
+  padding-bottom: 4px;
+  margin-bottom: 4px;
+}
+.level-up-dialog .gains-row {
+  padding: 2px 0;
+  align-items: center;
+}
+.level-up-dialog .gains-col-name {
+  flex: 2;
+}
+.level-up-dialog .gains-col {
+  flex: 1;
+  text-align: center;
+}
+.level-up-dialog .gains-col .free-point-input {
+  width: 42px;
+  text-align: center;
+}
+.level-up-dialog .gains-total {
+  font-weight: bold;
+}
+.level-up-dialog .free-points-summary {
+  gap: 12px;
+  margin: 8px 0;
+  font-size: 13px;
+  justify-content: center;
+}
+.level-up-dialog .level-up-actions {
+  gap: 8px;
+  margin-top: 8px;
+  justify-content: flex-end;
+}
+.level-up-dialog .level-up-confirm:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* -------------------------------------------- */
+/*  Template selectors on actor sheet            */
+/* -------------------------------------------- */
+
+.aspects-of-power .template-select {
+  flex: 1;
+  max-width: 140px;
+}
+.aspects-of-power .level-up-btn {
+  width: 100%;
+  cursor: pointer;
+}
+.aspects-of-power .free-points-badge {
+  font-size: 11px;
+  color: #4488ff;
+  margin-top: 2px;
+}
+.aspects-of-power .free-points-display {
+  margin: 8px 0;
+}
+
+/* Template Grant — Use button in inventory */
+.aspects-of-power .use-grant-item {
+  cursor: pointer;
+  color: #44ff44;
+}

@@ -31,15 +31,12 @@ export class AspectsofPowerActor extends Actor {
     const actorData = this;
     const systemData = actorData.system;
 
-    // --- Race rank ---
-    if (systemData.attributes.race.level <= 9)
-      systemData.attributes.race.rank = "G";
-    else if (systemData.attributes.race.level <= 24)
-      systemData.attributes.race.rank = "F";
-    else if (systemData.attributes.race.level <= 99)
-      systemData.attributes.race.rank = "E";
-    else if (systemData.attributes.race.level <= 199)
-      systemData.attributes.race.rank = "D";
+    // --- Rank derivation for all attribute types ---
+    for (const type of ['race', 'class', 'profession']) {
+      if (systemData.attributes[type]) {
+        systemData.attributes[type].rank = CONFIG.ASPECTSOFPOWER.getRankForLevel(systemData.attributes[type].level);
+      }
+    }
 
     // Sigmoid modifier formula.
     const sigmoidMod = (value, key) => {

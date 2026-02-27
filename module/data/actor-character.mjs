@@ -25,19 +25,26 @@ export class CharacterData extends foundry.abstract.TypeDataModel {
 
       attributes: new fields.SchemaField({
         class: new fields.SchemaField({
-          level: new fields.NumberField({ initial: 1, min: 0, integer: true }),
-          name:  new fields.StringField({ initial: 'Uninitiated' }),
+          level:      new fields.NumberField({ initial: 1, min: 0, integer: true }),
+          name:       new fields.StringField({ initial: 'Uninitiated' }),
+          templateId: new fields.StringField({ initial: '' }),
+          rank:       new fields.StringField({ initial: 'G' }),
         }),
         race: new fields.SchemaField({
-          level: new fields.NumberField({ initial: 0, min: 0, integer: true }),
-          name:  new fields.StringField({ initial: 'Human' }),
-          rank:  new fields.StringField({ initial: 'G' }),
+          level:      new fields.NumberField({ initial: 0, min: 0, integer: true }),
+          name:       new fields.StringField({ initial: 'Human' }),
+          templateId: new fields.StringField({ initial: '' }),
+          rank:       new fields.StringField({ initial: 'G' }),
         }),
         profession: new fields.SchemaField({
-          level: new fields.NumberField({ initial: 0, min: 0, integer: true }),
-          name:  new fields.StringField({ initial: 'Uninitiated' }),
+          level:      new fields.NumberField({ initial: 0, min: 0, integer: true }),
+          name:       new fields.StringField({ initial: 'Uninitiated' }),
+          templateId: new fields.StringField({ initial: '' }),
+          rank:       new fields.StringField({ initial: 'G' }),
         }),
       }),
+
+      freePoints: new fields.NumberField({ initial: 0, min: 0, integer: true }),
 
       abilities: new fields.SchemaField({
         vitality:     abilitySchema(),

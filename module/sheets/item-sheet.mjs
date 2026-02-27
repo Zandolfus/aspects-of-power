@@ -21,9 +21,13 @@ export class AspectsofPowerItemSheet extends foundry.applications.api.Handlebars
 
   // Each item type maps to its own template file.
   static PARTS = {
-    item:    { template: 'systems/aspects-of-power/templates/item/item-item-sheet.hbs' },
-    feature: { template: 'systems/aspects-of-power/templates/item/item-feature-sheet.hbs' },
-    skill:   { template: 'systems/aspects-of-power/templates/item/item-skill-sheet.hbs' },
+    item:          { template: 'systems/aspects-of-power/templates/item/item-item-sheet.hbs' },
+    feature:       { template: 'systems/aspects-of-power/templates/item/item-feature-sheet.hbs' },
+    skill:         { template: 'systems/aspects-of-power/templates/item/item-skill-sheet.hbs' },
+    race:          { template: 'systems/aspects-of-power/templates/item/item-race-sheet.hbs' },
+    class:         { template: 'systems/aspects-of-power/templates/item/item-class-sheet.hbs' },
+    profession:    { template: 'systems/aspects-of-power/templates/item/item-profession-sheet.hbs' },
+    templateGrant: { template: 'systems/aspects-of-power/templates/item/item-template-grant-sheet.hbs' },
   };
 
   /** Render only the part that matches this item's type. */
@@ -100,6 +104,34 @@ export class AspectsofPowerItemSheet extends foundry.applications.api.Handlebars
         skillName: this.item.actor?.items.get(entry.skillId)?.name ?? '(unknown)',
         trigger: entry.trigger,
       }));
+    }
+
+    // Race / Class / Profession template items: build rank gains rows for the sheet.
+    if (['race', 'class', 'profession'].includes(this.item.type)) {
+      const tiers = CONFIG.ASPECTSOFPOWER.rankTiers;
+      const abilityKeys = Object.keys(CONFIG.ASPECTSOFPOWER.abilities);
+      context.rankGainsRows = Object.entries(tiers).map(([tierKey, tierDef]) => ({
+        tierKey,
+        tierLabel: tierKey,
+        tierRange: `${tierDef.min}–${tierDef.max === Infinity ? '+' : tierDef.max}`,
+        freePoints: this.item.system.freePointsPerLevel?.[tierKey] ?? 0,
+        freePointsFieldName: `system.freePointsPerLevel.${tierKey}`,
+        abilities: abilityKeys.map(aKey => ({
+          key: aKey,
+          label: game.i18n.localize(CONFIG.ASPECTSOFPOWER.abilities[aKey]),
+          value: this.item.system.rankGains?.[tierKey]?.[aKey] ?? 0,
+          fieldName: `system.rankGains.${tierKey}.${aKey}`,
+        })),
+      }));
+    }
+
+    // Template Grant items: build list of available templates filtered by grant type.
+    if (this.item.type === 'templateGrant') {
+      const grantType = this.item.system.grantType ?? 'class';
+      context.grantTypeChoices = CONFIG.ASPECTSOFPOWER.levelTypes;
+      context.availableGrantTemplates = game.items
+        .filter(i => i.type === grantType)
+        .map(i => ({ id: i.id, name: i.name }));
     }
 
     return context;

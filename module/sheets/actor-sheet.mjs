@@ -3,6 +3,7 @@ import {
   prepareActiveEffectCategories,
 } from '../helpers/effects.mjs';
 import { EquipmentSystem } from '../systems/equipment.mjs';
+import { LevelUpDialog } from '../apps/level-up-dialog.mjs';
 
 /**
  * Extend ActorSheetV2 with Aspects of Power-specific behaviour.
@@ -77,6 +78,25 @@ export class AspectsofPowerActorSheet extends foundry.applications.api.Handlebar
    */
   _prepareCharacterData(context) {
     context.statsSummary = context.system.statsSummary;
+
+    // Levelling: template references and available templates for dropdowns.
+    const types = ['race', 'class', 'profession'];
+    context.templateRefs = {};
+    context.availableTemplates = {};
+    for (const type of types) {
+      const attr = context.system.attributes[type];
+      const templateItem = attr.templateId ? game.items.get(attr.templateId) : null;
+      context.templateRefs[type] = {
+        templateId: attr.templateId,
+        templateName: templateItem?.name ?? '',
+        hasTemplate: !!templateItem,
+      };
+      context.availableTemplates[type] = game.items
+        .filter(i => i.type === type)
+        .map(i => ({ id: i.id, name: i.name }));
+    }
+    context.freePoints = context.system.freePoints ?? 0;
+    context.isGM = game.user.isGM;
   }
 
   /**
@@ -84,9 +104,10 @@ export class AspectsofPowerActorSheet extends foundry.applications.api.Handlebar
    * @param {object} context The context object to mutate
    */
   _prepareItems(context) {
-    const gear     = [];
-    const features = [];
-    const skills   = { Active: [], Passive: [] };
+    const gear           = [];
+    const features       = [];
+    const skills         = { Active: [], Passive: [] };
+    const templateGrants = [];
 
     for (const i of context.items) {
       i.img = i.img || Item.DEFAULT_ICON;
@@ -103,12 +124,18 @@ export class AspectsofPowerActorSheet extends foundry.applications.api.Handlebar
         if (i.system.skillType !== undefined) {
           skills[i.system.skillType].push(i);
         }
+      } else if (i.type === 'templateGrant') {
+        const templateItem = i.system.templateId ? game.items.get(i.system.templateId) : null;
+        i.grantTemplateLabel = templateItem?.name ?? '(none)';
+        i.grantTypeLabel = game.i18n.localize(CONFIG.ASPECTSOFPOWER.levelTypes[i.system.grantType] ?? 'class');
+        templateGrants.push(i);
       }
     }
 
-    context.gear     = gear;
-    context.features = features;
-    context.skills   = skills;
+    context.gear           = gear;
+    context.features       = features;
+    context.skills         = skills;
+    context.templateGrants = templateGrants;
 
     // Equipment slot summary for the Equipment tab.
     context.equipmentSlots = {};
@@ -262,6 +289,56 @@ export class AspectsofPowerActorSheet extends foundry.applications.api.Handlebar
           return;
         }
         await EquipmentSystem.repair(item, kit);
+      });
+    });
+
+    // Level Up button — opens the level-up dialog (all players).
+    this.element.querySelector('.level-up-btn')?.addEventListener('click', () => {
+      new LevelUpDialog(this.actor).render(true);
+    });
+
+    // Template selector dropdowns (GM only).
+    this.element.querySelectorAll('.template-select').forEach(el => {
+      el.addEventListener('change', async () => {
+        const type = el.dataset.type;
+        const templateId = el.value;
+        const templateItem = templateId ? game.items.get(templateId) : null;
+        const updates = {
+          [`system.attributes.${type}.templateId`]: templateId,
+        };
+        if (templateItem) {
+          updates[`system.attributes.${type}.name`] = templateItem.name;
+        }
+        await this.document.update(updates);
+      });
+    });
+
+    // Use template grant item (consume it).
+    this.element.querySelectorAll('.use-grant-item').forEach(el => {
+      el.addEventListener('click', async () => {
+        const itemId = el.closest('.item')?.dataset.itemId;
+        const grantItem = this.actor.items.get(itemId);
+        if (!grantItem || grantItem.type !== 'templateGrant') return;
+
+        const grantType = grantItem.system.grantType;
+        const templateId = grantItem.system.templateId;
+        const templateItem = templateId ? game.items.get(templateId) : null;
+        if (!templateItem) {
+          ui.notifications.warn(game.i18n.localize('ASPECTSOFPOWER.Level.noTemplate'));
+          return;
+        }
+
+        await this.actor.update({
+          [`system.attributes.${grantType}.templateId`]: templateId,
+          [`system.attributes.${grantType}.name`]: templateItem.name,
+        });
+        await grantItem.delete();
+
+        const typeLabel = game.i18n.localize(CONFIG.ASPECTSOFPOWER.levelTypes[grantType]);
+        ChatMessage.create({
+          speaker: ChatMessage.getSpeaker({ actor: this.actor }),
+          content: `<p><strong>${this.actor.name}</strong> ${game.i18n.localize('ASPECTSOFPOWER.Level.grantConsumed')} ${typeLabel}: <strong>${templateItem.name}</strong></p>`,
+        });
       });
     });
 

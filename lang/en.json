@@ -135,6 +135,41 @@
       "onHit": "On Hit",
       "onMiss": "On Miss"
     },
+    "Rank": {
+      "G": "G",
+      "F": "F",
+      "E": "E",
+      "D": "D",
+      "C": "C",
+      "B": "B",
+      "A": "A",
+      "S": "S"
+    },
+    "Level": {
+      "race": "Race",
+      "class": "Class",
+      "profession": "Profession",
+      "levelUp": "Level Up",
+      "dialogTitle": "Level Up",
+      "chooseType": "Choose Level Type",
+      "statGains": "Stat Gains",
+      "freePoints": "Free Points",
+      "freePointsPerLevel": "Free Points / Level",
+      "currentFreePoints": "Current Free Points",
+      "available": "Available",
+      "allocated": "Allocated",
+      "remaining": "Remaining",
+      "confirm": "Confirm Level Up",
+      "back": "Back",
+      "noTemplate": "No template assigned",
+      "rankBreakpoint": "Rank Up!",
+      "rankBreakpointNotice": "Your GM may assign a new template at this rank.",
+      "template": "Template",
+      "free": "Free",
+      "total": "Total",
+      "useGrant": "Use",
+      "grantConsumed": "gained"
+    },
     "Equip": {
       "tabLabel": "Equipment",
       "equip": "Equip",
@@ -198,7 +233,11 @@
     "Item": {
       "item": "Item",
       "feature": "Feature",
-      "skill": "Skill"
+      "skill": "Skill",
+      "race": "Race",
+      "class": "Class",
+      "profession": "Profession",
+      "templateGrant": "Template Grant"
     }
   }
 }

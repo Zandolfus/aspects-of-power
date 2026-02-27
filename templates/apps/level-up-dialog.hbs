@@ -1,0 +1,78 @@
+<div class="level-up-dialog flexcol">
+
+  {{#unless selectedType}}
+    {{!-- Step 1: Choose level type --}}
+    <h2>{{localize "ASPECTSOFPOWER.Level.chooseType"}}</h2>
+
+    <div class="level-type-list">
+      {{#each types as |t|}}
+        <div class="level-type-option flexrow {{#unless t.hasTemplate}}disabled{{/unless}}">
+          <div class="level-type-info">
+            <h3 class="level-type-select {{#unless t.hasTemplate}}no-click{{/unless}}"
+                {{#if t.hasTemplate}}data-type="{{t.type}}"{{/if}}>
+              {{t.label}}
+            </h3>
+            <span class="level-type-detail">
+              Level {{t.currentLevel}} (Rank {{t.currentRank}}) &mdash; {{t.templateName}}
+            </span>
+          </div>
+        </div>
+      {{/each}}
+    </div>
+
+    {{#if (gt currentFreePoints 0)}}
+      <p class="free-points-display">
+        {{localize "ASPECTSOFPOWER.Level.currentFreePoints"}}: <strong>{{currentFreePoints}}</strong>
+      </p>
+    {{/if}}
+
+  {{else}}
+    {{!-- Step 2: Preview + Allocate --}}
+    <div class="level-up-preview">
+      <h2>{{selectedTypeData.label}}: Level {{selectedTypeData.currentLevel}} &rarr; {{selectedTypeData.nextLevel}}</h2>
+
+      {{#if selectedTypeData.rankChanged}}
+        <div class="rank-change-notice">
+          <strong>{{localize "ASPECTSOFPOWER.Level.rankBreakpoint"}}</strong>
+          {{selectedTypeData.currentRank}} &rarr; {{selectedTypeData.nextRank}}
+          <br>
+          <em>{{localize "ASPECTSOFPOWER.Level.rankBreakpointNotice"}}</em>
+        </div>
+      {{/if}}
+
+      <h3>{{localize "ASPECTSOFPOWER.Level.statGains"}}</h3>
+      <div class="stat-gains-table">
+        <div class="gains-header flexrow">
+          <span class="gains-col-name">Ability</span>
+          <span class="gains-col">{{localize "ASPECTSOFPOWER.Level.template"}}</span>
+          <span class="gains-col">{{localize "ASPECTSOFPOWER.Level.free"}}</span>
+          <span class="gains-col">{{localize "ASPECTSOFPOWER.Level.total"}}</span>
+        </div>
+        {{#each gainRows as |row|}}
+          <div class="gains-row flexrow">
+            <span class="gains-col-name">{{row.label}}</span>
+            <span class="gains-col">+{{row.templateGain}}</span>
+            <span class="gains-col">
+              <input type="number" class="free-point-input" data-ability="{{row.key}}"
+                     value="{{row.freeGain}}" min="0" />
+            </span>
+            <span class="gains-col gains-total">+{{row.total}}</span>
+          </div>
+        {{/each}}
+      </div>
+
+      <div class="free-points-summary flexrow">
+        <span>{{localize "ASPECTSOFPOWER.Level.available"}}: {{totalFreePoints}}</span>
+        <span>{{localize "ASPECTSOFPOWER.Level.allocated"}}: {{allocatedPoints}}</span>
+        <span>{{localize "ASPECTSOFPOWER.Level.remaining"}}: {{remainingPoints}}</span>
+      </div>
+
+      <div class="level-up-actions flexrow">
+        <button type="button" class="level-up-back">{{localize "ASPECTSOFPOWER.Level.back"}}</button>
+        <button type="button" class="level-up-confirm" {{#if (lt remainingPoints 0)}}disabled{{/if}}>
+          {{localize "ASPECTSOFPOWER.Level.confirm"}}
+        </button>
+      </div>
+    </div>
+  {{/unless}}
+</div>

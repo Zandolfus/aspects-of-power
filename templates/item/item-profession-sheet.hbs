@@ -1,0 +1,52 @@
+<form class="{{cssClass}} profession flexcol" autocomplete="off">
+
+  {{!-- Header --}}
+  <header class="sheet-header flexrow">
+    <img class="profile-img" src="{{item.img}}" data-edit="img" title="{{item.name}}" height="100" width="100"/>
+    <div class="header-fields">
+      <h1 class="charname"><input name="name" type="text" value="{{item.name}}" placeholder="Profession Name"/></h1>
+    </div>
+  </header>
+
+  {{!-- Tabs --}}
+  <nav class="sheet-tabs tabs" data-group="primary">
+    <a class="item" data-tab="description">Description</a>
+    <a class="item" data-tab="rankGains">Rank Gains</a>
+    <a class="item" data-tab="effects">Effects</a>
+  </nav>
+
+  <section class="sheet-body">
+    {{!-- Description --}}
+    <div class="tab description" data-group="primary" data-tab="description">
+      <prose-mirror name="system.description" value="{{system.description}}" compact>
+        {{{enrichedDescription}}}
+      </prose-mirror>
+    </div>
+
+    {{!-- Rank Gains --}}
+    <div class="tab rank-gains" data-group="primary" data-tab="rankGains">
+      {{#each rankGainsRows as |tier|}}
+        <div class="rank-tier-section">
+          <h3 class="rank-tier-header">Rank {{tier.tierLabel}} <span class="tier-range">(Levels {{tier.tierRange}})</span></h3>
+          <div class="rank-gains-row flexrow">
+            {{#each tier.abilities as |ab|}}
+              <div class="rank-gain-field">
+                <label>{{ab.label}}</label>
+                <input type="number" name="{{ab.fieldName}}" value="{{ab.value}}" />
+              </div>
+            {{/each}}
+            <div class="rank-gain-field free-points-field">
+              <label>Free Pts</label>
+              <input type="number" name="{{tier.freePointsFieldName}}" value="{{tier.freePoints}}" min="0" />
+            </div>
+          </div>
+        </div>
+      {{/each}}
+    </div>
+
+    {{!-- Effects --}}
+    <div class="tab effects flexcol" data-group="primary" data-tab="effects">
+      {{> "systems/aspects-of-power/templates/actor/parts/actor-effects.hbs"}}
+    </div>
+  </section>
+</form>
