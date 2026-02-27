@@ -36,7 +36,7 @@ export class LevelUpDialog extends foundry.applications.api.HandlebarsApplicatio
     context.actor = this.actor;
     context.types = types.map(type => {
       const attr = sys.attributes[type];
-      const templateItem = attr.templateId ? game.items.get(attr.templateId) : null;
+      const templateItem = attr.templateId ? fromUuidSync(attr.templateId) : null;
       const currentRank = CONFIG.ASPECTSOFPOWER.getRankForLevel(attr.level);
       const nextLevel = attr.level + 1;
       const nextRank = CONFIG.ASPECTSOFPOWER.getRankForLevel(nextLevel);
@@ -139,7 +139,7 @@ export class LevelUpDialog extends foundry.applications.api.HandlebarsApplicatio
 
     const sys = this.actor.system;
     const attr = sys.attributes[this.selectedType];
-    const templateItem = attr.templateId ? game.items.get(attr.templateId) : null;
+    const templateItem = attr.templateId ? fromUuidSync(attr.templateId) : null;
     if (!templateItem) {
       ui.notifications.warn(game.i18n.localize('ASPECTSOFPOWER.Level.noTemplate'));
       return;

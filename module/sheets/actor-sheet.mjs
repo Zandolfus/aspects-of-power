@@ -79,12 +79,12 @@ export class AspectsofPowerActorSheet extends foundry.applications.api.Handlebar
   _prepareCharacterData(context) {
     context.statsSummary = context.system.statsSummary;
 
-    // Levelling: template references (resolved from stored templateId).
+    // Levelling: template references (resolved from stored UUID).
     const types = ['race', 'class', 'profession'];
     context.templateRefs = {};
     for (const type of types) {
       const attr = context.system.attributes[type];
-      const templateItem = attr.templateId ? game.items.get(attr.templateId) : null;
+      const templateItem = attr.templateId ? fromUuidSync(attr.templateId) : null;
       context.templateRefs[type] = {
         templateId: attr.templateId,
         templateName: templateItem?.name ?? '',
@@ -288,9 +288,9 @@ export class AspectsofPowerActorSheet extends foundry.applications.api.Handlebar
 
     // Template link — click to open the source template item sheet.
     this.element.querySelectorAll('.template-link').forEach(el => {
-      el.addEventListener('click', () => {
-        const templateId = el.dataset.templateId;
-        const item = game.items.get(templateId);
+      el.addEventListener('click', async () => {
+        const uuid = el.dataset.templateId;
+        const item = await fromUuid(uuid);
         if (item) item.sheet.render(true);
       });
     });
@@ -358,8 +358,9 @@ export class AspectsofPowerActorSheet extends foundry.applications.api.Handlebar
         return;
       }
       const type = item.type;
+      // Store the UUID so both world items and compendium items work.
       await this.actor.update({
-        [`system.attributes.${type}.templateId`]: item.id,
+        [`system.attributes.${type}.templateId`]: item.uuid,
         [`system.attributes.${type}.name`]: item.name,
       });
       const typeLabel = game.i18n.localize(CONFIG.ASPECTSOFPOWER.levelTypes[type]);

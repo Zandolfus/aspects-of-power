@@ -46,7 +46,26 @@
       "path": "lang/en.json"
     }
   ],
-  "packs": [],
+  "packs": [
+    {
+      "name": "races",
+      "label": "Races",
+      "type": "Item",
+      "path": "packs/races"
+    },
+    {
+      "name": "classes",
+      "label": "Classes",
+      "type": "Item",
+      "path": "packs/classes"
+    },
+    {
+      "name": "professions",
+      "label": "Professions",
+      "type": "Item",
+      "path": "packs/professions"
+    }
+  ],
   "packFolders": [],
   "socket": true,
   "manifest": "Replace this with a link to the /latest release system.json so people can receive updates after they've installed the system",
