@@ -49,6 +49,35 @@
           {{/each}}
         </div>
       </div>
+
+      <div class="equip-section">
+        <div class="equip-section-header flexrow">
+          <h4>{{localize "ASPECTSOFPOWER.Augment.itemBonuses"}}</h4>
+          <a class="item-bonus-add" title="Add Item Bonus"><i class="fas fa-plus"></i></a>
+        </div>
+        <div class="item-bonus-list">
+          {{#each system.itemBonuses as |bonus idx|}}
+            <div class="item-bonus-row flexrow" data-index="{{idx}}">
+              <select class="item-bonus-field" data-index="{{idx}}">
+                {{#each @root.itemBonusFields as |label fKey|}}
+                  <option value="{{fKey}}" {{#if (eq fKey bonus.field)}}selected{{/if}}>
+                    {{label}}
+                  </option>
+                {{/each}}
+              </select>
+              <input type="number" class="item-bonus-value" data-index="{{idx}}"
+                     value="{{bonus.value}}" step="any" />
+              <select class="item-bonus-mode" data-index="{{idx}}">
+                <option value="percentage" {{#if (eq bonus.mode "percentage")}}selected{{/if}}>%</option>
+                <option value="flat" {{#if (eq bonus.mode "flat")}}selected{{/if}}>Flat</option>
+              </select>
+              <a class="item-bonus-delete" data-index="{{idx}}" title="Remove">
+                <i class="fas fa-trash"></i>
+              </a>
+            </div>
+          {{/each}}
+        </div>
+      </div>
     </div>
 
     {{! Effects Tab }}

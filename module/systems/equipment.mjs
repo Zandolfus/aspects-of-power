@@ -113,11 +113,16 @@ export class EquipmentSystem {
       });
     }
 
-    // Slotted augment bonuses.
+    // Slotted augment stat bonuses + collect item bonuses.
+    let augArmorFlat = 0, augArmorPct = 0;
+    let augVeilFlat = 0, augVeilPct = 0;
+
     for (const augEntry of (item.system.augments ?? [])) {
       if (!augEntry.augmentId) continue;
       const augItem = actor.items.get(augEntry.augmentId);
       if (!augItem || augItem.type !== 'augment') continue;
+
+      // Actor stat bonuses from augment.
       for (const bonus of (augItem.system.statBonuses ?? [])) {
         if (!bonus.ability || !bonus.value) continue;
         changes.push({
@@ -127,22 +132,39 @@ export class EquipmentSystem {
           priority: 20,
         });
       }
+
+      // Item-specific bonuses — modify the host item's armor/veil.
+      for (const ib of (augItem.system.itemBonuses ?? [])) {
+        if (!ib.field || !ib.value) continue;
+        if (ib.field === 'armorBonus') {
+          if (ib.mode === 'percentage') augArmorPct += ib.value;
+          else augArmorFlat += ib.value;
+        } else if (ib.field === 'veilBonus') {
+          if (ib.mode === 'percentage') augVeilPct += ib.value;
+          else augVeilFlat += ib.value;
+        }
+      }
     }
 
-    if (item.system.armorBonus > 0) {
+    // Calculate effective armor/veil with augment item bonuses applied.
+    const baseArmor = item.system.armorBonus ?? 0;
+    const effectiveArmor = Math.round(baseArmor * (1 + augArmorPct / 100) + augArmorFlat);
+    if (effectiveArmor > 0) {
       changes.push({
         key: 'system.defense.armor.value',
         mode: 2,
-        value: String(item.system.armorBonus),
+        value: String(effectiveArmor),
         priority: 20,
       });
     }
 
-    if (item.system.veilBonus > 0) {
+    const baseVeil = item.system.veilBonus ?? 0;
+    const effectiveVeil = Math.round(baseVeil * (1 + augVeilPct / 100) + augVeilFlat);
+    if (effectiveVeil > 0) {
       changes.push({
         key: 'system.defense.veil.value',
         mode: 2,
-        value: String(item.system.veilBonus),
+        value: String(effectiveVeil),
         priority: 20,
       });
     }
@@ -404,8 +426,8 @@ export class EquipmentSystem {
       return;
     }
 
-    // An augment item's stat bonuses changed — re-sync any equipped gear referencing it.
-    if (item.type === 'augment' && sys.statBonuses && item.parent) {
+    // An augment item's bonuses changed — re-sync any equipped gear referencing it.
+    if (item.type === 'augment' && (sys.statBonuses || sys.itemBonuses) && item.parent) {
       for (const equip of item.parent.items) {
         if (equip.type !== 'item' || !equip.system.equipped) continue;
         if ((equip.system.augments ?? []).some(a => a.augmentId === item.id)) {

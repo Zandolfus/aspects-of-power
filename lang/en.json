@@ -223,6 +223,11 @@
         "mythic": "Mythic",
         "divine": "Divine"
       }
+    },
+    "Augment": {
+      "itemBonuses": "Item Bonuses",
+      "fieldArmor": "Armor",
+      "fieldVeil": "Veil"
     }
   },
 
@@ -237,7 +242,8 @@
       "skill": "Skill",
       "race": "Race",
       "class": "Class",
-      "profession": "Profession"
+      "profession": "Profession",
+      "augment": "Augment"
     }
   }
 }

@@ -847,6 +847,25 @@
   cursor: pointer;
   color: #888;
 }
+.aspects-of-power .item-bonus-row {
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 4px;
+}
+.aspects-of-power .item-bonus-row select {
+  flex: 1;
+}
+.aspects-of-power .item-bonus-row .item-bonus-value {
+  width: 56px;
+  text-align: center;
+}
+.aspects-of-power .item-bonus-row .item-bonus-mode {
+  width: 56px;
+}
+.aspects-of-power .item-bonus-row a {
+  cursor: pointer;
+  color: #888;
+}
 .aspects-of-power .augment-slot {
   gap: 6px;
   margin-bottom: 4px;

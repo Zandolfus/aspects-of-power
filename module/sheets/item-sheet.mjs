@@ -62,6 +62,14 @@ export class AspectsofPowerItemSheet extends foundry.applications.api.Handlebars
     context.config  = CONFIG.ASPECTSOFPOWER;
     context.effects = prepareActiveEffectCategories(this.item.effects);
 
+    // Item bonus field labels for augment sheets.
+    if (this.item.type === 'augment') {
+      context.itemBonusFields = {
+        armorBonus: game.i18n.localize('ASPECTSOFPOWER.Augment.fieldArmor'),
+        veilBonus:  game.i18n.localize('ASPECTSOFPOWER.Augment.fieldVeil'),
+      };
+    }
+
     // Prepare augment slot display data for item-type items.
     if (this.item.type === 'item') {
       const slots = this.item.system.augmentSlots ?? 0;
@@ -74,10 +82,18 @@ export class AspectsofPowerItemSheet extends foundry.applications.api.Handlebars
         if (augmentId && this.item.actor) {
           const augItem = this.item.actor.items.get(augmentId);
           if (augItem && augItem.type === 'augment') {
-            const bonuses = (augItem.system.statBonuses ?? [])
+            const statParts = (augItem.system.statBonuses ?? [])
               .filter(b => b.ability && b.value)
-              .map(b => `${game.i18n.localize(CONFIG.ASPECTSOFPOWER.abilities[b.ability])} +${b.value}`)
-              .join(', ');
+              .map(b => `${game.i18n.localize(CONFIG.ASPECTSOFPOWER.abilities[b.ability])} +${b.value}`);
+            const itemParts = (augItem.system.itemBonuses ?? [])
+              .filter(b => b.field && b.value)
+              .map(b => {
+                const label = b.field === 'armorBonus' ? game.i18n.localize('ASPECTSOFPOWER.Augment.fieldArmor')
+                            : game.i18n.localize('ASPECTSOFPOWER.Augment.fieldVeil');
+                const suffix = b.mode === 'percentage' ? '%' : '';
+                return `${label} +${b.value}${suffix}`;
+              });
+            const bonuses = [...statParts, ...itemParts].join(', ');
             slotData = {
               filled: true,
               augmentId: augItem.id,
@@ -303,11 +319,17 @@ export class AspectsofPowerItemSheet extends foundry.applications.api.Handlebars
       }
     }
 
-    // --- Augment item fields: stat bonus changes ---
+    // --- Augment item fields: stat bonus and item bonus changes ---
     if (this.item.type === 'augment') {
       if (event.target?.classList?.contains('stat-bonus-ability')
           || event.target?.classList?.contains('stat-bonus-value')) {
         this._saveEquipmentArrays();
+        return;
+      }
+      if (event.target?.classList?.contains('item-bonus-field')
+          || event.target?.classList?.contains('item-bonus-value')
+          || event.target?.classList?.contains('item-bonus-mode')) {
+        this._saveItemBonuses();
         return;
       }
     }
@@ -359,6 +381,21 @@ export class AspectsofPowerItemSheet extends foundry.applications.api.Handlebars
       statBonuses.push({ ability, value });
     });
     await this.document.update({ 'system.statBonuses': statBonuses });
+  }
+
+  /**
+   * Collect item bonus arrays from the DOM and save them (augment items only).
+   */
+  async _saveItemBonuses() {
+    const form = this.element.querySelector('form');
+    const itemBonuses = [];
+    form.querySelectorAll('.item-bonus-row').forEach(row => {
+      const field = row.querySelector('.item-bonus-field')?.value ?? 'armorBonus';
+      const value = Number(row.querySelector('.item-bonus-value')?.value) || 0;
+      const mode  = row.querySelector('.item-bonus-mode')?.value ?? 'percentage';
+      itemBonuses.push({ field, value, mode });
+    });
+    await this.document.update({ 'system.itemBonuses': itemBonuses });
   }
 
   /** @override – save scroll position before DOM replacement. */
@@ -423,6 +460,21 @@ export class AspectsofPowerItemSheet extends foundry.applications.api.Handlebars
         const bonuses = [...(this.item.system.statBonuses ?? [])];
         bonuses.splice(idx, 1);
         await this.document.update({ 'system.statBonuses': bonuses });
+      });
+    });
+
+    // --- Augment item: Add / Delete item bonus rows ---
+    this.element.querySelector('.item-bonus-add')?.addEventListener('click', async () => {
+      const bonuses = [...(this.item.system.itemBonuses ?? []), { field: 'armorBonus', value: 0, mode: 'percentage' }];
+      await this.document.update({ 'system.itemBonuses': bonuses });
+    });
+
+    this.element.querySelectorAll('.item-bonus-delete').forEach(el => {
+      el.addEventListener('click', async () => {
+        const idx = Number(el.dataset.index);
+        const bonuses = [...(this.item.system.itemBonuses ?? [])];
+        bonuses.splice(idx, 1);
+        await this.document.update({ 'system.itemBonuses': bonuses });
       });
     });
 
