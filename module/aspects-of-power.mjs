@@ -13,6 +13,7 @@ import { SkillData } from './data/item-skill.mjs';
 import { RaceData } from './data/item-race.mjs';
 import { ClassData } from './data/item-class.mjs';
 import { ProfessionData } from './data/item-profession.mjs';
+import { AugmentData } from './data/item-augment.mjs';
 // Import helper/utility classes and constants.
 import { preloadHandlebarsTemplates } from './helpers/templates.mjs';
 import { ASPECTSOFPOWER } from './helpers/config.mjs';
@@ -77,6 +78,7 @@ Hooks.once('init', function () {
     race:          RaceData,
     class:         ClassData,
     profession:    ProfessionData,
+    augment:       AugmentData,
   };
 
   // Register sheet application classes
@@ -129,6 +131,7 @@ Hooks.on('renderCompendium', (app, html) => {
     'aspects-of-power.races': 'race',
     'aspects-of-power.classes': 'class',
     'aspects-of-power.professions': 'profession',
+    'aspects-of-power.augments': 'augment',
   };
   const itemType = typeMap[packId];
   if (!itemType) return;

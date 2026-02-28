@@ -160,15 +160,24 @@
         </div>
 
         {{!-- Augments --}}
-        <div class="equip-section">
+        <div class="equip-section augment-section">
           <h4>{{localize "ASPECTSOFPOWER.Equip.augments"}} ({{system.augmentSlots}})</h4>
           <div class="augment-list">
-            {{#each augmentRows as |aug idx|}}
-              <div class="augment-row flexrow" data-index="{{idx}}">
-                <input type="text" class="augment-name" data-index="{{idx}}"
-                       value="{{aug.name}}" placeholder="Name" />
-                <input type="text" class="augment-bonus" data-index="{{idx}}"
-                       value="{{aug.bonus}}" placeholder="Bonus" />
+            {{#each augmentSlots as |slot idx|}}
+              <div class="augment-slot flexrow {{#if slot.filled}}filled{{else}}empty{{/if}}"
+                   data-index="{{idx}}" data-augment-id="{{slot.augmentId}}">
+                {{#if slot.filled}}
+                  <img class="augment-icon" src="{{slot.img}}" width="24" height="24"/>
+                  <span class="augment-name">{{slot.name}}</span>
+                  <span class="augment-bonuses">{{slot.bonusSummary}}</span>
+                  <a class="augment-remove" data-index="{{idx}}" title="{{localize 'ASPECTSOFPOWER.Equip.augmentRemove'}}">
+                    <i class="fas fa-times"></i>
+                  </a>
+                {{else}}
+                  <span class="augment-empty-slot">
+                    <i class="fas fa-gem"></i> {{localize "ASPECTSOFPOWER.Equip.augmentDrop"}}
+                  </span>
+                {{/if}}
               </div>
             {{/each}}
           </div>

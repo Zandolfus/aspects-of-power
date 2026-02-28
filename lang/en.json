@@ -189,6 +189,8 @@
       "veilBonus": "Veil Bonus",
       "augments": "Augments",
       "augmentSlots": "Augment Slots",
+      "augmentDrop": "Drag augment here",
+      "augmentRemove": "Remove Augment",
       "grantedSkills": "Granted Skills",
       "repairKit": "Repair Kit",
       "repairAmount": "Repair Amount",

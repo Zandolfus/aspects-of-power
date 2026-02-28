@@ -42,8 +42,7 @@ export class ItemItemData extends foundry.abstract.TypeDataModel {
       // Augment slots (auto-set from rarity, but stored for override).
       augmentSlots: new fields.NumberField({ initial: 0, min: 0, integer: true }),
       augments: new fields.ArrayField(new fields.SchemaField({
-        name:  new fields.StringField({ initial: '' }),
-        bonus: new fields.StringField({ initial: '' }),
+        augmentId: new fields.StringField({ initial: '' }),
       }), { initial: [] }),
 
       // Skill IDs this item grants access to when equipped.

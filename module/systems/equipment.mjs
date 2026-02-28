@@ -100,7 +100,7 @@ export class EquipmentSystem {
     if (!item.system.equipped) return;
     if (item.system.durability.value <= 0 && item.system.durability.max > 0) return;
 
-    // Build the changes array from stat bonuses + armor/veil.
+    // Build the changes array from stat bonuses + augment bonuses + armor/veil.
     const changes = [];
 
     for (const bonus of (item.system.statBonuses ?? [])) {
@@ -111,6 +111,22 @@ export class EquipmentSystem {
         value: String(bonus.value),
         priority: 20,
       });
+    }
+
+    // Slotted augment bonuses.
+    for (const augEntry of (item.system.augments ?? [])) {
+      if (!augEntry.augmentId) continue;
+      const augItem = actor.items.get(augEntry.augmentId);
+      if (!augItem || augItem.type !== 'augment') continue;
+      for (const bonus of (augItem.system.statBonuses ?? [])) {
+        if (!bonus.ability || !bonus.value) continue;
+        changes.push({
+          key: `system.abilities.${bonus.ability}.value`,
+          mode: 2,
+          value: String(bonus.value),
+          priority: 20,
+        });
+      }
     }
 
     if (item.system.armorBonus > 0) {
@@ -376,9 +392,26 @@ export class EquipmentSystem {
       return;
     }
 
+    // Augment slots changed on an equipped item — re-sync.
+    if (item.system.equipped && sys.augments) {
+      this._syncEffects(item);
+      return;
+    }
+
     // Stat/defense bonuses changed on an equipped item — re-sync.
     if (item.system.equipped && (sys.statBonuses || sys.armorBonus !== undefined || sys.veilBonus !== undefined)) {
       this._syncEffects(item);
+      return;
+    }
+
+    // An augment item's stat bonuses changed — re-sync any equipped gear referencing it.
+    if (item.type === 'augment' && sys.statBonuses && item.parent) {
+      for (const equip of item.parent.items) {
+        if (equip.type !== 'item' || !equip.system.equipped) continue;
+        if ((equip.system.augments ?? []).some(a => a.augmentId === item.id)) {
+          this._syncEffects(equip);
+        }
+      }
     }
   }
 
@@ -387,9 +420,29 @@ export class EquipmentSystem {
    */
   static _onItemDelete(item, _options, _userId) {
     if (game.userId !== _userId) return;
-    if (!item.parent || item.type !== 'item') return;
-    if (!item.system.equipped) return;
-    this._removeItemEffects(item);
+    if (!item.parent) return;
+
+    // Equipped equipment deleted — remove its effects.
+    if (item.type === 'item' && item.system.equipped) {
+      this._removeItemEffects(item);
+    }
+
+    // Augment deleted — clear it from any equipment that references it.
+    if (item.type === 'augment') {
+      for (const equip of item.parent.items) {
+        if (equip.type !== 'item') continue;
+        const augments = equip.system.augments ?? [];
+        const idx = augments.findIndex(a => a.augmentId === item.id);
+        if (idx >= 0) {
+          const newAugments = [...augments];
+          newAugments[idx] = { augmentId: '' };
+          equip.update({ 'system.augments': newAugments });
+          if (equip.system.equipped) {
+            this._syncEffects(equip);
+          }
+        }
+      }
+    }
   }
 
   /**

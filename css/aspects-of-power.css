@@ -847,16 +847,51 @@
   cursor: pointer;
   color: #888;
 }
-.aspects-of-power .augment-row {
+.aspects-of-power .augment-slot {
   gap: 6px;
   margin-bottom: 4px;
   align-items: center;
+  padding: 4px 6px;
+  border: 1px dashed #555;
+  border-radius: 3px;
+  min-height: 32px;
 }
-.aspects-of-power .augment-row .augment-name {
-  flex: 1;
+.aspects-of-power .augment-slot.filled {
+  border-style: solid;
+  border-color: #888;
+  background: rgba(255, 255, 255, 0.05);
 }
-.aspects-of-power .augment-row .augment-bonus {
+.aspects-of-power .augment-slot.empty {
+  border-color: #444;
+  color: #666;
+}
+.aspects-of-power .augment-slot .augment-icon {
+  flex: 0 0 24px;
+  border: none;
+}
+.aspects-of-power .augment-slot .augment-name {
   flex: 1;
+  font-weight: bold;
+}
+.aspects-of-power .augment-slot .augment-bonuses {
+  flex: 1;
+  color: #aaa;
+  font-size: 11px;
+}
+.aspects-of-power .augment-slot .augment-remove {
+  cursor: pointer;
+  color: #888;
+}
+.aspects-of-power .augment-slot .augment-remove:hover {
+  color: #ff4444;
+}
+.aspects-of-power .augment-slot .augment-empty-slot {
+  color: #666;
+  font-style: italic;
+  font-size: 11px;
+}
+.aspects-of-power .augment-slot .augment-empty-slot i {
+  margin-right: 4px;
 }
 
 /* ============================== */

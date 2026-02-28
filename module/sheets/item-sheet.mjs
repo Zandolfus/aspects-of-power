@@ -27,6 +27,7 @@ export class AspectsofPowerItemSheet extends foundry.applications.api.Handlebars
     race:          { template: 'systems/aspects-of-power/templates/item/item-race-sheet.hbs', scrollable: ['.sheet-body'] },
     class:         { template: 'systems/aspects-of-power/templates/item/item-class-sheet.hbs', scrollable: ['.sheet-body'] },
     profession:    { template: 'systems/aspects-of-power/templates/item/item-profession-sheet.hbs', scrollable: ['.sheet-body'] },
+    augment:       { template: 'systems/aspects-of-power/templates/item/item-augment-sheet.hbs', scrollable: ['.sheet-body'] },
   };
 
   /** Render only the part that matches this item's type. */
@@ -61,13 +62,32 @@ export class AspectsofPowerItemSheet extends foundry.applications.api.Handlebars
     context.config  = CONFIG.ASPECTSOFPOWER;
     context.effects = prepareActiveEffectCategories(this.item.effects);
 
-    // Prepare augment rows for item-type items (pad to augmentSlots count).
+    // Prepare augment slot display data for item-type items.
     if (this.item.type === 'item') {
       const slots = this.item.system.augmentSlots ?? 0;
       const existing = this.item.system.augments ?? [];
-      context.augmentRows = [];
+      context.augmentSlots = [];
       for (let i = 0; i < slots; i++) {
-        context.augmentRows.push(existing[i] ?? { name: '', bonus: '' });
+        const entry = existing[i];
+        const augmentId = entry?.augmentId ?? '';
+        let slotData = { filled: false, augmentId: '', name: '', img: '', bonusSummary: '' };
+        if (augmentId && this.item.actor) {
+          const augItem = this.item.actor.items.get(augmentId);
+          if (augItem && augItem.type === 'augment') {
+            const bonuses = (augItem.system.statBonuses ?? [])
+              .filter(b => b.ability && b.value)
+              .map(b => `${game.i18n.localize(CONFIG.ASPECTSOFPOWER.abilities[b.ability])} +${b.value}`)
+              .join(', ');
+            slotData = {
+              filled: true,
+              augmentId: augItem.id,
+              name: augItem.name,
+              img: augItem.img,
+              bonusSummary: bonuses || '—',
+            };
+          }
+        }
+        context.augmentSlots.push(slotData);
       }
     }
 
@@ -275,11 +295,18 @@ export class AspectsofPowerItemSheet extends foundry.applications.api.Handlebars
         return;
       }
 
-      // Stat bonus or augment fields: collect from DOM.
+      // Stat bonus fields: collect from DOM.
       if (event.target?.classList?.contains('stat-bonus-ability')
-          || event.target?.classList?.contains('stat-bonus-value')
-          || event.target?.classList?.contains('augment-name')
-          || event.target?.classList?.contains('augment-bonus')) {
+          || event.target?.classList?.contains('stat-bonus-value')) {
+        this._saveEquipmentArrays();
+        return;
+      }
+    }
+
+    // --- Augment item fields: stat bonus changes ---
+    if (this.item.type === 'augment') {
+      if (event.target?.classList?.contains('stat-bonus-ability')
+          || event.target?.classList?.contains('stat-bonus-value')) {
         this._saveEquipmentArrays();
         return;
       }
@@ -320,28 +347,18 @@ export class AspectsofPowerItemSheet extends foundry.applications.api.Handlebars
   }
 
   /**
-   * Collect stat bonus and augment arrays from the DOM and save them.
+   * Collect stat bonus arrays from the DOM and save them.
+   * Works for both equipment items and augment items (both have statBonuses).
    */
   async _saveEquipmentArrays() {
     const form = this.element.querySelector('form');
-
-    // Stat bonuses.
     const statBonuses = [];
     form.querySelectorAll('.stat-bonus-row').forEach(row => {
       const ability = row.querySelector('.stat-bonus-ability')?.value ?? 'strength';
       const value = Number(row.querySelector('.stat-bonus-value')?.value) || 0;
       statBonuses.push({ ability, value });
     });
-
-    // Augments.
-    const augments = [];
-    form.querySelectorAll('.augment-row').forEach(row => {
-      const name = row.querySelector('.augment-name')?.value ?? '';
-      const bonus = row.querySelector('.augment-bonus')?.value ?? '';
-      augments.push({ name, bonus });
-    });
-
-    await this.document.update({ 'system.statBonuses': statBonuses, 'system.augments': augments });
+    await this.document.update({ 'system.statBonuses': statBonuses });
   }
 
   /** @override – save scroll position before DOM replacement. */
@@ -409,6 +426,28 @@ export class AspectsofPowerItemSheet extends foundry.applications.api.Handlebars
       });
     });
 
+    // --- Augment drop zone + remove buttons (equipment items) ---
+    if (this.item.type === 'item') {
+      const augSection = this.element.querySelector('.augment-section');
+      if (augSection) {
+        augSection.addEventListener('dragover', ev => {
+          ev.preventDefault();
+          ev.dataTransfer.dropEffect = 'copy';
+        });
+        augSection.addEventListener('drop', this._onDrop.bind(this));
+      }
+      this.element.querySelectorAll('.augment-remove').forEach(el => {
+        el.addEventListener('click', async (ev) => {
+          const idx = Number(ev.currentTarget.dataset.index);
+          const augments = [...(this.item.system.augments ?? [])];
+          if (idx >= 0 && idx < augments.length) {
+            augments[idx] = { augmentId: '' };
+            await this.item.update({ 'system.augments': augments });
+          }
+        });
+      });
+    }
+
     // --- Skill Chaining: Add / Delete chain entries ---
     this.element.querySelector('.chain-add')?.addEventListener('click', async () => {
       const chains = [...(this.item.system.chainedSkills ?? []), { skillId: '', trigger: 'always' }];
@@ -423,5 +462,97 @@ export class AspectsofPowerItemSheet extends foundry.applications.api.Handlebars
         await this.document.update({ 'system.chainedSkills': chains });
       });
     });
+  }
+
+  /* -------------------------------------------- */
+
+  /**
+   * Handle drop events on the item sheet.
+   * Intercepts augment item drops onto equipment item sheets.
+   * @param {DragEvent} event
+   */
+  async _onDrop(event) {
+    if (this.item.type !== 'item') return;
+
+    let data;
+    try {
+      data = JSON.parse(event.dataTransfer?.getData('text/plain') ?? '{}');
+    } catch { return; }
+    if (data?.type !== 'Item') return;
+
+    const droppedItem = await Item.implementation.fromDropData(data);
+    if (!droppedItem || droppedItem.type !== 'augment') return;
+
+    await this._slotAugment(droppedItem, event);
+  }
+
+  /**
+   * Slot an augment item into this equipment item.
+   * If the augment is from a compendium or another source, creates a copy on
+   * the owning actor first.
+   * @param {Item} augmentItem  The augment item to slot.
+   * @param {DragEvent} event   The drop event (used to determine target slot).
+   */
+  async _slotAugment(augmentItem, event) {
+    const actor = this.item.actor;
+    if (!actor) {
+      ui.notifications.warn('Equipment must be owned by an actor to slot augments.');
+      return;
+    }
+
+    const slots = this.item.system.augmentSlots ?? 0;
+    const existing = this.item.system.augments ?? [];
+
+    // Determine target slot index from drop target element.
+    const slotEl = event.target.closest('.augment-slot');
+    let targetIdx = slotEl ? Number(slotEl.dataset.index) : -1;
+
+    // If no specific slot targeted, find the first empty slot.
+    if (targetIdx < 0 || targetIdx >= slots) {
+      targetIdx = -1;
+      for (let i = 0; i < slots; i++) {
+        if (!existing[i]?.augmentId) { targetIdx = i; break; }
+      }
+    } else if (existing[targetIdx]?.augmentId) {
+      ui.notifications.warn('This augment slot is already filled. Remove the existing augment first.');
+      return;
+    }
+
+    if (targetIdx < 0) {
+      ui.notifications.warn('No empty augment slots available.');
+      return;
+    }
+
+    // If the augment is not already owned by this actor, create a copy.
+    let ownedAugment;
+    if (augmentItem.parent?.id === actor.id) {
+      ownedAugment = augmentItem;
+    } else {
+      const created = await actor.createEmbeddedDocuments('Item', [augmentItem.toObject()]);
+      ownedAugment = created[0];
+    }
+
+    // Check if this augment is already slotted in any equipment on this actor.
+    for (const otherItem of actor.items) {
+      if (otherItem.type !== 'item') continue;
+      const otherAugs = otherItem.system.augments ?? [];
+      if (otherAugs.some(a => a.augmentId === ownedAugment.id)) {
+        ui.notifications.warn(`${ownedAugment.name} is already slotted in ${otherItem.name}.`);
+        return;
+      }
+    }
+
+    // Build updated augments array.
+    const newAugments = [];
+    for (let i = 0; i < slots; i++) {
+      if (i === targetIdx) {
+        newAugments.push({ augmentId: ownedAugment.id });
+      } else {
+        newAugments.push(existing[i] ?? { augmentId: '' });
+      }
+    }
+
+    await this.item.update({ 'system.augments': newAugments });
+    ui.notifications.info(`Slotted ${ownedAugment.name} into ${this.item.name}.`);
   }
 }

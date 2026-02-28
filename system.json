@@ -64,6 +64,12 @@
       "label": "Professions",
       "type": "Item",
       "path": "packs/professions"
+    },
+    {
+      "name": "augments",
+      "label": "Augments",
+      "type": "Item",
+      "path": "packs/augments"
     }
   ],
   "packFolders": [],

@@ -1,0 +1,59 @@
+<form class="{{cssClass}} flexcol" autocomplete="off">
+  <header class="sheet-header">
+    <img class="profile-img" src="{{item.img}}" data-edit="img" title="{{item.name}}"/>
+    <div class="header-fields">
+      <h1 class="charname">
+        <input name="name" type="text" value="{{item.name}}" placeholder="Name"/>
+      </h1>
+    </div>
+  </header>
+
+  <nav class="sheet-tabs tabs" data-group="primary">
+    <a class="item" data-tab="description">Description</a>
+    <a class="item" data-tab="stats">Stats</a>
+    <a class="item" data-tab="effects">Effects</a>
+  </nav>
+
+  <section class="sheet-body scrollable" data-scrollable>
+
+    {{! Description Tab }}
+    <div class="tab" data-group="primary" data-tab="description">
+      <prose-mirror name="system.description" value="{{system.description}}" compact>
+        {{{enrichedDescription}}}
+      </prose-mirror>
+    </div>
+
+    {{! Stats Tab }}
+    <div class="tab" data-group="primary" data-tab="stats">
+      <div class="equip-section">
+        <div class="equip-section-header flexrow">
+          <h4>{{localize "ASPECTSOFPOWER.Equip.statBonuses"}}</h4>
+          <a class="stat-bonus-add" title="Add Stat Bonus"><i class="fas fa-plus"></i></a>
+        </div>
+        <div class="stat-bonus-list">
+          {{#each system.statBonuses as |bonus idx|}}
+            <div class="stat-bonus-row flexrow" data-index="{{idx}}">
+              <select class="stat-bonus-ability" data-index="{{idx}}">
+                {{#each @root.config.abilities as |label aKey|}}
+                  <option value="{{aKey}}" {{#if (eq aKey bonus.ability)}}selected{{/if}}>
+                    {{localize label}}
+                  </option>
+                {{/each}}
+              </select>
+              <input type="number" class="stat-bonus-value" data-index="{{idx}}"
+                     value="{{bonus.value}}" />
+              <a class="stat-bonus-delete" data-index="{{idx}}" title="Remove">
+                <i class="fas fa-trash"></i>
+              </a>
+            </div>
+          {{/each}}
+        </div>
+      </div>
+    </div>
+
+    {{! Effects Tab }}
+    <div class="tab effects" data-group="primary" data-tab="effects">
+      {{> "systems/aspects-of-power/templates/item/parts/item-effects.hbs"}}
+    </div>
+  </section>
+</form>
