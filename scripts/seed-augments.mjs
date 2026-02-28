@@ -21,7 +21,7 @@ export async function seed() {
     {
       name: 'Deflection',
       type: 'augment',
-      img: 'icons/magic/defensive/shield-barrier-deflection-blue.webp',
+      img: 'icons/magic/defensive/shield-barrier-blue.webp',
       system: {
         description: '<p><strong>Reaction.</strong> Attempt to deflect a ranged attack flying towards you by warping space. Costs 20 mana. Increases ranged defense by 10%, up to 352.</p>',
         statBonuses: [],
@@ -32,7 +32,7 @@ export async function seed() {
     {
       name: 'Headshot',
       type: 'augment',
-      img: 'icons/skills/ranged/target-bullseye-arrow-glowing.webp',
+      img: 'icons/skills/ranged/arrow-strike-glowing-teal.webp',
       system: {
         description: '<p>Take aim at an enemy and fire a blast of mana at the target. Make a physical ranged attack roll. If you hit, determine if it is a headshot or not.</p><p>If your attack roll is double or more the ranged defense of the target, it is a guaranteed headshot. If it is not double or more, compare the two values and roll a d20. On a 20, it becomes a headshot. For every 5% above the enemy\'s ranged defense, the headshot range increases.</p><p>Deals 500 damage on a normal strike. Deals double damage on a headshot. Costs 50 stored mana.</p>',
         statBonuses: [],
@@ -54,7 +54,7 @@ export async function seed() {
     {
       name: 'Minor Dangersense',
       type: 'augment',
-      img: 'icons/magic/perception/eye-ringed-glow-angry-red.webp',
+      img: 'icons/magic/perception/eye-ringed-glow-angry-small-red.webp',
       system: {
         description: '<p>Alerts the wearer of potential danger. Only works at short ranges.</p>',
         statBonuses: [],
@@ -65,7 +65,7 @@ export async function seed() {
     {
       name: 'Silent Eavesdrop',
       type: 'augment',
-      img: 'icons/magic/perception/ear-runes-glow-blue.webp',
+      img: 'icons/magic/sonic/projectile-sound-rings-wave.webp',
       system: {
         description: '<p>Consumes 20 mana to silently listen to any whisper or quiet conversation within 15 feet, even through thin walls or curtains. Sounds are delivered via magical murmur.</p>',
         statBonuses: [],
@@ -76,7 +76,7 @@ export async function seed() {
     {
       name: 'Flickerstep',
       type: 'augment',
-      img: 'icons/magic/movement/trail-streak-zigzag-blue.webp',
+      img: 'icons/magic/movement/trail-streak-zigzag-teal.webp',
       system: {
         description: '<p><strong>Reaction.</strong> Stores a charge over a day-long period. User can reactively tap into the ring and blink 10ft in any direction. A temporary afterimage is generated at the point of origin.</p>',
         statBonuses: [],
@@ -87,7 +87,7 @@ export async function seed() {
     {
       name: 'Ember Aura',
       type: 'augment',
-      img: 'icons/magic/fire/flame-burning-hand-orange.webp',
+      img: 'icons/magic/fire/flame-burning-yellow-orange.webp',
       system: {
         description: '<p>The ring generates a field of heat around the wearer. Wearer can ignite flammable material with a touch. Also grants resistance to cold temperatures.</p>',
         statBonuses: [],
@@ -98,7 +98,7 @@ export async function seed() {
     {
       name: 'Mirror Veil',
       type: 'augment',
-      img: 'icons/magic/defensive/shield-barrier-flaming-diamond-purple.webp',
+      img: 'icons/magic/defensive/shield-barrier-flaming-diamond-teal.webp',
       system: {
         description: '<p><strong>Reaction.</strong> Stores a charge over a day-long period. Automatically attempts to reflect a single target magic attack that would strike its user using a contested willpower roll. Any attempt consumes the charge.</p>',
         statBonuses: [],
@@ -109,20 +109,20 @@ export async function seed() {
     {
       name: 'Illuminated Sight',
       type: 'augment',
-      img: 'icons/magic/perception/eye-ringed-glow-blue.webp',
+      img: 'icons/magic/perception/hand-eye-fire-blue.webp',
       system: {
         description: '<p>Consumes 20 mana to reveal a 30ft area in line of sight, revealing anyone within the area whose stealth roll is 800 or below.</p>',
         statBonuses: [],
       },
     },
 
-    // ── Gem Slot ──
+    // ── Gem Slot (gem effects TBD) ──
     {
       name: 'Gem Slot',
       type: 'augment',
-      img: 'icons/commodities/gems/gem-faceted-round-green.webp',
+      img: 'icons/commodities/gems/gem-rough-oval-green.webp',
       system: {
-        description: '<p>A beautiful green gem appears to have been grown into the staff itself. Stores up to 400 mana.</p>',
+        description: '<p>A beautiful green gem appears to have been grown into the staff itself. Stores up to 400 mana.</p><p><em>Gem effects are to be determined.</em></p>',
         statBonuses: [],
       },
     },
@@ -131,7 +131,7 @@ export async function seed() {
     {
       name: 'Natural Feeding',
       type: 'augment',
-      img: 'icons/magic/nature/root-vine-entangled-hand.webp',
+      img: 'icons/magic/nature/stealth-hide-eyes-green.webp',
       system: {
         description: '<p>The staff can pierce the wielder\'s hand and drain vitality to generate mana for the staff to store. 1:1 ratio.</p><p>Alternatively, plant the staff in the ground and it will slowly regain mana at a rate of 10/hour.</p>',
         statBonuses: [],
@@ -142,7 +142,7 @@ export async function seed() {
     {
       name: "Nature's Wrath",
       type: 'augment',
-      img: 'icons/magic/nature/root-vine-barrier-wall-green.webp',
+      img: 'icons/magic/nature/tree-animated-strike.webp',
       system: {
         description: '<p>Conjures a wild patch of thorns that wrap and pierce an enemy. Uses the wielder\'s intelligence at a .6 modifier. Causes bleeding, poisoning, and constriction. Consumes 200 of the stored mana in the staff.</p>',
         statBonuses: [],
@@ -153,7 +153,7 @@ export async function seed() {
     {
       name: 'Mana Capacitor',
       type: 'augment',
-      img: 'icons/magic/lightning/bolt-strike-chest-blue.webp',
+      img: 'icons/magic/lightning/bolt-strike-blue.webp',
       system: {
         description: '<p>Mana can be stored in the threads, up to 400. Can be drawn upon for casting.</p><p>Upon being struck, automatically casts mana shield for the full quantity.</p>',
         statBonuses: [],
@@ -164,7 +164,7 @@ export async function seed() {
     {
       name: 'Mana-Absorptive Fabric',
       type: 'augment',
-      img: 'icons/magic/symbols/runes-star-pentagon-blue.webp',
+      img: 'icons/magic/symbols/runes-star-blue.webp',
       system: {
         description: '<p>The robe passively absorbs mana in the atmosphere. Stores 10 mana/hour under standard conditions.</p>',
         statBonuses: [],
