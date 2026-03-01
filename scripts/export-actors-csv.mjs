@@ -57,10 +57,18 @@ function findFolder(path) {
 }
 
 /**
- * Get all actors in a folder (non-recursive).
+ * Get all actors in a folder and all its subfolders (recursive).
  */
 function getActorsInFolder(folder) {
-  return game.actors.filter(a => a.folder?.id === folder.id);
+  const folderIds = new Set();
+  const collect = (f) => {
+    folderIds.add(f.id);
+    for (const child of game.folders.filter(c => c.type === 'Actor' && c.folder?.id === f.id)) {
+      collect(child);
+    }
+  };
+  collect(folder);
+  return game.actors.filter(a => a.folder && folderIds.has(a.folder.id));
 }
 
 /**
