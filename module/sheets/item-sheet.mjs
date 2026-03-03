@@ -354,6 +354,11 @@ export class AspectsofPowerItemSheet extends foundry.applications.api.Handlebars
       return;
     }
 
+    if (this.item.type === 'skill' && event.target?.name === 'system.rarity') {
+      await this.document.update({ 'system.rarity': event.target.value });
+      return;
+    }
+
     if (this.item.type === 'skill' && event.target?.name?.startsWith('system.roll.')) {
       const form = this.element.querySelector('form');
       const rollData = {
