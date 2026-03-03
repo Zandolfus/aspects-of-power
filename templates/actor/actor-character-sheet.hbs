@@ -182,7 +182,55 @@
         </aside>
 
         <section class="main grid-span-2">
-          {{> "systems/aspects-of-power/templates/actor/parts/actor-skills.hbs"}}
+          <ol class='items-list'>
+            {{#each skills as |skills skillType|}}
+              <li class='item flexrow items-header skill-type-{{toLowerCase skillType}}'>
+                <div class='item-name'>
+                  {{localize 'ASPECTSOFPOWER.Item.Skill.skillType' type=skillType}}
+                </div>
+                <div class='item-controls'>
+                  <a
+                    class='item-control item-create'
+                    title='{{localize "DOCUMENT.Create" type='Skill'}}'
+                    data-type='skill'
+                    data-skill-type='{{skillType}}'
+                  >
+                    <i class='fas fa-plus'></i>
+                    {{localize 'ASPECTSOFPOWER.Item.Skill.addType' type=skillType}}
+                  </a>
+                </div>
+              </li>
+              {{#each skills as |item id|}}
+                <li class='item flexrow' data-item-id='{{item._id}}'>
+                  <div class='item-name flexrow'>
+                    <div class='item-image'>
+                      <a class='rollable' data-roll-type='item'><img
+                          src='{{item.img}}'
+                          title='{{item.name}}'
+                          width='24'
+                          height='24'
+                        /></a>
+                    </div>
+                    <h4 style="color: {{item.rarityColor}}">{{item.name}}</h4>
+                  </div>
+                  <div class='item-controls'>
+                    <a
+                      class='item-control item-edit'
+                      title='{{localize "DOCUMENT.Edit" type='Skill'}}'
+                    >
+                      <i class='fas fa-edit'></i>
+                    </a>
+                    <a
+                      class='item-control item-delete'
+                      title='{{localize "DOCUMENT.Delete" type='Skill'}}'
+                    >
+                      <i class='fas fa-trash'></i>
+                    </a>
+                  </div>
+                </li>
+              {{/each}}
+            {{/each}}
+          </ol>
         </section>
 
       </section>
@@ -382,7 +430,55 @@
 
     {{!-- Owned Skills Tab --}}
     <div class="tab skills" data-group="primary" data-tab="skills">
-      {{> "systems/aspects-of-power/templates/actor/parts/actor-skills.hbs"}}
+      <ol class='items-list'>
+        {{#each skills as |skills skillType|}}
+          <li class='item flexrow items-header skill-type-{{toLowerCase skillType}}'>
+            <div class='item-name'>
+              {{localize 'ASPECTSOFPOWER.Item.Skill.skillType' type=skillType}}
+            </div>
+            <div class='item-controls'>
+              <a
+                class='item-control item-create'
+                title='{{localize "DOCUMENT.Create" type='Skill'}}'
+                data-type='skill'
+                data-skill-type='{{skillType}}'
+              >
+                <i class='fas fa-plus'></i>
+                {{localize 'ASPECTSOFPOWER.Item.Skill.addType' type=skillType}}
+              </a>
+            </div>
+          </li>
+          {{#each skills as |item id|}}
+            <li class='item flexrow' data-item-id='{{item._id}}'>
+              <div class='item-name flexrow'>
+                <div class='item-image'>
+                  <a class='rollable' data-roll-type='item'><img
+                      src='{{item.img}}'
+                      title='{{item.name}}'
+                      width='24'
+                      height='24'
+                    /></a>
+                </div>
+                <h4 style="color: {{item.rarityColor}}">{{item.name}}</h4>
+              </div>
+              <div class='item-controls'>
+                <a
+                  class='item-control item-edit'
+                  title='{{localize "DOCUMENT.Edit" type='Skill'}}'
+                >
+                  <i class='fas fa-edit'></i>
+                </a>
+                <a
+                  class='item-control item-delete'
+                  title='{{localize "DOCUMENT.Delete" type='Skill'}}'
+                >
+                  <i class='fas fa-trash'></i>
+                </a>
+              </div>
+            </li>
+          {{/each}}
+        {{/each}}
+      </ol>
     </div>
 
     {{!-- Active Effects Tab --}}
