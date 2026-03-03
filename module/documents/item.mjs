@@ -220,15 +220,18 @@ export class AspectsofPowerItem extends Item {
                 merged.push({ ...incoming });
               }
             }
+            // Duration becomes the maximum of what's remaining vs. the new application.
+            const existingRemaining = ((existing.duration?.startRound ?? 0) + (existing.duration?.rounds ?? 0)) - startRound;
+            const newDuration = Math.max(existingRemaining, payload.duration);
             await existing.update({
               changes: merged,
-              'duration.rounds': payload.duration,
+              'duration.rounds': newDuration,
               'duration.startRound': startRound,
               'duration.startTurn': startTurn,
             });
             const mergedTotal = merged.reduce((sum, c) => sum + Number(c.value), 0);
             ChatMessage.create({ speaker: payload.speaker, rollMode: payload.rollMode,
-              content: `<p>Buff on <strong>${target.name}</strong> stacked (total +${mergedTotal}) for ${payload.duration} rounds.</p>`,
+              content: `<p>Buff on <strong>${target.name}</strong> stacked (total +${mergedTotal}) for ${newDuration} rounds.</p>`,
             });
           } else {
             // Non-stackable: keep higher total.
@@ -324,10 +327,14 @@ export class AspectsofPowerItem extends Item {
               }
             }
 
+            // Duration becomes the maximum of what's remaining vs. the new application.
+            const existingRemaining = ((existing.duration?.startRound ?? 0) + (existing.duration?.rounds ?? 0)) - startRound;
+            const newDuration = Math.max(existingRemaining, payload.duration);
+
             // Merge DoT flags: add incoming damage to existing.
             const updateData = {
               changes: merged,
-              'duration.rounds': payload.duration,
+              'duration.rounds': newDuration,
               'duration.startRound': startRound,
               'duration.startTurn': startTurn,
             };
@@ -343,7 +350,7 @@ export class AspectsofPowerItem extends Item {
             await existing.update(updateData);
             const mergedTotal = merged.reduce((sum, c) => sum + Math.abs(Number(c.value)), 0);
             ChatMessage.create({ speaker: payload.speaker, rollMode: payload.rollMode,
-              content: `<p>Debuff on <strong>${target.name}</strong> stacked (total -${mergedTotal}) for ${payload.duration} rounds.</p>`,
+              content: `<p>Debuff on <strong>${target.name}</strong> stacked (total -${mergedTotal}) for ${newDuration} rounds.</p>`,
             });
           } else {
             // No existing — create new effect.
