@@ -381,6 +381,17 @@
           <option value='Active' {{#if (eq system.skillType "Active")}}selected{{/if}}>Active</option>
         </select>
       </div>
+      <div class='resource'>
+        <label class='resource-label'>{{localize "ASPECTSOFPOWER.Equip.rarity"}}</label>
+        <select name='system.rarity' class='rarity-select'>
+          {{#each config.rarities as |rarDef rarKey|}}
+            <option value='{{rarKey}}' {{#if (eq rarKey @root.system.rarity)}}selected{{/if}}
+                    style="color: {{rarDef.color}}">
+              {{localize rarDef.label}}
+            </option>
+          {{/each}}
+        </select>
+      </div>
     </div>
   </section>
 </form>

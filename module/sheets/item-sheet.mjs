@@ -303,11 +303,15 @@ export class AspectsofPowerItemSheet extends foundry.applications.api.Handlebars
         return;
       }
 
-      // Rarity change: update rarity + auto-set augmentSlots from config.
+      // Rarity change: for equipment, also auto-set augmentSlots.
       if (name === 'system.rarity') {
         const rarity = event.target.value;
-        const augSlots = CONFIG.ASPECTSOFPOWER.rarities[rarity]?.augments ?? 0;
-        await this.document.update({ 'system.rarity': rarity, 'system.augmentSlots': augSlots });
+        if (this.document.type === 'item') {
+          const augSlots = CONFIG.ASPECTSOFPOWER.rarities[rarity]?.augments ?? 0;
+          await this.document.update({ 'system.rarity': rarity, 'system.augmentSlots': augSlots });
+        } else {
+          await this.document.update({ 'system.rarity': rarity });
+        }
         return;
       }
 

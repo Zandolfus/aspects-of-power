@@ -120,6 +120,8 @@ export class AspectsofPowerActorSheet extends foundry.applications.api.Handlebar
       } else if (i.type === 'feature') {
         features.push(i);
       } else if (i.type === 'skill') {
+        const skillRarityDef = CONFIG.ASPECTSOFPOWER.rarities[i.system.rarity];
+        i.rarityColor = skillRarityDef?.color ?? '#ffffff';
         if (i.system.skillType !== undefined) {
           skills[i.system.skillType].push(i);
         }
