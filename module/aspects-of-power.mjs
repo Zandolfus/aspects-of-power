@@ -129,6 +129,7 @@ Hooks.on('renderCompendium', (app, html) => {
   const packId = app.collection?.collection;
   if (!packId) return;
 
+  // ── System template packs: override Create Entry ──────────────────────────
   const typeMap = {
     'aspects-of-power.races': 'race',
     'aspects-of-power.classes': 'class',
@@ -136,23 +137,65 @@ Hooks.on('renderCompendium', (app, html) => {
     'aspects-of-power.augments': 'augment',
   };
   const itemType = typeMap[packId];
-  if (!itemType) return;
+  if (itemType) {
+    const btn = el.querySelector('[data-action="createEntry"]') ?? el.querySelector('.create-entry');
+    if (btn) {
+      const newBtn = btn.cloneNode(true);
+      btn.replaceWith(newBtn);
+      newBtn.addEventListener('click', async (ev) => {
+        ev.preventDefault();
+        const label = game.i18n.localize(CONFIG.ASPECTSOFPOWER.levelTypes[itemType]);
+        const item = await Item.create(
+          { name: `New ${label}`, type: itemType },
+          { pack: packId }
+        );
+        item?.sheet?.render(true);
+      });
+    }
+  }
 
-  const btn = el.querySelector('[data-action="createEntry"]') ?? el.querySelector('.create-entry');
-  if (!btn) return;
+  // ── All packs: route folder creation through GM for non-GM owners ─────────
+  if (!game.user.isGM) {
+    const pack = game.packs.get(packId);
+    const ownerLevel = CONST.DOCUMENT_OWNERSHIP_LEVELS.OWNER;
+    if (!pack || pack.getUserLevel(game.user) < ownerLevel) return;
 
-  // Clone to strip existing listeners, then add our own.
-  const newBtn = btn.cloneNode(true);
-  btn.replaceWith(newBtn);
-  newBtn.addEventListener('click', async (ev) => {
-    ev.preventDefault();
-    const label = game.i18n.localize(CONFIG.ASPECTSOFPOWER.levelTypes[itemType]);
-    const item = await Item.create(
-      { name: `New ${label}`, type: itemType },
-      { pack: packId }
-    );
-    item?.sheet?.render(true);
-  });
+    const folderBtn = el.querySelector('[data-action="createFolder"]')
+                   ?? el.querySelector('.create-folder');
+    if (!folderBtn) return;
+
+    const newFolderBtn = folderBtn.cloneNode(true);
+    folderBtn.replaceWith(newFolderBtn);
+    newFolderBtn.addEventListener('click', async (ev) => {
+      ev.preventDefault();
+      ev.stopPropagation();
+
+      // Ask for a name via a small dialog.
+      const name = await new Promise(resolve => {
+        new Dialog({
+          title: 'Create Folder',
+          content: '<div style="margin:4px 0"><label>Name: <input type="text" name="fname" value="New Folder" autofocus style="width:100%"/></label></div>',
+          buttons: {
+            ok: {
+              label: 'Create',
+              callback: html => resolve(html.querySelector('[name="fname"]').value.trim() || 'New Folder'),
+            },
+            cancel: { label: 'Cancel', callback: () => resolve(null) },
+          },
+          default: 'ok',
+          close: () => resolve(null),
+        }).render(true);
+      });
+      if (!name) return;
+
+      game.socket.emit('system.aspects-of-power', {
+        type: 'gmCreateCompendiumFolder',
+        packId,
+        folderName: name,
+        folderType: pack.documentName,
+      });
+    });
+  }
 });
 
 /* -------------------------------------------- */
@@ -179,6 +222,10 @@ Hooks.once('ready', function () {
       });
     } else if (['gmApplyBuff', 'gmApplyDebuff', 'gmApplyRestoration'].includes(payload.type)) {
       await AspectsofPowerItem.executeGmAction(payload);
+    } else if (payload.type === 'gmCreateCompendiumFolder') {
+      const pack = game.packs.get(payload.packId);
+      if (!pack) return;
+      await Folder.create({ name: payload.folderName, type: payload.folderType }, { pack: payload.packId });
     }
   });
 });
