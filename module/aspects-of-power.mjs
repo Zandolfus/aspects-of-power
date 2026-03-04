@@ -178,7 +178,10 @@ Hooks.on('renderCompendium', (app, html) => {
           buttons: {
             ok: {
               label: 'Create',
-              callback: html => resolve(html.querySelector('[name="fname"]').value.trim() || 'New Folder'),
+              callback: html => {
+                const el = html instanceof HTMLElement ? html : html[0];
+                resolve(el.querySelector('[name="fname"]').value.trim() || 'New Folder');
+              },
             },
             cancel: { label: 'Cancel', callback: () => resolve(null) },
           },
