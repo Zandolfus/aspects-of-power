@@ -42,39 +42,6 @@ const _moveActionTracker = new Map();
 /*  Init Hook                                   */
 /* -------------------------------------------- */
 
-/* -------------------------------------------- */
-/*  Foundry v13 Compatibility Patch             */
-/* -------------------------------------------- */
-
-/**
- * MIGRATION NOTE (Foundry v13 patch — revisit on upgrade to v14+):
- *
- * In Foundry v13, compendium folder documents are not synced to non-GM clients
- * regardless of the pack's user permission level. Folder#visible evaluates to
- * false for non-GMs on compendium folders because the renderer checks
- * game.user.isGM before building the folder tree.
- *
- * This patch overrides Folder#visible so that non-GM users can see folders in
- * compendium packs where they hold at least OBSERVER-level access. It does NOT
- * affect world (non-compendium) folder visibility.
- *
- * If Foundry adds native support for non-GM compendium folder visibility in a
- * future version, this patch should be removed to avoid double-patching.
- */
-{
-  const _descriptor = Object.getOwnPropertyDescriptor(Folder.prototype, 'visible');
-  Object.defineProperty(Folder.prototype, 'visible', {
-    get() {
-      // Only intercept compendium folders; world folders use the original getter.
-      if (!this.pack) return _descriptor.get.call(this);
-      const pack = game.packs.get(this.pack);
-      if (!pack) return game.user.isGM;
-      return pack.getUserLevel(game.user) >= CONST.DOCUMENT_OWNERSHIP_LEVELS.OBSERVER;
-    },
-    configurable: true,
-  });
-}
-
 Hooks.once('init', function () {
   // Add utility classes to the global game object so that they're more easily
   // accessible in global contexts.
@@ -87,6 +54,48 @@ Hooks.once('init', function () {
 
   // Add custom constants for configuration.
   CONFIG.ASPECTSOFPOWER = ASPECTSOFPOWER;
+
+  /* -------------------------------------------- */
+  /*  Foundry v13 Compatibility Patch             */
+  /* -------------------------------------------- */
+
+  /**
+   * MIGRATION NOTE (Foundry v13 patch — revisit on upgrade to v14+):
+   *
+   * In Foundry v13, compendium folder documents are not synced to non-GM clients
+   * regardless of the pack's user permission level. Folder#visible evaluates to
+   * false for non-GMs on compendium folders because the renderer checks
+   * game.user.isGM before building the folder tree.
+   *
+   * This patch overrides Folder#visible so that non-GM users can see folders in
+   * compendium packs where they hold at least OBSERVER-level access. It does NOT
+   * affect world (non-compendium) folder visibility.
+   *
+   * If Foundry adds native support for non-GM compendium folder visibility in a
+   * future version, this patch should be removed to avoid double-patching.
+   */
+  {
+    // Walk the prototype chain — 'visible' is inherited, not an own property of Folder.prototype.
+    let _proto = Object.getPrototypeOf(Folder.prototype);
+    let _descriptor;
+    while (_proto) {
+      _descriptor = Object.getOwnPropertyDescriptor(_proto, 'visible');
+      if (_descriptor) break;
+      _proto = Object.getPrototypeOf(_proto);
+    }
+
+    Object.defineProperty(Folder.prototype, 'visible', {
+      get() {
+        if (!this.pack) {
+          return _descriptor ? _descriptor.get.call(this) : this.testUserPermission(game.user, 'OBSERVER');
+        }
+        const pack = game.packs.get(this.pack);
+        if (!pack) return game.user.isGM;
+        return pack.getUserLevel(game.user) >= CONST.DOCUMENT_OWNERSHIP_LEVELS.OBSERVER;
+      },
+      configurable: true,
+    });
+  }
 
   /**
    * Set an initiative formula for the system
