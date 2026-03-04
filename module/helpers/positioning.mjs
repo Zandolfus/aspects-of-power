@@ -75,11 +75,13 @@ export function getPositionalTags(attackerToken, targetToken) {
     } else {
       // Project offset into token-local space.
       // localForward > 0 = in front of body centre; localRight > 0 = to the right.
-      // Derivation:
-      //   forward unit vector in canvas space = (sin θ, −cos θ)  [+y is canvas-down]
-      //   right   unit vector in canvas space = (cos θ,  sin θ)
-      const localForward = dx * Math.sin(rotRad) - dy * Math.cos(rotRad);
-      const localRight   = dx * Math.cos(rotRad) + dy * Math.sin(rotRad);
+      //
+      // Foundry rotation 0 = image as-is; default token art faces south (+y).
+      // Rotating by θ CW in canvas space (PIXI convention):
+      //   forward unit vector = (−sin θ,  cos θ)   [south at θ=0]
+      //   right   unit vector = (−cos θ, −sin θ)   [west  at θ=0, character's own right]
+      const localForward = -dx * Math.sin(rotRad) + dy * Math.cos(rotRad);
+      const localRight   = -dx * Math.cos(rotRad) - dy * Math.sin(rotRad);
 
       // Forward / back axis
       if      (localForward > 0) tags.push('front');
@@ -101,7 +103,8 @@ export function getPositionalTags(attackerToken, targetToken) {
     const compassDeg = (ray.angle * 180 / Math.PI + 90 + 360) % 360;
 
     // Body-relative angle: 0° = facing direction, 90° = right, 180° = back, 270° = left.
-    const bodyAngle = (compassDeg - (targetToken.document.rotation ?? 0) + 360) % 360;
+    // Offset by 180° because default token art faces south (compass 180°) at rotation 0.
+    const bodyAngle = (compassDeg - (targetToken.document.rotation ?? 0) - 180 + 720) % 360;
 
     // Cardinals receive exactly one tag; all other angles receive two.
     if      (bodyAngle === 0)   tags.push('front');
