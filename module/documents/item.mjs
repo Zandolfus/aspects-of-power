@@ -399,6 +399,7 @@ export class AspectsofPowerItem extends Item {
                   ...existingAopFlags,
                   dot:              true,
                   dotDamage:        newTotalDot,
+                  debuffDamage:     newTotalDot,
                   dotDamageType:    dotType,
                   applierActorUuid: payload.effectData.flags['aspects-of-power'].applierActorUuid,
                 },
