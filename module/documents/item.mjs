@@ -1,4 +1,5 @@
 import { EquipmentSystem } from '../systems/equipment.mjs';
+import { getPositionalTags } from '../helpers/positioning.mjs';
 
 /**
  * Extend the basic Item with some very simple modifications.
@@ -116,9 +117,12 @@ export class AspectsofPowerItem extends Item {
     const mitigation   = isPhysical
       ? (targetActor.system.defense.armor?.value ?? 0)
       : (targetActor.system.defense.veil?.value  ?? 0);
-    const toughnessMod = targetActor.system.abilities?.toughness?.mod ?? 0;
-    const finalDamage  = isHit ? Math.max(0, Math.round(dmgRoll.total - mitigation - toughnessMod)) : 0;
-    const mitigLabel   = isPhysical ? 'Armor' : 'Veil';
+    const attackerToken     = this.actor.getActiveTokens()[0] ?? null;
+    const toughnessMod      = targetActor.system.abilities?.toughness?.mod ?? 0;
+    const affinityDR        = this._getAffinityDRReduction(targetActor, attackerToken, targetToken);
+    const effectiveToughness = Math.max(0, toughnessMod - affinityDR);
+    const finalDamage        = isHit ? Math.max(0, Math.round(dmgRoll.total - mitigation - effectiveToughness)) : 0;
+    const mitigLabel         = isPhysical ? 'Armor' : 'Veil';
 
     const resultBadge = isHit
       ? `<strong style="color:green;">HIT</strong>`
@@ -134,7 +138,7 @@ export class AspectsofPowerItem extends Item {
            ${hitLine}
            <hr>
            <p>Raw damage: ${Math.round(dmgRoll.total)}</p>
-           <p>${mitigLabel}: −${mitigation} &nbsp;&nbsp; Toughness: −${toughnessMod}</p>
+           <p>${mitigLabel}: −${mitigation} &nbsp;&nbsp; Toughness: −${effectiveToughness}${affinityDR > 0 ? ` <em>(−${affinityDR} affinity)</em>` : ''}</p>
            <p><strong>Final damage: ${finalDamage}</strong></p>
            <button class="apply-damage"
              data-actor-uuid="${targetActor.uuid}"
@@ -159,6 +163,50 @@ export class AspectsofPowerItem extends Item {
     }
 
     return { isHit };
+  }
+
+  /**
+   * Compute total toughness DR reduction from debuffs on the target that
+   * share an affinity or magic type with this skill.
+   *
+   * Directional debuffs (directions.length > 0) only apply when the attacker
+   * is currently in one of those positions relative to the target.
+   * Non-directional debuffs (directions: []) always apply when affinity matches.
+   *
+   * @param {Actor} targetActor
+   * @param {Token|null} attackerToken  The attacker's canvas token.
+   * @param {Token|null} targetToken    The target's canvas token.
+   * @returns {number}
+   */
+  _getAffinityDRReduction(targetActor, attackerToken = null, targetToken = null) {
+    const skillAffinities = this.system.affinities ?? [];
+    const skillMagicType  = this.system.magicType ?? '';
+    if (!skillAffinities.length && !skillMagicType) return 0;
+
+    const currentPositions = (attackerToken && targetToken)
+      ? getPositionalTags(attackerToken, targetToken)
+      : [];
+
+    let total = 0;
+    for (const effect of targetActor.allApplicableEffects()) {
+      const flags = effect.flags?.['aspects-of-power'] ?? {};
+      if (!flags.debuffDamage) continue;
+
+      const effectAffinities = flags.affinities ?? [];
+      const effectMagicType  = flags.magicType ?? '';
+      const effectDirections = flags.directions ?? [];  // [] = non-directional
+
+      const sharesAffinity  = skillAffinities.some(a => effectAffinities.includes(a));
+      const sharesMagicType = skillMagicType && skillMagicType === effectMagicType;
+      if (!(sharesAffinity || sharesMagicType)) continue;
+
+      // Directional constraint: if the debuff recorded specific directions, the
+      // attacker must currently be in one of those positions.
+      if (effectDirections.length > 0 && !currentPositions.some(p => effectDirections.includes(p))) continue;
+
+      total += flags.debuffDamage;
+    }
+    return total;
   }
 
   /**
@@ -489,16 +537,23 @@ export class AspectsofPowerItem extends Item {
       changes,
     };
 
-    if (dealsDmg) {
-      effectData.flags = {
-        'aspects-of-power': {
-          dot: true,
-          dotDamage: rollTotal,
-          dotDamageType: dmgType,
-          applierActorUuid: this.actor.uuid,
-        },
-      };
-    }
+    // Capture positional tags only if this debuff is flagged as directional.
+    const isDirectional = this.system.tagConfig?.debuffDirectional ?? false;
+    const casterToken   = isDirectional ? (this.actor.getActiveTokens()[0] ?? null) : null;
+    const directions    = (isDirectional && casterToken && targetToken)
+      ? getPositionalTags(casterToken, targetToken)
+      : [];
+
+    // Always store affinity metadata so attack skills can match against this debuff.
+    effectData.flags = {
+      'aspects-of-power': {
+        debuffDamage: rollTotal,
+        affinities: this.system.affinities ?? [],
+        magicType: this.system.magicType ?? 'non-magical',
+        directions,
+        ...(dealsDmg ? { dot: true, dotDamage: rollTotal, dotDamageType: dmgType, applierActorUuid: this.actor.uuid } : {}),
+      },
+    };
 
     const statSummary = entries.length > 0
       ? entries.map(e => `${e.attribute} -${Math.round(rollTotal * (e.value || 1))}`).join(', ')

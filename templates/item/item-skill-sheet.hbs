@@ -38,6 +38,23 @@
         </select>
       </div>
 
+      {{! ── Affinities ── }}
+      <div class='skill-affinities'>
+        <label class='resource-label'>Affinities</label>
+        <div class='affinity-chips'>
+          {{#each system.affinities as |affinity|}}
+            <span class='affinity-chip'>
+              {{affinity}}
+              <a class='affinity-remove' data-affinity='{{affinity}}' title='Remove'>×</a>
+            </span>
+          {{/each}}
+        </div>
+        <div class='affinity-add-row'>
+          <input type='text' class='affinity-input' placeholder='e.g. fire, lunar...' />
+          <a class='affinity-add' title='Add affinity'><i class='fas fa-plus'></i></a>
+        </div>
+      </div>
+
       {{! ── Tag Checkboxes (filtered by category) ── }}
       <div class='skill-tags'>
         <label class='resource-label'>{{localize "ASPECTSOFPOWER.Tag.label"}}</label>
@@ -287,6 +304,11 @@
           Stackable
         </label>
         <label class='resource-label dot-toggle'>
+          <input type='checkbox' name='system.tagConfig.debuffDirectional'
+                 {{#if system.tagConfig.debuffDirectional}}checked{{/if}} />
+          Directional
+        </label>
+        <label class='resource-label dot-toggle'>
           <input type='checkbox' name='system.tagConfig.debuffDealsDamage'
                  {{#if system.tagConfig.debuffDealsDamage}}checked{{/if}} />
           {{localize "ASPECTSOFPOWER.TagConfig.debuffDealsDamage"}}
@@ -379,6 +401,13 @@
         <select name='system.skillType'>
           <option value='Passive' {{#if (eq system.skillType "Passive")}}selected{{/if}}>Passive</option>
           <option value='Active' {{#if (eq system.skillType "Active")}}selected{{/if}}>Active</option>
+        </select>
+      </div>
+      <div class='resource'>
+        <label class='resource-label'>Magic Type</label>
+        <select name='system.magicType'>
+          <option value='non-magical' {{#if (eq system.magicType "non-magical")}}selected{{/if}}>Non-Magical</option>
+          <option value='magical' {{#if (eq system.magicType "magical")}}selected{{/if}}>Magical</option>
         </select>
       </div>
       <div class='resource'>

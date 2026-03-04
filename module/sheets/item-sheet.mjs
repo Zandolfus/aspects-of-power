@@ -205,7 +205,10 @@ export class AspectsofPowerItemSheet extends foundry.applications.api.Handlebars
 
     // Simple system fields (e.g. skillType, description): update directly
     // so the full-form processor doesn't choke on complex skill fields.
-    if (this.item.type === 'skill' && event.target?.name === 'system.skillType') {
+    if (this.item.type === 'skill' && (
+      event.target?.name === 'system.skillType' ||
+      event.target?.name === 'system.magicType'
+    )) {
       await this.document.update({ [event.target.name]: event.target.value });
       return;
     }
@@ -505,6 +508,26 @@ export class AspectsofPowerItemSheet extends foundry.applications.api.Handlebars
             augments[idx] = { augmentId: '' };
             await this.item.update({ 'system.augments': augments });
           }
+        });
+      });
+    }
+
+    // --- Skill: Affinity add / remove ---
+    if (this.item.type === 'skill') {
+      this.element.querySelector('.affinity-add')?.addEventListener('click', async () => {
+        const input = this.element.querySelector('.affinity-input');
+        const val = input?.value?.trim().toLowerCase();
+        if (!val) return;
+        const affinities = [...(this.item.system.affinities ?? [])];
+        if (!affinities.includes(val)) affinities.push(val);
+        await this.document.update({ 'system.affinities': affinities });
+      });
+
+      this.element.querySelectorAll('.affinity-remove').forEach(el => {
+        el.addEventListener('click', async () => {
+          const val = el.dataset.affinity;
+          const affinities = (this.item.system.affinities ?? []).filter(a => a !== val);
+          await this.document.update({ 'system.affinities': affinities });
         });
       });
     }

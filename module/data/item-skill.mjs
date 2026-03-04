@@ -27,6 +27,14 @@ export class SkillData extends foundry.abstract.TypeDataModel {
       // Tags that define what this skill does when activated (e.g. ["attack","debuff"]).
       tags: new fields.ArrayField(new fields.StringField(), { initial: [] }),
 
+      // Elemental or thematic affinities (e.g. "fire", "lunar", "space").
+      // Used to match against debuffs on the target to reduce toughness DR.
+      affinities: new fields.ArrayField(new fields.StringField(), { initial: [] }),
+
+      // Whether this skill is magical or non-magical.
+      // Used alongside affinities to match target debuffs.
+      magicType: new fields.StringField({ initial: 'non-magical' }),
+
       // ID of the item that must be equipped to use this skill. Empty = no requirement.
       requiredEquipment: new fields.StringField({ initial: '' }),
 
@@ -67,10 +75,11 @@ export class SkillData extends foundry.abstract.TypeDataModel {
           attribute: new fields.StringField({ initial: 'abilities.strength' }),
           value:     new fields.NumberField({ initial: 1, min: 0 }),
         }), { initial: [] }),
-        debuffDuration:    new fields.NumberField({ initial: 1, integer: true, min: 0 }),
-        debuffStackable:   new fields.BooleanField({ initial: false }),
-        debuffDealsDamage: new fields.BooleanField({ initial: false }),
-        debuffDamageType:  new fields.StringField({ initial: 'physical' }),
+        debuffDuration:     new fields.NumberField({ initial: 1, integer: true, min: 0 }),
+        debuffStackable:    new fields.BooleanField({ initial: false }),
+        debuffDirectional:  new fields.BooleanField({ initial: false }),
+        debuffDealsDamage:  new fields.BooleanField({ initial: false }),
+        debuffDamageType:   new fields.StringField({ initial: 'physical' }),
 
         // Repair: which material types this skill can repair.
         repairMaterials: new fields.ArrayField(new fields.StringField(), { initial: [] }),
