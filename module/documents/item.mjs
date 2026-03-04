@@ -553,10 +553,12 @@ export class AspectsofPowerItem extends Item {
         : '',
     };
 
-    // Capture positional tags only if this debuff is flagged as directional.
-    const isDirectional = this.system.tagConfig?.debuffDirectional ?? false;
-    const casterToken   = isDirectional ? (this.actor.getActiveTokens()[0] ?? null) : null;
-    const directions    = (isDirectional && casterToken && targetToken)
+    // Capture positional tags for all debuffs so DR is direction-gated by default.
+    // 'debuffDirectional' now acts as an "Omnidirectional DR" opt-out:
+    // when set, directions is empty and the DR applies regardless of angle.
+    const isOmnidirectional = this.system.tagConfig?.debuffDirectional ?? false;
+    const casterToken       = isOmnidirectional ? null : (this.actor.getActiveTokens()[0] ?? null);
+    const directions        = (!isOmnidirectional && casterToken && targetToken)
       ? getPositionalTags(casterToken, targetToken)
       : [];
 
