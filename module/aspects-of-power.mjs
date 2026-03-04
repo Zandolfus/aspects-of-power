@@ -229,6 +229,11 @@ Hooks.once('ready', function () {
       const pack = game.packs.get(payload.packId);
       if (!pack) return;
       await Folder.create({ name: payload.folderName, type: payload.folderType }, { pack: payload.packId });
+      // Notify all clients to refresh the compendium browser.
+      game.socket.emit('system.aspects-of-power', { type: 'refreshCompendium', packId: payload.packId });
+      game.packs.get(payload.packId)?.render();
+    } else if (payload.type === 'refreshCompendium') {
+      game.packs.get(payload.packId)?.render();
     }
   });
 });
