@@ -168,6 +168,11 @@ export class AspectsofPowerActorSheet extends foundry.applications.api.Handlebar
     const input = event.target;
     if (!input?.name) return super._onChangeForm(formConfig, event);
 
+    if (input.name === 'name') {
+      await this.document.update({ name: input.value.trim() || this.document.name });
+      return;
+    }
+
     if (input.type === 'number') {
       const raw = Number(input.value);
       if (!isNaN(raw) && isFinite(raw)) {
