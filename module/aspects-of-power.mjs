@@ -379,6 +379,45 @@ Hooks.on('combatTurnChange', async (combat, prior, _current) => {
  * Only visible to the token's owning player(s).
  */
 Hooks.on('refreshToken', (token) => {
+  // ── Facing indicator ──────────────────────────────────────────────────────
+  if (token._facingIndicator) {
+    token._facingIndicator.destroy();
+    token._facingIndicator = null;
+  }
+
+  const rotRad = (token.document.rotation ?? 0) * Math.PI / 180;
+  const cx     = token.w / 2;
+  const cy     = token.h / 2;
+  const r      = Math.min(token.w, token.h) / 2;
+  const fwdX   = Math.sin(rotRad);
+  const fwdY   = -Math.cos(rotRad);
+  const rgtX   = Math.cos(rotRad);
+  const rgtY   = Math.sin(rotRad);
+  const hw     = r * 0.2;
+  const depth  = r * 0.3;
+  const tipX   = cx + fwdX * r;
+  const tipY   = cy + fwdY * r;
+  const pts    = [
+    tipX,                               tipY,
+    tipX - fwdX * depth + rgtX * hw,   tipY - fwdY * depth + rgtY * hw,
+    tipX - fwdX * depth - rgtX * hw,   tipY - fwdY * depth - rgtY * hw,
+  ];
+
+  const fi = new PIXI.Graphics();
+  if (typeof fi.drawPolygon === 'function') {
+    fi.beginFill(0xffffff, 0.9);
+    fi.lineStyle(1, 0x222222, 0.6);
+    fi.drawPolygon(pts);
+    fi.endFill();
+  } else {
+    fi.poly(pts);
+    fi.fill({ color: 0xffffff, alpha: 0.9 });
+    fi.stroke({ color: 0x222222, alpha: 0.6, width: 1 });
+  }
+  token.addChild(fi);
+  token._facingIndicator = fi;
+
+  // ── Casting range aura ────────────────────────────────────────────────────
   // Remove any existing aura graphic first (idempotent redraw).
   if (token._castingRangeAura) {
     token._castingRangeAura.destroy();
