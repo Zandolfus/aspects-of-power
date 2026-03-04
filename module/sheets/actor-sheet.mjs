@@ -307,8 +307,14 @@ export class AspectsofPowerActorSheet extends foundry.applications.api.Handlebar
     this.element.querySelectorAll('.template-link').forEach(el => {
       el.addEventListener('click', async () => {
         const uuid = el.dataset.templateId;
-        const item = await fromUuid(uuid);
-        if (item) item.sheet.render(true);
+        let item;
+        try { item = await fromUuid(uuid); } catch (e) { /* invalid UUID */ }
+        if (!item) return;
+        try {
+          item.sheet.render(true);
+        } catch (e) {
+          ui.notifications.warn('You do not have permission to view this item.');
+        }
       });
     });
 
