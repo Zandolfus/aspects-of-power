@@ -388,7 +388,7 @@ export class EquipmentSystem {
 
     // Progress changed — derive durability.max from progress.
     if (sys.progress !== undefined) {
-      const newMax = item.system.progress;
+      const newMax = item.system.progress * 2;
       const updates = { 'system.durability.max': newMax };
       // If current durability exceeds new max, clamp it.
       if (item.system.durability.value > newMax) {
@@ -476,9 +476,10 @@ export class EquipmentSystem {
     if (item.type !== 'item') return;
     const updates = {};
     const progress = item.system.progress ?? 0;
-    if (item.system.durability.max !== progress) {
-      updates['system.durability.max'] = progress;
-      updates['system.durability.value'] = progress;
+    const durMax = progress * 2;
+    if (item.system.durability.max !== durMax) {
+      updates['system.durability.max'] = durMax;
+      updates['system.durability.value'] = durMax;
     }
     const augSlots = CONFIG.ASPECTSOFPOWER.rarities[item.system.rarity]?.augments ?? 0;
     if (item.system.augmentSlots !== augSlots) {
