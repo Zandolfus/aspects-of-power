@@ -387,15 +387,23 @@ export class AspectsofPowerItem extends Item {
               'duration.startTurn': startTurn,
             };
             if (payload.effectData.flags?.['aspects-of-power']?.dot) {
-              const existingDot = existing.flags?.['aspects-of-power']?.dotDamage ?? 0;
+              const existingAopFlags = existing.flags?.['aspects-of-power'] ?? {};
+              const existingDot = existingAopFlags.dotDamage ?? 0;
               const incomingDot = payload.effectData.flags['aspects-of-power'].dotDamage ?? 0;
               const newTotalDot = existingDot + incomingDot;
               const dotType     = payload.effectData.flags['aspects-of-power'].dotDamageType;
-              updateData['flags.aspects-of-power.dot']              = true;
-              updateData['flags.aspects-of-power.dotDamage']        = newTotalDot;
-              updateData['flags.aspects-of-power.dotDamageType']    = dotType;
-              updateData['flags.aspects-of-power.applierActorUuid'] = payload.effectData.flags['aspects-of-power'].applierActorUuid;
-              updateData['description'] = `Deals <strong>${newTotalDot}</strong> ${dotType} damage per round (bypasses armor &amp; veil; reduced by Toughness).`;
+              // Use a full nested flags object to avoid dot-notation issues with
+              // hyphenated namespace keys (aspects-of-power) in Foundry's expandObject.
+              updateData.flags = {
+                'aspects-of-power': {
+                  ...existingAopFlags,
+                  dot:              true,
+                  dotDamage:        newTotalDot,
+                  dotDamageType:    dotType,
+                  applierActorUuid: payload.effectData.flags['aspects-of-power'].applierActorUuid,
+                },
+              };
+              updateData.description = `Deals <strong>${newTotalDot}</strong> ${dotType} damage per round (bypasses armor &amp; veil; reduced by Toughness).`;
             }
 
             await existing.update(updateData);
