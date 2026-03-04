@@ -17,6 +17,7 @@ import { AugmentData } from './data/item-augment.mjs';
 // Import helper/utility classes and constants.
 import { preloadHandlebarsTemplates } from './helpers/templates.mjs';
 import { ASPECTSOFPOWER } from './helpers/config.mjs';
+import { getPositionalTags } from './helpers/positioning.mjs';
 // Import systems.
 import { EquipmentSystem } from './systems/equipment.mjs';
 
@@ -48,6 +49,7 @@ Hooks.once('init', function () {
     AspectsofPowerActor,
     AspectsofPowerItem,
     rollItemMacro,
+    getPositionalTags,
   };
 
   // Add custom constants for configuration.
