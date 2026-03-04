@@ -389,10 +389,13 @@ export class AspectsofPowerItem extends Item {
             if (payload.effectData.flags?.['aspects-of-power']?.dot) {
               const existingDot = existing.flags?.['aspects-of-power']?.dotDamage ?? 0;
               const incomingDot = payload.effectData.flags['aspects-of-power'].dotDamage ?? 0;
-              updateData['flags.aspects-of-power.dot'] = true;
-              updateData['flags.aspects-of-power.dotDamage'] = existingDot + incomingDot;
-              updateData['flags.aspects-of-power.dotDamageType'] = payload.effectData.flags['aspects-of-power'].dotDamageType;
+              const newTotalDot = existingDot + incomingDot;
+              const dotType     = payload.effectData.flags['aspects-of-power'].dotDamageType;
+              updateData['flags.aspects-of-power.dot']              = true;
+              updateData['flags.aspects-of-power.dotDamage']        = newTotalDot;
+              updateData['flags.aspects-of-power.dotDamageType']    = dotType;
               updateData['flags.aspects-of-power.applierActorUuid'] = payload.effectData.flags['aspects-of-power'].applierActorUuid;
+              updateData['description'] = `Deals <strong>${newTotalDot}</strong> ${dotType} damage per round (bypasses armor &amp; veil; reduced by Toughness).`;
             }
 
             await existing.update(updateData);
@@ -528,13 +531,17 @@ export class AspectsofPowerItem extends Item {
     }));
 
     // Build effect data with optional DoT flags.
+    const effectName = `${item.name} (Debuff)`;
     const effectData = {
-      name:   `${item.name} (Debuff)`,
-      img:    item.img ?? 'icons/svg/downgrade.svg',
-      origin: this.uuid,
+      name:        effectName,
+      img:         item.img ?? 'icons/svg/downgrade.svg',
+      origin:      this.uuid,
       'duration.rounds': duration,
-      disabled: false,
+      disabled:    false,
       changes,
+      description: dealsDmg
+        ? `Deals <strong>${rollTotal}</strong> ${dmgType} damage per round (bypasses armor &amp; veil; reduced by Toughness).`
+        : '',
     };
 
     // Capture positional tags only if this debuff is flagged as directional.
@@ -562,7 +569,7 @@ export class AspectsofPowerItem extends Item {
     await this._gmAction({
       type: 'gmApplyDebuff',
       targetActorUuid: targetActor.uuid,
-      effectName: `${item.name} (Debuff)`,
+      effectName,
       originUuid: this.uuid,
       stackable: this.system.tagConfig?.debuffStackable ?? false,
       effectData: (changes.length > 0 || dealsDmg) ? effectData : null,
