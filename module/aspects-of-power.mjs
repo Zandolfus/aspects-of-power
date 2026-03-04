@@ -42,6 +42,39 @@ const _moveActionTracker = new Map();
 /*  Init Hook                                   */
 /* -------------------------------------------- */
 
+/* -------------------------------------------- */
+/*  Foundry v13 Compatibility Patch             */
+/* -------------------------------------------- */
+
+/**
+ * MIGRATION NOTE (Foundry v13 patch — revisit on upgrade to v14+):
+ *
+ * In Foundry v13, compendium folder documents are not synced to non-GM clients
+ * regardless of the pack's user permission level. Folder#visible evaluates to
+ * false for non-GMs on compendium folders because the renderer checks
+ * game.user.isGM before building the folder tree.
+ *
+ * This patch overrides Folder#visible so that non-GM users can see folders in
+ * compendium packs where they hold at least OBSERVER-level access. It does NOT
+ * affect world (non-compendium) folder visibility.
+ *
+ * If Foundry adds native support for non-GM compendium folder visibility in a
+ * future version, this patch should be removed to avoid double-patching.
+ */
+{
+  const _descriptor = Object.getOwnPropertyDescriptor(Folder.prototype, 'visible');
+  Object.defineProperty(Folder.prototype, 'visible', {
+    get() {
+      // Only intercept compendium folders; world folders use the original getter.
+      if (!this.pack) return _descriptor.get.call(this);
+      const pack = game.packs.get(this.pack);
+      if (!pack) return game.user.isGM;
+      return pack.getUserLevel(game.user) >= CONST.DOCUMENT_OWNERSHIP_LEVELS.OBSERVER;
+    },
+    configurable: true,
+  });
+}
+
 Hooks.once('init', function () {
   // Add utility classes to the global game object so that they're more easily
   // accessible in global contexts.
@@ -228,7 +261,11 @@ Hooks.once('ready', function () {
     } else if (payload.type === 'gmCreateCompendiumFolder') {
       const pack = game.packs.get(payload.packId);
       if (!pack) return;
-      await Folder.create({ name: payload.folderName, type: payload.folderType }, { pack: payload.packId });
+      await Folder.create({
+        name: payload.folderName,
+        type: payload.folderType,
+        ownership: { default: CONST.DOCUMENT_OWNERSHIP_LEVELS.OBSERVER },
+      }, { pack: payload.packId });
       // Notify all clients to refresh the compendium browser.
       game.socket.emit('system.aspects-of-power', { type: 'refreshCompendium', packId: payload.packId });
       game.packs.get(payload.packId)?.render();
