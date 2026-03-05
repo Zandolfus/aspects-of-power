@@ -1,0 +1,501 @@
+Name,Hardness,Elemental Affinity,Quality,Description,Crafting Bonus
+Ashiron,45,Fire,Common,Dull grey iron streaked with faint char lines.,Minor fire resistance on crafted items
+Brinefer,40,Water,Common,Rough salt-encrusted ore pulled from coastal deposits.,Improves durability in wet conditions
+Mudstone,35,Earth,Common,Dense earthen ore with a clay-like compacted exterior.,Increases weight and physical defense
+Coldglass,55,Ice,Common,Brittle glassy ore that stays cool to the touch.,Applies mild chill on contact
+Grimalloy,65,Necrotic,Common,A dark alloy threaded with pulsing dark veins.,Drains minor vitality on hit
+Bogmetal,50,Nature,Common,Mossy-hued metal smelling faintly of earth and decay.,Improves natural camouflage for worn items
+Duskore,60,Shadow,Common,An ore that seems to absorb the light around it.,Minor stealth bonus on crafted gear
+Sootferrite,45,Fire,Common,"Black as coal, leaves ashy residue on bare skin.",Adds minor fire damage to weapons
+Saltglass,40,Water,Common,Crystalline formations from compressed evaporated seawater.,Corrodes non-sealed metals on contact
+Dunestone,70,Earth,Common,Sandy-brown ore with visible dune-like grain patterns.,Adds bulk to constructed armor pieces
+Snowiron,45,Ice,Common,Iron ore with faint blue tint from cold mineral deposits.,Applies minor chill on hit
+Dawniron,55,Solar,Common,Warm-tinted iron found near sun-exposed ridgelines.,Adds minor radiant damage to weapons
+Cragore,80,Earth,Common,Jagged irregular ore chunks from deep cliff faces.,Increases physical impact force of weapons
+Peatmetal,40,Nature,Common,Dark organic metal found embedded in peat bogs.,Minor nature affinity in crafted weapons
+Ashglass,50,Fire,Common,Glassy ore formed from silica in volcanic ash deposits.,Minor fire damage on weapons
+Holloware,45,Air,Common,Lightweight ore with porous internal channel structure.,Reduces weight of crafted items
+Mudferrite,40,Earth,Common,Soft ferrite ore laden with mineral-rich mud deposits.,Modest defense bonus on armor
+Galestone,60,Air,Common,Light grey ore that rattles faintly in the wind.,Reduces equipment weight slightly
+Swampiron,50,Water,Common,Greenish iron ore pulled from marsh and fen beds.,Minor water resistance on armor
+Blightiron,65,Necrotic,Common,Iron ore threaded with dark corruption from blighted earth.,Weakens enemies on prolonged contact
+Cinderore,75,Fire,Common,Ore that still smokes faintly even after cooling.,Adds burn damage to weapons
+Frostslate,45,Ice,Common,Slate-like ore with frost crystal formations growing through it.,Applies chill on hit
+Greyslate,40,None,Common,Plain dull-grey slate ore used in basic construction.,No notable bonuses
+Brackenmetal,55,Nature,Common,Rough metal covered in fern-like mineral growths.,Minor nature resistance on armor
+Loamglass,50,Earth,Common,Dark earth-rich glass with high mineral content.,Increases tool endurance and longevity
+Rimefrost,45,Ice,Common,An ore perpetually coated in thin crystalline ice layers.,Applies freeze on extended contact
+Stormslate,85,Lightning,Common,Flat grey ore that retains static charge after storms.,Adds minor shock damage to weapons
+Gritstone,35,Earth,Common,Coarse abrasive ore of low refinement quality.,Basic construction material only
+Mireiron,50,Water,Common,Bog iron from stagnant pools with a dark green sheen.,Mild water resistance on armor
+Coalferrite,55,Fire,Common,Ferrite closely associated with coal seam deposits.,Adds minor fire damage to weapons
+Saltferrite,45,Water,Common,Coastal ferrite with a saline crystalline outer layer.,Mild corrode on contact with metals
+Dustmetal,40,Air,Common,Powdery ore that crumbles if over-refined during crafting.,Lightweight construction material
+Embriron,70,Fire,Common,Iron ore from near-volcanic regions; always slightly warm.,Adds minor fire damage to weapons
+Darkmire,55,Shadow,Common,Dark green-black ore from lightless swamp depths.,Minor stealth bonus on crafted gear
+Coldmetal,45,Ice,Common,Permanently cold metal from deep arctic deposits.,Applies chill on any contact
+Rustferrite,50,Necrotic,Common,Heavily oxidized ferrite with a reddish-brown hue.,Drains durability of contact metals
+Slagiron,60,Fire,Common,Iron reclaimed and refined from smelting slag.,Moderate fire resistance on armor
+Ridgestone,70,Earth,Common,Compacted ore from exposed mountain ridge formations.,Adds structural integrity to constructions
+Bleakiron,50,Shadow,Common,Grey-black iron with an oppressive lightless quality.,Slight morale drain aura on nearby foes
+Gravelmetal,45,Earth,Common,Metal laden with embedded gravel and rock aggregate.,Adds bulk and weight to armor
+Frostglass,60,Ice,Common,Glassy ice-mineral ore formed in tundra outcroppings.,Applies chill on hit
+Cinderash,65,Fire,Common,Fine-grained ashen ore with fire mineral traces inside.,Minor burn damage to weapons
+Veinore,60,Necrotic,Common,Ore threaded with dark pulsing corrupted mineral veins.,Minor life drain on hit
+Murkiron,55,Shadow,Common,Iron with a dark smoky quality that resists ambient light.,Minor stealth bonus on gear
+Bileore,45,Poison,Common,Yellow-green ore with a faint persistent acrid smell.,Minor poison damage on cut wounds
+Sandglass,45,Earth,Common,Fused sand and mineral glass from desert surface deposits.,Mild heat resistance on armor
+Morkmetal,55,Shadow,Common,Dull black metal with no reflective surface whatsoever.,Minor stealth bonus on crafted gear
+Greycopper,50,None,Common,Plain grey copper alloy common throughout lowland mines.,No notable bonuses
+Fogmetal,60,Air,Common,Metal with fine porous channels that bleed trapped air slowly.,Reduces weight of crafted items
+Flintore,75,Earth,Common,Flint-hard ore that sparks visibly when struck forcefully.,Adds spark damage on impact weapons
+Ashferrite,55,Fire,Common,Fire-tinted ferrite from volcanic mineral fields.,Minor fire damage on weapons
+Tidestone,45,Water,Common,Smoothed stone-ore from tidal zone beach deposits.,Minor water resistance on armor
+Moldferrite,40,Nature,Common,Ferrite with biological mold patterns bonded to its surface.,Minor nature affinity on weapons
+Bleakmetal,55,Shadow,Common,Uniform black metal that swallows surrounding ambient light.,Minor morale debuff aura
+Seairon,50,Water,Common,Iron ore from seabed deposits; slightly corroded but durable.,Mild water resistance on armor
+Iceglass,55,Ice,Common,Clear glassy ice-mineral ore from frozen glacier beds.,Applies minor chill on hit
+Smoulderore,70,Fire,Common,Ore that stays warm to the touch even after long extraction.,Minor burn damage to weapons
+Bogferrite,50,Water,Common,Ferrite from waterlogged marsh deposits; slightly spongy.,Minor rust resistance on metal
+Holloiron,45,Air,Common,Porous iron ore with hollow channel structures inside.,Lightweight construction material
+Saltbronze,60,Water,Common,Bronze with salt crystal inclusions from coastal mine deposits.,Minor corrode on weapon edges
+Tarnmetal,45,None,Common,Heavily tarnished base metal from long-abandoned mines.,No notable bonuses
+Frigidore,55,Ice,Common,Dense ice-mineral ore with extreme cold retention capacity.,Applies chill on any direct contact
+Palecopper,40,None,Common,Bleached copper ore from high-altitude exposed mine shafts.,No notable bonuses
+Galeshard,65,Air,Common,Shard-like ore formations from wind-carved ridge exposures.,Reduces item weight slightly
+Scorchore,70,Fire,Common,Ore still bearing heat marks from ancient fire exposure.,Minor burn damage to weapons
+Woodore,40,Nature,Common,Mineral ore with dense wood-like grain patterns inside.,Minor nature affinity on weapons
+Cinderglass,60,Fire,Common,Glass formed from volcanic cinder and compacted silica.,Minor fire damage on weapons
+Darkslate,55,Shadow,Common,Flat black slate with a light-absorbing matte surface.,Minor shadow affinity on gear
+Frostferrite,50,Ice,Common,Cold ferrite from polar regions; retains its chill indefinitely.,Applies frost on any contact
+Hazeore,55,Air,Common,Ore mined from cloud-high ridges; unusually and noticeably light.,Reduces armor weight
+Swampglass,50,Nature,Common,Glass-like ore grown from ancient petrified swamp matter.,Minor nature affinity on weapons
+Cragferrite,65,Earth,Common,Dense ferrite from steep sheer cliff deposits.,Adds structural integrity to armor
+Brinemetal,55,Water,Common,Metal cast from brine-saturated coastal ore deposits.,Resists water corrosion
+Emberdust,70,Fire,Common,Fine ember-laden ore dust compressed and fused into solid form.,Minor fire damage on weapons
+Pallidiron,45,None,Common,Bleached pale iron from exposed high-altitude deposits.,No notable bonuses
+Bittenore,60,Poison,Common,Iron ore with faint bitter mineral toxin residue inside.,Inflicts minor poison on deep cuts
+Greyglass,50,None,Common,Plain grey-glass ore of entirely ordinary quality.,No notable bonuses
+Dawnstone,65,Solar,Common,Warm golden-orange stone ore from sun-baked exposed ridges.,Minor radiant damage on weapons
+Nightglass,60,Shadow,Common,Nearly opaque glass ore that forms in lightless caves.,Minor shadow affinity on gear
+Peatferrite,45,Nature,Common,Organic ferrite from peat bog mineral layers.,Minor nature affinity on weapons
+Coarseore,40,Earth,Common,Rough unrefined ore with poor mineral consistency.,Basic construction material
+Thornmetal,65,Nature,Common,Metal with sharp thorn-like natural mineral protrusions.,Minor piercing damage from rough edges
+Grimstone,55,Necrotic,Common,Dark grey stone ore from ancient burial ground deposits.,Minor necrotic affinity on weapons
+Duskglass,50,Shadow,Common,Glass-like ore that darkens visibly in strong direct light.,Minor shadow resistance on armor
+Dustiron,40,Air,Common,Fine-grained iron ore that releases mineral dust when worked.,Lightweight; minor air affinity
+Slabstone,70,Earth,Common,Massive flat ore slabs used in heavy structural construction.,Excellent structural building material
+Bleachore,40,None,Common,Sun-bleached ore from exposed desert surface deposits.,No notable bonuses
+Brimstone,85,Fire,Common,Sulphur-laced ore that smells sharply of fire and char.,Adds burn damage and toxic smoke
+Thornwire,60,Nature,Common,Thin wire-like ore strands from thorny mineral formations.,Minor piercing bonus on weapons
+Rottingore,35,Necrotic,Common,Ore permeated with dark organic decay matter.,Minor life drain; weapons corrode quickly
+Slateiron,45,Earth,Common,Compressed slate and iron deposits fused under pressure.,Adds weight and physical defense
+Crustmetal,50,Earth,Common,Ore with a thick brittle outer crust over a dense core.,Good armor base; brittle under flexing
+Milkstone,40,None,Common,Pale white stone-ore with an unusual opaque appearance.,No notable bonuses
+Grainore,45,Earth,Common,Sandy granular ore with low refinement yield.,Basic construction only
+Embershale,70,Fire,Common,Layered shale ore with embers trapped between seam layers.,Minor fire damage on weapons
+Grimferrite,55,Necrotic,Common,Dark necrotic-touched ferrite from plague-blighted earth.,Minor life drain on any hit
+Sootiron,60,Fire,Common,Iron ore permanently blackened with soot mineral deposits.,Minor fire damage on weapons
+Coldslate,45,Ice,Common,Slate ore pulled from deep below permafrost layers.,Applies minor chill on contact
+Stormcopper,180,Lightning,Uncommon,Copper ore etched with crackling static patterns.,Adds shock damage to weapons; improves speed
+Moonsilver,200,Lunar,Uncommon,A shimmering silver alloy that glows faintly under moonlight.,Effective against creatures of darkness
+Sunforge,220,Solar,Uncommon,Warm golden-hued metal forged in open-air solar furnaces.,Adds radiant damage; blinds on critical hits
+Greenveil,170,Nature,Uncommon,A deep green metal laced with dormant spores and living minerals.,Improves healing effects on armor
+Shadowsteel,250,Shadow,Uncommon,Near-black steel that absorbs direct light around the blade.,Improves stealth and adds shadow damage
+Stormglass,300,Lightning,Uncommon,Glassy ore charged with static during storm formations.,Adds shock damage; crackles when wet
+Ironsong,180,Magnetic,Uncommon,Iron ore that hums faintly at a constant low tone.,Affects metallic constructs; improves aim
+Voidferrite,220,Shadow,Uncommon,Ferrite with a deep null quality that silences nearby sounds.,Minor silence aura; adds shadow damage
+Runecopper,260,Arcane,Uncommon,Copper threaded with ancient runic mineral patterns.,Boosts magical enchantment potency
+Tideiron,190,Water,Uncommon,Iron ore drawn from ocean floor pressure deposits.,Water resistance; minor cold on armor
+Embersteel,280,Fire,Uncommon,Steel with fire minerals locked in its crystalline structure.,Significant burn damage; armor runs hot
+Coldalloy,230,Ice,Uncommon,An alloy that retains arctic cold regardless of ambient temperature.,Applies chill and mild slow on hit
+Thornsteel,200,Nature,Uncommon,Steel interwoven with nature mineral growth; thorny edge.,Minor bleed on weapon edges
+Ashalloy,250,Fire,Uncommon,Alloy of ash mineral and iron; lightweight and warm.,Minor fire resistance and burn damage
+Skyfrost,270,Ice,Uncommon,Pale blue metal from high-altitude glacier core deposits.,Applies chill and reduces enemy speed
+Graveglass,300,Necrotic,Uncommon,Dark glass suffused with necrotic energy from burial sites.,Life drain; minor fear aura
+Verdantore,180,Nature,Uncommon,Vibrant green ore grown in ancient forest root systems.,Improves healing; minor nature damage
+Moonore,220,Lunar,Uncommon,Pale ore only extractable during moonlit nights.,Effective against lycanthropes and shadow
+Lichstone,280,Necrotic,Uncommon,Stone ore permeated with undead essence.,Life drain; resists turning effects
+Stormshard,350,Lightning,Uncommon,A jagged shard ore crackling with unrelenting static.,Strong shock damage; ignites in rain
+Blazeferrite,230,Fire,Uncommon,Ferrite with a sustained inner glow from fire minerals.,Adds persistent burn damage to weapons
+Rustblood,190,Necrotic,Uncommon,Orange-red ore resembling oxidized blood left to dry.,Inflicts wound-toxin; damages metals
+Deepwater,210,Water,Uncommon,Dense blue-black ore from abyssal ocean trench deposits.,Water resistance; minor pressure damage
+Mirrorsilver,240,Arcane,Uncommon,Hyper-reflective silver alloy that bounces spell fragments.,Reflects minor magical damage back
+Thorncopper,180,Nature,Uncommon,Copper with jagged thorn-like structural mineral growths.,Adds bleed and minor nature damage
+Fogshard,200,Air,Uncommon,Shard ore that releases a fine mist when worked or struck.,Obscures vision in area on impact
+Blazeglass,260,Fire,Uncommon,Glass that flames briefly when exposed to intense impact.,Adds burst fire damage on heavy hits
+Duskmetal,230,Shadow,Uncommon,Dark grey metal that seems to dim lights around it.,Minor stealth and shadow damage boost
+Frostiron,200,Ice,Uncommon,Iron pulled from below deep permafrost; permanently cold.,Applies strong chill on hit
+Voidiron,280,Shadow,Uncommon,Iron ore with a deep silent null quality inside it.,Silences magical effects; shadow damage
+Blazeiron,250,Fire,Uncommon,Iron ore with fire minerals fused into the crystalline grain.,Strong burn damage; armor runs very hot
+Wraithsteel,320,Shadow,Uncommon,Steel with a ghostly translucent inner layer.,Passes minor force through physical defense
+Crystalferrite,260,Arcane,Uncommon,Ferrite with arcane crystal inclusions throughout.,Boosts spell damage; amplifies enchantments
+Dawnsteel,280,Solar,Uncommon,Steel with warm golden sunrise coloring; glows softly at dawn.,Adds radiant damage; boosts holy abilities
+Runeiron,300,Arcane,Uncommon,Iron ore etched with pre-existing runic formations inside.,Boosts magic enchantment capacity significantly
+Boneferrite,220,Necrotic,Uncommon,Ferrite with bone-mineral inclusions; off-white and brittle.,Adds bone-shard damage; minor life drain
+Stoneclad,180,Earth,Uncommon,Iron ore coated in a natural thick stone mineral crust.,Heavy; very high physical defense on armor
+Aquaferrite,200,Water,Uncommon,Ferrite drawn from underwater mineral vents.,Strong water resistance; minor cold damage
+Sparkore,250,Lightning,Uncommon,Ore that emits visible sparks when struck or carried rapidly.,Shock damage; ignites flammable targets
+Venomferrite,220,Poison,Uncommon,Ferrite saturated with natural mineral toxin channels.,Inflicts persistent poison on wounds
+Radiantore,280,Radiant,Uncommon,Ore that glows faintly with a golden-white warm inner light.,Adds radiant damage; blinds undead
+Nightore,240,Shadow,Uncommon,Ore that seems darker than black in any lighting condition.,Strong stealth bonus; adds shadow damage
+Ironveil,200,Magnetic,Uncommon,Iron ore that hums and pulls toward other metal objects.,Draws metallic projectiles; disrupts armor
+Bleaksteel,270,Shadow,Uncommon,Steel with a hopeless oppressive quality suffused through it.,Inflicts minor fear; adds shadow damage
+Ashenalloy,230,Fire,Uncommon,Alloy of volcanic ash-iron with residual flame energy.,Fire resistance and minor burn damage
+Crystalsteel,300,Arcane,Uncommon,Steel with arcane crystal veins throughout its structure.,Significantly boosts magical enchantments
+Flameore,280,Fire,Uncommon,Ore that blazes briefly when struck with force.,Strong burn damage; risk of igniting wielder
+Coldore,220,Ice,Uncommon,Dense ore from deep arctic underground deposits.,Strong chill on hit; reduces wearer warmth
+Shadowshard,260,Shadow,Uncommon,Shard ore that refracts light oddly and dims nearby sources.,Strong stealth bonus; shadow damage
+Galeiron,200,Air,Uncommon,Iron ore from wind-carved high altitude cliff faces.,Reduces armor weight; adds air affinity
+Bloomore,220,Nature,Uncommon,Ore with active living moss and micro-growth inside.,Adds nature damage; improves regeneration
+Ghostmetal,280,Shadow,Uncommon,Semi-translucent metal with a hazy ghost-like inner quality.,Passes through partial defenses; shadow
+Emberiron,250,Fire,Uncommon,Iron ore with molten ember cores that glow red inside.,Strong fire damage; armor gets dangerously hot
+Ashstone,200,Fire,Uncommon,Stone-ore saturated with volcanic ash from eruption layers.,Fire resistance; minor burn damage
+Mistalloy,230,Water,Uncommon,Alloy with moisture-releasing internal channels inside.,Applies chill; obscures area in mist
+Moonstone,260,Lunar,Uncommon,Stone ore with pale lunar mineral crystallization inside.,Effective against dark creatures; lunar buff
+Bloodore,280,Necrotic,Uncommon,"Deep red ore that smells faintly metallic, like old wounds.",Drains life on hit; corrupts metals
+Tideferrite,220,Water,Uncommon,Ferrite from tidal flow zone mineral deposits.,Water resistance; mild corrosion immunity
+Emberveil,250,Fire,Uncommon,Faintly glowing ore with heat trails under the surface.,Burn damage; warms wearer in cold
+Shadowglass,280,Shadow,Uncommon,Black glass that reflects nothing; absorbs all light entirely.,Strong stealth bonus; shadow damage
+Ironrose,220,Nature,Uncommon,Iron ore with organic rose-mineral spiral growths inside.,Minor bleed and nature damage combined
+Crystalveil,260,Arcane,Uncommon,Veil-like ore with thin arcane crystal layers.,Strong magical enchantment boost
+Coldstone,200,Ice,Uncommon,Dense stone ore from deep permafrost with cold mineral cores.,Strong chill on hit; slows enemies
+Runealloy,280,Arcane,Uncommon,Alloy with ancient runic patterns etched naturally in it.,Significant magical enchantment boost
+Blazealloy,250,Fire,Uncommon,Alloy with intense fire minerals and a red inner glow.,Strong burn damage; armor is very hot
+Venomglass,220,Poison,Uncommon,Glass-like ore saturated with toxic mineral channels.,Persistent poison on any wound inflicted
+Dawnore,260,Solar,Uncommon,Warm glowing ore extracted at first light from sun-drenched ridges.,Radiant damage; boosts holy effects
+Darkferrite,230,Shadow,Uncommon,Ferrite permeated with darkness from lightless deep mines.,Strong shadow damage; stealth bonus
+Strikeiron,280,Lightning,Uncommon,Iron that attracts and channels static charge from the air.,Shock damage; crackles in wet conditions
+Spiritore,300,Arcane,Uncommon,Ore with a faint spiritual resonance inside its grain.,Boosts soul and arcane enchantments
+Razorferrite,260,Force,Uncommon,Ferrite with razor-sharp internal crystalline edge formations.,Adds piercing force damage to weapons
+Glacialglass,240,Ice,Uncommon,Glass from deep glacial mineral deposits; always freezing.,Very strong chill on hit; slows
+Wraithore,280,Shadow,Uncommon,Ore with ghost-like inner translucence and eerie resonance.,Partial bypass of physical defense
+Tidealloy,220,Water,Uncommon,Alloy from ocean floor mineral deposits; heavy and blue.,Strong water resistance; mild cold aura
+Blightore,260,Necrotic,Uncommon,Ore from heavily corrupted necrotic earth deposits.,Life drain; corrupts other metals nearby
+Cinderferrite,240,Fire,Uncommon,Ferrite with cinder deposits fused throughout its interior.,Strong burn damage to weapons
+Moonalloy,280,Lunar,Uncommon,Alloy with lunar mineral inclusions; glows during moonlit nights.,Effective vs dark; lunar bonuses
+Frostmetal,220,Ice,Uncommon,Metal perpetually cold; frost crystals form on its surface.,Strong chill; slows enemies on hit
+Radiantstone,260,Radiant,Uncommon,Stone ore with bright golden-white mineral inclusions.,Radiant damage; blinds undead on hit
+Stormiron,300,Lightning,Uncommon,Iron ore suffused with storm mineral static energy.,Strong shock damage; ignites wet targets
+Verdantsteel,280,Nature,Uncommon,Steel with living green mineral veins active inside it.,Nature damage; improves healing effects
+Voidalloy,320,Shadow,Uncommon,Alloy with deep null shadow quality inside.,Silences magic; adds strong shadow damage
+Embersteel,350,Fire,Uncommon,Steel with intense fire mineral crystalline lattice inside.,Heavy burn damage; warms wearer
+Bloodferrite,280,Necrotic,Uncommon,Dark red ferrite with life-drain mineral channels inside.,Significant life drain on each hit
+Iceveil,260,Ice,Uncommon,Veil-like ore with ice mineral layers throughout.,Freeze on hit; slows all nearby movement
+Lightningore,300,Lightning,Uncommon,Ore that crackles visibly and audibly with static energy.,Strong shock damage and ignites wet targets
+Shadowalloy,280,Shadow,Uncommon,Alloy permeated with shadow energy; darkens surroundings.,Strong stealth and shadow damage
+Soulstone,320,Arcane,Uncommon,Stone ore with spiritual resonance and arcane inclusions.,Significant magical amplification
+Ashiron,350,"Fire, Air",Rare,Dense ash-iron ore from volcanic ejection zones high above.,Fire damage; reduces armor weight significantly
+Voidcrystal,500,Shadow,Rare,A crystalline ore formed in places devoid of all light.,Strong shadow damage; silences magic in area
+Skycrystal,550,"Air, Lightning",Rare,Crystal grown in upper atmosphere storm formations.,Shock damage; significantly reduces armor weight
+Staralloy,600,"Arcane, Radiant",Rare,Alloy of celestial minerals from meteorite deposits.,Boosts magical power; adds radiant damage
+Abyssstone,520,Shadow,Rare,Stone-ore from the deepest lightless ocean trenches.,Strong shadow damage; deep water resistance
+Sunsteel,580,Solar,Rare,Steel forged entirely under concentrated focused sunlight.,Heavy radiant damage; blinds enemies near
+Gravemetal,540,Necrotic,Rare,Metal suffused with death energy from ancient burial sites.,Strong life drain; minor fear aura
+Mooncrystal,570,"Lunar, Arcane",Rare,Crystal grown only in moonlit caverns; faintly luminous.,Effective vs dark creatures; boosts magic
+Icemetal,510,Ice,Rare,Metal with an absolute zero cold locked inside its core.,Freezes on any hit; slows to near halt
+Runecrystal,620,Arcane,Rare,Crystal with ancient runic growth visible throughout.,Greatly boosts magical enchantment capacity
+Blazecrystal,550,Fire,Rare,Crystal that blazes with inner fire even in vacuum.,Very heavy burn damage on any hit
+Shadowcrystal,580,Shadow,Rare,Crystal formed in total darkness; absorbs all ambient light.,Strong shadow damage; nearly invisible
+Thorncrystal,520,Nature,Rare,Crystal with active thorn-like mineral growth inside.,Bleed and nature damage on any hit
+Cosmicsteel,640,"Arcane, Radiant",Rare,Steel refined from meteorite iron; otherworldly pattern.,Boosts all magical and radiant effects
+Venomcrystal,540,Poison,Rare,Crystal saturated with potent mineral toxin chains.,Persistent powerful poison on any wound
+Galesteel,560,"Air, Force",Rare,Steel reduced to near weightlessness through air mineral infusion.,Dramatically reduces equipment weight
+Frostcrystal,600,Ice,Rare,Crystal formed in the coldest known deep underground cave.,Freezes enemies on hit; spreading ice aura
+Wraithsteel,580,Shadow,Rare,Steel with ghost-mineral translucence; passes defense layers.,Bypasses portion of physical defense
+Bloodcrystal,540,Necrotic,Rare,Dark red crystal with pulsing life-drain mineral channels.,Heavy life drain on each hit
+Stormshard,620,"Lightning, Force",Rare,Shard ore from storm strike locations; explosive energy inside.,Heavy shock damage; knockback
+Radiantcrystal,580,Radiant,Rare,Crystal with blinding golden-white inner glow.,Heavy radiant damage; blinds undead strongly
+Thornsteel,550,Nature,Rare,Steel with deep thorn-mineral growth throughout structure.,Bleed on hit; nature damage combined
+Embcrystal,600,Fire,Rare,Crystal formed over millennia inside volcanic magma chambers.,Very heavy fire damage; smelts armor
+Shadowshard,560,Shadow,Rare,Shard ore with near-total light absorption inside.,Bypasses stealth detection; shadow damage
+Dawncrystal,590,Solar,Rare,Crystal grown in direct unobstructed sunlight over decades.,Heavy radiant damage; boosts holy power
+Cosmiccrystal,650,"Arcane, Void",Rare,Crystal grown in places between worlds; alien structure.,Boosts all magic; minor void damage
+Moonmetal,570,Lunar,Rare,Metal infused with lunar mineral energy over long cycles.,Strong vs dark; amplifies lunar abilities
+Icesteel,530,Ice,Rare,Steel with absolute zero cold locked into its matrix.,Freeze on hit; drains body heat from armor
+Venomiron,540,Poison,Rare,Iron saturated with potent mineral toxin from poison veins.,Heavy persistent poison on any wound
+Galeiron,570,"Air, Force",Rare,Iron reduced to stunning lightness by air mineral infusion.,Removes most of equipment weight
+Starcrystal,640,"Arcane, Radiant",Rare,Crystal from meteorite mineral deposits; alien brilliance.,Boosts magic and adds radiant damage
+Wraithcrystal,590,Shadow,Rare,Crystal with ghost-like translucent interior layers.,Bypasses significant physical defense
+Abysscrystal,610,Shadow,Rare,Crystal formed in the deepest lightless void caverns.,Heavy shadow damage; absolute stealth bonus
+Soulcrystal,620,Arcane,Rare,Crystal with strong spiritual resonance inside its core.,Greatly amplifies all magical effects
+Volcanite,720,Fire,Rare,Dense ore drawn from deep inside active volcano cores.,Very heavy fire damage; burns through armor
+Graviteite,680,"Earth, Force",Rare,Ore with unnaturally dense gravity properties inside.,Adds weight impact; shatters heavy armor
+Tempestite,700,"Lightning, Air",Rare,Ore from lightning strike sites in high mountain peaks.,Heavy shock damage; knockback and stun
+Cryolite,650,Ice,Rare,Ice-mineral ore that freezes solid anything it contacts.,Freeze on hit; persists for multiple rounds
+Umbralite,720,Shadow,Rare,Ore from pure shadow-convergence deep underground.,Heavy shadow damage; silences magic
+Aetheron,680,Arcane,Rare,Ore saturated with pure ambient magical energy.,Greatly boosts all magical abilities and effects
+Sanguinite,640,Necrotic,Rare,Ore with pulsing blood-red life-drain mineral channels.,Heavy life drain; causes wounds to reopen
+Solarium,760,Solar,Rare,Ore processed under focused solar energy for seasons.,Heavy radiant damage; boosts holy greatly
+Glacium,700,Ice,Rare,Ore that maintains absolute cold in all environments.,Freeze on hit; creates ice radius on strike
+Vesperon,640,Shadow,Rare,Ore of dusk-time formation; between shadow and light.,Shadow damage; partial bypass of defense
+Phantorite,680,Psychic,Rare,Ore with strong psychic resonance; disturbing to hold.,Psychic damage; causes confusion on hit
+Mortite,660,Necrotic,Rare,Ore of deep death-energy saturation from ancient tombs.,Heavy life drain; minor undead control aura
+Volantite,700,"Air, Force",Rare,Ore of extreme lightness from high cloud-mineral deposits.,Removes nearly all equipment weight
+Pyroclast,740,Fire,Rare,Ore ejected during volcanic eruptions; dense fire energy.,Very heavy fire damage; ignites all flammables
+Wyrmsteel,820,"Fire, Force",Very Rare,Steel said to contain trace scale-minerals from great wyrms.,Heavy fire damage; shatters protective enchantments
+Voidmetal,900,Shadow,Very Rare,Metal formed in places of complete magical nullity.,Silences all magic in area; heavy shadow damage
+Skymetal,980,"Air, Lightning",Very Rare,Metal of extreme lightness with crackling storm energy inside.,Very heavy shock damage; weightless on wear
+Cosmicmetal,1050,"Arcane, Radiant",Very Rare,Metal forged from meteorite core with alien mineral structure.,Greatly boosts all magic; heavy radiant damage
+Abyssmetal,970,Shadow,Very Rare,Metal from the deepest shadow-convergence underground voids.,Absolute stealth; very heavy shadow damage
+Soulsteel,1100,Arcane,Very Rare,Steel with a persistent spiritual resonance woven inside it.,Greatly amplifies soul and magical effects
+Chronosteel,1150,Temporal,Very Rare,Steel formed over thousands of years in time-convergence sites.,Slows enemies briefly on hit; ages metals
+Sunmetal,1080,Solar,Very Rare,Metal forged under sustained solar energy over centuries.,Very heavy radiant damage; sears all darkness
+Dreamferrite,960,Psychic,Very Rare,Ferrite from psychic-convergence caverns; hypnotic grain.,Causes confusion and psychic damage on hit
+Voidsteel,1200,Shadow,Very Rare,Steel permeated with pure void energy from null-spaces.,Silences magic; very heavy shadow damage
+Frostmithril,1150,Ice,Very Rare,Rare mithril ore with deep arctic cold trapped inside lattice.,Freeze on hit; dramatically reduces weight
+Moonmithril,1100,Lunar,Very Rare,Mithril with lunar mineral inclusions from sacred moon sites.,Strong vs dark; boosts lunar and arcane magic
+Suncalcite,1050,Solar,Very Rare,Calcite-like ore formed in intense focused sunlight deposits.,Heavy radiant damage; sustains holy auras
+Wraithmetal,1200,"Shadow, Force",Very Rare,Metal with ghost-mineral translucence throughout its matrix.,Bypasses significant physical defense layers
+Voidcrystalline,1180,Shadow,Very Rare,Crystalline ore of pure void energy formation.,Absolute magic silence; heavy shadow damage
+Soulore,1100,Arcane,Very Rare,Ore saturated with concentrated spiritual energy.,Amplifies all magical and soul-based effects
+Chronite,1250,Temporal,Very Rare,Ore with time-mineral inclusions; aged from the inside out.,Temporal effects; slows enemies on contact
+Gravemithril,1150,Necrotic,Very Rare,Mithril touched by death energy over deep burial epochs.,Life drain; mithril lightness combined
+Pyrosteel,1080,Fire,Very Rare,Steel with extreme fire mineral energy inside crystalline lattice.,Extreme burn damage; ignites enchantments
+Cosmicstone,1200,Arcane,Very Rare,Stone-ore grown in interplanar convergence zones.,Boosts all dimensional and magical effects
+Thundersteel,1150,"Lightning, Force",Very Rare,Steel with explosive thunder-mineral energy locked inside.,Extreme shock damage; knockback on every hit
+Phantomite,1100,Psychic,Very Rare,Ore with strong psychic resonance; causes visions on touch.,Psychic damage; confusion and fear on hit
+Bloodmithril,1050,Necrotic,Very Rare,Mithril-class ore with life-drain blood mineral channels.,Heavy life drain combined with mithril weight
+Galesteel,1150,"Air, Force",Very Rare,Steel of near-zero weight with explosive force mineral energy.,Removes all weight; adds kinetic force damage
+Solarmetal,1200,Solar,Very Rare,Metal of extreme radiant energy forged in solar convergence.,Extreme radiant damage; sears all shadow magic
+Dreamsteel,1080,Psychic,Very Rare,Steel with dream-psychic mineral inclusions; unsettling grain.,Confusion and psychic damage on any hit
+Voidstone,1250,Shadow,Very Rare,Stone-ore of complete magical nullity and void energy.,Silences magic; extreme shadow damage
+Aetherstone,1150,Arcane,Very Rare,Stone with dense pure magical energy crystallized inside.,Greatly amplifies all magical effects
+Blightmetal,1100,Necrotic,Very Rare,Metal from the deepest necrotic-convergence underground sites.,Extreme life drain; corrupts all metals nearby
+Starlance,1200,"Arcane, Radiant",Very Rare,Thin lanced ore formations from meteorite deep impacts.,Pierces magical defenses; heavy arcane damage
+Icemithril,1150,Ice,Very Rare,Mithril-class ore with absolute zero cold inside lattice.,Freeze on hit; mithril lightness preserved
+Luminite,1100,Radiant,Very Rare,Ore of blinding inner radiant energy; painful to look at.,Extreme radiant damage; blinds all nearby
+Tidalmetal,1050,Water,Very Rare,Metal from abyssal ocean floor tidal-energy convergence.,Very strong water resistance; cold damage aura
+Aethersteel,2200,"Arcane, Force",Epic,Steel refined from pure aetheric energy; alien structure.,Amplifies all magic; kinetic force on any hit
+Voidheart,2400,Shadow,Epic,A core ore of absolute void; radiates complete magical nullity.,Silences all magic in large area; immense shadow damage
+Solarheart,2350,Solar,Epic,Ore forged in the heart of solar concentrations over ages.,Extreme radiant damage; annihilates darkness
+Cosmicheart,2600,"Arcane, Radiant",Epic,Ore from interplanar convergence deep in other dimensions.,Boosts all magic to extreme levels; radiant damage
+Chronoheart,2500,Temporal,Epic,Ore grown over tens of thousands of years in time-loops.,Time effects on all hits; enemies age on contact
+Soulheart,2450,Arcane,Epic,Ore saturated with concentrated soul energy from convergence.,Extreme magical amplification; soul effects
+Phantorheart,2300,Psychic,Epic,Ore of intense psychic energy; causes nightmares to holders.,Extreme psychic damage; mass confusion aura
+Wyrmheart,2400,"Fire, Force",Epic,Ore grown inside the body of ancient great wyrms over ages.,Extreme fire damage; shatters all protective effects
+Graveheart,2350,Necrotic,Epic,Ore of death energy concentration from deepest burial sites.,Extreme life drain; undead serve the wielder
+Thunderheart,2500,"Lightning, Force",Epic,Ore with explosive thunder energy locked in dense matrix.,Extreme shock; mass knockback on any heavy hit
+Wraithmetal,2200,"Shadow, Force",Epic,Metal with deep ghostly translucence and force mineral energy.,Bypasses all physical defense layers significantly
+Dreamheart,2300,Psychic,Epic,Ore with dream-convergence energy; induces waking visions.,Mass confusion and psychic damage on any hit
+Frostheart,2400,Ice,Epic,Ore of absolute cold concentration from deepest arctic voids.,Freezes all nearby enemies; cold immunity
+Bloomblade,2150,Nature,Epic,Ore with explosive nature energy; living growth inside matrix.,Nature damage; grows and mends armor slowly
+Tempestheart,2450,"Lightning, Air",Epic,Ore of storm-convergence energy; crackles constantly loud.,Extreme storm and shock damage; gale force aura
+Soulvoid,2600,"Arcane, Shadow",Epic,Ore where soul and void energies merge into dark lattice.,Silences enemy magic; absorbs and amplifies spells
+Solarvoid,2500,"Solar, Shadow",Epic,Ore of ecliptic convergence where sun and dark meet.,Dual radiant and shadow damage; eclipse aura
+Bloodheart,2350,Necrotic,Epic,Ore pulsing with extreme life-drain blood mineral channels.,Extreme life drain; wounds cannot be healed
+Arcanheart,2600,Arcane,Epic,Ore of pure crystallized magical force; alien formation.,Extreme magical amplification for all effects
+Tidalheart,2300,Water,Epic,Ore from abyssal tidal convergence; constant water pressure.,Very heavy water effects; immense cold damage
+Glacialheart,2400,Ice,Epic,Ore of glacial mass compressed over millions of cold years.,Extreme freeze; mass slow on any contact
+Cosmicvoid,2700,"Arcane, Shadow",Epic,Ore grown where space-between-worlds meets shadow planes.,Boosts all dimensions magic; tears in reality
+Phantomheart,2450,Psychic,Epic,Ore with overwhelming psychic energy; minds crack on touch.,Extreme psychic damage; mass confusion and fear
+Blazeheart,2350,Fire,Epic,Ore of pure fire energy concentration; melts most minerals.,Extreme fire damage; melts through all armor
+Shadowheart,2400,Shadow,Epic,Ore of pure dark-convergence; absolute light absorption inside.,Extreme shadow damage; absolute invisibility aura
+Venomheart,2200,Poison,Epic,Ore saturated with concentrated lethal mineral toxin chains.,Extreme persistent poison; no healing while active
+Aetherheart,2600,Arcane,Epic,Ore of pure aetheric crystallization; hums at all frequencies.,Extreme magical amplification; all affinity boost
+Starheart,2800,"Arcane, Radiant",Epic,Ore grown in the core of fallen stars over deep time.,Extreme all magical effects; radiant devastation
+Galeheart,2250,"Air, Force",Epic,Ore of extreme air concentration; near total weightlessness.,Removes all weight; hurricane force aura on wear
+Sunvoid,2500,"Solar, Void",Epic,Ore where solar energy and void nullity create strange fusion.,Radiant damage and magic silence combined
+Skyheart,2400,"Air, Lightning",Epic,Ore from sky-convergence; crackles with storm and wind inside.,Extreme storm damage; hurricane-level air aura
+Thunderhollowite,2300,"Lightning, Force",Epic,Ore with hollow thunder-force mineral channels inside lattice.,Extreme thunder damage; ruptures armor layers
+Cosmichallite,4500,"Arcane, Radiant",Legendary,A legendary ore from deep interplanar meteorite deposits.,Transcends all known magical limits
+Shadowlord,4200,Shadow,Legendary,Ore worshipped by shadow cults as the metal of darkness itself.,Absolute darkness and immense shadow damage
+Solarbrand,4800,Solar,Legendary,The rarest solar-convergence ore; forged only at solar maxima.,Annihilates all darkness; extreme radiant
+Voidlord,5200,Shadow,Legendary,Ore of absolute void found only in null-space pockets between planes.,Silences all reality; void destruction
+Thunderlord,4600,"Lightning, Force",Legendary,Ore from the most violent lightning-convergence storms ever seen.,Extreme thunder; shatters worlds on hit
+Chronolord,5000,Temporal,Legendary,Ore of complete temporal convergence; time bends around it.,Freezes time briefly on powerful strikes
+Soullord,4800,Arcane,Legendary,The densest known concentration of soul energy in ore form.,Extreme magical amplification; soul capture
+Phantomlord,4400,Psychic,Legendary,Ore of such powerful psychic resonance that minds shatter near it.,Extreme psychic devastation; mass fear
+Frostlord,4600,Ice,Legendary,Ore of absolute zero cold; freezes matter at the quantum level.,Absolute freeze; cold immunity for wielder
+Gravlord,4800,Necrotic,Legendary,The most powerful necrotic-convergence ore in existence.,Extreme life drain; commands undead armies
+Bloombrand,4200,Nature,Legendary,Ore of the most powerful nature-convergence in existence.,Nature magic transcendence; heals all allies
+Wraithlord,4600,"Shadow, Force",Legendary,Ore where shadow and force merge completely; phases matter.,Bypasses all physical defenses entirely
+Aetherlord,5000,Arcane,Legendary,The most powerful aetheric ore in known existence.,Transcends all magical limitations entirely
+Sunlord,5200,Solar,Legendary,The apex of solar-energy ore formation; blinds from miles away.,Annihilates all darkness and shadow utterly
+Starcore,5500,"Arcane, Radiant",Legendary,Ore from the core of an extinguished star.,Extreme all-damage; transcends magical limits
+Galactic,6800,"Arcane, Void",Legendary,Ore formed in the space between galaxies over cosmic ages.,Dimensional damage; bends space on any hit
+Cosmicvortex,7200,"Arcane, Force",Legendary,Ore of cosmic-vortex convergence; tears space on impact.,Space-bending damage; extreme kinetic force
+Primordial,6500,"Earth, Force",Legendary,Ore from before the world existed; impossibly ancient.,Exceeds all known material limits; indestructible
+Etherweave,7000,"Arcane, Air",Legendary,Ore woven from pure aetheric energy given material form.,Transcends all magic; reshapes reality in use
+Abyssalheart,9500,Shadow,Mythic,Ore from the absolute void; predates creation itself.,Destroys reality at contact; unmeasurable shadow
+Soultear,8500,Arcane,Mythic,Ore that tears the soul from anything it touches deeply.,Destroys magical binding; captures any soul
+Chronocore,11000,Temporal,Mythic,Ore from a collapsed time loop; loops existence on impact.,Rewrites time on powerful hit; ages all matter
+Starbreaker,12000,"Arcane, Radiant",Mythic,Ore from a supernova impact; destroys matter on any contact.,Destroys magical protection; extreme all-damage
+Voidtear,10000,Shadow,Mythic,Ore of absolute void that tears holes in the fabric of space.,Silences all existence; tears dimensional fabric
+Dreambreaker,9000,Psychic,Mythic,Ore that unmakes consciousness; no mind survives its touch.,Destroys minds permanently; mass psychic death
+Soulvortex,11500,Arcane,Mythic,Ore of soul-vortex convergence; consumes all magic near it.,Absorbs and destroys all magical effects nearby
+Cosmicbreaker,13000,"Arcane, Force",Mythic,Ore from the collision of two galaxies; unmeasurable density.,Transcends all damage limits; breaks any barrier
+Godmetal,18000,"Arcane, Radiant, Force",Divine,Metal said to have fallen from a dying god's body at world's end. It reshapes reality around it and no known force can damage it.,Transcends all limitations; rewrites the world on use
+Cobbriron,45,Earth,Common,Low-grade iron mixed with cobblestone aggregate.,Basic paving and construction
+Saltcrust,50,Water,Common,Salt-encrusted ore from dried seabed evaporation flats.,Mild corrosion on contact metals
+Scorchedslate,60,Fire,Common,Slate burned by ancient fires; still smells of old char.,Minor fire resistance on armor
+Crakore,55,Earth,Common,Cracked ore from surface deposits exposed to weathering.,Bulk material; modest defense
+Bleachglass,45,None,Common,Sun-bleached glass ore from high-exposure desert deposits.,No notable bonuses
+Thornshale,65,Nature,Common,Shale with thorn-mineral crystalline surface protrusions.,Minor piercing on weapon edges
+Moorstone,50,Water,Common,Pale brownish stone from waterlogged moorland deposits.,Mild water resistance
+Coldshale,45,Ice,Common,Shale pulled from below permafrost; always slightly chilly.,Minor chill on contact
+Gloomslate,55,Shadow,Common,Dull grey slate that seems to absorb nearby ambient light.,Minor stealth affinity
+Oakiron,40,Nature,Common,Iron ore with dense organic oak-mineral grain patterns.,Minor nature affinity on weapons
+Chalkore,35,None,Common,Soft chalky ore of poor mineral quality.,Basic construction filler
+Fernferrite,50,Nature,Common,Ferrite with fern-like mineral growth bonded to surface.,Minor nature resistance on armor
+Tidecrystal,560,Water,Uncommon,Crystal grown in tidal surge mineral deposits over decades.,Water resistance and cold damage
+Nightshard,320,Shadow,Uncommon,Shard ore formed in absolute lightless cave formations.,Strong stealth; shadow damage
+Ironbloom,200,Nature,Uncommon,Iron ore with active blooming mineral growth inside.,Minor bleed and nature damage
+Coldveil,260,Ice,Uncommon,Veil-like ore with persistent ice mineral layers throughout.,Freeze on hit; slow effect
+Runestone,300,Arcane,Uncommon,Stone ore with natural runic formations inside its grain.,Boosts magical enchantment capacity
+Blightglass,280,Necrotic,Uncommon,Glass-like ore from necrotic-convergence underground sites.,Life drain; minor fear aura
+Wrathiron,250,Fire,Uncommon,Iron ore with intense internal fire mineral pressure.,Heavy burn damage; volatile under impact
+Ashveil,220,Fire,Uncommon,Veil-like ore from deep volcanic ash compression zones.,Fire resistance and minor burn
+Bloodsteel,310,Necrotic,Uncommon,Steel with deep red blood-mineral channels throughout.,Life drain on hit; wounds bleed more
+Tideglass,270,Water,Uncommon,Glass ore from tidal flow convergence deep under sea.,Water resistance; cold aura
+Shadowore,260,Shadow,Uncommon,Ore with near-total light absorption surface quality.,Strong stealth; shadow damage
+Tempestiron,320,Lightning,Uncommon,Iron ore from storm-strike locations on mountain peaks.,Shock damage; crackles in storms
+Froststone,240,Ice,Uncommon,Stone ore from frozen tundra underground cold deposits.,Chill on hit; mild slow effect
+Embermetal,280,Fire,Uncommon,Metal with persistent ember mineral energy inside lattice.,Burn damage; warm to the touch
+Lunarstone,260,Lunar,Uncommon,Stone with lunar mineral crystallization throughout interior.,Effective vs dark creatures
+Ghostiron,300,Shadow,Uncommon,Iron with a ghost-like translucent interior mineral layer.,Minor defense bypass; shadow damage
+Venomstone,270,Poison,Uncommon,Stone ore saturated with natural mineral toxin channels.,Persistent poison on wounds
+Cosmicglass,320,Arcane,Uncommon,Glass ore with meteorite mineral inclusions throughout.,Boosts magical effects; radiant bonus
+Phantomglass,270,Psychic,Uncommon,Glass with psychic mineral resonance; disturbing to handle.,Psychic damage; mild confusion
+Starlite,330,Arcane,Uncommon,Ore with meteorite mineral dust visible throughout interior.,Boosts magical power; radiant affinity
+Brimshard,290,Fire,Uncommon,Shard ore with sulphur-fire mineral content inside.,Burn damage; toxic fumes on impact
+Wrathstone,260,Force,Uncommon,Stone ore with dense kinetic force mineral energy inside.,Kinetic force damage; knockback on hit
+Glacstone,300,Ice,Uncommon,Stone from deep glacial ice-mineral convergence deposits.,Freeze on hit; mild slow effect
+Spiritglass,280,Arcane,Uncommon,Glass with strong spiritual arcane resonance throughout.,Boosts magical enchantment capacity
+Ashbloom,250,Fire,Uncommon,Ore with blooming fire-mineral growth visible at core.,Burn damage and minor nature affinity
+Tidesiron,290,Water,Uncommon,Iron from ocean floor deep mineral vent deposits.,Strong water resistance; cold damage
+Nightbloom,310,Shadow,Uncommon,Ore with dark blooming mineral formations inside lattice.,Shadow damage; stealth bonus
+Lunarite,330,Lunar,Uncommon,Ore with dense lunar mineral crystallization inside grain.,Effective vs dark; boosts lunar magic
+Glowferrite,280,Radiant,Uncommon,Ferrite with warm golden-white mineral glow inside.,Radiant damage; minor blind effect
+Grimveil,260,Necrotic,Uncommon,Veil-like ore from burial-site necrotic convergence.,Life drain; minor fear aura on armor
+Dawnglass,270,Solar,Uncommon,Glass from sun-drenched solstice mineral formations.,Radiant damage; boosts holy power
+Moonveil,260,Lunar,Uncommon,Veil-like ore with lunar mineral inclusions throughout.,Effective vs dark; lunar bonus
+Volcanore,780,Fire,Rare,Ore drawn directly from the throat of active volcanoes.,Very heavy fire damage; burns armor
+Abyssite,820,Shadow,Rare,Ore from deep shadow-convergence abyssal cavern formations.,Absolute stealth; heavy shadow damage
+Cryostone,720,Ice,Rare,Stone of extreme arctic cold from deep polar cave deposits.,Freeze on hit; large slow radius
+Aetherglass,760,Arcane,Rare,Glass suffused with pure ambient magical aetheric energy.,Greatly boosts all magical effects
+Cosmiciron,810,Arcane,Rare,Iron from meteorite deposits with alien mineral patterns.,Boosts magic; adds radiant damage
+Phantomstone,740,Psychic,Rare,Stone with overwhelming psychic energy inside its core.,Psychic damage; confusion on hit
+Wrathcrystal,780,Force,Rare,Crystal with explosive force mineral energy at its center.,Kinetic force; knockback on every hit
+Ghostcrystal,760,Shadow,Rare,Crystal with ghost-like translucent interior mineral layer.,Bypasses physical defense; shadow damage
+Gravestone,720,Necrotic,Rare,Stone from deep ancient burial site necrotic convergence.,Heavy life drain; minor undead aura
+Dreamcrystal,750,Psychic,Rare,Crystal with dream-energy resonance; causes waking visions.,Confusion and psychic damage on hit
+Stormcrystal,840,Lightning,Rare,Crystal charged with storm energy from lightning strikes.,Heavy shock damage; ignites wet targets
+Voidore,830,Shadow,Rare,Ore from the deepest null-space void pockets underground.,Heavy shadow damage; silences magic
+Tempestcrystal,870,Lightning,Rare,Crystal formed at the center of violent storm convergence zones.,Extreme shock damage; stun on hit
+Solstice,810,Solar,Rare,Ore formed only at solstice solar convergence over decades.,Heavy radiant damage; boosts holy
+Blightcrystal,780,Necrotic,Rare,Crystal from deep necrotic-convergence underground vaults.,Heavy life drain; corrupts nearby metals
+Dreamstone,760,Psychic,Rare,Stone with dream-energy mineral inclusions inside lattice.,Confusion and psychic damage on hit
+Wraithstone,800,Shadow,Rare,Stone with ghost-like translucent interior quality inside.,Bypasses significant physical defense
+Thundercrystal,850,Lightning,Rare,Crystal with explosive thunder energy inside tight lattice.,Heavy thunder damage; ruptures armor
+Gravite,780,Necrotic,Rare,Dense ore from ancient burial site energy convergence.,Heavy life drain; commands minor undead
+Frostcrystalline,820,Ice,Rare,Crystalline ore of extreme cold from deep arctic voids.,Freeze on hit; expanding ice radius
+Phantomiron,760,Psychic,Rare,Iron with psychic mineral inclusions; unsettling resonance.,Psychic damage; confusion on hit
+Solariron,800,Solar,Rare,Iron forged under concentrated solar energy over decades.,Heavy radiant damage; blinds enemies
+Spiritferrite,810,Arcane,Rare,Ferrite with strong spiritual arcane resonance inside.,Greatly boosts all magical effects
+Moonferrite,790,Lunar,Rare,Ferrite from lunar-mineral convergence deep cave deposits.,Strong vs darkness; lunar bonuses
+Lunarferrite,810,Lunar,Rare,Ferrite with dense lunar crystallization patterns inside.,Effective vs dark; boosts lunar magic
+Abyssferrite,840,Shadow,Rare,Ferrite from deep shadow-convergence abyssal caverns.,Absolute stealth; heavy shadow damage
+Bloodcrystalline,800,Necrotic,Rare,Crystal with pulsing life-drain blood mineral channels.,Heavy life drain; wounds cannot clot
+Thunderferrite,820,Lightning,Rare,Ferrite with explosive thunder energy inside its matrix.,Heavy thunder damage; knockback on hit
+Phantomferrite,790,Psychic,Rare,Ferrite with psychic resonance; disturbing to keep near.,Psychic damage; mild fear on hit
+Cosmicveil,870,Arcane,Rare,Veil-like ore from interplanar convergence deposits.,Boosts all dimensional magical effects
+Grimcrystal,740,Necrotic,Rare,Crystal grown in ancient execution site necrotic deposits.,Heavy life drain; fear aura
+Galecrystal,760,Air,Rare,Crystal from sky convergence formations; near weightless.,Removes most armor weight
+Solarferrite,800,Solar,Rare,Ferrite charged with sustained solar energy over years.,Heavy radiant damage; boosts holy
+Spiritstone,820,Arcane,Rare,Stone with intense soul-arcane resonance throughout.,Greatly boosts all magical effects
+Cryometal,1350,Ice,Very Rare,Metal of near-absolute zero cold from the deepest ice voids.,Freeze on hit; absolute cold aura
+Solarsteel,1280,Solar,Very Rare,Steel forged under centuries of focused solar convergence.,Extreme radiant damage; annihilates dark
+Phantomsteel,1200,Psychic,Very Rare,Steel with overwhelming psychic energy in its lattice.,Extreme psychic damage; mass confusion
+Gravitesteel,1320,Force,Very Rare,Steel with unnaturally dense gravity force inside.,Shatters armor; immense kinetic impact
+Soularite,1400,Arcane,Very Rare,Ore of extreme soul-energy convergence; spiritual resonance.,Extreme magical amplification
+Blazesteel,1300,Fire,Very Rare,Steel with extreme fire mineral energy at its core.,Extreme burn damage; melts through armor
+Moonheart,1180,Lunar,Very Rare,Ore with intense lunar convergence energy at its center.,Strong vs dark; amplifies moon magic
+Stormsteel,1350,Lightning,Very Rare,Steel charged with storm energy from repeated strike sites.,Extreme shock damage; gale aura
+Blightmethril,1200,Necrotic,Very Rare,Mithril-weight ore touched by extreme necrotic convergence.,Extreme life drain; mithril lightness
+Abyssteel,1450,Shadow,Very Rare,Steel from the deepest shadow-convergence void deposits.,Absolute stealth; extreme shadow damage
+Solarveil,1250,Solar,Very Rare,Veil-like ore of intense solar radiant energy inside.,Extreme radiant damage; boosts holy
+Wraithmethril,1350,Shadow,Very Rare,Mithril-class ore with ghost-mineral translucence inside.,Bypasses all physical defense; mithril weight
+Glacialsteel,1300,Ice,Very Rare,Steel of glacial mass compression over millions of years.,Extreme freeze; mass slow effect
+Sunstrike,1450,Solar,Very Rare,Strike-grade ore of pure solar energy; burns through armor.,Extreme radiant; melts through defense
+Voidhammer,1400,Shadow,Very Rare,Dense void-ore that destroys magical effects on any impact.,Destroys enchantments on hit
+Bloodhammer,1250,Necrotic,Very Rare,Dense ore that devastates life force on impact.,Extreme life drain; wounds refuse to heal
+Aetherveil,1350,Arcane,Very Rare,Veil ore of pure aetheric crystallization inside.,Extreme magical amplification; all affinity
+Cosmicvoidite,1500,"Arcane, Shadow",Very Rare,Ore where cosmic and void energy converge into dark matrix.,Boosts dimensional magic; void damage
+Lunarsteel,1280,Lunar,Very Rare,Steel with dense lunar-mineral inclusions from sacred sites.,Strong vs dark; amplifies lunar effects
+Thundersteal,1400,"Lightning, Force",Very Rare,Steel-grade ore with explosive thunder energy inside.,Extreme thunder; shatters all armor
+Cosmichammer,1450,"Arcane, Force",Very Rare,Hammer-grade ore with alien kinetic force inside.,Extreme force damage; breaks any barrier
+Soulhammer,1350,Arcane,Very Rare,Dense ore of soul energy concentration; spirit-shattering.,Extreme magical amplification; soul damage
+Frostvoidite,1300,Ice,Very Rare,Ore where absolute cold and void energy merge inside.,Freeze and void damage combined
+Phantomvoidite,1250,"Psychic, Shadow",Very Rare,Ore where psychic and shadow energy converge and merge.,Psychic and shadow damage combined
+Aetherstrike,1400,Arcane,Very Rare,Strike-grade aetheric ore; pierces all magical protections.,Pierces magical defenses; extreme damage
+Solarcrystal,1280,Solar,Very Rare,Crystal of concentrated solar radiant energy formation.,Extreme radiant damage; boosts holy
+Nightmetal,1200,Shadow,Very Rare,Metal of pure night-shadow convergence from deep voids.,Absolute stealth; extreme shadow damage
+Cosmicvoidheart,2700,"Arcane, Shadow",Epic,Ore grown where space-between-worlds meets shadow planes.,Boosts all dimensions magic; tears in reality
+Dreamvoid,2300,"Psychic, Shadow",Epic,Ore where dream and void converge; waking nightmares within.,Mass psychic damage; fear and confusion aura
+Bloodvoid,2350,"Necrotic, Shadow",Epic,Ore where necrotic and void converge; absolute life drain.,Extreme life drain; magic silence on hit
+Frostedge,2200,Ice,Epic,Ore with edge-of-absolute-zero cold in razor-sharp lattice.,Extreme freeze on hit; cold immunity
+Lunarfang,2350,Lunar,Epic,Fang-like ore formations from deep lunar-convergence voids.,Extreme lunar damage; strong vs darkness
+Stormcore,2500,"Lightning, Force",Epic,Core-grade ore of storm-convergence kinetic energy.,Extreme thunder; shatters reality on impact
+Shadowvoid,2600,Shadow,Epic,Ore of pure shadow-void convergence; tears light from space.,Absolute darkness; immense shadow damage
+Soulfang,2400,Arcane,Epic,Fang-like ore of soul-energy convergence at its tip.,Soul capture; extreme magical amplification
+Solarhammer,2300,Solar,Epic,Hammer-grade ore of intense solar radiant energy.,Extreme radiant damage; annihilates darkness
+Cosmicfang,2600,"Arcane, Radiant",Epic,Fang-like ore from interplanar meteorite deposits.,Extreme all magical effects; radiant devastation
+Chronofang,2500,Temporal,Epic,Fang-like ore of temporal convergence grown over millennia.,Time effects; enemies age on any contact
+Gravevoid,2400,Necrotic,Epic,Ore of death-void convergence; absolute life consumption.,Extreme life drain; controls all undead nearby
+Starlord,5800,"Arcane, Radiant",Legendary,Ore grown in the core of an ancient collapsed star.,Extreme all magical effects; radiant devastation
+Soulmaw,5500,Arcane,Legendary,Ore that consumes soul energy from anything it contacts.,Soul capture; extreme magical amplification
+Nightlord,5000,Shadow,Legendary,The apex shadow-convergence ore; absorbs all light and magic.,Absolute darkness; immense shadow damage
+Thundercrown,5200,"Lightning, Force",Legendary,Ore from the most powerful storm-convergence in existence.,Extreme thunder; world-shaking knockback
+Frozenthrone,4800,Ice,Legendary,Ore of absolute zero cold; freezes time around contact.,Absolute freeze; temporal slow effect
+Bloodpact,5100,Necrotic,Legendary,Legendary ore that binds life force permanently on contact.,Extreme life drain; soul binding effect
+Suntear,5400,Solar,Legendary,Ore that tears light from darkness permanently on contact.,Annihilates all shadow; extreme radiant
+Aethercrown,5800,Arcane,Legendary,The crown of aetheric ore formation; transcends magic itself.,Transcends all known magical limits
+Voidmaw,5500,Shadow,Legendary,Ore that consumes all magical energy in its vicinity.,Silences all magic; void consumption
+Dreambreach,4900,Psychic,Legendary,Ore that breaches consciousness itself on any contact.,Extreme psychic devastation; mind-shattering
+Cosmicwrath,6000,"Arcane, Force",Legendary,Ore of cosmic-wrath convergence; breaks laws of matter.,Breaks all physical and magical laws
+Deaththrall,5200,Necrotic,Legendary,Ore that commands the dead and enslaves life on contact.,Extreme life drain; commands undead masses
+Skyscale,290,Air,Uncommon,"Scale-like ore from high cliff-face wind erosion deposits.",Reduces armor weight; minor shock bonus
+Deeproot,210,Nature,Uncommon,"Ore grown around the roots of ancient massive trees.",Improves healing; minor nature affinity
+Grimglass,250,Necrotic,Uncommon,"Dark glass from execution-site mineral convergence.",Life drain; minor fear aura on worn armor
+Ashcrystal,270,Fire,Uncommon,"Crystal with dense fire-ash mineral inclusions inside.",Burn damage; fire resistance on armor
+Coldcrystal,280,Ice,Uncommon,"Crystal with deep cold mineral energy locked inside.",Freeze on hit; minor slow effect
+Tidestone,240,Water,Uncommon,"Dense water-mineral stone from ocean floor deposits.",Strong water resistance on armor
+Spiritshard,300,Arcane,Uncommon,"Shard ore with strong spiritual-arcane resonance.",Boosts soul and magical enchantments
+Wraithshard,280,Shadow,Uncommon,"Shard with ghost-mineral translucence inside.",Minor defense bypass; shadow affinity
+Solarstone,260,Solar,Uncommon,"Stone with warm solar mineral crystallization inside.",Radiant damage; boosts holy effects
+Lunarshale,240,Lunar,Uncommon,"Shale with pale lunar mineral inclusions inside.",Effective vs dark creatures; lunar affinity
+Bloomshard,220,Nature,Uncommon,"Shard with active bloom-mineral growth inside.",Nature damage; improves regeneration
+Stormveil,300,Lightning,Uncommon,"Veil-like ore with storm-static mineral energy.",Shock damage; ignites wet targets
+Venombloom,250,Poison,Uncommon,"Ore with blooming poison mineral growth inside lattice.",Persistent poison on wounds inflicted
+Blazestone,280,Fire,Uncommon,"Stone with intense fire mineral energy at its core.",Burn damage; warm to the touch
+Darkbloom,260,Shadow,Uncommon,"Ore with dark blooming shadow mineral formations.",Shadow damage; minor stealth bonus
+Voidbloom,290,Shadow,Uncommon,"Ore with void-shadow blooming formations inside.",Strong shadow damage; silences minor magic
+Soulbloom,270,Arcane,Uncommon,"Ore with soul-arcane blooming mineral growth inside.",Boosts magical effects; spiritual bonus
+Dreambloom,260,Psychic,Uncommon,"Ore with dream-energy blooming formations inside.",Psychic damage; mild confusion on hit
+Galesteel,310,Air,Uncommon,"Steel with air mineral energy reducing its weight.",Reduces armor weight; minor speed boost
+Radiantbloom,280,Radiant,Uncommon,"Ore with radiant-energy blooming formations inside.",Radiant damage; minor blind on hit
+Bloodbloom,290,Necrotic,Uncommon,"Ore with blood-mineral blooming formations inside.",Life drain on hit; wounds bleed more
+Chronite,700,Temporal,Rare,"Ore from time-convergence mineral deposits; oddly aged.",Temporal effects; slows enemies on hit
+Aetherhammer,860,Arcane,Rare,"Hammer-grade ore of dense aetheric energy inside.",Greatly boosts magical effects; force damage
+Dreamglass,750,Psychic,Rare,"Glass with dream-energy mineral inclusions inside.",Confusion and psychic damage on hit
+Voidglass,790,Shadow,Rare,"Glass of near-complete void formation inside.",Heavy shadow damage; silences magic
+Spiritmetal,810,Arcane,Rare,"Metal with strong spiritual-arcane resonance inside.",Greatly amplifies all magical effects
+Lunarmetal,780,Lunar,Rare,"Metal with dense lunar-mineral inclusions inside.",Strong vs dark; amplifies lunar magic
+Aetheriron,820,Arcane,Rare,"Iron with pure aetheric mineral energy inside lattice.",Greatly boosts magical enchantments
+Solarstone,840,Solar,Rare,"Stone with intense solar radiant energy inside.",Heavy radiant damage; boosts holy power
+Dreamferrite,770,Psychic,Rare,"Ferrite with dream-energy mineral channels inside.",Confusion and psychic damage on hit
+Ghostferrite,790,Shadow,Rare,"Ferrite with ghost-mineral translucence inside.",Bypasses physical defense; shadow damage
+Radiantglass,800,Radiant,Rare,"Glass with blinding radiant mineral energy inside.",Heavy radiant damage; blinds undead
+Phantomalloy,1220,Psychic,Very Rare,"Alloy with overwhelming psychic energy in matrix.",Extreme psychic damage; mass confusion
+Voidalloyite,1350,Shadow,Very Rare,"Alloy of pure void-shadow energy; null formation.",Absolute stealth; extreme shadow damage
+Solaralloy,1280,Solar,Very Rare,"Alloy forged under centuries of solar convergence.",Extreme radiant damage; sears darkness
+Chronoalloy,1400,Temporal,Very Rare,"Alloy formed in time-convergence loops over ages.",Time effects; ages contacted metals
+Dreamalloy,1200,Psychic,Very Rare,"Alloy with dream-convergence energy in its matrix.",Mass confusion and psychic damage
+Spiritalloy,1350,Arcane,Very Rare,"Alloy with concentrated soul-arcane energy inside.",Extreme magical amplification; soul bonus
+Bloomheart,2100,Nature,Epic,"Ore of the most powerful nature-convergence inside.",Extreme nature damage; heals all allies
+Venomcore,2200,Poison,Epic,"Core-grade ore saturated with lethal toxin chains.",Extreme persistent poison; no healing
+Frostvortex,2350,Ice,Epic,"Ore of ice-vortex convergence; absolute cold inside.",Extreme freeze; creates expanding ice zone
+Bloodvortex,2300,Necrotic,Epic,"Ore of blood-vortex convergence; extreme life drain.",Extreme life drain; wounds consume life
+Tidaltear,2250,Water,Epic,"Ore where tidal force tears through matter on hit.",Extreme water pressure; shatters armor
+Spirithammer,5300,Arcane,Legendary,"Hammer-grade legendary ore of soul-energy convergence.",Extreme magical power; soul capture
