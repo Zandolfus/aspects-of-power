@@ -1,27 +1,40 @@
 """
 Build script: builds the frontend and copies the output into prod/static/.
-Run this once before starting the production server.
 
-Usage:
+This script must be run from the ORIGINAL project (where the frontend/ folder
+exists alongside prod/). It is NOT needed on a deployment machine -- just copy
+the prod/ folder WITH the static/ directory already built.
+
+Usage (from the original project only):
     python build.py
 """
 
-import os
 import shutil
 import subprocess
 import sys
 from pathlib import Path
 
 PROD_DIR = Path(__file__).parent
-PROJECT_ROOT = PROD_DIR.parent
-FRONTEND_DIR = PROJECT_ROOT / "frontend"
 STATIC_DIR = PROD_DIR / "static"
+
+# Look for the frontend directory next to prod/
+FRONTEND_DIR = PROD_DIR.parent / "frontend"
 
 
 def main():
-    # Check that frontend directory exists
     if not FRONTEND_DIR.exists():
-        print(f"ERROR: Frontend directory not found at {FRONTEND_DIR}")
+        print("ERROR: frontend/ directory not found next to prod/.")
+        print(f"  Expected at: {FRONTEND_DIR}")
+        print()
+        if STATIC_DIR.exists():
+            print("However, static/ already exists -- you can run 'python start.py' directly.")
+        else:
+            print("This script must be run from the original project directory,")
+            print("where the frontend/ source code lives alongside the prod/ folder.")
+            print()
+            print("If you are on a deployment machine, copy the prod/ folder WITH")
+            print("the static/ directory already included. Then just run:")
+            print("    python start.py")
         sys.exit(1)
 
     # Check that node_modules exist
