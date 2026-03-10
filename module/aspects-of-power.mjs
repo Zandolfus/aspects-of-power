@@ -699,7 +699,8 @@ Hooks.on('renderChatMessageHTML', (message, html) => {
       await target.update(updateData);
 
       // Degrade durability on equipped items that provide the relevant defense.
-      const totalDamage = Math.max(0, preToughnessDmg - toughness);
+      const effectiveTough = Math.max(0, toughnessMod - affinityDR);
+      const totalDamage = Math.max(0, preToughnessDmg - effectiveTough);
       await EquipmentSystem.degradeDurability(target, totalDamage, damageType);
 
       const breakdown = parts.length ? ` (${parts.join(', ')})` : '';
