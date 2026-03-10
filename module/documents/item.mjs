@@ -1083,6 +1083,11 @@ export class AspectsofPowerItem extends Item {
         break;
       }
 
+      case 'repairKit': {
+        ui.notifications.info('Use the repair button on equipment to use this repair kit.');
+        return; // Don't consume a charge.
+      }
+
       case 'none': {
         ChatMessage.create({ speaker, rollMode, content: chatContent });
         break;

@@ -240,13 +240,8 @@ export class EquipmentSystem {
    * @param {Item} repairKit  The repair kit item to consume.
    */
   static async repair(item, repairKit) {
-    if (!repairKit.system.isRepairKit || repairKit.system.quantity <= 0) return;
-
-    // Guard: don't let the item consume itself as a repair kit.
-    if (item.id === repairKit.id) {
-      ui.notifications.warn('An item cannot repair itself.');
-      return;
-    }
+    if (repairKit.type !== 'consumable' || repairKit.system.effectType !== 'repairKit') return;
+    if (repairKit.system.quantity <= 0) return;
 
     const dur = item.system.durability;
     const newValue = Math.min(dur.max, dur.value + repairKit.system.repairAmount);
@@ -254,12 +249,29 @@ export class EquipmentSystem {
 
     await item.update({ 'system.durability.value': newValue });
 
-    // Consume one repair kit.
-    const newQty = repairKit.system.quantity - 1;
-    if (newQty <= 0) {
-      await repairKit.delete();
+    // Consume one charge / quantity from the repair kit.
+    const charges = repairKit.system.charges;
+    if (charges.max > 1) {
+      // Multi-charge: decrement charge, reset & consume quantity when depleted.
+      const newCharge = charges.value - 1;
+      if (newCharge <= 0) {
+        const newQty = repairKit.system.quantity - 1;
+        if (newQty <= 0) {
+          await repairKit.delete();
+        } else {
+          await repairKit.update({ 'system.quantity': newQty, 'system.charges.value': charges.max });
+        }
+      } else {
+        await repairKit.update({ 'system.charges.value': newCharge });
+      }
     } else {
-      await repairKit.update({ 'system.quantity': newQty });
+      // Single-use: consume quantity.
+      const newQty = repairKit.system.quantity - 1;
+      if (newQty <= 0) {
+        await repairKit.delete();
+      } else {
+        await repairKit.update({ 'system.quantity': newQty });
+      }
     }
 
     ui.notifications.info(`Repaired ${item.name} (+${actualRepair} durability).`);

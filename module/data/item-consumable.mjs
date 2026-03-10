@@ -54,6 +54,9 @@ export class ConsumableData extends foundry.abstract.TypeDataModel {
         shape:      new fields.StringField({ initial: 'circle' }),
         diameter:   new fields.NumberField({ initial: 10, min: 5, integer: true }),
       }),
+
+      // Repair Kit: how much durability is restored per use.
+      repairAmount: new fields.NumberField({ initial: 0, min: 0, integer: true }),
     };
   }
 }

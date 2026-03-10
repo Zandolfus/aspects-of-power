@@ -213,6 +213,17 @@
       </div>
       {{/if}}
 
+      {{!-- Repair Kit Config --}}
+      {{#if (eq system.effectType "repairKit")}}
+      <div class='effect-config'>
+        <h4>{{localize "ASPECTSOFPOWER.ConsumableEffect.repairKit"}}</h4>
+        <div class='equip-field'>
+          <label>{{localize "ASPECTSOFPOWER.Equip.repairAmount"}}</label>
+          <input type='number' name='system.repairAmount' value='{{system.repairAmount}}' min='0' />
+        </div>
+      </div>
+      {{/if}}
+
       {{!-- None --}}
       {{#if (eq system.effectType "none")}}
       <p class='hint'>This consumable has no mechanical effect.</p>
