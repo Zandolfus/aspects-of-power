@@ -644,37 +644,41 @@ Hooks.on('renderChatMessageHTML', (message, html) => {
 
       const actorUuid  = btn.dataset.actorUuid;
       const preToughnessDmg = parseInt(btn.dataset.damage, 10);
-      const toughness  = parseInt(btn.dataset.toughness, 10) || 0;
+      const toughnessMod = parseInt(btn.dataset.toughness, 10) || 0;
+      const affinityDR   = parseInt(btn.dataset.affinityDr, 10) || 0;
       const damageType = btn.dataset.damageType || 'physical';
       const target     = await fromUuid(actorUuid);
       if (!target || isNaN(preToughnessDmg)) return;
 
       // --- Damage routing: Barrier → Toughness → Overhealth → HP ---
-      // Toughness only applies to damage that passes through the barrier.
+      // Toughness and affinity DR only apply to damage that passes through barriers.
       let remaining = preToughnessDmg;
       const updateData = {};
       const parts = [];
+      let barrierAbsorbed = false;
 
-      // 1. Barrier absorbs first (if present). No toughness on this portion.
+      // 1. Barrier absorbs first (if present). No toughness/DR on this portion.
       const barrier = target.system.barrier;
       if (barrier?.value > 0) {
-        const barrierAbsorbed = Math.min(barrier.value, remaining);
-        const newBarrierVal = barrier.value - barrierAbsorbed;
-        remaining -= barrierAbsorbed;
+        const absorbed = Math.min(barrier.value, remaining);
+        const newBarrierVal = barrier.value - absorbed;
+        remaining -= absorbed;
+        barrierAbsorbed = true;
         updateData['system.barrier.value'] = newBarrierVal;
         if (newBarrierVal === 0) {
           updateData['system.barrier.max'] = 0;
           updateData['system.barrier.affinities'] = [];
           updateData['system.barrier.source'] = '';
         }
-        parts.push(`Barrier: −${barrierAbsorbed}${newBarrierVal === 0 ? ' (broken)' : ''}`);
+        parts.push(`Barrier: −${absorbed}${newBarrierVal === 0 ? ' (broken)' : ''}`);
       }
 
-      // 2. Toughness reduces whatever got through the barrier.
-      if (remaining > 0 && toughness > 0) {
-        const toughnessReduced = Math.min(toughness, remaining);
-        remaining = Math.max(0, remaining - toughness);
-        parts.push(`Toughness: −${toughnessReduced}`);
+      // 2. Toughness (with affinity DR) reduces whatever got through the barrier.
+      if (remaining > 0) {
+        const effectiveToughness = Math.max(0, toughnessMod - affinityDR);
+        const toughnessReduced = Math.min(effectiveToughness, remaining);
+        remaining = Math.max(0, remaining - effectiveToughness);
+        if (toughnessReduced > 0) parts.push(`Toughness: −${toughnessReduced}`);
       }
 
       // 3. Overhealth absorbs next.

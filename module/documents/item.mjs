@@ -184,7 +184,8 @@ export class AspectsofPowerItem extends Item {
            <button class="apply-damage"
              data-actor-uuid="${targetActor.uuid}"
              data-damage="${preToughnessDmg}"
-             data-toughness="${effectiveToughness}"
+             data-toughness="${toughnessMod}"
+             data-affinity-dr="${affinityDR}"
              data-damage-type="${isPhysical ? 'physical' : 'magical'}"
              style="margin-top:6px;width:100%;">
              Apply ${finalDamage} to ${targetActor.name}
