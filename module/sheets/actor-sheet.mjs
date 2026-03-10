@@ -294,7 +294,7 @@ export class AspectsofPowerActorSheet extends foundry.applications.api.Handlebar
         const itemId = ev.currentTarget.closest('.item').dataset.itemId;
         const item = this.actor.items.get(itemId);
         if (!item) return;
-        const kit = this.actor.items.find(i => i.type === 'item' && i.system.isRepairKit && i.system.quantity > 0);
+        const kit = this.actor.items.find(i => i.id !== itemId && i.type === 'item' && i.system.isRepairKit && i.system.quantity > 0);
         if (!kit) {
           ui.notifications.warn(game.i18n.localize('ASPECTSOFPOWER.Equip.noRepairKits'));
           return;

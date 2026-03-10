@@ -46,19 +46,6 @@
     {{! Equipment Tab }}
     <div class='tab equipment-config' data-group='primary' data-tab='equipment'>
 
-      {{!-- Repair Kit Toggle --}}
-      <label class="equip-field repair-kit-toggle">
-        <input type="checkbox" name="system.isRepairKit" {{checked system.isRepairKit}} />
-        {{localize "ASPECTSOFPOWER.Equip.repairKit"}}
-      </label>
-
-      {{#if system.isRepairKit}}
-        <div class="equip-field">
-          <label>{{localize "ASPECTSOFPOWER.Equip.repairAmount"}}</label>
-          <input type="number" name="system.repairAmount" value="{{system.repairAmount}}" min="0" />
-        </div>
-      {{else}}
-
         {{!-- Slot --}}
         <div class="equip-field">
           <label>{{localize "ASPECTSOFPOWER.Equip.slot"}}</label>
@@ -71,6 +58,20 @@
             {{/each}}
           </select>
         </div>
+
+        {{!-- Repair Kit (only for non-equipment items with no slot) --}}
+        {{#unless system.slot}}
+          <label class="equip-field repair-kit-toggle">
+            <input type="checkbox" name="system.isRepairKit" {{checked system.isRepairKit}} />
+            {{localize "ASPECTSOFPOWER.Equip.repairKit"}}
+          </label>
+          {{#if system.isRepairKit}}
+            <div class="equip-field">
+              <label>{{localize "ASPECTSOFPOWER.Equip.repairAmount"}}</label>
+              <input type="number" name="system.repairAmount" value="{{system.repairAmount}}" min="0" />
+            </div>
+          {{/if}}
+        {{/unless}}
 
         {{!-- Rarity --}}
         <div class="equip-field">
@@ -183,7 +184,6 @@
           </div>
         </div>
 
-      {{/if}}
     </div>
 
     {{! Attributes Tab }}

@@ -242,8 +242,15 @@ export class EquipmentSystem {
   static async repair(item, repairKit) {
     if (!repairKit.system.isRepairKit || repairKit.system.quantity <= 0) return;
 
+    // Guard: don't let the item consume itself as a repair kit.
+    if (item.id === repairKit.id) {
+      ui.notifications.warn('An item cannot repair itself.');
+      return;
+    }
+
     const dur = item.system.durability;
     const newValue = Math.min(dur.max, dur.value + repairKit.system.repairAmount);
+    const actualRepair = newValue - dur.value;
 
     await item.update({ 'system.durability.value': newValue });
 
@@ -255,7 +262,7 @@ export class EquipmentSystem {
       await repairKit.update({ 'system.quantity': newQty });
     }
 
-    ui.notifications.info(`Repaired ${item.name} (+${newValue - dur.value} durability).`);
+    ui.notifications.info(`Repaired ${item.name} (+${actualRepair} durability).`);
   }
 
   /**
@@ -442,16 +449,25 @@ export class EquipmentSystem {
    */
   static _onItemDelete(item, _options, _userId) {
     if (game.userId !== _userId) return;
-    if (!item.parent) return;
 
-    // Equipped equipment deleted — remove its effects.
+    // Resolve the actor — parent may be null after deletion in v13,
+    // so fall back to looking up the actor from the item's UUID.
+    const actor = item.parent ?? game.actors.get(item._source?.parent ?? '');
+    if (!actor) return;
+
+    // Equipped equipment deleted — remove its effects by ID.
     if (item.type === 'item' && item.system.equipped) {
-      this._removeItemEffects(item);
+      const toDelete = actor.effects
+        .filter(e => e.flags?.aspectsofpower?.itemSource === item.id)
+        .map(e => e.id);
+      if (toDelete.length > 0) {
+        actor.deleteEmbeddedDocuments('ActiveEffect', toDelete);
+      }
     }
 
     // Augment deleted — clear it from any equipment that references it.
     if (item.type === 'augment') {
-      for (const equip of item.parent.items) {
+      for (const equip of actor.items) {
         if (equip.type !== 'item') continue;
         const augments = equip.system.augments ?? [];
         const idx = augments.findIndex(a => a.augmentId === item.id);
