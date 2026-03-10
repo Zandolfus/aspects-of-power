@@ -95,7 +95,7 @@
       "cr": 0
     },
   "Item": {
-    "types": ["item", "feature", "skill", "race", "class", "profession", "augment"],
+    "types": ["item", "feature", "skill", "race", "class", "profession", "augment", "consumable"],
     "templates": {
       "base": {
         "description": ""
@@ -125,6 +125,9 @@
       "templates": ["base"]
     },
     "augment": {
+      "templates": ["base"]
+    },
+    "consumable": {
       "templates": ["base"]
     }
   }
