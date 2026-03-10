@@ -1,0 +1,252 @@
+<form class='{{cssClass}} flexcol' autocomplete='off'>
+  <header class='sheet-header'>
+    <img
+      class='profile-img'
+      src='{{item.img}}'
+      data-edit='img'
+      title='{{item.name}}'
+    />
+    <div class='header-fields'>
+      <h1 class='charname'><input
+          name='name'
+          type='text'
+          value='{{item.name}}'
+          placeholder='Name'
+        /></h1>
+      <div class='grid grid-3col'>
+        <div class='resource'>
+          <label class='resource-label'>{{localize "ASPECTSOFPOWER.Equip.quantity"}}</label>
+          <input type='number' name='system.quantity' value='{{system.quantity}}' min='0'/>
+        </div>
+        <div class='resource'>
+          <label class='resource-label'>{{localize "ASPECTSOFPOWER.Equip.weight"}}</label>
+          <input type='number' name='system.weight' value='{{system.weight}}' min='0'/>
+        </div>
+        <div class='resource'>
+          <label class='resource-label'>{{localize "ASPECTSOFPOWER.Consumable.charges"}}</label>
+          <div class='flexrow flex-center'>
+            <input type='number' name='system.charges.value' value='{{system.charges.value}}' min='0'/>
+            <span>/</span>
+            <input type='number' name='system.charges.max' value='{{system.charges.max}}' min='0'/>
+          </div>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  {{! Sheet Tab Navigation }}
+  <nav class='sheet-tabs tabs' data-group='primary'>
+    <a class='item' data-tab='description'>Description</a>
+    <a class='item' data-tab='config'>{{localize "ASPECTSOFPOWER.Consumable.configTab"}}</a>
+    <a class='item' data-tab='attributes'>Attributes</a>
+  </nav>
+
+  {{! Sheet Body }}
+  <section class='sheet-body scrollable' data-scrollable>
+
+    {{! Description Tab }}
+    <div class='tab' data-group='primary' data-tab='description'>
+      <prose-mirror name="system.description" value="{{system.description}}" compact>
+        {{{enrichedDescription}}}
+      </prose-mirror>
+    </div>
+
+    {{! Config Tab }}
+    <div class='tab consumable-config' data-group='primary' data-tab='config'>
+
+      {{!-- Consumable Type --}}
+      <div class='equip-field'>
+        <label>{{localize "ASPECTSOFPOWER.Consumable.type"}}</label>
+        <select name='system.consumableType'>
+          {{#each config.consumableTypes as |label key|}}
+            <option value='{{key}}' {{#if (eq key ../system.consumableType)}}selected{{/if}}>
+              {{localize label}}
+            </option>
+          {{/each}}
+        </select>
+      </div>
+
+      {{!-- Rarity --}}
+      <div class='equip-field'>
+        <label>{{localize "ASPECTSOFPOWER.Equip.rarity"}}</label>
+        <select name='system.rarity' class='rarity-select'>
+          {{#each config.rarities as |rarDef rarKey|}}
+            <option value='{{rarKey}}' {{#if (eq rarKey ../system.rarity)}}selected{{/if}}
+                    style='color: {{rarDef.color}}'>
+              {{localize rarDef.label}}
+            </option>
+          {{/each}}
+        </select>
+      </div>
+
+      {{!-- Effect Type --}}
+      <div class='equip-field'>
+        <label>{{localize "ASPECTSOFPOWER.Consumable.effectType"}}</label>
+        <select name='system.effectType'>
+          {{#each config.consumableEffectTypes as |label key|}}
+            <option value='{{key}}' {{#if (eq key ../system.effectType)}}selected{{/if}}>
+              {{localize label}}
+            </option>
+          {{/each}}
+        </select>
+      </div>
+
+      <hr>
+
+      {{!-- Restoration Config --}}
+      {{#if (eq system.effectType "restoration")}}
+      <div class='effect-config'>
+        <h4>{{localize "ASPECTSOFPOWER.ConsumableEffect.restoration"}}</h4>
+        <div class='equip-field'>
+          <label>{{localize "ASPECTSOFPOWER.Consumable.restoreResource"}}</label>
+          <select name='system.restoration.resource'>
+            {{#each config.restorationResources as |label key|}}
+              {{#unless (eq key "barrier")}}
+              <option value='{{key}}' {{#if (eq key ../system.restoration.resource)}}selected{{/if}}>
+                {{localize label}}
+              </option>
+              {{/unless}}
+            {{/each}}
+          </select>
+        </div>
+        <div class='equip-field'>
+          <label>{{localize "ASPECTSOFPOWER.Consumable.restoreAmount"}}</label>
+          <input type='number' name='system.restoration.amount' value='{{system.restoration.amount}}' min='0' />
+        </div>
+        {{#if (eq system.restoration.resource "health")}}
+        <label class='equip-field checkbox-label'>
+          <input type='checkbox' name='system.restoration.overhealth'
+                 {{#if system.restoration.overhealth}}checked{{/if}} />
+          Overflow into Overhealth
+        </label>
+        {{/if}}
+      </div>
+      {{/if}}
+
+      {{!-- Buff Config --}}
+      {{#if (eq system.effectType "buff")}}
+      <div class='effect-config'>
+        <h4>{{localize "ASPECTSOFPOWER.ConsumableEffect.buff"}}</h4>
+        <div class='equip-field'>
+          <label>{{localize "ASPECTSOFPOWER.Consumable.buffDuration"}}</label>
+          <input type='number' name='system.buff.duration' value='{{system.buff.duration}}' min='0' />
+        </div>
+        <div class='equip-section'>
+          <div class='equip-section-header flexrow'>
+            <h4>{{localize "ASPECTSOFPOWER.Equip.statBonuses"}}</h4>
+            <a class='consumable-buff-add' title='Add'><i class='fas fa-plus'></i></a>
+          </div>
+          <div class='consumable-buff-list'>
+            {{#each system.buff.entries as |entry idx|}}
+              <div class='stat-bonus-row flexrow' data-index='{{idx}}'>
+                <select class='consumable-buff-attr' data-index='{{idx}}'>
+                  {{#each @root.config.abilities as |label aKey|}}
+                    <option value='abilities.{{aKey}}' {{#if (eq (concat "abilities." aKey) entry.attribute)}}selected{{/if}}>
+                      {{localize label}}
+                    </option>
+                  {{/each}}
+                </select>
+                <input type='number' class='consumable-buff-value' data-index='{{idx}}'
+                       value='{{entry.value}}' />
+                <a class='consumable-buff-delete' data-index='{{idx}}' title='Remove'>
+                  <i class='fas fa-trash'></i>
+                </a>
+              </div>
+            {{/each}}
+          </div>
+        </div>
+      </div>
+      {{/if}}
+
+      {{!-- Poison Config --}}
+      {{#if (eq system.effectType "poison")}}
+      <div class='effect-config'>
+        <h4>{{localize "ASPECTSOFPOWER.ConsumableEffect.poison"}}</h4>
+        <div class='equip-field'>
+          <label>{{localize "ASPECTSOFPOWER.Consumable.poisonDamage"}}</label>
+          <input type='number' name='system.poison.damage' value='{{system.poison.damage}}' min='0' />
+        </div>
+        <div class='equip-field'>
+          <label>{{localize "ASPECTSOFPOWER.Consumable.damageType"}}</label>
+          <select name='system.poison.damageType'>
+            <option value='physical' {{#if (eq system.poison.damageType "physical")}}selected{{/if}}>Physical</option>
+            <option value='magical' {{#if (eq system.poison.damageType "magical")}}selected{{/if}}>Magical</option>
+          </select>
+        </div>
+        <div class='equip-field'>
+          <label>{{localize "ASPECTSOFPOWER.Consumable.poisonDuration"}}</label>
+          <input type='number' name='system.poison.duration' value='{{system.poison.duration}}' min='1' />
+          <p class='hint'>Attacks before the poison wears off.</p>
+        </div>
+      </div>
+      {{/if}}
+
+      {{!-- Bomb Config --}}
+      {{#if (eq system.effectType "bomb")}}
+      <div class='effect-config'>
+        <h4>{{localize "ASPECTSOFPOWER.ConsumableEffect.bomb"}}</h4>
+        <div class='equip-field'>
+          <label>{{localize "ASPECTSOFPOWER.Consumable.bombDamage"}}</label>
+          <input type='number' name='system.bomb.damage' value='{{system.bomb.damage}}' min='0' />
+        </div>
+        <div class='equip-field'>
+          <label>{{localize "ASPECTSOFPOWER.Consumable.damageType"}}</label>
+          <select name='system.bomb.damageType'>
+            <option value='physical' {{#if (eq system.bomb.damageType "physical")}}selected{{/if}}>Physical</option>
+            <option value='magical' {{#if (eq system.bomb.damageType "magical")}}selected{{/if}}>Magical</option>
+          </select>
+        </div>
+        <div class='equip-field'>
+          <label>{{localize "ASPECTSOFPOWER.Consumable.bombDiameter"}}</label>
+          <input type='number' name='system.bomb.diameter' value='{{system.bomb.diameter}}' min='5' step='5' />
+        </div>
+        <div class='equip-field'>
+          <label>{{localize "ASPECTSOFPOWER.Consumable.bombShape"}}</label>
+          <select name='system.bomb.shape'>
+            {{#each config.aoeShapes as |label key|}}
+              <option value='{{key}}' {{#if (eq key ../system.bomb.shape)}}selected{{/if}}>
+                {{localize label}}
+              </option>
+            {{/each}}
+          </select>
+        </div>
+      </div>
+      {{/if}}
+
+      {{!-- None --}}
+      {{#if (eq system.effectType "none")}}
+      <p class='hint'>This consumable has no mechanical effect.</p>
+      {{/if}}
+
+    </div>
+
+    {{! Attributes Tab }}
+    <div class='tab attributes' data-group='primary' data-tab='attributes'>
+      <ol class="items-list effects-list">
+        {{#each effects as |section sid|}}
+        <li class="items-header flexrow" data-effect-type="{{section.type}}">
+          <h3 class="item-name effect-name flexrow">{{localize section.label}}</h3>
+          <div class="item-controls">
+            <a class="effect-control" data-action="create" data-type="{{section.type}}">
+              <i class="fas fa-plus"></i> Add
+            </a>
+          </div>
+        </li>
+        {{#each section.effects as |effect eid|}}
+        <li class="item flexrow" data-effect-id="{{effect._id}}">
+          <div class="effect-image">
+            <img src="{{effect.img}}" title="{{effect.name}}" width="24" height="24"/>
+          </div>
+          <h4 class="effect-name">{{effect.name}}</h4>
+          <div class="item-controls">
+            <a class="effect-control" data-action="edit"><i class="fas fa-edit"></i></a>
+            <a class="effect-control" data-action="delete"><i class="fas fa-trash"></i></a>
+          </div>
+        </li>
+        {{/each}}
+        {{/each}}
+      </ol>
+    </div>
+
+  </section>
+</form>

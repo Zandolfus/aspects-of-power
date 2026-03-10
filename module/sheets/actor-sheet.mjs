@@ -105,6 +105,7 @@ export class AspectsofPowerActorSheet extends foundry.applications.api.Handlebar
    */
   _prepareItems(context) {
     const gear           = [];
+    const consumables    = [];
     const features       = [];
     const skills         = { Active: [], Passive: [] };
 
@@ -117,6 +118,13 @@ export class AspectsofPowerActorSheet extends foundry.applications.api.Handlebar
         const dur = i.system.durability;
         i.durabilityPercent = dur?.max > 0 ? Math.round((dur.value / dur.max) * 100) : 100;
         gear.push(i);
+      } else if (i.type === 'consumable') {
+        const rarityDef = CONFIG.ASPECTSOFPOWER.rarities[i.system.rarity];
+        i.rarityColor = rarityDef?.color ?? '#ffffff';
+        i.consumableLabel = game.i18n.localize(
+          CONFIG.ASPECTSOFPOWER.consumableTypes[i.system.consumableType] ?? 'ASPECTSOFPOWER.Consumable.other'
+        );
+        consumables.push(i);
       } else if (i.type === 'feature') {
         features.push(i);
       } else if (i.type === 'skill') {
@@ -129,6 +137,7 @@ export class AspectsofPowerActorSheet extends foundry.applications.api.Handlebar
     }
 
     context.gear           = gear;
+    context.consumables    = consumables;
     context.features       = features;
     context.skills         = skills;
 
@@ -272,6 +281,16 @@ export class AspectsofPowerActorSheet extends foundry.applications.api.Handlebar
     // Rollable abilities
     this.element.querySelectorAll('.rollable').forEach(el => {
       el.addEventListener('click', this._onRoll.bind(this));
+    });
+
+    // Use consumable
+    this.element.querySelectorAll('.consumable-use').forEach(el => {
+      el.addEventListener('click', async ev => {
+        const itemId = ev.currentTarget.closest('.item').dataset.itemId;
+        const item = this.actor.items.get(itemId);
+        if (!item || item.type !== 'consumable') return;
+        await item.useConsumable();
+      });
     });
 
     // Equip / Unequip toggle

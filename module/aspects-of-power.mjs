@@ -14,6 +14,7 @@ import { RaceData } from './data/item-race.mjs';
 import { ClassData } from './data/item-class.mjs';
 import { ProfessionData } from './data/item-profession.mjs';
 import { AugmentData } from './data/item-augment.mjs';
+import { ConsumableData } from './data/item-consumable.mjs';
 // Import helper/utility classes and constants.
 import { preloadHandlebarsTemplates } from './helpers/templates.mjs';
 import { ASPECTSOFPOWER } from './helpers/config.mjs';
@@ -81,6 +82,7 @@ Hooks.once('init', function () {
     class:         ClassData,
     profession:    ProfessionData,
     augment:       AugmentData,
+    consumable:    ConsumableData,
   };
 
   // Register sheet application classes

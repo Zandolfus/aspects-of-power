@@ -147,6 +147,29 @@ ASPECTSOFPOWER.aoeShapes = {
 };
 
 /**
+ * Consumable sub-types.
+ */
+ASPECTSOFPOWER.consumableTypes = {
+  potion:  'ASPECTSOFPOWER.Consumable.potion',
+  bomb:    'ASPECTSOFPOWER.Consumable.bomb',
+  poison:  'ASPECTSOFPOWER.Consumable.poison',
+  scroll:  'ASPECTSOFPOWER.Consumable.scroll',
+  food:    'ASPECTSOFPOWER.Consumable.food',
+  other:   'ASPECTSOFPOWER.Consumable.other',
+};
+
+/**
+ * Consumable effect types — what happens when the consumable is used.
+ */
+ASPECTSOFPOWER.consumableEffectTypes = {
+  restoration: 'ASPECTSOFPOWER.ConsumableEffect.restoration',
+  buff:        'ASPECTSOFPOWER.ConsumableEffect.buff',
+  poison:      'ASPECTSOFPOWER.ConsumableEffect.poison',
+  bomb:        'ASPECTSOFPOWER.ConsumableEffect.bomb',
+  none:        'ASPECTSOFPOWER.ConsumableEffect.none',
+};
+
+/**
  * Material types for equipment — determines which repair skills can target them.
  */
 ASPECTSOFPOWER.materialTypes = {

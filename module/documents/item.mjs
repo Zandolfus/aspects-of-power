@@ -992,6 +992,130 @@ export class AspectsofPowerItem extends Item {
   }
 
   /* ------------------------------------------------------------------ */
+  /*  Consumable usage                                                   */
+  /* ------------------------------------------------------------------ */
+
+  /**
+   * Use a consumable item. Applies its effect, consumes a charge (or quantity),
+   * and posts a chat message.
+   */
+  async useConsumable() {
+    if (this.type !== 'consumable') return;
+    const sys = this.system;
+
+    // Check charges / quantity.
+    if (sys.charges.value <= 0 && sys.quantity <= 0) {
+      ui.notifications.warn(`${this.name} has no charges or uses remaining.`);
+      return;
+    }
+
+    const speaker = ChatMessage.getSpeaker({ actor: this.actor });
+    const rollMode = game.settings.get('core', 'rollMode');
+    const effectType = sys.effectType;
+
+    // Determine target (self for restoration/buff, selected for poison).
+    let targetActor = this.actor;
+    if (effectType === 'buff') {
+      const targetToken = game.user.targets.first();
+      targetActor = targetToken?.actor ?? this.actor;
+    }
+
+    let chatContent = `<p><strong>${this.actor.name}</strong> uses <strong>${this.name}</strong>.</p>`;
+
+    switch (effectType) {
+      case 'restoration': {
+        const resource = sys.restoration.resource;
+        const amount = sys.restoration.amount;
+        if (amount > 0 && targetActor) {
+          await this._gmAction({
+            type: 'gmApplyRestoration',
+            targetActorUuid: targetActor.uuid,
+            amount,
+            resource,
+            overhealth: sys.restoration.overhealth ?? false,
+            speaker, rollMode,
+          });
+        }
+        break;
+      }
+
+      case 'buff': {
+        if (sys.buff.entries.length > 0 && targetActor) {
+          const changes = sys.buff.entries.map(e => ({
+            key: `system.${e.attribute}.value`,
+            mode: CONST.ACTIVE_EFFECT_MODES.ADD,
+            value: e.value,
+          }));
+          const effectName = `${this.name} (Consumable)`;
+          await this._gmAction({
+            type: 'gmApplyBuff',
+            targetActorUuid: targetActor.uuid,
+            effectName,
+            originUuid: this.uuid,
+            stackable: false,
+            changes,
+            duration: sys.buff.duration,
+            speaker, rollMode,
+          });
+        }
+        break;
+      }
+
+      case 'poison': {
+        // Apply poison flag to the actor's next N attacks.
+        const poisonData = {
+          damage: sys.poison.damage,
+          damageType: sys.poison.damageType,
+          remaining: sys.poison.duration,
+          source: this.name,
+        };
+        await this.actor.setFlag('aspects-of-power', 'appliedPoison', poisonData);
+        chatContent = `<p><strong>${this.actor.name}</strong> applies <strong>${this.name}</strong> `
+          + `(${sys.poison.damage} ${sys.poison.damageType} damage, ${sys.poison.duration} attacks).</p>`;
+        ChatMessage.create({ speaker, rollMode, content: chatContent });
+        break;
+      }
+
+      case 'bomb': {
+        chatContent = `<p><strong>${this.actor.name}</strong> throws <strong>${this.name}</strong> `
+          + `(${sys.bomb.damage} ${sys.bomb.damageType} damage, ${sys.bomb.diameter}ft ${sys.bomb.shape}).</p>`;
+        ChatMessage.create({ speaker, rollMode, content: chatContent });
+        break;
+      }
+
+      case 'none': {
+        ChatMessage.create({ speaker, rollMode, content: chatContent });
+        break;
+      }
+    }
+
+    // Consume a charge. If charges hit 0, consume a quantity and reset charges.
+    const updateData = {};
+    let newCharges = sys.charges.value - 1;
+    if (newCharges <= 0 && sys.charges.max > 0) {
+      // Multi-charge item: consume quantity, reset charges.
+      const newQty = sys.quantity - 1;
+      if (newQty <= 0) {
+        await this.delete();
+        return;
+      }
+      updateData['system.quantity'] = newQty;
+      updateData['system.charges.value'] = sys.charges.max;
+    } else if (sys.charges.max <= 1) {
+      // Single-use: consume quantity directly.
+      const newQty = sys.quantity - 1;
+      if (newQty <= 0) {
+        await this.delete();
+        return;
+      }
+      updateData['system.quantity'] = newQty;
+    } else {
+      updateData['system.charges.value'] = newCharges;
+    }
+    await this.update(updateData);
+  }
+
+  /* ------------------------------------------------------------------ */
   /*  Main roll dispatcher                                               */
   /* ------------------------------------------------------------------ */
 

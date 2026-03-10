@@ -28,6 +28,7 @@ export class AspectsofPowerItemSheet extends foundry.applications.api.Handlebars
     class:         { template: 'systems/aspects-of-power/templates/item/item-class-sheet.hbs', scrollable: ['.sheet-body'] },
     profession:    { template: 'systems/aspects-of-power/templates/item/item-profession-sheet.hbs', scrollable: ['.sheet-body'] },
     augment:       { template: 'systems/aspects-of-power/templates/item/item-augment-sheet.hbs', scrollable: ['.sheet-body'] },
+    consumable:    { template: 'systems/aspects-of-power/templates/item/item-consumable-sheet.hbs', scrollable: ['.sheet-body'] },
   };
 
   /** Render only the part that matches this item's type. */
@@ -382,6 +383,17 @@ export class AspectsofPowerItemSheet extends foundry.applications.api.Handlebars
       await this.document.update({ 'system.roll': rollData });
       return;
     }
+    // --- Consumable fields: direct update for simple fields ---
+    if (this.item.type === 'consumable' && event.target?.name?.startsWith('system.')) {
+      const name = event.target.name;
+      let value;
+      if (event.target.type === 'checkbox') value = event.target.checked;
+      else if (event.target.type === 'number') value = Number(event.target.value);
+      else value = event.target.value;
+      await this.document.update({ [name]: value });
+      return;
+    }
+
     return super._onChangeForm(formConfig, event);
   }
 
@@ -536,6 +548,34 @@ export class AspectsofPowerItemSheet extends foundry.applications.api.Handlebars
         });
       });
     }
+
+    // --- Consumable: Add / Delete buff entries ---
+    this.element.querySelector('.consumable-buff-add')?.addEventListener('click', async () => {
+      const entries = [...(this.item.system.buff?.entries ?? []), { attribute: 'abilities.strength', value: 0 }];
+      await this.document.update({ 'system.buff.entries': entries });
+    });
+
+    this.element.querySelectorAll('.consumable-buff-delete').forEach(el => {
+      el.addEventListener('click', async () => {
+        const idx = Number(el.dataset.index);
+        const entries = [...(this.item.system.buff?.entries ?? [])];
+        entries.splice(idx, 1);
+        await this.document.update({ 'system.buff.entries': entries });
+      });
+    });
+
+    this.element.querySelectorAll('.consumable-buff-attr, .consumable-buff-value').forEach(el => {
+      el.addEventListener('change', async () => {
+        const form = this.element.querySelector('form');
+        const entries = [];
+        form.querySelectorAll('.consumable-buff-list .stat-bonus-row').forEach(row => {
+          const attr = row.querySelector('.consumable-buff-attr')?.value ?? 'abilities.strength';
+          const val = Number(row.querySelector('.consumable-buff-value')?.value) || 0;
+          entries.push({ attribute: attr, value: val });
+        });
+        await this.document.update({ 'system.buff.entries': entries });
+      });
+    });
 
     // --- Skill Chaining: Add / Delete chain entries ---
     this.element.querySelector('.chain-add')?.addEventListener('click', async () => {

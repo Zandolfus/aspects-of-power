@@ -229,6 +229,36 @@
       "itemBonuses": "Item Bonuses",
       "fieldArmor": "Armor",
       "fieldVeil": "Veil"
+    },
+    "Consumable": {
+      "sectionTitle": "Consumables",
+      "type": "Consumable Type",
+      "charges": "Charges",
+      "configTab": "Configuration",
+      "effectType": "Effect Type",
+      "use": "Use",
+      "potion": "Potion",
+      "bomb": "Bomb",
+      "poison": "Poison",
+      "scroll": "Scroll",
+      "food": "Food",
+      "other": "Other",
+      "restoreResource": "Resource",
+      "restoreAmount": "Amount",
+      "buffDuration": "Duration (rounds)",
+      "poisonDamage": "Damage per Attack",
+      "poisonDuration": "Duration (attacks)",
+      "damageType": "Damage Type",
+      "bombDamage": "Damage",
+      "bombDiameter": "Diameter (ft)",
+      "bombShape": "Shape"
+    },
+    "ConsumableEffect": {
+      "restoration": "Restoration",
+      "buff": "Buff",
+      "poison": "Poison",
+      "bomb": "Bomb",
+      "none": "None"
     }
   },
 
@@ -244,7 +274,8 @@
       "race": "Race",
       "class": "Class",
       "profession": "Profession",
-      "augment": "Augment"
+      "augment": "Augment",
+      "consumable": "Consumable"
     }
   }
 }
