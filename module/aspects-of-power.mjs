@@ -661,16 +661,23 @@ Hooks.on('renderChatMessageHTML', (message, html) => {
 
       // 1. Barrier absorbs first (if present). No toughness/DR on this portion.
       const barrier = target.system.barrier;
-      if (barrier?.value > 0) {
+      const barrierEffect = target.effects.find(e =>
+        !e.disabled && e.flags?.aspectsofpower?.effectType === 'barrier'
+      );
+      if (barrier?.value > 0 && barrierEffect) {
         const absorbed = Math.min(barrier.value, remaining);
         const newBarrierVal = barrier.value - absorbed;
         remaining -= absorbed;
         barrierAbsorbed = true;
-        updateData['system.barrier.value'] = newBarrierVal;
+
         if (newBarrierVal === 0) {
-          updateData['system.barrier.max'] = 0;
-          updateData['system.barrier.affinities'] = [];
-          updateData['system.barrier.source'] = '';
+          // Barrier broken — delete the effect.
+          await barrierEffect.delete();
+        } else {
+          // Update the effect's barrier data.
+          await barrierEffect.update({
+            'flags.aspectsofpower.barrierData.value': newBarrierVal,
+          });
         }
         parts.push(`Barrier: −${absorbed}${newBarrierVal === 0 ? ' (broken)' : ''}`);
       }
@@ -707,8 +714,9 @@ Hooks.on('renderChatMessageHTML', (message, html) => {
 
       const breakdown = parts.length ? ` (${parts.join(', ')})` : '';
       const actualHpLoss = health.value - newHealth;
+      const newBarrierValue = barrierAbsorbed ? Math.max(0, barrier.value - Math.min(barrier.value, preToughnessDmg)) : 0;
       const barrierLine = barrierAbsorbed
-        ? `<br>Barrier: ${target.system.barrier?.value ?? 0} / ${barrier?.max ?? 0} remaining`
+        ? `<br>Barrier: ${newBarrierValue} / ${barrier.max} remaining`
         : '';
       ChatMessage.create({
         whisper: ChatMessage.getWhisperRecipients('GM'),

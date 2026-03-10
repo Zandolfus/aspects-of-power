@@ -169,6 +169,26 @@ export class AspectsofPowerActor extends Actor {
     systemData.carryWeight = Math.round(systemData.carryWeight * 10) / 10;
     systemData.encumbered = systemData.carryWeight > systemData.carryCapacity;
 
+    // --- Barrier: aggregate from ActiveEffects ---
+    // Find the active barrier effect and populate system.barrier for the sheet.
+    if (systemData.barrier) {
+      const barrierEffect = this.effects.find(e =>
+        !e.disabled && e.flags?.aspectsofpower?.effectType === 'barrier'
+      );
+      if (barrierEffect) {
+        const bd = barrierEffect.flags.aspectsofpower.barrierData ?? {};
+        systemData.barrier.value = bd.value ?? 0;
+        systemData.barrier.max = bd.max ?? 0;
+        systemData.barrier.affinities = bd.affinities ?? [];
+        systemData.barrier.source = bd.source ?? '';
+      } else {
+        systemData.barrier.value = 0;
+        systemData.barrier.max = 0;
+        systemData.barrier.affinities = [];
+        systemData.barrier.source = '';
+      }
+    }
+
     // Make separate methods for each Actor type (character, npc, etc.) to keep
     // things organized.
     this._prepareCharacterData(actorData);

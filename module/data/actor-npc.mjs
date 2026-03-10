@@ -58,6 +58,14 @@ export class NpcData extends foundry.abstract.TypeDataModel {
         mind:   defenseSchema(),
         soul:   defenseSchema(),
       }),
+
+      // Barrier — populated from ActiveEffects in prepareDerivedData.
+      barrier: new fields.SchemaField({
+        value:      new fields.NumberField({ initial: 0, min: 0, integer: true }),
+        max:        new fields.NumberField({ initial: 0, min: 0, integer: true }),
+        affinities: new fields.ArrayField(new fields.StringField(), { initial: [] }),
+        source:     new fields.StringField({ initial: '' }),
+      }),
     };
   }
 }

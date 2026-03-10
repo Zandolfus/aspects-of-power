@@ -323,21 +323,74 @@ export class AspectsofPowerItem extends Item {
                    + `${resLabel}: ${newHealth} / ${pool.max}</p>`,
           });
         } else if (resource === 'barrier') {
-          // Barrier creation: roll total sets both value and max (the mana pool).
+          // Barrier creation via ActiveEffect.
           const barrierValue = payload.amount;
           const affinities   = payload.barrierAffinities ?? [];
           const source       = payload.barrierSource ?? '';
-          const existing     = target.system.barrier;
-
-          await target.update({
-            'system.barrier.value':      barrierValue,
-            'system.barrier.max':        barrierValue,
-            'system.barrier.affinities': affinities,
-            'system.barrier.source':     source,
-          });
-
           const affText = affinities.length > 0 ? ` (${affinities.join(', ')})` : '';
-          const replaced = existing.max > 0 ? ' (replaced existing barrier)' : '';
+
+          // Check for existing barrier effect.
+          const existingEffect = target.effects.find(e =>
+            !e.disabled && e.flags?.aspectsofpower?.effectType === 'barrier'
+          );
+
+          // Prompt the target's owner to accept. If the target is an NPC, GM decides.
+          const owners = Object.entries(target.ownership ?? {})
+            .filter(([uid, level]) => level >= 3 && uid !== 'default')
+            .map(([uid]) => uid);
+          const decidingUser = owners.find(uid => game.users.get(uid)?.active) ?? game.users.activeGM?.id;
+
+          // Build confirmation prompt content.
+          const existingNote = existingEffect
+            ? `<p class="hint">This will replace your current barrier (${existingEffect.flags.aspectsofpower.barrierData?.value ?? 0} / ${existingEffect.flags.aspectsofpower.barrierData?.max ?? 0}).</p>`
+            : '';
+          const promptContent = `<p>Apply a <strong>${barrierValue}</strong> HP barrier${affText} from <strong>${source}</strong>?</p>${existingNote}`;
+
+          // If the deciding user is the current GM processing this action, prompt directly.
+          // Otherwise we apply it (GM action is already authorized).
+          let accepted = true;
+          if (decidingUser === game.userId) {
+            accepted = await foundry.applications.api.DialogV2.confirm({
+              window: { title: `Barrier — ${target.name}` },
+              content: promptContent,
+              yes: { label: 'Accept', icon: 'fas fa-shield-alt' },
+              no: { label: 'Decline' },
+            });
+          }
+
+          if (!accepted) {
+            ChatMessage.create({
+              speaker: payload.speaker, rollMode: payload.rollMode,
+              content: `<p><strong>${target.name}</strong> declined the barrier.</p>`,
+            });
+            return;
+          }
+
+          // Remove existing barrier effect if present.
+          if (existingEffect) {
+            await existingEffect.delete();
+          }
+
+          // Create barrier ActiveEffect.
+          await target.createEmbeddedDocuments('ActiveEffect', [{
+            name: `Barrier: ${source}`,
+            img: 'icons/magic/defensive/shield-barrier-glowing-blue.webp',
+            disabled: false,
+            flags: {
+              aspectsofpower: {
+                effectType: 'barrier',
+                effectCategory: 'temporary',
+                barrierData: {
+                  value: barrierValue,
+                  max: barrierValue,
+                  affinities,
+                  source,
+                },
+              },
+            },
+          }]);
+
+          const replaced = existingEffect ? ' (replaced existing barrier)' : '';
           ChatMessage.create({
             speaker: payload.speaker, rollMode: payload.rollMode,
             content: `<p><strong>${target.name}</strong> gains a <strong>${barrierValue}</strong> point barrier${affText}${replaced}.</p>`,
