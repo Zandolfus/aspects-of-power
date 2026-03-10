@@ -173,6 +173,23 @@ Hooks.once('ready', function () {
   // Socket listener: only the active GM executes mutations so that
   // players can buff/debuff/heal actors they don't own.
   game.socket.on('system.aspects-of-power', async (payload) => {
+    // --- Player-side: barrier prompt from GM ---
+    if (payload.type === 'barrierPrompt' && payload.targetUserId === game.userId) {
+      const accepted = await foundry.applications.api.DialogV2.confirm({
+        window: { title: `Barrier — ${payload.targetName}` },
+        content: payload.promptContent,
+        yes: { label: 'Accept', icon: 'fas fa-shield-alt' },
+        no: { label: 'Decline' },
+      });
+      game.socket.emit('system.aspects-of-power', {
+        type: 'barrierPromptResponse',
+        requestId: payload.requestId,
+        accepted,
+      });
+      return;
+    }
+
+    // --- GM-side handlers ---
     if (game.users.activeGM !== game.user) return;
 
     if (payload.type === 'gmCombatResult') {

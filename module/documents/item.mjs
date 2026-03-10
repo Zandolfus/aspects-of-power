@@ -338,18 +338,49 @@ export class AspectsofPowerItem extends Item {
           const owners = Object.entries(target.ownership ?? {})
             .filter(([uid, level]) => level >= 3 && uid !== 'default')
             .map(([uid]) => uid);
-          const decidingUser = owners.find(uid => game.users.get(uid)?.active) ?? game.users.activeGM?.id;
+          const playerOwner = owners.find(uid => {
+            const u = game.users.get(uid);
+            return u?.active && !u.isGM;
+          });
 
           // Build confirmation prompt content.
           const existingNote = existingEffect
-            ? `<p class="hint">This will replace your current barrier (${existingEffect.flags.aspectsofpower.barrierData?.value ?? 0} / ${existingEffect.flags.aspectsofpower.barrierData?.max ?? 0}).</p>`
+            ? `<p class="hint">This will replace the current barrier (${existingEffect.flags.aspectsofpower.barrierData?.value ?? 0} / ${existingEffect.flags.aspectsofpower.barrierData?.max ?? 0}).</p>`
             : '';
           const promptContent = `<p>Apply a <strong>${barrierValue}</strong> HP barrier${affText} from <strong>${source}</strong>?</p>${existingNote}`;
 
-          // If the deciding user is the current GM processing this action, prompt directly.
-          // Otherwise we apply it (GM action is already authorized).
           let accepted = true;
-          if (decidingUser === game.userId) {
+          if (playerOwner) {
+            // Send prompt to the player via socket and wait for response.
+            const requestId = foundry.utils.randomID();
+            accepted = await new Promise((resolve) => {
+              const timeout = setTimeout(() => {
+                cleanup();
+                resolve(true); // Default accept on timeout (30s).
+              }, 30000);
+
+              const handler = (response) => {
+                if (response.type !== 'barrierPromptResponse' || response.requestId !== requestId) return;
+                cleanup();
+                resolve(response.accepted);
+              };
+
+              const cleanup = () => {
+                clearTimeout(timeout);
+                game.socket.off('system.aspects-of-power', handler);
+              };
+
+              game.socket.on('system.aspects-of-power', handler);
+              game.socket.emit('system.aspects-of-power', {
+                type: 'barrierPrompt',
+                targetUserId: playerOwner,
+                targetName: target.name,
+                promptContent,
+                requestId,
+              });
+            });
+          } else {
+            // GM-owned target (NPC) — prompt the GM directly.
             accepted = await foundry.applications.api.DialogV2.confirm({
               window: { title: `Barrier — ${target.name}` },
               content: promptContent,
