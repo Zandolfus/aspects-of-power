@@ -225,8 +225,6 @@ export class AspectsofPowerItem extends Item {
     }
 
     // Barrier fully absorbs → flag so debuff/DoT can be skipped.
-    // Use pre-toughness damage since barrier absorbs before toughness applies.
-    const barrierValue = targetActor.system.barrier?.value ?? 0;
     const fullyBlocked = isHit && preToughnessDmg > 0 && barrierValue >= preToughnessDmg;
     return { isHit, fullyBlocked };
   }
