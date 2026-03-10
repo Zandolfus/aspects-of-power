@@ -643,19 +643,21 @@ Hooks.on('renderChatMessageHTML', (message, html) => {
       if (!game.user.isGM) return;
 
       const actorUuid  = btn.dataset.actorUuid;
-      const damage     = parseInt(btn.dataset.damage, 10);
+      const preToughnessDmg = parseInt(btn.dataset.damage, 10);
+      const toughness  = parseInt(btn.dataset.toughness, 10) || 0;
       const damageType = btn.dataset.damageType || 'physical';
       const target     = await fromUuid(actorUuid);
-      if (!target || isNaN(damage)) return;
+      if (!target || isNaN(preToughnessDmg)) return;
 
-      // --- Damage routing: Barrier → Overhealth → HP ---
-      let remaining = damage;
+      // --- Damage routing: Barrier → Toughness → Overhealth → HP ---
+      // Toughness only applies to damage that passes through the barrier.
+      let remaining = preToughnessDmg;
       const updateData = {};
       const parts = [];
 
-      // 1. Barrier absorbs first (if present).
+      // 1. Barrier absorbs first (if present). No toughness on this portion.
       const barrier = target.system.barrier;
-      if (barrier.value > 0) {
+      if (barrier?.value > 0) {
         const barrierAbsorbed = Math.min(barrier.value, remaining);
         const newBarrierVal = barrier.value - barrierAbsorbed;
         remaining -= barrierAbsorbed;
@@ -668,16 +670,23 @@ Hooks.on('renderChatMessageHTML', (message, html) => {
         parts.push(`Barrier: −${barrierAbsorbed}${newBarrierVal === 0 ? ' (broken)' : ''}`);
       }
 
-      // 2. Overhealth absorbs next.
+      // 2. Toughness reduces whatever got through the barrier.
+      if (remaining > 0 && toughness > 0) {
+        const toughnessReduced = Math.min(toughness, remaining);
+        remaining = Math.max(0, remaining - toughness);
+        parts.push(`Toughness: −${toughnessReduced}`);
+      }
+
+      // 3. Overhealth absorbs next.
       const overhealth = target.system.overhealth;
-      if (remaining > 0 && overhealth.value > 0) {
+      if (remaining > 0 && overhealth?.value > 0) {
         const ohAbsorbed = Math.min(overhealth.value, remaining);
         remaining -= ohAbsorbed;
         updateData['system.overhealth.value'] = overhealth.value - ohAbsorbed;
         parts.push(`Overhealth: −${ohAbsorbed}`);
       }
 
-      // 3. Remaining hits HP.
+      // 4. Remaining hits HP.
       const health = target.system.health;
       const newHealth = Math.max(0, health.value - remaining);
       updateData['system.health.value'] = newHealth;
@@ -686,12 +695,13 @@ Hooks.on('renderChatMessageHTML', (message, html) => {
       await target.update(updateData);
 
       // Degrade durability on equipped items that provide the relevant defense.
-      await EquipmentSystem.degradeDurability(target, damage, damageType);
+      const totalDamage = Math.max(0, preToughnessDmg - toughness);
+      await EquipmentSystem.degradeDurability(target, totalDamage, damageType);
 
       const breakdown = parts.length ? ` (${parts.join(', ')})` : '';
       ChatMessage.create({
         whisper: ChatMessage.getWhisperRecipients('GM'),
-        content: `<p><strong>${target.name}</strong> takes <strong>${damage}</strong> damage${breakdown}. `
+        content: `<p><strong>${target.name}</strong> takes <strong>${preToughnessDmg}</strong> damage${breakdown}. `
                + `Health: ${newHealth} / ${health.max}${newHealth === 0 ? ' — <em>Incapacitated!</em>' : ''}</p>`,
       });
 

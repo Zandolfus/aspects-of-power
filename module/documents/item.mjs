@@ -159,7 +159,10 @@ export class AspectsofPowerItem extends Item {
     const toughnessMod      = targetActor.system.abilities?.toughness?.mod ?? 0;
     const affinityDR        = this._getAffinityDRReduction(targetActor, attackerToken, targetToken);
     const effectiveToughness = Math.max(0, toughnessMod - affinityDR);
-    const finalDamage        = isHit ? Math.max(0, Math.round(dmgRoll.total - mitigation - effectiveToughness)) : 0;
+    // Pre-toughness damage (after armor/veil only). Toughness is applied in the
+    // button handler so it only affects damage that passes through barriers.
+    const preToughnessDmg    = isHit ? Math.max(0, Math.round(dmgRoll.total - mitigation)) : 0;
+    const finalDamage        = isHit ? Math.max(0, preToughnessDmg - effectiveToughness) : 0;
     const mitigLabel         = isPhysical ? 'Armor' : 'Veil';
 
     const resultBadge = isHit
@@ -180,7 +183,8 @@ export class AspectsofPowerItem extends Item {
            <p><strong>Final damage: ${finalDamage}</strong></p>
            <button class="apply-damage"
              data-actor-uuid="${targetActor.uuid}"
-             data-damage="${finalDamage}"
+             data-damage="${preToughnessDmg}"
+             data-toughness="${effectiveToughness}"
              data-damage-type="${isPhysical ? 'physical' : 'magical'}"
              style="margin-top:6px;width:100%;">
              Apply ${finalDamage} to ${targetActor.name}
@@ -201,8 +205,9 @@ export class AspectsofPowerItem extends Item {
     }
 
     // Barrier fully absorbs → flag so debuff/DoT can be skipped.
+    // Use pre-toughness damage since barrier absorbs before toughness applies.
     const barrierValue = targetActor.system.barrier?.value ?? 0;
-    const fullyBlocked = isHit && finalDamage > 0 && barrierValue >= finalDamage;
+    const fullyBlocked = isHit && preToughnessDmg > 0 && barrierValue >= preToughnessDmg;
     return { isHit, fullyBlocked };
   }
 
