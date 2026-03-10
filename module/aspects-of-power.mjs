@@ -704,10 +704,15 @@ Hooks.on('renderChatMessageHTML', (message, html) => {
       await EquipmentSystem.degradeDurability(target, totalDamage, damageType);
 
       const breakdown = parts.length ? ` (${parts.join(', ')})` : '';
+      const actualHpLoss = health.value - newHealth;
+      const barrierLine = barrierAbsorbed
+        ? `<br>Barrier: ${target.system.barrier?.value ?? 0} / ${barrier?.max ?? 0} remaining`
+        : '';
       ChatMessage.create({
         whisper: ChatMessage.getWhisperRecipients('GM'),
-        content: `<p><strong>${target.name}</strong> takes <strong>${preToughnessDmg}</strong> damage${breakdown}. `
-               + `Health: ${newHealth} / ${health.max}${newHealth === 0 ? ' — <em>Incapacitated!</em>' : ''}</p>`,
+        content: `<p><strong>${target.name}</strong> takes <strong>${preToughnessDmg}</strong> incoming damage${breakdown}.`
+               + `<br>HP damage: ${actualHpLoss} &nbsp;|&nbsp; Health: ${newHealth} / ${health.max}${barrierLine}`
+               + `${newHealth === 0 ? '<br><em>Incapacitated!</em>' : ''}</p>`,
       });
 
       // Disable the button so it can't be double-applied.
