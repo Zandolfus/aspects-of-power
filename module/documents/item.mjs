@@ -1009,9 +1009,29 @@ export class AspectsofPowerItem extends Item {
       return;
     }
 
+    const effectType = sys.effectType;
+
+    // Repair kits are used via the equipment repair button, not directly.
+    if (effectType === 'repairKit') {
+      ui.notifications.info('Use the repair button on equipment to use this repair kit.');
+      return;
+    }
+
+    // Build a summary for the confirmation dialog.
+    const effectSummary = this._getConsumableEffectSummary();
+
+    // Confirmation dialog.
+    const confirmed = await foundry.applications.api.DialogV2.confirm({
+      window: { title: `Use ${this.name}?` },
+      content: `<p>Use <strong>${this.name}</strong>?</p>`
+        + `<p class="hint">${effectSummary}</p>`,
+      yes: { label: 'Use', icon: 'fas fa-flask' },
+      no: { label: 'Cancel' },
+    });
+    if (!confirmed) return;
+
     const speaker = ChatMessage.getSpeaker({ actor: this.actor });
     const rollMode = game.settings.get('core', 'rollMode');
-    const effectType = sys.effectType;
 
     // Determine target (self for restoration/buff, selected for poison).
     let targetActor = this.actor;
@@ -1083,11 +1103,6 @@ export class AspectsofPowerItem extends Item {
         break;
       }
 
-      case 'repairKit': {
-        ui.notifications.info('Use the repair button on equipment to use this repair kit.');
-        return; // Don't consume a charge.
-      }
-
       case 'none': {
         ChatMessage.create({ speaker, rollMode, content: chatContent });
         break;
@@ -1118,6 +1133,41 @@ export class AspectsofPowerItem extends Item {
       updateData['system.charges.value'] = newCharges;
     }
     await this.update(updateData);
+  }
+
+  /**
+   * Build a human-readable summary of this consumable's effect.
+   * @returns {string}
+   */
+  _getConsumableEffectSummary() {
+    const sys = this.system;
+    const effectLabel = game.i18n.localize(
+      CONFIG.ASPECTSOFPOWER.consumableEffectTypes[sys.effectType] ?? 'ASPECTSOFPOWER.ConsumableEffect.none'
+    );
+    switch (sys.effectType) {
+      case 'restoration': {
+        const resLabel = game.i18n.localize(
+          CONFIG.ASPECTSOFPOWER.restorationResources[sys.restoration.resource] ?? 'Health'
+        );
+        return `${effectLabel}: ${resLabel} +${sys.restoration.amount}`;
+      }
+      case 'buff': {
+        const parts = (sys.buff.entries ?? []).map(e => {
+          const attrKey = e.attribute?.split('.').pop() ?? '?';
+          const sign = e.value >= 0 ? '+' : '';
+          return `${attrKey} ${sign}${e.value}`;
+        });
+        return `${effectLabel}: ${parts.join(', ')} (${sys.buff.duration} rounds)`;
+      }
+      case 'poison':
+        return `${effectLabel}: ${sys.poison.damage} ${sys.poison.damageType} damage for ${sys.poison.duration} attacks`;
+      case 'bomb':
+        return `${effectLabel}: ${sys.bomb.damage} ${sys.bomb.damageType} damage, ${sys.bomb.diameter}ft ${sys.bomb.shape}`;
+      case 'repairKit':
+        return `${effectLabel}: +${sys.repairAmount} durability`;
+      default:
+        return effectLabel;
+    }
   }
 
   /* ------------------------------------------------------------------ */

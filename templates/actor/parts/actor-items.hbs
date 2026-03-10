@@ -30,6 +30,9 @@
   <ol class='items-list'>
     <li class='item flexrow items-header'>
       <div class='item-name'>{{localize "ASPECTSOFPOWER.Consumable.sectionTitle"}}</div>
+      <span class='item-prop consumable-col-type'>{{localize "ASPECTSOFPOWER.Consumable.type"}}</span>
+      <span class='item-prop consumable-col-effect'>Effect</span>
+      <span class='item-prop consumable-col-uses'>Uses</span>
       <div class='item-controls'>
         <a class='item-control item-create' title='New Consumable' data-type='consumable'>
           <i class='fas fa-plus'></i> New Consumable
@@ -44,8 +47,13 @@
           </div>
           <h4 style="color: {{item.rarityColor}}">{{item.name}}</h4>
         </div>
-        <span class="item-prop">{{item.consumableLabel}}</span>
+        <span class='item-prop consumable-col-type'>{{item.consumableLabel}}</span>
+        <span class='item-prop consumable-col-effect'>{{item.effectSummary}}</span>
+        <span class='item-prop consumable-col-uses'>{{item.usesDisplay}}</span>
         <div class='item-controls'>
+          <a class='consumable-use' title='{{localize "ASPECTSOFPOWER.Consumable.use"}}'>
+            <i class='fas fa-flask'></i>
+          </a>
           <a class='item-control item-edit' title='Edit'><i class='fas fa-edit'></i></a>
           <a class='item-control item-delete' title='Delete'><i class='fas fa-trash'></i></a>
         </div>

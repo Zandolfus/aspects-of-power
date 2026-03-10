@@ -124,6 +124,12 @@ export class AspectsofPowerActorSheet extends foundry.applications.api.Handlebar
         i.consumableLabel = game.i18n.localize(
           CONFIG.ASPECTSOFPOWER.consumableTypes[i.system.consumableType] ?? 'ASPECTSOFPOWER.Consumable.other'
         );
+        i.effectSummary = this._buildConsumableEffectSummary(i);
+        // Total uses: charges × quantity for multi-charge, just quantity for single-use.
+        const ch = i.system.charges;
+        i.usesDisplay = ch.max > 1
+          ? `${ch.value}/${ch.max} (×${i.system.quantity})`
+          : `${i.system.quantity}`;
         consumables.push(i);
       } else if (i.type === 'feature') {
         features.push(i);
@@ -163,6 +169,48 @@ export class AspectsofPowerActorSheet extends foundry.applications.api.Handlebar
     // Carry bar percentage (clamped to 100 for display).
     const cap = context.system.carryCapacity || 1;
     context.carryPercent = Math.min(100, Math.round((context.system.carryWeight / cap) * 100));
+  }
+
+  /**
+   * Build a human-readable effect summary for a consumable item.
+   * @param {object} i  The plain item data object.
+   * @returns {string}  e.g. "Restoration (Health +50)" or "Buff (STR +10, 3 rds)"
+   */
+  _buildConsumableEffectSummary(i) {
+    const sys = i.system;
+    const effectLabel = game.i18n.localize(
+      CONFIG.ASPECTSOFPOWER.consumableEffectTypes[sys.effectType] ?? 'ASPECTSOFPOWER.ConsumableEffect.none'
+    );
+
+    switch (sys.effectType) {
+      case 'restoration': {
+        const resLabel = game.i18n.localize(
+          CONFIG.ASPECTSOFPOWER.restorationResources[sys.restoration.resource] ?? 'Health'
+        );
+        return `${effectLabel} (${resLabel} +${sys.restoration.amount})`;
+      }
+      case 'buff': {
+        const parts = (sys.buff.entries ?? []).map(e => {
+          const attrKey = e.attribute?.split('.').pop() ?? '?';
+          const abbr = game.i18n.localize(CONFIG.ASPECTSOFPOWER.abilityAbbreviations[attrKey] ?? attrKey).toUpperCase();
+          const sign = e.value >= 0 ? '+' : '';
+          return `${abbr} ${sign}${e.value}`;
+        });
+        const dur = sys.buff.duration ? `, ${sys.buff.duration} rds` : '';
+        return `${effectLabel} (${parts.join(', ')}${dur})`;
+      }
+      case 'poison': {
+        return `${effectLabel} (${sys.poison.damage} ${sys.poison.damageType}, ${sys.poison.duration} atks)`;
+      }
+      case 'bomb': {
+        return `${effectLabel} (${sys.bomb.damage} ${sys.bomb.damageType}, ${sys.bomb.diameter}ft)`;
+      }
+      case 'repairKit': {
+        return `${effectLabel} (+${sys.repairAmount} durability)`;
+      }
+      default:
+        return effectLabel;
+    }
   }
 
   /* -------------------------------------------- */

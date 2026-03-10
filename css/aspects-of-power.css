@@ -850,6 +850,26 @@
   font-size: 12px;
 }
 
+/* Consumable columns */
+.aspects-of-power .consumable-col-type {
+  flex: 0 0 70px;
+  text-align: center;
+  font-size: 12px;
+}
+.aspects-of-power .consumable-col-effect {
+  flex: 1 1 140px;
+  font-size: 11px;
+  color: #aaa;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.aspects-of-power .consumable-col-uses {
+  flex: 0 0 60px;
+  text-align: center;
+  font-size: 12px;
+}
+
 /* ============================== */
 /* Item Sheet: Equipment Config   */
 /* ============================== */

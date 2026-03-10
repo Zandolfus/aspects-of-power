@@ -445,12 +445,12 @@
         <div class="consumables-section">
           <div class="items-header flexrow">
             <span class="item-name">{{localize "ASPECTSOFPOWER.Consumable.sectionTitle"}}</span>
-            <span class="item-prop equip-col-type">{{localize "ASPECTSOFPOWER.Consumable.type"}}</span>
-            <span class="item-prop equip-col-charges">{{localize "ASPECTSOFPOWER.Consumable.charges"}}</span>
-            <span class="item-prop equip-col-qty">{{localize "ASPECTSOFPOWER.Equip.quantity"}}</span>
+            <span class="item-prop consumable-col-type">{{localize "ASPECTSOFPOWER.Consumable.type"}}</span>
+            <span class="item-prop consumable-col-effect">Effect</span>
+            <span class="item-prop consumable-col-uses">Uses</span>
             <div class="item-controls">
               <a class="item-control item-create" title="{{localize 'DOCUMENT.Create' type='Item'}}" data-type="consumable">
-                <i class="fas fa-plus"></i> {{localize "DOCUMENT.New" type="consumable"}}
+                <i class="fas fa-plus"></i> New Consumable
               </a>
             </div>
           </div>
@@ -462,9 +462,9 @@
                 </div>
                 <h4 style="color: {{item.rarityColor}}">{{item.name}}</h4>
               </div>
-              <span class="item-prop equip-col-type">{{item.consumableLabel}}</span>
-              <span class="item-prop equip-col-charges">{{item.system.charges.value}}/{{item.system.charges.max}}</span>
-              <span class="item-prop equip-col-qty">{{item.system.quantity}}</span>
+              <span class="item-prop consumable-col-type">{{item.consumableLabel}}</span>
+              <span class="item-prop consumable-col-effect">{{item.effectSummary}}</span>
+              <span class="item-prop consumable-col-uses">{{item.usesDisplay}}</span>
               <div class="item-controls">
                 <a class="consumable-use" title="{{localize 'ASPECTSOFPOWER.Consumable.use'}}">
                   <i class="fas fa-flask"></i>
