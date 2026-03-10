@@ -173,14 +173,33 @@ export class AspectsofPowerItem extends Item {
       ? `<p>Attack: ${Math.round(hitRoll.total)} vs ${targetActor.name}'s ${targetDefKey} defense (${defenseValue})</p>`
       : '';
 
+    // Barrier preview: show how damage routes through barrier if present.
+    const barrierValue = targetActor.system.barrier?.value ?? 0;
+    let barrierLine = '';
+    let damageAfterBarrier = preToughnessDmg;
+    let displayDamage = finalDamage;
+    if (isHit && barrierValue > 0) {
+      const barrierAbsorbs = Math.min(barrierValue, preToughnessDmg);
+      damageAfterBarrier = preToughnessDmg - barrierAbsorbs;
+      const toughnessAfter = Math.min(effectiveToughness, damageAfterBarrier);
+      displayDamage = Math.max(0, damageAfterBarrier - effectiveToughness);
+      barrierLine = `<p>Barrier absorbs: ${barrierAbsorbs} / ${barrierValue}${barrierAbsorbs >= barrierValue ? ' <em>(breaks)</em>' : ''}</p>`;
+    }
+
+    const toughnessLine = damageAfterBarrier > 0
+      ? `<p>Toughness: −${Math.min(effectiveToughness, damageAfterBarrier)}${affinityDR > 0 ? ` <em>(−${affinityDR} affinity)</em>` : ''}</p>`
+      : '';
+
     const gmContent = isHit
       ? `<div class="combat-result">
            <h3>${item.name} — ${resultBadge}</h3>
            ${hitLine}
            <hr>
            <p>Raw damage: ${Math.round(dmgRoll.total)}</p>
-           <p>${mitigLabel}: −${mitigation} &nbsp;&nbsp; Toughness: −${effectiveToughness}${affinityDR > 0 ? ` <em>(−${affinityDR} affinity)</em>` : ''}</p>
-           <p><strong>Final damage: ${finalDamage}</strong></p>
+           <p>${mitigLabel}: −${mitigation}</p>
+           ${barrierLine}
+           ${toughnessLine}
+           <p><strong>Final damage: ${displayDamage}</strong></p>
            <button class="apply-damage"
              data-actor-uuid="${targetActor.uuid}"
              data-damage="${preToughnessDmg}"
@@ -188,7 +207,7 @@ export class AspectsofPowerItem extends Item {
              data-affinity-dr="${affinityDR}"
              data-damage-type="${isPhysical ? 'physical' : 'magical'}"
              style="margin-top:6px;width:100%;">
-             Apply ${finalDamage} to ${targetActor.name}
+             Apply to ${targetActor.name}
            </button>
          </div>`
       : `<div class="combat-result">
