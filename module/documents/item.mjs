@@ -54,32 +54,32 @@ export class AspectsofPowerItem extends Item {
   async _promptBarrierManaCost(maxMana) {
     const multiplier = this.system.tagConfig?.barrierMultiplier ?? 1;
     return new Promise(resolve => {
-      new Dialog({
-        title: 'Barrier — Mana Cost',
-        content: `<form>
-          <div class="form-group">
+      let resolved = false;
+      new foundry.applications.api.DialogV2({
+        window: { title: 'Barrier — Mana Cost' },
+        content: `<div class="form-group">
             <label>Mana to spend (max ${maxMana}):</label>
             <input type="number" name="manaCost" value="${maxMana}" min="1" max="${maxMana}" autofocus />
           </div>
-          <p class="hint">Barrier HP = Mana &times; ${multiplier}</p>
-        </form>`,
-        buttons: {
-          confirm: {
-            icon: '<i class="fas fa-shield-alt"></i>',
+          <p class="hint">Barrier HP = Mana &times; ${multiplier}</p>`,
+        buttons: [
+          {
+            action: 'confirm',
             label: 'Create Barrier',
-            callback: html => {
-              const val = parseInt(html.find('[name=manaCost]').val(), 10);
+            default: true,
+            callback: (event, button) => {
+              resolved = true;
+              const val = parseInt(button.form.elements.manaCost?.value, 10);
               resolve(Math.min(Math.max(1, val || 0), maxMana));
             },
           },
-          cancel: {
-            icon: '<i class="fas fa-times"></i>',
+          {
+            action: 'cancel',
             label: 'Cancel',
-            callback: () => resolve(null),
+            callback: () => { resolved = true; resolve(null); },
           },
-        },
-        default: 'confirm',
-        close: () => resolve(null),
+        ],
+        close: () => { if (!resolved) resolve(null); },
       }).render(true);
     });
   }

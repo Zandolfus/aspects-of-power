@@ -278,6 +278,10 @@ export class AspectsofPowerItemSheet extends foundry.applications.api.Handlebars
         debuffStackable:   form.querySelector('[name="system.tagConfig.debuffStackable"]')?.checked ?? false,
         debuffDealsDamage: form.querySelector('[name="system.tagConfig.debuffDealsDamage"]')?.checked ?? false,
         debuffDamageType:  form.querySelector('[name="system.tagConfig.debuffDamageType"]')?.value ?? 'physical',
+        debuffDirectional: form.querySelector('[name="system.tagConfig.debuffDirectional"]')?.checked ?? false,
+
+        // Barrier multiplier (mana-to-HP ratio).
+        barrierMultiplier: Number(form.querySelector('[name="system.tagConfig.barrierMultiplier"]')?.value) || 1,
 
         // Repair: collect checked material types.
         repairMaterials: [...form.querySelectorAll('input[name="system.tagConfig.repairMaterials"]:checked')]
