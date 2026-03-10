@@ -299,7 +299,7 @@ export class AspectsofPowerItem extends Item {
         const pool        = target.system[resource];
         const resLabel    = resource.charAt(0).toUpperCase() + resource.slice(1);
 
-        // Health restoration overflows into overhealth.
+        // Health restoration; overflows into overhealth only if skill opts in.
         if (resource === 'health') {
           const newHealth   = Math.min(pool.max, pool.value + payload.amount);
           const healthGain  = newHealth - pool.value;
@@ -307,7 +307,7 @@ export class AspectsofPowerItem extends Item {
           const updateData  = { 'system.health.value': newHealth };
           let ohGain = 0;
 
-          if (excess > 0) {
+          if (excess > 0 && payload.overhealth && target.system.overhealth) {
             const oh       = target.system.overhealth;
             const ohCap    = oh.cap ?? (pool.max * 2);
             const newOh    = Math.min(ohCap, oh.value + excess);
@@ -608,6 +608,7 @@ export class AspectsofPowerItem extends Item {
       targetActorUuid: targetActor.uuid,
       amount,
       resource,
+      overhealth: this.system.tagConfig?.restorationOverhealth ?? false,
       speaker, rollMode,
     };
 

@@ -238,6 +238,13 @@
             </option>
           {{/each}}
         </select>
+        {{#if (eq system.tagConfig.restorationResource "health")}}
+        <label class='resource-label checkbox-label'>
+          <input type='checkbox' name='system.tagConfig.restorationOverhealth'
+                 {{#if system.tagConfig.restorationOverhealth}}checked{{/if}} />
+          Overflow into Overhealth
+        </label>
+        {{/if}}
         {{#if (eq system.tagConfig.restorationResource "barrier")}}
         <label class='resource-label'>Barrier Multiplier</label>
         <input type='number' name='system.tagConfig.barrierMultiplier'

@@ -60,6 +60,7 @@ export class SkillData extends foundry.abstract.TypeDataModel {
       tagConfig: new fields.SchemaField({
         restorationTarget:   new fields.StringField({ initial: 'selected' }),
         restorationResource: new fields.StringField({ initial: 'health' }),
+        restorationOverhealth: new fields.BooleanField({ initial: false }),
 
         // Buff: array of { attribute, value (multiplier) } pairs + duration.
         // value is a multiplier applied to the roll total (default 1 = full roll value).
