@@ -648,16 +648,50 @@ Hooks.on('renderChatMessageHTML', (message, html) => {
       const target     = await fromUuid(actorUuid);
       if (!target || isNaN(damage)) return;
 
-      const health    = target.system.health;
-      const newHealth = Math.max(0, health.value - damage);
-      await target.update({ 'system.health.value': newHealth });
+      // --- Damage routing: Barrier → Overhealth → HP ---
+      let remaining = damage;
+      const updateData = {};
+      const parts = [];
+
+      // 1. Barrier absorbs first (if present).
+      const barrier = target.system.barrier;
+      if (barrier.value > 0) {
+        const barrierAbsorbed = Math.min(barrier.value, remaining);
+        const newBarrierVal = barrier.value - barrierAbsorbed;
+        remaining -= barrierAbsorbed;
+        updateData['system.barrier.value'] = newBarrierVal;
+        if (newBarrierVal === 0) {
+          updateData['system.barrier.max'] = 0;
+          updateData['system.barrier.affinities'] = [];
+          updateData['system.barrier.source'] = '';
+        }
+        parts.push(`Barrier: −${barrierAbsorbed}${newBarrierVal === 0 ? ' (broken)' : ''}`);
+      }
+
+      // 2. Overhealth absorbs next.
+      const overhealth = target.system.overhealth;
+      if (remaining > 0 && overhealth.value > 0) {
+        const ohAbsorbed = Math.min(overhealth.value, remaining);
+        remaining -= ohAbsorbed;
+        updateData['system.overhealth.value'] = overhealth.value - ohAbsorbed;
+        parts.push(`Overhealth: −${ohAbsorbed}`);
+      }
+
+      // 3. Remaining hits HP.
+      const health = target.system.health;
+      const newHealth = Math.max(0, health.value - remaining);
+      updateData['system.health.value'] = newHealth;
+      if (remaining > 0) parts.push(`Health: −${remaining}`);
+
+      await target.update(updateData);
 
       // Degrade durability on equipped items that provide the relevant defense.
       await EquipmentSystem.degradeDurability(target, damage, damageType);
 
+      const breakdown = parts.length ? ` (${parts.join(', ')})` : '';
       ChatMessage.create({
         whisper: ChatMessage.getWhisperRecipients('GM'),
-        content: `<p><strong>${target.name}</strong> takes <strong>${damage}</strong> damage. `
+        content: `<p><strong>${target.name}</strong> takes <strong>${damage}</strong> damage${breakdown}. `
                + `Health: ${newHealth} / ${health.max}${newHealth === 0 ? ' — <em>Incapacitated!</em>' : ''}</p>`,
       });
 

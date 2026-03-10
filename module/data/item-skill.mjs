@@ -81,6 +81,9 @@ export class SkillData extends foundry.abstract.TypeDataModel {
         debuffDealsDamage:  new fields.BooleanField({ initial: false }),
         debuffDamageType:   new fields.StringField({ initial: 'physical' }),
 
+        // Barrier: mana-to-HP multiplier for barrier restoration skills.
+        barrierMultiplier: new fields.NumberField({ initial: 1, min: 0 }),
+
         // Repair: which material types this skill can repair.
         repairMaterials: new fields.ArrayField(new fields.StringField(), { initial: [] }),
       }),

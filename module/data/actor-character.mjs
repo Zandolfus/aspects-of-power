@@ -21,6 +21,19 @@ export class CharacterData extends foundry.abstract.TypeDataModel {
       health:    resourceSchema(5, 10),
       stamina:   resourceSchema(5, 10),
       mana:      resourceSchema(5, 5),
+
+      overhealth: new fields.SchemaField({
+        value: new fields.NumberField({ initial: 0, min: 0, integer: true }),
+        decayRate: new fields.NumberField({ initial: 10, min: 0 }),
+      }),
+
+      barrier: new fields.SchemaField({
+        value:      new fields.NumberField({ initial: 0, min: 0, integer: true }),
+        max:        new fields.NumberField({ initial: 0, min: 0, integer: true }),
+        affinities: new fields.ArrayField(new fields.StringField(), { initial: [] }),
+        source:     new fields.StringField({ initial: '' }),
+      }),
+
       biography: new fields.HTMLField({ initial: '' }),
 
       attributes: new fields.SchemaField({

@@ -31,6 +31,35 @@
           </div>
         </div>
 
+        {{!-- Overhealth --}}
+        {{#if (gt system.overhealth.value 0)}}
+        <div class="resource flex-group-center resource-overhealth">
+          <label class="resource-label">Overhealth</label>
+          <div class="resource-content flexrow flex-center flex-between">
+            <span class="overhealth-value">{{system.overhealth.value}}</span>
+            <span> / {{system.overhealth.cap}}</span>
+          </div>
+        </div>
+        {{/if}}
+
+        {{!-- Barrier --}}
+        {{#if (gt system.barrier.max 0)}}
+        <div class="resource flex-group-center resource-barrier">
+          <label class="resource-label">Barrier</label>
+          <div class="resource-content flexrow flex-center flex-between">
+            <span class="barrier-value">{{system.barrier.value}}</span>
+            <span> / {{system.barrier.max}}</span>
+          </div>
+          {{#if system.barrier.affinities.length}}
+          <div class="barrier-affinities">
+            {{#each system.barrier.affinities as |aff|}}
+              <span class="affinity-chip">{{aff}}</span>
+            {{/each}}
+          </div>
+          {{/if}}
+        </div>
+        {{/if}}
+
         <div class="resource flex-group-center">
           <label for="system.attributes.class.level" class="resource-label">Class Level</label>
           <div class="resource-content flexrow flex-center flex-between">

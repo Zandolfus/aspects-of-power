@@ -238,6 +238,12 @@
             </option>
           {{/each}}
         </select>
+        {{#if (eq system.tagConfig.restorationResource "barrier")}}
+        <label class='resource-label'>Barrier Multiplier</label>
+        <input type='number' name='system.tagConfig.barrierMultiplier'
+               value='{{system.tagConfig.barrierMultiplier}}' min='0' step='0.1' />
+        <p class='hint'>Barrier HP = Mana spent &times; multiplier. Uses the skill's affinities.</p>
+        {{/if}}
       </div>
       {{/if}}
 

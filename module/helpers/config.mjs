@@ -124,6 +124,7 @@ ASPECTSOFPOWER.restorationResources = {
   health:  'ASPECTSOFPOWER.RestorationResource.health',
   mana:    'ASPECTSOFPOWER.RestorationResource.mana',
   stamina: 'ASPECTSOFPOWER.RestorationResource.stamina',
+  barrier: 'ASPECTSOFPOWER.RestorationResource.barrier',
 };
 
 /**

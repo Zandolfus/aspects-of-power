@@ -129,6 +129,12 @@ export class AspectsofPowerActor extends Actor {
     systemData.mana.max = systemData.abilities.willpower.mod;
     systemData.stamina.max = systemData.abilities.endurance.mod;
 
+    // Overhealth cap: 200% of max HP.
+    systemData.overhealth.cap = systemData.health.max * 2;
+    if (systemData.overhealth.value > systemData.overhealth.cap) {
+      systemData.overhealth.value = systemData.overhealth.cap;
+    }
+
     // Defense values: compute base from ability mods, then add any
     // ActiveEffect contributions by explicitly summing effect changes.
     const effectBonus = (key) => {

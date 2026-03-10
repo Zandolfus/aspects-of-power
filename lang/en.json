@@ -64,7 +64,8 @@
     "RestorationResource": {
       "health": "Health",
       "mana": "Mana",
-      "stamina": "Stamina"
+      "stamina": "Stamina",
+      "barrier": "Barrier"
     },
     "Range": {
       "castingRange": "Casting Range",

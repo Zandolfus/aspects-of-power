@@ -46,6 +46,44 @@ export class AspectsofPowerItem extends Item {
    * @param {object} rollData  The roll data object from getRollData().
    * @returns {{ hitFormula: string|null, dmgFormula: string }}
    */
+  /**
+   * Prompt the user for how much mana to spend on a barrier skill.
+   * @param {number} maxMana  Current mana available.
+   * @returns {Promise<number|null>}  Chosen mana amount, or null if cancelled.
+   */
+  async _promptBarrierManaCost(maxMana) {
+    const multiplier = this.system.tagConfig?.barrierMultiplier ?? 1;
+    return new Promise(resolve => {
+      new Dialog({
+        title: 'Barrier — Mana Cost',
+        content: `<form>
+          <div class="form-group">
+            <label>Mana to spend (max ${maxMana}):</label>
+            <input type="number" name="manaCost" value="${maxMana}" min="1" max="${maxMana}" autofocus />
+          </div>
+          <p class="hint">Barrier HP = Mana &times; ${multiplier}</p>
+        </form>`,
+        buttons: {
+          confirm: {
+            icon: '<i class="fas fa-shield-alt"></i>',
+            label: 'Create Barrier',
+            callback: html => {
+              const val = parseInt(html.find('[name=manaCost]').val(), 10);
+              resolve(Math.min(Math.max(1, val || 0), maxMana));
+            },
+          },
+          cancel: {
+            icon: '<i class="fas fa-times"></i>',
+            label: 'Cancel',
+            callback: () => resolve(null),
+          },
+        },
+        default: 'confirm',
+        close: () => resolve(null),
+      }).render(true);
+    });
+  }
+
   _buildRollFormulas(rollData) {
     const A   = this.actor.system.abilities;
     const ab  = A[rollData.roll.abilities]?.mod ?? 0;
@@ -162,7 +200,10 @@ export class AspectsofPowerItem extends Item {
       game.socket.emit('system.aspects-of-power', { type: 'gmCombatResult', content: gmContent });
     }
 
-    return { isHit };
+    // Barrier fully absorbs → flag so debuff/DoT can be skipped.
+    const barrierValue = targetActor.system.barrier?.value ?? 0;
+    const fullyBlocked = isHit && finalDamage > 0 && barrierValue >= finalDamage;
+    return { isHit, fullyBlocked };
   }
 
   /**
@@ -233,15 +274,61 @@ export class AspectsofPowerItem extends Item {
         if (!target) return;
         const resource    = payload.resource ?? 'health';
         const pool        = target.system[resource];
-        const newValue    = Math.min(pool.max, pool.value + payload.amount);
-        const actualGain  = newValue - pool.value;
-        await target.update({ [`system.${resource}.value`]: newValue });
-        const resLabel = resource.charAt(0).toUpperCase() + resource.slice(1);
-        ChatMessage.create({
-          speaker: payload.speaker, rollMode: payload.rollMode,
-          content: `<p><strong>${target.name}</strong> restores <strong>${actualGain}</strong> ${resLabel}. `
-                 + `${resLabel}: ${newValue} / ${pool.max}</p>`,
-        });
+        const resLabel    = resource.charAt(0).toUpperCase() + resource.slice(1);
+
+        // Health restoration overflows into overhealth.
+        if (resource === 'health') {
+          const newHealth   = Math.min(pool.max, pool.value + payload.amount);
+          const healthGain  = newHealth - pool.value;
+          const excess      = payload.amount - healthGain;
+          const updateData  = { 'system.health.value': newHealth };
+          let ohGain = 0;
+
+          if (excess > 0) {
+            const oh       = target.system.overhealth;
+            const ohCap    = oh.cap ?? (pool.max * 2);
+            const newOh    = Math.min(ohCap, oh.value + excess);
+            ohGain         = newOh - oh.value;
+            updateData['system.overhealth.value'] = newOh;
+          }
+
+          await target.update(updateData);
+          const ohNote = ohGain > 0 ? ` (+${ohGain} overhealth)` : '';
+          ChatMessage.create({
+            speaker: payload.speaker, rollMode: payload.rollMode,
+            content: `<p><strong>${target.name}</strong> restores <strong>${healthGain}</strong> ${resLabel}${ohNote}. `
+                   + `${resLabel}: ${newHealth} / ${pool.max}</p>`,
+          });
+        } else if (resource === 'barrier') {
+          // Barrier creation: roll total sets both value and max (the mana pool).
+          const barrierValue = payload.amount;
+          const affinities   = payload.barrierAffinities ?? [];
+          const source       = payload.barrierSource ?? '';
+          const existing     = target.system.barrier;
+
+          await target.update({
+            'system.barrier.value':      barrierValue,
+            'system.barrier.max':        barrierValue,
+            'system.barrier.affinities': affinities,
+            'system.barrier.source':     source,
+          });
+
+          const affText = affinities.length > 0 ? ` (${affinities.join(', ')})` : '';
+          const replaced = existing.max > 0 ? ' (replaced existing barrier)' : '';
+          ChatMessage.create({
+            speaker: payload.speaker, rollMode: payload.rollMode,
+            content: `<p><strong>${target.name}</strong> gains a <strong>${barrierValue}</strong> point barrier${affText}${replaced}.</p>`,
+          });
+        } else {
+          const newValue    = Math.min(pool.max, pool.value + payload.amount);
+          const actualGain  = newValue - pool.value;
+          await target.update({ [`system.${resource}.value`]: newValue });
+          ChatMessage.create({
+            speaker: payload.speaker, rollMode: payload.rollMode,
+            content: `<p><strong>${target.name}</strong> restores <strong>${actualGain}</strong> ${resLabel}. `
+                   + `${resLabel}: ${newValue} / ${pool.max}</p>`,
+          });
+        }
         break;
       }
 
@@ -426,17 +513,37 @@ export class AspectsofPowerItem extends Item {
           }
         }
 
-        // Immediate DoT damage (bypasses armor/veil but not toughness).
+        // Immediate DoT damage (bypasses armor/veil AND barrier, but not toughness).
+        // Pre-existing wounds bypass barriers — routes through: Overhealth → HP.
         if (payload.dotDamage > 0) {
           const toughnessMod = target.system.abilities?.toughness?.mod ?? 0;
+          let remaining = Math.max(0, payload.dotDamage - toughnessMod);
+          const updateData = {};
+          const parts = [];
+
+          // Overhealth absorbs first (DoTs bypass barrier).
+          const overhealth = target.system.overhealth;
+          if (remaining > 0 && overhealth.value > 0) {
+            const absorbed = Math.min(overhealth.value, remaining);
+            remaining -= absorbed;
+            updateData['system.overhealth.value'] = overhealth.value - absorbed;
+            parts.push(`Overhealth: −${absorbed}`);
+          }
+
+          // Remaining hits HP.
+          const health = target.system.health;
+          const newHealth = Math.max(0, health.value - remaining);
+          updateData['system.health.value'] = newHealth;
+          if (remaining > 0) parts.push(`Health: −${remaining}`);
+
+          await target.update(updateData);
+
           const mitigated = Math.max(0, payload.dotDamage - toughnessMod);
-          const health    = target.system.health;
-          const newHealth = Math.max(0, health.value - mitigated);
-          await target.update({ 'system.health.value': newHealth });
+          const breakdown = parts.length ? ` (${parts.join(', ')})` : '';
           ChatMessage.create({
             whisper: ChatMessage.getWhisperRecipients('GM'),
             content: `<p><strong>${target.name}</strong> takes <strong>${mitigated}</strong> `
-                   + `${payload.dotDamageType} damage from ${payload.effectName} (Toughness: −${toughnessMod}). `
+                   + `${payload.dotDamageType} damage from ${payload.effectName} (Toughness: −${toughnessMod})${breakdown}. `
                    + `Health: ${newHealth} / ${health.max}`
                    + `${newHealth === 0 ? ' &mdash; <em>Incapacitated!</em>' : ''}</p>`,
           });
@@ -450,9 +557,15 @@ export class AspectsofPowerItem extends Item {
    * Restoration tag: restore health, mana, or stamina and route through GM.
    */
   async _handleRestorationTag(item, rollData, dmgRoll, speaker, rollMode, label, targetTokenOverride = null) {
-    const amount   = Math.round(dmgRoll.total);
+    let amount     = Math.round(dmgRoll.total);
     const target   = this.system.tagConfig?.restorationTarget ?? 'selected';
     const resource = this.system.tagConfig?.restorationResource ?? 'health';
+
+    // Barrier: value comes from variable mana cost × multiplier, not roll total.
+    if (resource === 'barrier') {
+      const multiplier = this.system.tagConfig?.barrierMultiplier ?? 1;
+      amount = Math.round((rollData.roll.variableManaCost ?? amount) * multiplier);
+    }
 
     let targetActor;
     if (target === 'self' && !targetTokenOverride) {
@@ -467,13 +580,21 @@ export class AspectsofPowerItem extends Item {
       return;
     }
 
-    await this._gmAction({
+    const actionPayload = {
       type: 'gmApplyRestoration',
       targetActorUuid: targetActor.uuid,
       amount,
       resource,
       speaker, rollMode,
-    });
+    };
+
+    // Barrier creation passes affinities and source name.
+    if (resource === 'barrier') {
+      actionPayload.barrierAffinities = this.system.affinities ?? [];
+      actionPayload.barrierSource = this.name;
+    }
+
+    await this._gmAction(actionPayload);
   }
 
   /**
@@ -877,6 +998,20 @@ export class AspectsofPowerItem extends Item {
     // Build formulas (also populates rollData.roll.abilitymod and resourcevalue).
     const { hitFormula, dmgFormula } = this._buildRollFormulas(rollData);
 
+    // Variable mana cost for barrier skills — prompt user for amount.
+    const isBarrier = tags.includes('restoration') && this.system.tagConfig?.restorationResource === 'barrier';
+    if (isBarrier) {
+      const maxMana = rollData.roll.resourcevalue;
+      if (maxMana <= 0) {
+        ChatMessage.create({ speaker, rollMode, flavor: label, content: `Not enough ${rollData.roll.resource}` });
+        return;
+      }
+      const chosenMana = await this._promptBarrierManaCost(maxMana);
+      if (chosenMana === null) return; // cancelled
+      rollData.roll.cost = chosenMana;
+      rollData.roll.variableManaCost = chosenMana;
+    }
+
     // Not enough resource → warn and abort.
     if (rollData.roll.resourcevalue < rollData.roll.cost) {
       ChatMessage.create({
@@ -945,7 +1080,7 @@ export class AspectsofPowerItem extends Item {
           switch (tag) {
             case 'attack': {
               const result = await this._handleAttackTag(item, rollData, hitRoll, dmgRoll, speaker, rollMode, label, targetToken);
-              if (result) hitResults.set(targetToken, result.isHit);
+              if (result) hitResults.set(targetToken, result);
               break;
             }
             case 'restoration':
@@ -954,9 +1089,13 @@ export class AspectsofPowerItem extends Item {
             case 'buff':
               await this._handleBuffTag(item, rollData, dmgRoll, speaker, rollMode, label, targetToken);
               break;
-            case 'debuff':
+            case 'debuff': {
+              // Barrier fully absorbed the attack → skip debuff/DoT for this target.
+              const attackResult = hitResults.get(targetToken);
+              if (attackResult?.fullyBlocked) break;
               await this._handleDebuffTag(item, rollData, dmgRoll, speaker, rollMode, label, targetToken);
               break;
+            }
             case 'repair':
               await this._handleRepairTag(item, rollData, dmgRoll, speaker, rollMode, label, targetToken);
               break;
@@ -1008,7 +1147,7 @@ export class AspectsofPowerItem extends Item {
       switch (tag) {
         case 'attack': {
           const result = await this._handleAttackTag(item, rollData, hitRoll, dmgRoll, speaker, rollMode, label);
-          if (result) hitResults.set(null, result.isHit);
+          if (result) hitResults.set(null, result);
           break;
         }
         case 'restoration':
@@ -1017,9 +1156,13 @@ export class AspectsofPowerItem extends Item {
         case 'buff':
           await this._handleBuffTag(item, rollData, dmgRoll, speaker, rollMode, label);
           break;
-        case 'debuff':
+        case 'debuff': {
+          // Barrier fully absorbed the attack → skip debuff/DoT.
+          const attackResult = hitResults.get(null);
+          if (attackResult?.fullyBlocked) break;
           await this._handleDebuffTag(item, rollData, dmgRoll, speaker, rollMode, label);
           break;
+        }
         case 'repair':
           await this._handleRepairTag(item, rollData, dmgRoll, speaker, rollMode, label);
           break;
@@ -1039,7 +1182,7 @@ export class AspectsofPowerItem extends Item {
    *   - The chained skill does NOT trigger its own chains (no recursion).
    *   - The chained skill targets the same token(s) as the parent.
    *
-   * @param {Map<Token|null, boolean>} hitResults  Per-target hit results from parent.
+   * @param {Map<Token|null, {isHit: boolean, fullyBlocked: boolean}>} hitResults  Per-target hit results from parent.
    * @param {Token[]|null} aoeTargets              AOE targets array, or null for single-target.
    * @param {object} speaker                       Chat speaker data.
    * @param {string} rollMode                      Roll mode setting.
@@ -1061,7 +1204,8 @@ export class AspectsofPowerItem extends Item {
 
       for (const targetToken of targets) {
         // Evaluate trigger condition per-target.
-        const wasHit = hitResults.get(targetToken) ?? hitResults.get(null);
+        const hitResult = hitResults.get(targetToken) ?? hitResults.get(null);
+        const wasHit = hitResult?.isHit;
         if (chain.trigger === 'on-hit' && wasHit !== true) continue;
         if (chain.trigger === 'on-miss' && wasHit !== false) continue;
 
