@@ -349,7 +349,7 @@ export class AspectsofPowerItem extends Item {
             : '';
           const promptContent = `<p>Apply a <strong>${barrierValue}</strong> HP barrier${affText} from <strong>${source}</strong>?</p>${existingNote}`;
 
-          let accepted = true;
+          let accepted = false;
           if (playerOwner) {
             // Send prompt to the player via socket and wait for response.
             const requestId = foundry.utils.randomID();
@@ -395,6 +395,16 @@ export class AspectsofPowerItem extends Item {
               content: `<p><strong>${target.name}</strong> declined the barrier.</p>`,
             });
             return;
+          }
+
+          // Deduct caster's resource cost now that barrier was accepted.
+          if (payload.casterActorUuid && payload.casterCost) {
+            const caster = await fromUuid(payload.casterActorUuid);
+            if (caster) {
+              const res = payload.casterResource ?? 'mana';
+              const curVal = caster.system[res]?.value ?? 0;
+              await caster.update({ [`system.${res}.value`]: Math.max(0, curVal - payload.casterCost) });
+            }
           }
 
           // Remove existing barrier effect if present.
@@ -696,10 +706,16 @@ export class AspectsofPowerItem extends Item {
       speaker, rollMode,
     };
 
-    // Barrier creation passes affinities and source name.
+    // Barrier creation passes affinities, source name, and caster cost info
+    // so the GM can deduct cost only after the target accepts.
     if (resource === 'barrier') {
       actionPayload.barrierAffinities = this.system.affinities ?? [];
       actionPayload.barrierSource = this.name;
+      const casterRes = rollData.roll.resource ?? 'mana';
+      const casterCost = rollData.roll.cost ?? 0;
+      actionPayload.casterActorUuid = this.actor.uuid;
+      actionPayload.casterResource = casterRes;
+      actionPayload.casterCost = casterCost;
     }
 
     await this._gmAction(actionPayload);
@@ -1394,7 +1410,10 @@ export class AspectsofPowerItem extends Item {
       await this._executeChainedSkills(hitResults, targets, speaker, rollMode);
 
       // Deduct resource cost AFTER effects are applied.
-      await this.actor.update({ [`system.${resource}.value`]: newResVal });
+      // Barrier skills defer cost deduction to executeGmAction (after target accepts).
+      if (!isBarrier) {
+        await this.actor.update({ [`system.${resource}.value`]: newResVal });
+      }
 
       // Remove instantaneous templates (duration = 0).
       if ((this.system.aoe.templateDuration ?? 0) === 0) {
@@ -1405,7 +1424,10 @@ export class AspectsofPowerItem extends Item {
     }
 
     // ── Deduct resource cost (non-AOE) ──────────────────────────────────
-    await this.actor.update({ [`system.${resource}.value`]: newResVal });
+    // Barrier skills defer cost until after the target accepts.
+    if (!isBarrier) {
+      await this.actor.update({ [`system.${resource}.value`]: newResVal });
+    }
 
     // ── Legacy behavior for tagless skills ──────────────────────────────
     if (tags.length === 0) {
