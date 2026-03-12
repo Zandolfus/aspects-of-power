@@ -111,7 +111,8 @@
       "partialDefense": "Partial Defense",
       "noPool": "No defense pool remaining",
       "defend": "Defend",
-      "takeHit": "Take Hit"
+      "takeHit": "Take Hit",
+      "reaction": "Reaction"
     },
     "Stats": {
       "tabLabel": "Stats",

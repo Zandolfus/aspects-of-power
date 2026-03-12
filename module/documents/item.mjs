@@ -165,50 +165,63 @@ export class AspectsofPowerItem extends Item {
     const effectiveToughness = Math.max(0, toughnessMod - affinityDR);
     const mitigLabel         = isPhysical ? 'Armor' : 'Veil';
 
-    // ── Defense pool resolution ──────────────────────────────────────────
+    // ── Defense pool + reaction resolution ─────────────────────────────
     let isHit = true;
     let damageMultiplier = 1;
     let defenseLine = '';
+    let reactionLine = '';
 
     if (hitRoll && targetDefKey) {
       const pool    = targetActor.system.defense[targetDefKey]?.pool ?? 0;
       const poolMax = targetActor.system.defense[targetDefKey]?.poolMax ?? 0;
       const defLabel = targetDefKey.charAt(0).toUpperCase() + targetDefKey.slice(1);
 
-      if (pool > 0) {
-        // Prompt the defender to choose whether to use their pool.
-        const defenseResult = await this._promptDefensePool(
-          targetActor, targetDefKey, hitTotal, item.name
-        );
+      // Prompt the defender (shows defense pool and/or available reactions).
+      const defenseResult = await this._promptDefensePool(
+        targetActor, targetDefKey, hitTotal, item.name
+      );
 
-        if (defenseResult.defend) {
-          if (pool >= hitTotal) {
-            // Full dodge — pool absorbs the entire hit.
-            isHit = false;
-            const newPool = pool - hitTotal;
-            await this._gmAction({
-              type: 'gmUpdateDefensePool',
-              targetActorUuid: targetActor.uuid,
-              defKey: targetDefKey,
-              newPool,
-            });
-            defenseLine = `<p>${defLabel} defense: full dodge (pool ${pool} → ${newPool} / ${poolMax})</p>`;
-          } else {
-            // Partial defense — damage reduced proportionally, pool depleted.
-            damageMultiplier = 1 - (pool / hitTotal);
-            await this._gmAction({
-              type: 'gmUpdateDefensePool',
-              targetActorUuid: targetActor.uuid,
-              defKey: targetDefKey,
-              newPool: 0,
-            });
-            defenseLine = `<p>${defLabel} defense: partial (${Math.round((1 - damageMultiplier) * 100)}% reduced, pool ${pool} → 0 / ${poolMax})</p>`;
-          }
+      // Handle defense pool usage.
+      if (defenseResult.defend && pool > 0) {
+        if (pool >= hitTotal) {
+          isHit = false;
+          const newPool = pool - hitTotal;
+          await this._gmAction({
+            type: 'gmUpdateDefensePool',
+            targetActorUuid: targetActor.uuid,
+            defKey: targetDefKey,
+            newPool,
+          });
+          defenseLine = `<p>${defLabel} defense: full dodge (pool ${pool} → ${newPool} / ${poolMax})</p>`;
         } else {
-          defenseLine = `<p>${defLabel} defense: declined (pool ${pool} / ${poolMax})</p>`;
+          damageMultiplier = 1 - (pool / hitTotal);
+          await this._gmAction({
+            type: 'gmUpdateDefensePool',
+            targetActorUuid: targetActor.uuid,
+            defKey: targetDefKey,
+            newPool: 0,
+          });
+          defenseLine = `<p>${defLabel} defense: partial (${Math.round((1 - damageMultiplier) * 100)}% reduced, pool ${pool} → 0 / ${poolMax})</p>`;
         }
+      } else if (pool > 0) {
+        defenseLine = `<p>${defLabel} defense: declined (pool ${pool} / ${poolMax})</p>`;
       } else {
         defenseLine = `<p>${defLabel} defense: no pool remaining (0 / ${poolMax})</p>`;
+      }
+
+      // Handle reaction skill usage.
+      if (defenseResult.reactionSkillId) {
+        const reactionSkill = targetActor.items.get(defenseResult.reactionSkillId);
+        if (reactionSkill) {
+          // Consume a reaction via GM action.
+          await this._gmAction({
+            type: 'gmConsumeReaction',
+            targetActorUuid: targetActor.uuid,
+          });
+          // Execute the reaction skill (it rolls and posts its own chat messages).
+          await reactionSkill.roll();
+          reactionLine = `<p><em>${targetActor.name} reacts with <strong>${reactionSkill.name}</strong>!</em></p>`;
+        }
       }
     }
 
@@ -247,6 +260,7 @@ export class AspectsofPowerItem extends Item {
            <h3>${item.name} — ${resultBadge}</h3>
            ${hitLine}
            ${defenseLine}
+           ${reactionLine}
            <hr>
            <p>Raw damage: ${rawDmg}</p>
            <p>${mitigLabel}: −${mitigation}</p>
@@ -268,6 +282,7 @@ export class AspectsofPowerItem extends Item {
            <h3>${item.name} — ${resultBadge}</h3>
            ${hitLine}
            ${defenseLine}
+           ${reactionLine}
          </div>`;
 
     if (game.user.isGM) {
@@ -293,16 +308,30 @@ export class AspectsofPowerItem extends Item {
     const poolMax = targetActor.system.defense[defKey]?.poolMax ?? 0;
     const defLabel = defKey.charAt(0).toUpperCase() + defKey.slice(1);
 
-    if (pool <= 0) return { defend: false };
+    // Gather available reaction skills if actor has reactions remaining.
+    const reactions = targetActor.system.reactions ?? { value: 0, max: 1 };
+    const reactionSkills = reactions.value > 0
+      ? targetActor.items.filter(i => i.type === 'skill' && i.system.skillType === 'Reaction')
+      : [];
+    const reactionList = reactionSkills.map(s => ({ id: s.id, name: s.name, img: s.img }));
 
-    const fullDodge = pool >= hitTotal;
-    const outcomeText = fullDodge
-      ? `<strong>Full dodge.</strong> Pool: ${pool} → ${pool - hitTotal}`
-      : `<strong>Partial defense (${Math.round((pool / hitTotal) * 100)}% reduction).</strong> Pool: ${pool} → 0`;
+    // If pool is empty and no reactions, skip prompt entirely.
+    if (pool <= 0 && reactionList.length === 0) return { defend: false, reactionSkillId: null };
 
-    const promptContent = `<p><strong>${attackName}</strong> incoming (to-hit: ${hitTotal})</p>
-      <p>${defLabel} defense pool: ${pool} / ${poolMax}</p>
-      <p>If you defend: ${outcomeText}</p>`;
+    const fullDodge = pool > 0 && pool >= hitTotal;
+    let defenseText = '';
+    if (pool > 0) {
+      const outcomeText = fullDodge
+        ? `<strong>Full dodge.</strong> Pool: ${pool} → ${pool - hitTotal}`
+        : `<strong>Partial defense (${Math.round((pool / hitTotal) * 100)}% reduction).</strong> Pool: ${pool} → 0`;
+      defenseText = `<p>${defLabel} defense pool: ${pool} / ${poolMax}</p><p>If you defend: ${outcomeText}</p>`;
+    }
+
+    const reactionText = reactionList.length > 0
+      ? `<p>Reactions: ${reactions.value} / ${reactions.max}</p>`
+      : '';
+
+    const promptContent = `<p><strong>${attackName}</strong> incoming (to-hit: ${hitTotal})</p>${defenseText}${reactionText}`;
 
     // Find the owning player.
     const owners = Object.entries(targetActor.ownership ?? {})
@@ -313,15 +342,15 @@ export class AspectsofPowerItem extends Item {
       return u?.active && !u.isGM;
     });
 
-    let defend = false;
+    let result = { defend: false, reactionSkillId: null };
     if (playerOwner) {
       const requestId = foundry.utils.randomID();
-      defend = await new Promise((resolve) => {
-        const timeout = setTimeout(() => { cleanup(); resolve(false); }, 30000);
+      result = await new Promise((resolve) => {
+        const timeout = setTimeout(() => { cleanup(); resolve({ defend: false, reactionSkillId: null }); }, 30000);
         const handler = (response) => {
           if (response.type !== 'defensePromptResponse' || response.requestId !== requestId) return;
           cleanup();
-          resolve(response.defend);
+          resolve({ defend: response.defend, reactionSkillId: response.reactionSkillId ?? null });
         };
         const cleanup = () => {
           clearTimeout(timeout);
@@ -334,19 +363,44 @@ export class AspectsofPowerItem extends Item {
           targetName: targetActor.name,
           promptContent,
           requestId,
+          hasPool: pool > 0,
+          reactionSkills: reactionList,
         });
       });
     } else {
       // GM-owned target — prompt the GM directly.
-      defend = await foundry.applications.api.DialogV2.confirm({
-        window: { title: `Defend — ${targetActor.name}` },
-        content: promptContent,
-        yes: { label: 'Defend', icon: 'fas fa-shield-alt' },
-        no:  { label: 'Take Hit' },
-      });
+      result = await this._showDefenseDialog(targetActor.name, promptContent, pool > 0, reactionList);
     }
 
-    return { defend };
+    return result;
+  }
+
+  /**
+   * Show the defense/reaction dialog locally (for GM-owned targets).
+   * Returns { defend: boolean, reactionSkillId: string|null }.
+   */
+  async _showDefenseDialog(targetName, promptContent, hasPool, reactionSkills) {
+    const buttons = [];
+    if (hasPool) {
+      buttons.push({ action: 'defend', label: 'Defend', icon: 'fas fa-shield-alt', default: true });
+    }
+    for (const rs of reactionSkills) {
+      buttons.push({ action: `reaction:${rs.id}`, label: rs.name, icon: 'fas fa-bolt' });
+    }
+    buttons.push({ action: 'takeHit', label: 'Take Hit' });
+
+    const action = await foundry.applications.api.DialogV2.wait({
+      window: { title: `Defend — ${targetName}` },
+      content: promptContent,
+      buttons,
+      close: () => 'takeHit',
+    });
+
+    if (action === 'defend') return { defend: true, reactionSkillId: null };
+    if (typeof action === 'string' && action.startsWith('reaction:')) {
+      return { defend: false, reactionSkillId: action.slice('reaction:'.length) };
+    }
+    return { defend: false, reactionSkillId: null };
   }
 
   /**
@@ -794,6 +848,16 @@ export class AspectsofPowerItem extends Item {
         const defKey = payload.defKey;
         if (!['melee', 'ranged', 'mind', 'soul'].includes(defKey)) return;
         await target.update({ [`system.defense.${defKey}.pool`]: payload.newPool });
+        break;
+      }
+
+      case 'gmConsumeReaction': {
+        const target = await fromUuid(payload.targetActorUuid);
+        if (!target) return;
+        const reactions = target.system.reactions;
+        if (reactions && reactions.value > 0) {
+          await target.update({ 'system.reactions.value': reactions.value - 1 });
+        }
         break;
       }
     }

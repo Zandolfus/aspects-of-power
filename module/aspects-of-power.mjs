@@ -175,16 +175,35 @@ Hooks.once('ready', function () {
   game.socket.on('system.aspects-of-power', async (payload) => {
     // --- Player-side: defense prompt ---
     if (payload.type === 'defensePrompt' && payload.targetUserId === game.userId) {
-      const defend = await foundry.applications.api.DialogV2.confirm({
+      const buttons = [];
+      if (payload.hasPool) {
+        buttons.push({ action: 'defend', label: 'Defend', icon: 'fas fa-shield-alt', default: true });
+      }
+      for (const rs of (payload.reactionSkills ?? [])) {
+        buttons.push({ action: `reaction:${rs.id}`, label: rs.name, icon: 'fas fa-bolt' });
+      }
+      buttons.push({ action: 'takeHit', label: 'Take Hit' });
+
+      const action = await foundry.applications.api.DialogV2.wait({
         window: { title: `Defend — ${payload.targetName}` },
         content: payload.promptContent,
-        yes: { label: 'Defend', icon: 'fas fa-shield-alt' },
-        no:  { label: 'Take Hit' },
+        buttons,
+        close: () => 'takeHit',
       });
+
+      let defend = false;
+      let reactionSkillId = null;
+      if (action === 'defend') {
+        defend = true;
+      } else if (typeof action === 'string' && action.startsWith('reaction:')) {
+        reactionSkillId = action.slice('reaction:'.length);
+      }
+
       game.socket.emit('system.aspects-of-power', {
         type: 'defensePromptResponse',
         requestId: payload.requestId,
-        defend: !!defend,
+        defend,
+        reactionSkillId,
       });
       return;
     }
@@ -213,7 +232,7 @@ Hooks.once('ready', function () {
         whisper: ChatMessage.getWhisperRecipients('GM'),
         content: payload.content,
       });
-    } else if (['gmApplyBuff', 'gmApplyDebuff', 'gmApplyRestoration', 'gmUpdateDefensePool'].includes(payload.type)) {
+    } else if (['gmApplyBuff', 'gmApplyDebuff', 'gmApplyRestoration', 'gmUpdateDefensePool', 'gmConsumeReaction'].includes(payload.type)) {
       await AspectsofPowerItem.executeGmAction(payload);
     }
   });
@@ -296,7 +315,7 @@ Hooks.on('combatTurnChange', async (combat, _prior, current) => {
 /* -------------------------------------------- */
 
 /**
- * Reset all four defense pools to max at the start of each combatant's turn.
+ * Reset defense pools and reactions at the start of each combatant's turn.
  * Only the GM executes the update to avoid duplicate writes.
  */
 Hooks.on('combatTurnChange', async (combat, _prior, current) => {
@@ -313,13 +332,18 @@ Hooks.on('combatTurnChange', async (combat, _prior, current) => {
       updateData[`system.defense.${defKey}.pool`] = poolMax;
     }
   }
+  // Reset reactions to max.
+  const reactions = actor.system.reactions;
+  if (reactions && reactions.value !== reactions.max) {
+    updateData['system.reactions.value'] = reactions.max;
+  }
   if (Object.keys(updateData).length > 0) {
     await actor.update(updateData);
   }
 });
 
 /**
- * Initialize defense pools to max when combat starts.
+ * Initialize defense pools and reactions when combat starts.
  */
 Hooks.on('combatStart', async (combat) => {
   if (!game.user.isGM) return;
@@ -331,6 +355,7 @@ Hooks.on('combatStart', async (combat) => {
       const poolMax = actor.system.defense[defKey]?.poolMax ?? 0;
       updateData[`system.defense.${defKey}.pool`] = poolMax;
     }
+    updateData['system.reactions.value'] = actor.system.reactions?.max ?? 1;
     await actor.update(updateData);
   }
 });

@@ -66,6 +66,16 @@
         </div>
         {{/if}}
 
+        {{!-- Reactions --}}
+        <div class="resource flex-group-center">
+          <label class="resource-label">Reactions</label>
+          <div class="resource-content flexrow flex-center flex-between">
+            <span>{{system.reactions.value}}</span>
+            <span class="separator">/</span>
+            <span>{{system.reactions.max}}</span>
+          </div>
+        </div>
+
       </div>
       <div class="resources grid grid-6col">
         <div class="resource flex-group-center">

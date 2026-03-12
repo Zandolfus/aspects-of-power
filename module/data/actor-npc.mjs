@@ -60,6 +60,12 @@ export class NpcData extends foundry.abstract.TypeDataModel {
         soul:   defenseSchema(),
       }),
 
+      // Reactions per round (usually 1). Resets at start of combatant's turn.
+      reactions: new fields.SchemaField({
+        value: new fields.NumberField({ initial: 1, min: 0, integer: true }),
+        max:   new fields.NumberField({ initial: 1, min: 0, integer: true }),
+      }),
+
       // Barrier — populated from ActiveEffects in prepareDerivedData.
       barrier: new fields.SchemaField({
         value:      new fields.NumberField({ initial: 0, min: 0, integer: true }),

@@ -84,6 +84,12 @@ export class CharacterData extends foundry.abstract.TypeDataModel {
       // Base stamina regeneration per turn (percentage of max stamina).
       // Active effects can modify this value via system.staminaRegen.
       staminaRegen: new fields.NumberField({ initial: 5, min: 0 }),
+
+      // Reactions per round (usually 1). Resets at start of combatant's turn.
+      reactions: new fields.SchemaField({
+        value: new fields.NumberField({ initial: 1, min: 0, integer: true }),
+        max:   new fields.NumberField({ initial: 1, min: 0, integer: true }),
+      }),
     };
   }
 }
