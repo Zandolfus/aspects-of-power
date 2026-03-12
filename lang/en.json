@@ -105,7 +105,13 @@
       "melee": "Melee Defense",
       "ranged": "Ranged Defense",
       "mind": "Mind Defense",
-      "soul": "Soul Defense"
+      "soul": "Soul Defense",
+      "pool": "Defense Pool",
+      "fullDodge": "Full Dodge",
+      "partialDefense": "Partial Defense",
+      "noPool": "No defense pool remaining",
+      "defend": "Defend",
+      "takeHit": "Take Hit"
     },
     "Stats": {
       "tabLabel": "Stats",

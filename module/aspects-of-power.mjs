@@ -173,6 +173,22 @@ Hooks.once('ready', function () {
   // Socket listener: only the active GM executes mutations so that
   // players can buff/debuff/heal actors they don't own.
   game.socket.on('system.aspects-of-power', async (payload) => {
+    // --- Player-side: defense prompt ---
+    if (payload.type === 'defensePrompt' && payload.targetUserId === game.userId) {
+      const defend = await foundry.applications.api.DialogV2.confirm({
+        window: { title: `Defend — ${payload.targetName}` },
+        content: payload.promptContent,
+        yes: { label: 'Defend', icon: 'fas fa-shield-alt' },
+        no:  { label: 'Take Hit' },
+      });
+      game.socket.emit('system.aspects-of-power', {
+        type: 'defensePromptResponse',
+        requestId: payload.requestId,
+        defend: !!defend,
+      });
+      return;
+    }
+
     // --- Player-side: barrier prompt from GM ---
     if (payload.type === 'barrierPrompt' && payload.targetUserId === game.userId) {
       const accepted = await foundry.applications.api.DialogV2.confirm({
@@ -197,7 +213,7 @@ Hooks.once('ready', function () {
         whisper: ChatMessage.getWhisperRecipients('GM'),
         content: payload.content,
       });
-    } else if (['gmApplyBuff', 'gmApplyDebuff', 'gmApplyRestoration'].includes(payload.type)) {
+    } else if (['gmApplyBuff', 'gmApplyDebuff', 'gmApplyRestoration', 'gmUpdateDefensePool'].includes(payload.type)) {
       await AspectsofPowerItem.executeGmAction(payload);
     }
   });
@@ -273,6 +289,50 @@ Hooks.on('combatTurnChange', async (combat, _prior, current) => {
     speaker: ChatMessage.getSpeaker({ actor }),
     content: `<p><em>${actor.name} regenerates ${newValue - stamina.value} stamina (${regenPct}% of ${stamina.max}).</em></p>`,
   });
+});
+
+/* -------------------------------------------- */
+/*  Defense Pool Reset — Combatant's Turn        */
+/* -------------------------------------------- */
+
+/**
+ * Reset all four defense pools to max at the start of each combatant's turn.
+ * Only the GM executes the update to avoid duplicate writes.
+ */
+Hooks.on('combatTurnChange', async (combat, _prior, current) => {
+  if (!game.user.isGM) return;
+
+  const combatant = combat.combatants.get(current.combatantId);
+  if (!combatant?.actor) return;
+
+  const actor = combatant.actor;
+  const updateData = {};
+  for (const defKey of ['melee', 'ranged', 'mind', 'soul']) {
+    const poolMax = actor.system.defense[defKey]?.poolMax ?? 0;
+    if ((actor.system.defense[defKey]?.pool ?? 0) !== poolMax) {
+      updateData[`system.defense.${defKey}.pool`] = poolMax;
+    }
+  }
+  if (Object.keys(updateData).length > 0) {
+    await actor.update(updateData);
+  }
+});
+
+/**
+ * Initialize defense pools to max when combat starts.
+ */
+Hooks.on('combatStart', async (combat) => {
+  if (!game.user.isGM) return;
+  for (const combatant of combat.combatants) {
+    if (!combatant.actor) continue;
+    const actor = combatant.actor;
+    const updateData = {};
+    for (const defKey of ['melee', 'ranged', 'mind', 'soul']) {
+      const poolMax = actor.system.defense[defKey]?.poolMax ?? 0;
+      updateData[`system.defense.${defKey}.pool`] = poolMax;
+    }
+    await actor.update(updateData);
+  }
 });
 
 /* -------------------------------------------- */

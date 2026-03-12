@@ -11,6 +11,7 @@ export class NpcData extends foundry.abstract.TypeDataModel {
     });
     const defenseSchema = () => new fields.SchemaField({
       value: new fields.NumberField({ initial: 0, integer: true }),
+      pool:  new fields.NumberField({ initial: 0, min: 0, integer: true }),
     });
     const resourceSchema = (valueInitial, maxInitial) => new fields.SchemaField({
       value: new fields.NumberField({ initial: valueInitial, min: 0, integer: true }),

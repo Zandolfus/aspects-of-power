@@ -155,6 +155,14 @@ export class AspectsofPowerActor extends Actor {
     systemData.defense.mind.value   = Math.round((systemData.abilities.intelligence.mod + systemData.abilities.wisdom.mod*.3)*1.1) + effectBonus('system.defense.mind.value');
     systemData.defense.soul.value   = Math.round((systemData.abilities.wisdom.mod + systemData.abilities.willpower.mod*.3)*1.1) + effectBonus('system.defense.soul.value');
 
+    // Defense pools: max = 2× calculated value. Clamp current pool to max.
+    for (const defKey of ['melee', 'ranged', 'mind', 'soul']) {
+      systemData.defense[defKey].poolMax = systemData.defense[defKey].value * 2;
+      if (systemData.defense[defKey].pool > systemData.defense[defKey].poolMax) {
+        systemData.defense[defKey].pool = systemData.defense[defKey].poolMax;
+      }
+    }
+
     // Casting range (feet) and movement ranges (feet).
     systemData.castingRange = Math.round(40 + (systemData.abilities.perception.mod / 10));
     systemData.walkRange    = Math.round(35 + (systemData.abilities.endurance.mod / 10));

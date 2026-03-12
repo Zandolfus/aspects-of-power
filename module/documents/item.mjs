@@ -140,8 +140,13 @@ export class AspectsofPowerItem extends Item {
   /* ------------------------------------------------------------------ */
 
   /**
-   * Attack tag: resolve hit vs target defense, calculate mitigated damage,
+   * Attack tag: resolve hit vs target defense pool, calculate mitigated damage,
    * and post a GM-whispered combat result with an Apply Damage button.
+   *
+   * Defense pool flow:
+   *   pool >= toHit  → full dodge, pool -= toHit
+   *   0 < pool < toHit → partial, damage *= (1 - pool/toHit), pool = 0
+   *   pool == 0       → full hit
    */
   async _handleAttackTag(item, rollData, hitRoll, dmgRoll, speaker, rollMode, label, targetTokenOverride = null) {
     const targetToken  = targetTokenOverride ?? game.user.targets.first() ?? null;
@@ -149,31 +154,79 @@ export class AspectsofPowerItem extends Item {
     if (!targetActor) return;
 
     const targetDefKey = rollData.roll.targetDefense;
-    const defenseValue = targetDefKey ? (targetActor.system.defense[targetDefKey]?.value ?? 0) : 0;
-    const isHit        = hitRoll ? hitRoll.total >= defenseValue : true;
+    const hitTotal     = hitRoll ? Math.round(hitRoll.total) : 0;
     const isPhysical   = rollData.roll.damageType === 'physical';
     const mitigation   = isPhysical
       ? (targetActor.system.defense.armor?.value ?? 0)
       : (targetActor.system.defense.veil?.value  ?? 0);
-    const attackerToken     = this.actor.getActiveTokens()[0] ?? null;
-    const toughnessMod      = targetActor.system.abilities?.toughness?.mod ?? 0;
-    const affinityDR        = this._getAffinityDRReduction(targetActor, attackerToken, targetToken);
+    const attackerToken      = this.actor.getActiveTokens()[0] ?? null;
+    const toughnessMod       = targetActor.system.abilities?.toughness?.mod ?? 0;
+    const affinityDR         = this._getAffinityDRReduction(targetActor, attackerToken, targetToken);
     const effectiveToughness = Math.max(0, toughnessMod - affinityDR);
-    // Pre-toughness damage (after armor/veil only). Toughness is applied in the
-    // button handler so it only affects damage that passes through barriers.
-    const preToughnessDmg    = isHit ? Math.max(0, Math.round(dmgRoll.total - mitigation)) : 0;
-    const finalDamage        = isHit ? Math.max(0, preToughnessDmg - effectiveToughness) : 0;
     const mitigLabel         = isPhysical ? 'Armor' : 'Veil';
+
+    // ── Defense pool resolution ──────────────────────────────────────────
+    let isHit = true;
+    let damageMultiplier = 1;
+    let defenseLine = '';
+
+    if (hitRoll && targetDefKey) {
+      const pool    = targetActor.system.defense[targetDefKey]?.pool ?? 0;
+      const poolMax = targetActor.system.defense[targetDefKey]?.poolMax ?? 0;
+      const defLabel = targetDefKey.charAt(0).toUpperCase() + targetDefKey.slice(1);
+
+      if (pool > 0) {
+        // Prompt the defender to choose whether to use their pool.
+        const defenseResult = await this._promptDefensePool(
+          targetActor, targetDefKey, hitTotal, item.name
+        );
+
+        if (defenseResult.defend) {
+          if (pool >= hitTotal) {
+            // Full dodge — pool absorbs the entire hit.
+            isHit = false;
+            const newPool = pool - hitTotal;
+            await this._gmAction({
+              type: 'gmUpdateDefensePool',
+              targetActorUuid: targetActor.uuid,
+              defKey: targetDefKey,
+              newPool,
+            });
+            defenseLine = `<p>${defLabel} defense: full dodge (pool ${pool} → ${newPool} / ${poolMax})</p>`;
+          } else {
+            // Partial defense — damage reduced proportionally, pool depleted.
+            damageMultiplier = 1 - (pool / hitTotal);
+            await this._gmAction({
+              type: 'gmUpdateDefensePool',
+              targetActorUuid: targetActor.uuid,
+              defKey: targetDefKey,
+              newPool: 0,
+            });
+            defenseLine = `<p>${defLabel} defense: partial (${Math.round((1 - damageMultiplier) * 100)}% reduced, pool ${pool} → 0 / ${poolMax})</p>`;
+          }
+        } else {
+          defenseLine = `<p>${defLabel} defense: declined (pool ${pool} / ${poolMax})</p>`;
+        }
+      } else {
+        defenseLine = `<p>${defLabel} defense: no pool remaining (0 / ${poolMax})</p>`;
+      }
+    }
+
+    // Pre-toughness damage (after armor/veil and defense multiplier).
+    const rawDmg          = Math.round(dmgRoll.total);
+    const afterMitigation = Math.max(0, rawDmg - mitigation);
+    const preToughnessDmg = isHit ? Math.max(0, Math.round(afterMitigation * damageMultiplier)) : 0;
+    const finalDamage     = isHit ? Math.max(0, preToughnessDmg - effectiveToughness) : 0;
 
     const resultBadge = isHit
       ? `<strong style="color:green;">HIT</strong>`
       : `<strong style="color:red;">MISS</strong>`;
 
     const hitLine = hitRoll && targetDefKey
-      ? `<p>Attack: ${Math.round(hitRoll.total)} vs ${targetActor.name}'s ${targetDefKey} defense (${defenseValue})</p>`
+      ? `<p>Attack: ${hitTotal} vs ${targetActor.name}</p>`
       : '';
 
-    // Barrier preview: show how damage routes through barrier if present.
+    // Barrier preview.
     const barrierValue = targetActor.system.barrier?.value ?? 0;
     let barrierLine = '';
     let damageAfterBarrier = preToughnessDmg;
@@ -181,7 +234,6 @@ export class AspectsofPowerItem extends Item {
     if (isHit && barrierValue > 0) {
       const barrierAbsorbs = Math.min(barrierValue, preToughnessDmg);
       damageAfterBarrier = preToughnessDmg - barrierAbsorbs;
-      const toughnessAfter = Math.min(effectiveToughness, damageAfterBarrier);
       displayDamage = Math.max(0, damageAfterBarrier - effectiveToughness);
       barrierLine = `<p>Barrier absorbs: ${barrierAbsorbs} / ${barrierValue}${barrierAbsorbs >= barrierValue ? ' <em>(breaks)</em>' : ''}</p>`;
     }
@@ -194,9 +246,11 @@ export class AspectsofPowerItem extends Item {
       ? `<div class="combat-result">
            <h3>${item.name} — ${resultBadge}</h3>
            ${hitLine}
+           ${defenseLine}
            <hr>
-           <p>Raw damage: ${Math.round(dmgRoll.total)}</p>
+           <p>Raw damage: ${rawDmg}</p>
            <p>${mitigLabel}: −${mitigation}</p>
+           ${damageMultiplier < 1 ? `<p>Defense reduction: −${Math.round((1 - damageMultiplier) * 100)}%</p>` : ''}
            ${barrierLine}
            ${toughnessLine}
            <p><strong>Final damage: ${displayDamage}</strong></p>
@@ -213,6 +267,7 @@ export class AspectsofPowerItem extends Item {
       : `<div class="combat-result">
            <h3>${item.name} — ${resultBadge}</h3>
            ${hitLine}
+           ${defenseLine}
          </div>`;
 
     if (game.user.isGM) {
@@ -227,6 +282,71 @@ export class AspectsofPowerItem extends Item {
     // Barrier fully absorbs → flag so debuff/DoT can be skipped.
     const fullyBlocked = isHit && preToughnessDmg > 0 && barrierValue >= preToughnessDmg;
     return { isHit, fullyBlocked };
+  }
+
+  /**
+   * Prompt the target's owner to choose whether to defend with their pool.
+   * Player-owned targets are prompted via socket; GM-owned via direct dialog.
+   */
+  async _promptDefensePool(targetActor, defKey, hitTotal, attackName) {
+    const pool    = targetActor.system.defense[defKey]?.pool ?? 0;
+    const poolMax = targetActor.system.defense[defKey]?.poolMax ?? 0;
+    const defLabel = defKey.charAt(0).toUpperCase() + defKey.slice(1);
+
+    if (pool <= 0) return { defend: false };
+
+    const fullDodge = pool >= hitTotal;
+    const outcomeText = fullDodge
+      ? `<strong>Full dodge.</strong> Pool: ${pool} → ${pool - hitTotal}`
+      : `<strong>Partial defense (${Math.round((pool / hitTotal) * 100)}% reduction).</strong> Pool: ${pool} → 0`;
+
+    const promptContent = `<p><strong>${attackName}</strong> incoming (to-hit: ${hitTotal})</p>
+      <p>${defLabel} defense pool: ${pool} / ${poolMax}</p>
+      <p>If you defend: ${outcomeText}</p>`;
+
+    // Find the owning player.
+    const owners = Object.entries(targetActor.ownership ?? {})
+      .filter(([uid, level]) => level >= 3 && uid !== 'default')
+      .map(([uid]) => uid);
+    const playerOwner = owners.find(uid => {
+      const u = game.users.get(uid);
+      return u?.active && !u.isGM;
+    });
+
+    let defend = false;
+    if (playerOwner) {
+      const requestId = foundry.utils.randomID();
+      defend = await new Promise((resolve) => {
+        const timeout = setTimeout(() => { cleanup(); resolve(false); }, 30000);
+        const handler = (response) => {
+          if (response.type !== 'defensePromptResponse' || response.requestId !== requestId) return;
+          cleanup();
+          resolve(response.defend);
+        };
+        const cleanup = () => {
+          clearTimeout(timeout);
+          game.socket.off('system.aspects-of-power', handler);
+        };
+        game.socket.on('system.aspects-of-power', handler);
+        game.socket.emit('system.aspects-of-power', {
+          type: 'defensePrompt',
+          targetUserId: playerOwner,
+          targetName: targetActor.name,
+          promptContent,
+          requestId,
+        });
+      });
+    } else {
+      // GM-owned target — prompt the GM directly.
+      defend = await foundry.applications.api.DialogV2.confirm({
+        window: { title: `Defend — ${targetActor.name}` },
+        content: promptContent,
+        yes: { label: 'Defend', icon: 'fas fa-shield-alt' },
+        no:  { label: 'Take Hit' },
+      });
+    }
+
+    return { defend };
   }
 
   /**
@@ -665,6 +785,15 @@ export class AspectsofPowerItem extends Item {
                    + `${newHealth === 0 ? ' &mdash; <em>Incapacitated!</em>' : ''}</p>`,
           });
         }
+        break;
+      }
+
+      case 'gmUpdateDefensePool': {
+        const target = await fromUuid(payload.targetActorUuid);
+        if (!target) return;
+        const defKey = payload.defKey;
+        if (!['melee', 'ranged', 'mind', 'soul'].includes(defKey)) return;
+        await target.update({ [`system.defense.${defKey}.pool`]: payload.newPool });
         break;
       }
     }
