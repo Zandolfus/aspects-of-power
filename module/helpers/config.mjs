@@ -46,6 +46,7 @@ ASPECTSOFPOWER.skillTags = {
   restoration: 'ASPECTSOFPOWER.Tag.restoration',
   buff:        'ASPECTSOFPOWER.Tag.buff',
   debuff:      'ASPECTSOFPOWER.Tag.debuff',
+  cleanse:     'ASPECTSOFPOWER.Tag.cleanse',
   repair:      'ASPECTSOFPOWER.Tag.repair',
 };
 
@@ -57,6 +58,7 @@ ASPECTSOFPOWER.combatTags = {
   restoration: 'ASPECTSOFPOWER.Tag.restoration',
   buff:        'ASPECTSOFPOWER.Tag.buff',
   debuff:      'ASPECTSOFPOWER.Tag.debuff',
+  cleanse:     'ASPECTSOFPOWER.Tag.cleanse',
 };
 
 ASPECTSOFPOWER.reactionTypes = {

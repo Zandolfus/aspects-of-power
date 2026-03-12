@@ -33,6 +33,7 @@
       "restoration": "Restoration",
       "buff": "Buff",
       "debuff": "Debuff",
+      "cleanse": "Cleanse",
       "repair": "Repair"
     },
     "TagConfig": {
@@ -156,6 +157,13 @@
       "charmed": "is charmed!",
       "enragedMsg": "is enraged!",
       "weakened": "is weakened!"
+    },
+    "Cleanse": {
+      "noTarget": "No target for cleanse.",
+      "noDebuffs": "No cleansable debuffs on target.",
+      "nonMagical": "Only magical skills can cleanse debuffs.",
+      "progress": "Cleanse progress on",
+      "cleansed": "cleansed from"
     },
     "SkillComponent": {
       "requiresSight": "Requires Sight",

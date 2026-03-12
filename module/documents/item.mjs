@@ -882,6 +882,65 @@ export class AspectsofPowerItem extends Item {
         break;
       }
 
+      case 'gmApplyCleanse': {
+        const target = await fromUuid(payload.targetActorUuid);
+        if (!target) return;
+
+        // Find all magical debuffs on the target, sorted strongest (highest debuffDamage) first.
+        const magicalDebuffs = target.effects
+          .filter(e => {
+            if (e.disabled) return false;
+            const flags = e.flags?.['aspects-of-power'];
+            if (!flags?.debuffType || flags.debuffType === 'none') return false;
+            return flags.magicType === 'magical';
+          })
+          .sort((a, b) =>
+            (b.flags['aspects-of-power'].debuffDamage ?? 0) - (a.flags['aspects-of-power'].debuffDamage ?? 0)
+          );
+
+        if (magicalDebuffs.length === 0) {
+          ChatMessage.create({ speaker: payload.speaker, rollMode: payload.rollMode,
+            content: `<p><em>${game.i18n.localize('ASPECTSOFPOWER.Cleanse.noDebuffs')}</em></p>`,
+          });
+          break;
+        }
+
+        // Distribute cleanse roll total across debuffs as breakProgress.
+        let budget = payload.rollTotal;
+        const results = [];
+        for (const effect of magicalDebuffs) {
+          if (budget <= 0) break;
+          const flags = effect.flags['aspects-of-power'];
+          const threshold = flags.debuffDamage ?? 0;
+          const previousProgress = flags.breakProgress ?? 0;
+          const typeName = game.i18n.localize(
+            CONFIG.ASPECTSOFPOWER.debuffTypes[flags.debuffType] ?? flags.debuffType
+          );
+
+          // Add full budget to this effect's progress.
+          const newProgress = previousProgress + budget;
+
+          if (newProgress >= threshold && threshold > 0) {
+            // Cleansed! Remove the effect, carry over excess.
+            const excess = newProgress - threshold;
+            budget = excess;
+            await effect.delete();
+            results.push(`<strong>${typeName}</strong> ${game.i18n.localize('ASPECTSOFPOWER.Cleanse.cleansed')} <strong>${target.name}</strong>! [${newProgress} / ${threshold}]`);
+          } else {
+            // Partial progress — consume entire budget.
+            await effect.setFlag('aspects-of-power', 'breakProgress', newProgress);
+            budget = 0;
+            results.push(`${game.i18n.localize('ASPECTSOFPOWER.Cleanse.progress')} <strong>${typeName}</strong>: [${newProgress} / ${threshold}]`);
+          }
+        }
+
+        ChatMessage.create({ speaker: payload.speaker, rollMode: payload.rollMode,
+          content: `<p><strong>${payload.skillName}</strong> cleanses <strong>${target.name}</strong> (roll: ${payload.rollTotal}):</p>`
+                 + `<ul>${results.map(r => `<li>${r}</li>`).join('')}</ul>`,
+        });
+        break;
+      }
+
       case 'gmUpdateDefensePool': {
         const target = await fromUuid(payload.targetActorUuid);
         if (!target) return;
@@ -1129,6 +1188,36 @@ export class AspectsofPowerItem extends Item {
     });
   }
 
+  /**
+   * Cleanse tag: add the roll total to breakProgress on magical debuffs on the target.
+   * Only magical skills can cleanse. Distributes roll total across debuffs (strongest first)
+   * until the budget is exhausted or all debuffs are processed.
+   */
+  async _handleCleanseTag(item, rollData, dmgRoll, speaker, rollMode, label, targetTokenOverride = null) {
+    const targetToken = targetTokenOverride ?? game.user.targets.first() ?? null;
+    const targetActor = targetToken?.actor ?? null;
+    if (!targetActor) {
+      ChatMessage.create({ speaker, rollMode, content: `<p><em>${game.i18n.localize('ASPECTSOFPOWER.Cleanse.noTarget')}</em></p>` });
+      return;
+    }
+
+    // Only magical skills can cleanse.
+    if ((this.system.magicType ?? 'non-magical') !== 'magical') {
+      ChatMessage.create({ speaker, rollMode, content: `<p><em>${game.i18n.localize('ASPECTSOFPOWER.Cleanse.nonMagical')}</em></p>` });
+      return;
+    }
+
+    const rollTotal = Math.round(dmgRoll.total);
+
+    await this._gmAction({
+      type: 'gmApplyCleanse',
+      targetActorUuid: targetActor.uuid,
+      rollTotal,
+      skillName: item.name,
+      speaker, rollMode,
+    });
+  }
+
   /* ------------------------------------------------------------------ */
   /*  AOE helpers                                                        */
   /* ------------------------------------------------------------------ */
@@ -1140,7 +1229,7 @@ export class AspectsofPowerItem extends Item {
   _getAoeColor() {
     const tags = this.system.tags ?? [];
     if (tags.includes('attack') || tags.includes('debuff')) return '#ff4444';
-    if (tags.includes('restoration') || tags.includes('buff') || tags.includes('repair')) return '#44ff44';
+    if (tags.includes('restoration') || tags.includes('buff') || tags.includes('repair') || tags.includes('cleanse')) return '#44ff44';
     return '#4488ff';
   }
 
@@ -1762,6 +1851,9 @@ export class AspectsofPowerItem extends Item {
             case 'repair':
               await this._handleRepairTag(item, rollData, dmgRoll, speaker, rollMode, label, targetToken);
               break;
+            case 'cleanse':
+              await this._handleCleanseTag(item, rollData, dmgRoll, speaker, rollMode, label, targetToken);
+              break;
           }
         }
       }
@@ -1834,6 +1926,9 @@ export class AspectsofPowerItem extends Item {
         }
         case 'repair':
           await this._handleRepairTag(item, rollData, dmgRoll, speaker, rollMode, label);
+          break;
+        case 'cleanse':
+          await this._handleCleanseTag(item, rollData, dmgRoll, speaker, rollMode, label);
           break;
       }
     }
@@ -1911,6 +2006,9 @@ export class AspectsofPowerItem extends Item {
               break;
             case 'repair':
               await chainedItem._handleRepairTag(chainedItem, chainRollData, cDmgRoll, speaker, rollMode, chainLabel, targetToken);
+              break;
+            case 'cleanse':
+              await chainedItem._handleCleanseTag(chainedItem, chainRollData, cDmgRoll, speaker, rollMode, chainLabel, targetToken);
               break;
           }
         }
