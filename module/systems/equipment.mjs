@@ -34,6 +34,17 @@ export class EquipmentSystem {
       return false;
     }
 
+    // Dismembered: check if the target slot is disabled by a dismembered debuff.
+    const dismembered = actor.effects.find(e =>
+      !e.disabled
+      && e.flags?.['aspects-of-power']?.debuffType === 'dismembered'
+      && e.flags?.['aspects-of-power']?.dismemberedSlot === slot
+    );
+    if (dismembered) {
+      ui.notifications.warn(`Cannot equip to ${slot} — dismembered!`);
+      return false;
+    }
+
     const slotDef = CONFIG.ASPECTSOFPOWER.equipmentSlots[slot];
     if (!slotDef) {
       ui.notifications.warn(`Unknown equipment slot: ${slot}`);

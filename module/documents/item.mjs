@@ -825,6 +825,22 @@ export class AspectsofPowerItem extends Item {
                 content: `<p><strong>${target.name}</strong> debuffed: ${payload.statSummary} for ${payload.duration} rounds.</p>`,
               });
             }
+
+            // Dismembered: force-unequip items in the disabled slot.
+            const dType = payload.effectData.flags?.['aspects-of-power']?.debuffType;
+            const dSlot = payload.effectData.flags?.['aspects-of-power']?.dismemberedSlot;
+            if (dType === 'dismembered' && dSlot) {
+              const equippedInSlot = target.items.filter(
+                i => i.type === 'item' && i.system.equipped && i.system.slot === dSlot
+              );
+              for (const equippedItem of equippedInSlot) {
+                await EquipmentSystem.unequip(equippedItem);
+              }
+              const slotLabel = game.i18n.localize(`ASPECTSOFPOWER.Equip.Slot.${dSlot}`) || dSlot;
+              ChatMessage.create({ speaker: payload.speaker, rollMode: payload.rollMode,
+                content: `<p><strong>${target.name}</strong> loses use of <strong>${slotLabel}</strong> slot!</p>`,
+              });
+            }
           }
         }
 
@@ -988,11 +1004,12 @@ export class AspectsofPowerItem extends Item {
       return;
     }
 
-    const entries   = this.system.tagConfig?.debuffEntries ?? [];
-    const duration  = this.system.tagConfig?.debuffDuration ?? 1;
-    const dealsDmg  = this.system.tagConfig?.debuffDealsDamage ?? false;
-    const dmgType   = this.system.tagConfig?.debuffDamageType ?? 'physical';
-    const rollTotal = Math.round(dmgRoll.total);
+    const entries    = this.system.tagConfig?.debuffEntries ?? [];
+    const duration   = this.system.tagConfig?.debuffDuration ?? 1;
+    const dealsDmg   = this.system.tagConfig?.debuffDealsDamage ?? false;
+    const dmgType    = this.system.tagConfig?.debuffDamageType ?? 'physical';
+    const debuffType = this.system.tagConfig?.debuffType ?? 'none';
+    const rollTotal  = Math.round(dmgRoll.total);
 
     // Build stat-reduction changes (roll-based).
     const changes = entries.map(e => ({
@@ -1024,13 +1041,40 @@ export class AspectsofPowerItem extends Item {
       ? getPositionalTags(casterToken, targetToken)
       : [];
 
+    // Dismembered: GM chooses which equipment slot to disable.
+    let dismemberedSlot = null;
+    if (debuffType === 'dismembered') {
+      const slots = CONFIG.ASPECTSOFPOWER.equipmentSlots ?? {};
+      const slotOptions = Object.entries(slots)
+        .map(([key, def]) => `<option value="${key}">${game.i18n.localize(def.label ?? `ASPECTSOFPOWER.Equip.Slot.${key}`)}</option>`)
+        .join('');
+      dismemberedSlot = await new Promise(resolve => {
+        new foundry.applications.api.DialogV2({
+          window: { title: 'Dismember — Choose Slot' },
+          content: `<div class="form-group"><label>Slot to disable:</label><select name="slot">${slotOptions}</select></div>`,
+          buttons: [{
+            action: 'confirm', label: 'Confirm', default: true,
+            callback: (event, button) => resolve(button.form.elements.slot?.value || null),
+          }, {
+            action: 'cancel', label: 'Cancel',
+            callback: () => resolve(null),
+          }],
+          close: () => resolve(null),
+        }).render({ force: true });
+      });
+      if (!dismemberedSlot) return; // cancelled
+    }
+
     // Always store affinity metadata so attack skills can match against this debuff.
     effectData.flags = {
       'aspects-of-power': {
         debuffDamage: rollTotal,
+        debuffType,
+        casterActorUuid: this.actor.uuid,
         affinities: this.system.affinities ?? [],
         magicType: this.system.magicType ?? 'non-magical',
         directions,
+        ...(dismemberedSlot ? { dismemberedSlot } : {}),
         ...(dealsDmg ? { dot: true, dotDamage: rollTotal, dotDamageType: dmgType, applierActorUuid: this.actor.uuid } : {}),
       },
     };
@@ -1045,7 +1089,7 @@ export class AspectsofPowerItem extends Item {
       effectName,
       originUuid: this.uuid,
       stackable: this.system.tagConfig?.debuffStackable ?? false,
-      effectData: (changes.length > 0 || dealsDmg) ? effectData : null,
+      effectData: (changes.length > 0 || dealsDmg || debuffType !== 'none') ? effectData : null,
       dotDamage: dealsDmg ? rollTotal : 0,
       dotDamageType: dmgType,
       duration,
@@ -1543,6 +1587,56 @@ export class AspectsofPowerItem extends Item {
       return;
     }
 
+    // ── Debuff enforcement: check if the actor is blocked from using this skill ──
+    if (this.actor) {
+      const _hasDebuff = (types) => {
+        const arr = Array.isArray(types) ? types : [types];
+        return this.actor.effects.find(e =>
+          !e.disabled && arr.includes(e.flags?.['aspects-of-power']?.debuffType)
+        );
+      };
+
+      // Turn-skipping debuffs block all active skill use.
+      const skipDebuff = _hasDebuff(['stun', 'sleep', 'paralysis']);
+      if (skipDebuff) {
+        const typeName = game.i18n.localize(
+          CONFIG.ASPECTSOFPOWER.debuffTypes[skipDebuff.flags['aspects-of-power'].debuffType] ?? 'Debuff'
+        );
+        ui.notifications.warn(`${this.actor.name} ${game.i18n.localize('ASPECTSOFPOWER.Debuff.cannotAct')} (${typeName})`);
+        return;
+      }
+
+      // Immobilized blocks physical (non-mana) skills.
+      if (_hasDebuff('immobilized') && rollData.roll.resource !== 'mana') {
+        ui.notifications.warn(`${this.actor.name} ${game.i18n.localize('ASPECTSOFPOWER.Debuff.cannotAct')} (${game.i18n.localize('ASPECTSOFPOWER.Debuff.immobilized')})`);
+        return;
+      }
+
+      // Silence blocks skills with vocal components.
+      if (_hasDebuff('silence') && this.system.vocalComponent) {
+        ui.notifications.warn(`${this.actor.name} ${game.i18n.localize('ASPECTSOFPOWER.Debuff.silenced')} — cannot use ${this.name}!`);
+        return;
+      }
+
+      // Blind blocks skills that require sight.
+      if (_hasDebuff('blind') && this.system.requiresSight) {
+        // Blind doesn't fully block — it reduces to-hit. Mark for later.
+        rollData._blindDebuff = _hasDebuff('blind');
+      }
+
+      // Deafened blocks skills that require hearing.
+      if (_hasDebuff('deafened') && this.system.requiresHearing) {
+        ui.notifications.warn(`${this.actor.name} ${game.i18n.localize('ASPECTSOFPOWER.Debuff.deafened')} — cannot use ${this.name}!`);
+        return;
+      }
+
+      // Weaken: mark for damage reduction later.
+      const weakenEffect = _hasDebuff('weaken');
+      if (weakenEffect) {
+        rollData._weakenDebuff = weakenEffect;
+      }
+    }
+
     // Build formulas (also populates rollData.roll.abilitymod and resourcevalue).
     const { hitFormula, dmgFormula } = this._buildRollFormulas(rollData);
 
@@ -1577,6 +1671,27 @@ export class AspectsofPowerItem extends Item {
 
     const dmgRoll = new Roll(dmgFormula, rollData);
     await dmgRoll.evaluate();
+
+    // ── Apply debuff modifiers to roll totals ─────────────────────────
+    // Blind: reduce to-hit by amount perception was overcome.
+    if (rollData._blindDebuff && hitRoll) {
+      const debuffRoll    = rollData._blindDebuff.flags?.['aspects-of-power']?.debuffDamage ?? 0;
+      const perceptionMod = this.actor.system.abilities?.perception?.mod ?? 0;
+      const hitReduction  = Math.max(0, debuffRoll - perceptionMod);
+      if (hitReduction > 0) {
+        hitRoll._total = Math.max(0, hitRoll.total - hitReduction);
+      }
+    }
+
+    // Weaken: reduce damage by the debuff's strength modifier reduction.
+    if (rollData._weakenDebuff && dmgRoll) {
+      const debuffRoll   = rollData._weakenDebuff.flags?.['aspects-of-power']?.debuffDamage ?? 0;
+      const strengthMod  = this.actor.system.abilities?.strength?.mod ?? 0;
+      const dmgReduction = Math.max(0, debuffRoll - strengthMod);
+      if (dmgReduction > 0) {
+        dmgRoll._total = Math.max(0, dmgRoll.total - dmgReduction);
+      }
+    }
 
     const resource  = rollData.roll.resource;
     const newResVal = Math.max(0, Math.round(rollData.roll.resourcevalue - rollData.roll.cost));

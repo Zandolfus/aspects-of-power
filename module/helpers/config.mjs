@@ -65,6 +65,32 @@ ASPECTSOFPOWER.reactionTypes = {
   barrier: 'ASPECTSOFPOWER.Reaction.barrier',
 };
 
+/**
+ * Non-damaging debuff subtypes applied via the debuff tag.
+ * Each type stores its key on the ActiveEffect flags for enforcement.
+ */
+ASPECTSOFPOWER.debuffTypes = {
+  none:          'ASPECTSOFPOWER.Debuff.none',
+  root:          'ASPECTSOFPOWER.Debuff.root',
+  immobilized:   'ASPECTSOFPOWER.Debuff.immobilized',
+  slow:          'ASPECTSOFPOWER.Debuff.slow',
+  chilled:       'ASPECTSOFPOWER.Debuff.chilled',
+  frozen:        'ASPECTSOFPOWER.Debuff.frozen',
+  sleep:         'ASPECTSOFPOWER.Debuff.sleep',
+  stun:          'ASPECTSOFPOWER.Debuff.stun',
+  paralysis:     'ASPECTSOFPOWER.Debuff.paralysis',
+  fear:          'ASPECTSOFPOWER.Debuff.fear',
+  blind:         'ASPECTSOFPOWER.Debuff.blind',
+  silence:       'ASPECTSOFPOWER.Debuff.silence',
+  weaken:        'ASPECTSOFPOWER.Debuff.weaken',
+  deafened:      'ASPECTSOFPOWER.Debuff.deafened',
+  taunt:         'ASPECTSOFPOWER.Debuff.taunt',
+  charm:         'ASPECTSOFPOWER.Debuff.charm',
+  enraged:       'ASPECTSOFPOWER.Debuff.enraged',
+  hallucination: 'ASPECTSOFPOWER.Debuff.hallucination',
+  dismembered:   'ASPECTSOFPOWER.Debuff.dismembered',
+};
+
 ASPECTSOFPOWER.professionTags = {
   repair:      'ASPECTSOFPOWER.Tag.repair',
 };

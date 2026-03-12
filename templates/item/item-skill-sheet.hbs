@@ -291,6 +291,14 @@
       {{! ── Debuff Tag Config ── }}
       {{#if (includes system.tags "debuff")}}
       <div class='tag-config debuff-config'>
+        <label class='resource-label'>{{localize "ASPECTSOFPOWER.Debuff.label"}}</label>
+        <select name='system.tagConfig.debuffType'>
+          {{#each config.debuffTypes as |label key|}}
+            <option value='{{key}}' {{#if (eq key ../system.tagConfig.debuffType)}}selected{{/if}}>
+              {{localize label}}
+            </option>
+          {{/each}}
+        </select>
         <label class='resource-label'>{{localize "ASPECTSOFPOWER.TagConfig.debuffAttributes"}}</label>
         {{#each debuffAttributeGroups}}
           <div class='attribute-group'>
@@ -434,6 +442,26 @@
           <option value='magical' {{#if (eq system.magicType "magical")}}selected{{/if}}>Magical</option>
         </select>
       </div>
+
+      {{! ── Skill Component Flags ── }}
+      <div class='skill-components'>
+        <label class='resource-label dot-toggle'>
+          <input type='checkbox' name='system.requiresSight'
+                 {{#if system.requiresSight}}checked{{/if}} />
+          {{localize "ASPECTSOFPOWER.SkillComponent.requiresSight"}}
+        </label>
+        <label class='resource-label dot-toggle'>
+          <input type='checkbox' name='system.vocalComponent'
+                 {{#if system.vocalComponent}}checked{{/if}} />
+          {{localize "ASPECTSOFPOWER.SkillComponent.vocalComponent"}}
+        </label>
+        <label class='resource-label dot-toggle'>
+          <input type='checkbox' name='system.requiresHearing'
+                 {{#if system.requiresHearing}}checked{{/if}} />
+          {{localize "ASPECTSOFPOWER.SkillComponent.requiresHearing"}}
+        </label>
+      </div>
+
       <div class='resource'>
         <label class='resource-label'>{{localize "ASPECTSOFPOWER.Equip.rarity"}}</label>
         <select name='system.rarity' class='rarity-select'>

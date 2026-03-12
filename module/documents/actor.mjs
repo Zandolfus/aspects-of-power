@@ -150,8 +150,32 @@ export class AspectsofPowerActor extends Actor {
       return sum;
     };
 
-    systemData.defense.melee.value  = Math.round((systemData.abilities.dexterity.mod + systemData.abilities.strength.mod*.3)*1.1) + effectBonus('system.defense.melee.value');
-    systemData.defense.ranged.value = Math.round((systemData.abilities.dexterity.mod*.3 + systemData.abilities.perception.mod)*1.1) + effectBonus('system.defense.ranged.value');
+    // Check for root/immobilized debuffs that reduce dexterity application to defenses.
+    let dexMeleeReduction = 0;
+    let dexRangedReduction = 0;
+    for (const effect of this.effects) {
+      if (effect.disabled) continue;
+      const flags = effect.flags?.['aspects-of-power'];
+      if (!flags?.debuffType) continue;
+
+      if (flags.debuffType === 'root') {
+        // Root reduces dexterity contribution by the debuff roll amount.
+        const reduction = flags.debuffDamage ?? 0;
+        dexMeleeReduction += reduction;
+        dexRangedReduction += reduction;
+      } else if (flags.debuffType === 'immobilized' || flags.debuffType === 'frozen') {
+        // Immobilized/Frozen zeroes out melee & ranged defense entirely.
+        dexMeleeReduction = Infinity;
+        dexRangedReduction = Infinity;
+      }
+    }
+
+    const dexMod = systemData.abilities.dexterity.mod;
+    const effectiveDexMelee  = Math.max(0, dexMod - dexMeleeReduction);
+    const effectiveDexRanged = Math.max(0, dexMod * 0.3 - dexRangedReduction);
+
+    systemData.defense.melee.value  = Math.round((effectiveDexMelee + systemData.abilities.strength.mod*.3)*1.1) + effectBonus('system.defense.melee.value');
+    systemData.defense.ranged.value = Math.round((effectiveDexRanged + systemData.abilities.perception.mod)*1.1) + effectBonus('system.defense.ranged.value');
     systemData.defense.mind.value   = Math.round((systemData.abilities.intelligence.mod + systemData.abilities.wisdom.mod*.3)*1.1) + effectBonus('system.defense.mind.value');
     systemData.defense.soul.value   = Math.round((systemData.abilities.wisdom.mod + systemData.abilities.willpower.mod*.3)*1.1) + effectBonus('system.defense.soul.value');
 

@@ -57,6 +57,11 @@ export class SkillData extends foundry.abstract.TypeDataModel {
         templateDuration: new fields.NumberField({ initial: 0, min: 0, integer: true }),
       }),
 
+      // Skill component flags — determine which debuffs block this skill.
+      requiresSight:   new fields.BooleanField({ initial: false }),
+      vocalComponent:  new fields.BooleanField({ initial: false }),
+      requiresHearing: new fields.BooleanField({ initial: false }),
+
       // Per-tag configuration.
       // Attack tag reuses roll.targetDefense and roll.damageType — no extra config needed.
       tagConfig: new fields.SchemaField({
@@ -73,7 +78,8 @@ export class SkillData extends foundry.abstract.TypeDataModel {
         buffDuration:  new fields.NumberField({ initial: 1, integer: true, min: 0 }),
         buffStackable: new fields.BooleanField({ initial: false }),
 
-        // Debuff: array of { attribute, value (multiplier) } pairs + duration + optional DoT.
+        // Debuff: subtype (root, stun, blind, etc.) + stat entries + duration + optional DoT.
+        debuffType: new fields.StringField({ initial: 'none' }),
         debuffEntries: new fields.ArrayField(new fields.SchemaField({
           attribute: new fields.StringField({ initial: 'abilities.strength' }),
           value:     new fields.NumberField({ initial: 1, min: 0 }),

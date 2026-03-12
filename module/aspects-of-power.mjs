@@ -40,6 +40,38 @@ const _movementTracker = new Map();
 const _moveActionTracker = new Map();
 
 /* -------------------------------------------- */
+/*  Debuff Helpers                              */
+/* -------------------------------------------- */
+
+/**
+ * Check if an actor has an active (non-disabled) debuff of the given type(s).
+ * @param {Actor} actor
+ * @param {string|string[]} types  One or more debuffType keys to check for.
+ * @returns {ActiveEffect|undefined}  The first matching effect, or undefined.
+ */
+function getActiveDebuff(actor, types) {
+  if (!actor?.effects) return undefined;
+  const typeArr = Array.isArray(types) ? types : [types];
+  return actor.effects.find(e =>
+    !e.disabled && typeArr.includes(e.flags?.['aspects-of-power']?.debuffType)
+  );
+}
+
+/**
+ * Get all active debuffs of the given type(s) on an actor.
+ * @param {Actor} actor
+ * @param {string|string[]} types
+ * @returns {ActiveEffect[]}
+ */
+function getActiveDebuffs(actor, types) {
+  if (!actor?.effects) return [];
+  const typeArr = Array.isArray(types) ? types : [types];
+  return actor.effects.filter(e =>
+    !e.disabled && typeArr.includes(e.flags?.['aspects-of-power']?.debuffType)
+  );
+}
+
+/* -------------------------------------------- */
 /*  Init Hook                                   */
 /* -------------------------------------------- */
 
@@ -336,10 +368,54 @@ Hooks.on('combatTurnChange', async (combat, _prior, current) => {
 
   const actor = combatant.actor;
   const updateData = {};
+  const speaker = ChatMessage.getSpeaker({ actor });
+
+  // Check for active sleep effects that modify mind defense restoration.
+  const sleepEffects = getActiveDebuffs(actor, 'sleep');
+  // Sum of all active sleep debuff rolls that reduce mind defense restoration.
+  const sleepDrain = sleepEffects.reduce((sum, e) =>
+    sum + (e.flags?.['aspects-of-power']?.debuffDamage ?? 0), 0);
+
   for (const defKey of ['melee', 'ranged', 'mind', 'soul']) {
     const poolMax = actor.system.defense[defKey]?.poolMax ?? 0;
-    if ((actor.system.defense[defKey]?.pool ?? 0) !== poolMax) {
-      updateData[`system.defense.${defKey}.pool`] = poolMax;
+    let targetPool = poolMax;
+
+    // Sleep reduces mind defense restoration.
+    if (defKey === 'mind' && sleepDrain > 0) {
+      const currentPool = actor.system.defense.mind?.pool ?? 0;
+      const normalRestoration = poolMax - currentPool;
+      const reducedRestoration = Math.max(0, normalRestoration - sleepDrain);
+      targetPool = currentPool + reducedRestoration;
+
+      // Check if sleep activates (mind pool stays at 0).
+      if (targetPool <= 0) {
+        targetPool = 0;
+        // Flag sleep as "active" (target is now asleep).
+        for (const se of sleepEffects) {
+          if (!se.flags?.['aspects-of-power']?.sleepActive) {
+            await se.setFlag('aspects-of-power', 'sleepActive', true);
+            ChatMessage.create({
+              speaker,
+              content: `<p><strong>${actor.name}</strong> ${game.i18n.localize('ASPECTSOFPOWER.Debuff.fellAsleep')}</p>`,
+            });
+          }
+        }
+      } else {
+        // Mind defense recovered past sleep threshold — wake up.
+        for (const se of sleepEffects) {
+          if (se.flags?.['aspects-of-power']?.sleepActive && targetPool >= (se.flags['aspects-of-power'].debuffDamage ?? 0)) {
+            await se.delete();
+            ChatMessage.create({
+              speaker,
+              content: `<p><strong>${actor.name}</strong> ${game.i18n.localize('ASPECTSOFPOWER.Debuff.wokeUp')}</p>`,
+            });
+          }
+        }
+      }
+    }
+
+    if ((actor.system.defense[defKey]?.pool ?? 0) !== targetPool) {
+      updateData[`system.defense.${defKey}.pool`] = targetPool;
     }
   }
   // Reset reactions to max.
@@ -367,6 +443,98 @@ Hooks.on('combatStart', async (combat) => {
     }
     updateData['system.reactions.value'] = actor.system.reactions?.max ?? 1;
     await actor.update(updateData);
+  }
+});
+
+/* -------------------------------------------- */
+/*  Debuff Enforcement — Turn Start             */
+/* -------------------------------------------- */
+
+/**
+ * At the start of a combatant's turn, enforce turn-skipping debuffs (stun, paralysis,
+ * sleep, immobilized) and process auto-roll break checks for applicable debuffs.
+ *
+ * Break mechanics by debuff type:
+ *   root       → Strength roll vs debuff roll total
+ *   stun       → Does not break (expires by duration)
+ *   paralysis  → Vitality roll vs debuff roll total
+ *   fear       → Willpower roll vs debuff roll total (flee is GM-enforced)
+ *   taunt      → Intelligence roll vs debuff roll total
+ *   charm      → Willpower roll vs debuff roll total
+ *   enraged    → Wisdom roll vs debuff roll total
+ *   sleep      → Handled separately (mind defense recovery system)
+ */
+const DEBUFF_BREAK_STAT = {
+  root:      'strength',
+  paralysis: 'vitality',
+  fear:      'willpower',
+  taunt:     'intelligence',
+  charm:     'willpower',
+  enraged:   'wisdom',
+};
+
+const TURN_SKIP_DEBUFFS = ['stun', 'paralysis', 'sleep', 'immobilized'];
+
+Hooks.on('combatTurnChange', async (combat, _prior, current) => {
+  if (!game.user.isGM) return;
+
+  const combatant = combat.combatants.get(current.combatantId);
+  if (!combatant?.actor) return;
+  const actor = combatant.actor;
+  const speaker = ChatMessage.getSpeaker({ actor });
+
+  // Collect all active debuffs with a type.
+  const typedDebuffs = actor.effects.filter(e =>
+    !e.disabled && e.flags?.['aspects-of-power']?.debuffType
+    && e.flags['aspects-of-power'].debuffType !== 'none'
+  );
+
+  for (const effect of typedDebuffs) {
+    const flags      = effect.flags['aspects-of-power'];
+    const debuffType = flags.debuffType;
+    const rollTotal  = flags.debuffDamage ?? 0;
+    const typeName   = game.i18n.localize(CONFIG.ASPECTSOFPOWER.debuffTypes[debuffType] ?? debuffType);
+
+    // Check if this debuff has a break stat.
+    const breakStat = DEBUFF_BREAK_STAT[debuffType];
+    if (breakStat) {
+      const statMod = actor.system.abilities?.[breakStat]?.mod ?? 0;
+      // Roll 1d20 + stat mod vs debuff roll total.
+      const breakRoll = new Roll('1d20 + @mod', { mod: statMod });
+      await breakRoll.evaluate();
+      const breakLabel = game.i18n.localize(`ASPECTSOFPOWER.Ability.${breakStat}.long`);
+
+      if (breakRoll.total >= rollTotal) {
+        // Broke free!
+        await effect.delete();
+        await breakRoll.toMessage({
+          speaker,
+          flavor: `${typeName} — ${game.i18n.localize('ASPECTSOFPOWER.Debuff.breakRoll')} (${breakLabel})`,
+        });
+        ChatMessage.create({
+          speaker,
+          content: `<p><strong>${actor.name}</strong> ${game.i18n.localize('ASPECTSOFPOWER.Debuff.broke')} <strong>${typeName}</strong>!</p>`,
+        });
+        continue; // Effect removed, skip turn-skip check.
+      } else {
+        await breakRoll.toMessage({
+          speaker,
+          flavor: `${typeName} — ${game.i18n.localize('ASPECTSOFPOWER.Debuff.breakRoll')} (${breakLabel})`,
+        });
+        ChatMessage.create({
+          speaker,
+          content: `<p><strong>${actor.name}</strong> ${game.i18n.localize('ASPECTSOFPOWER.Debuff.failedBreak')} <strong>${typeName}</strong>.</p>`,
+        });
+      }
+    }
+
+    // Announce turn-skipping debuffs.
+    if (TURN_SKIP_DEBUFFS.includes(debuffType)) {
+      ChatMessage.create({
+        speaker,
+        content: `<p><strong>${actor.name}</strong> ${game.i18n.localize('ASPECTSOFPOWER.Debuff.cannotAct')} (${typeName})</p>`,
+      });
+    }
   }
 });
 
@@ -675,11 +843,37 @@ Hooks.on('preUpdateToken', (tokenDoc, changes, options, userId) => {
   const actor = tokenDoc.actor;
   if (!actor?.system) return;
 
-  const walkRange = actor.system.walkRange;
+  // Block movement for root, immobilized, frozen, sleep, stun, paralysis debuffs.
+  const moveBlocker = getActiveDebuff(actor, ['root', 'immobilized', 'frozen', 'sleep', 'stun', 'paralysis']);
+  if (moveBlocker) {
+    const typeName = game.i18n.localize(
+      CONFIG.ASPECTSOFPOWER.debuffTypes[moveBlocker.flags['aspects-of-power'].debuffType] ?? 'Debuff'
+    );
+    ui.notifications.warn(`${actor.name} ${game.i18n.localize('ASPECTSOFPOWER.Debuff.cannotMove')} (${typeName})`);
+    return false;
+  }
+
+  let walkRange = actor.system.walkRange;
   if (!walkRange || walkRange <= 0) return;
 
-  const sprintRange = actor.system.sprintRange;
+  let sprintRange = actor.system.sprintRange;
   const stamina     = actor.system.stamina;
+
+  // Chilled: reduce movement speed by comparing endurance to debuff roll.
+  // Movement reduction = debuffRoll - enduranceMod (minimum 50% reduction).
+  const chilledEffect = getActiveDebuff(actor, 'chilled');
+  if (chilledEffect) {
+    const debuffRoll   = chilledEffect.flags?.['aspects-of-power']?.debuffDamage ?? 0;
+    const enduranceMod = actor.system.abilities?.endurance?.mod ?? 0;
+    const reduction    = Math.max(0, debuffRoll - enduranceMod);
+    // Reduce walk/sprint ranges; if reduction >= walkRange, actor is effectively frozen.
+    walkRange   = Math.max(0, walkRange - reduction);
+    sprintRange = Math.max(0, sprintRange - reduction);
+    if (walkRange <= 0 && sprintRange <= 0) {
+      ui.notifications.warn(`${actor.name} is frozen solid! (Chilled overcame Endurance)`);
+      return false;
+    }
+  }
 
   // Check movement actions remaining (max 3 per turn).
   const actionsUsed = _moveActionTracker.get(combatant.id) ?? 0;
@@ -818,6 +1012,18 @@ Hooks.on('renderChatMessageHTML', (message, html) => {
       if (remaining > 0) parts.push(`Health: −${remaining}`);
 
       await target.update(updateData);
+
+      // Sleep breaks on taking damage.
+      if (remaining > 0) {
+        const sleepEffect = getActiveDebuff(target, 'sleep');
+        if (sleepEffect) {
+          await sleepEffect.delete();
+          ChatMessage.create({
+            speaker: ChatMessage.getSpeaker({ actor: target }),
+            content: `<p><strong>${target.name}</strong> ${game.i18n.localize('ASPECTSOFPOWER.Debuff.wokeUp')} (took damage)</p>`,
+          });
+        }
+      }
 
       // Degrade durability on equipped items that provide the relevant defense.
       const effectiveTough = Math.max(0, toughnessMod - affinityDR);
