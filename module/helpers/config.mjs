@@ -59,6 +59,12 @@ ASPECTSOFPOWER.combatTags = {
   debuff:      'ASPECTSOFPOWER.Tag.debuff',
 };
 
+ASPECTSOFPOWER.reactionTypes = {
+  dodge:   'ASPECTSOFPOWER.Reaction.dodge',
+  parry:   'ASPECTSOFPOWER.Reaction.parry',
+  barrier: 'ASPECTSOFPOWER.Reaction.barrier',
+};
+
 ASPECTSOFPOWER.professionTags = {
   repair:      'ASPECTSOFPOWER.Tag.repair',
 };

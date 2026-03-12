@@ -9,7 +9,9 @@ export class SkillData extends foundry.abstract.TypeDataModel {
       description: new fields.HTMLField({ initial: '' }),
       rarity:      new fields.StringField({ initial: 'common' }),
       skillCategory: new fields.StringField({ initial: 'combat' }),
-      skillType:   new fields.StringField({ initial: 'Passive' }),
+      skillType:     new fields.StringField({ initial: 'Passive' }),
+      // For Reaction skills: what type of reaction (dodge, parry, barrier).
+      reactionType:  new fields.StringField({ initial: 'dodge' }),
       formula:     new fields.StringField({ initial: '' }),
       roll: new fields.SchemaField({
         dice:         new fields.StringField({ initial: '' }),

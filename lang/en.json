@@ -115,6 +115,11 @@
       "reaction": "Reaction",
       "reactionsMax": "Reactions per Round"
     },
+    "Reaction": {
+      "dodge": "Dodge",
+      "parry": "Parry",
+      "barrier": "Barrier"
+    },
     "Stats": {
       "tabLabel": "Stats",
       "base": "Base",

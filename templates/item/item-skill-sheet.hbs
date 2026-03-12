@@ -417,6 +417,16 @@
           <option value='Reaction' {{#if (eq system.skillType "Reaction")}}selected{{/if}}>Reaction</option>
         </select>
       </div>
+      {{#if (eq system.skillType "Reaction")}}
+      <div class='resource'>
+        <label class='resource-label'>Reaction Type</label>
+        <select name='system.reactionType'>
+          {{#each config.reactionTypes as |label key|}}
+            <option value='{{key}}' {{#if (eq key ../system.reactionType)}}selected{{/if}}>{{localize label}}</option>
+          {{/each}}
+        </select>
+      </div>
+      {{/if}}
       <div class='resource'>
         <label class='resource-label'>Magic Type</label>
         <select name='system.magicType'>

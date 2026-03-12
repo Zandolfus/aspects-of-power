@@ -213,14 +213,35 @@ export class AspectsofPowerItem extends Item {
       if (defenseResult.reactionSkillId) {
         const reactionSkill = targetActor.items.get(defenseResult.reactionSkillId);
         if (reactionSkill) {
+          const rType = reactionSkill.system.reactionType ?? 'dodge';
+
           // Consume a reaction via GM action.
           await this._gmAction({
             type: 'gmConsumeReaction',
             targetActorUuid: targetActor.uuid,
           });
-          // Execute the reaction skill (it rolls and posts its own chat messages).
-          await reactionSkill.roll();
-          reactionLine = `<p><em>${targetActor.name} reacts with <strong>${reactionSkill.name}</strong>!</em></p>`;
+
+          if (rType === 'dodge') {
+            // Dodge: completely avoids the attack, no defense pool cost.
+            isHit = false;
+            reactionLine = `<p><em>${targetActor.name} dodges with <strong>${reactionSkill.name}</strong>!</em></p>`;
+          } else if (rType === 'parry') {
+            // Parry: roll the reaction skill's hit formula and compare to-hits.
+            const parryRoll = await reactionSkill.roll({ parryOnly: true });
+            const parryTotal = parryRoll ? Math.round(parryRoll.total) : 0;
+            if (parryTotal >= hitTotal) {
+              isHit = false;
+              reactionLine = `<p><em>${targetActor.name} parries with <strong>${reactionSkill.name}</strong>! `
+                           + `(${parryTotal} vs ${hitTotal})</em></p>`;
+            } else {
+              reactionLine = `<p><em>${targetActor.name} fails to parry with <strong>${reactionSkill.name}</strong> `
+                           + `(${parryTotal} vs ${hitTotal})</em></p>`;
+            }
+          } else if (rType === 'barrier') {
+            // Barrier: execute the skill normally (creates barrier via restoration tag).
+            await reactionSkill.roll();
+            reactionLine = `<p><em>${targetActor.name} reacts with <strong>${reactionSkill.name}</strong> (Barrier)!</em></p>`;
+          }
         }
       }
     }
@@ -313,7 +334,10 @@ export class AspectsofPowerItem extends Item {
     const reactionSkills = reactions.value > 0
       ? targetActor.items.filter(i => i.type === 'skill' && i.system.skillType === 'Reaction')
       : [];
-    const reactionList = reactionSkills.map(s => ({ id: s.id, name: s.name, img: s.img }));
+    const reactionList = reactionSkills.map(s => ({
+      id: s.id, name: s.name, img: s.img,
+      reactionType: s.system.reactionType ?? 'dodge',
+    }));
 
     // If pool is empty and no reactions, skip prompt entirely.
     if (pool <= 0 && reactionList.length === 0) return { defend: false, reactionSkillId: null };
@@ -1472,13 +1496,23 @@ export class AspectsofPowerItem extends Item {
    * to per-tag handlers based on the skill's tags array.
    * @private
    */
-  async roll() {
+  async roll(options = {}) {
     const item     = this;
     const rollData = this.getRollData();
     const speaker  = ChatMessage.getSpeaker({ actor: this.actor });
     const rollMode = game.settings.get('core', 'rollMode');
     const label    = `[${item.type}] ${item.name}`;
     const tags     = this.system.tags ?? [];
+
+    // ── Parry-only mode: evaluate just the hit roll for comparison ─────
+    if (options.parryOnly) {
+      const { hitFormula } = this._buildRollFormulas(rollData);
+      if (!hitFormula) return null;
+      const hitRoll = new Roll(hitFormula, rollData);
+      await hitRoll.evaluate();
+      await hitRoll.toMessage({ speaker, rollMode, flavor: `${label} — Parry` });
+      return hitRoll;
+    }
 
     // Passive skills → post description only (no roll).
     if (this.system.skillType === 'Passive') {
