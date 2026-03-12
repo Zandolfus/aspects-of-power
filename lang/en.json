@@ -112,7 +112,8 @@
       "noPool": "No defense pool remaining",
       "defend": "Defend",
       "takeHit": "Take Hit",
-      "reaction": "Reaction"
+      "reaction": "Reaction",
+      "reactionsMax": "Reactions per Round"
     },
     "Stats": {
       "tabLabel": "Stats",

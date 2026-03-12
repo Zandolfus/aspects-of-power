@@ -85,6 +85,14 @@ ASPECTSOFPOWER.buffableAttributes = {
 };
 
 /**
+ * Extra effect keys that don't follow the standard `system.X.value` pattern.
+ * These appear in the ActiveEffect config dropdown alongside buffableAttributes.
+ */
+ASPECTSOFPOWER.extraEffectKeys = {
+  'system.reactions.max': 'ASPECTSOFPOWER.Defense.reactionsMax',
+};
+
+/**
  * Attribute groups for the buff/debuff UI — sorted by category.
  */
 ASPECTSOFPOWER.attributeGroups = [

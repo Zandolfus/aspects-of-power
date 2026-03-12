@@ -264,8 +264,18 @@ Hooks.on('renderActiveEffectConfig', (app, element, _options) => {
     emptyOpt.textContent = '\u2014 Select \u2014';
     select.appendChild(emptyOpt);
 
+    // Standard attributes: short key → system.{key}.value
     for (const [attrKey, label] of Object.entries(attrs)) {
       const fullKey = `system.${attrKey}.value`;
+      const opt = document.createElement('option');
+      opt.value = fullKey;
+      opt.textContent = game.i18n.localize(label);
+      if (input.value === fullKey) opt.selected = true;
+      select.appendChild(opt);
+    }
+    // Extra effect keys that don't follow the .value pattern.
+    const extras = CONFIG.ASPECTSOFPOWER.extraEffectKeys ?? {};
+    for (const [fullKey, label] of Object.entries(extras)) {
       const opt = document.createElement('option');
       opt.value = fullKey;
       opt.textContent = game.i18n.localize(label);
