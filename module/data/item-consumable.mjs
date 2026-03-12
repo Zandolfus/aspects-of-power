@@ -47,6 +47,11 @@ export class ConsumableData extends foundry.abstract.TypeDataModel {
         duration:   new fields.NumberField({ initial: 3, integer: true, min: 1 }),
       }),
 
+      // Barrier: creates a barrier on the user with a fixed HP value.
+      barrier: new fields.SchemaField({
+        value: new fields.NumberField({ initial: 0, min: 0, integer: true }),
+      }),
+
       // Bomb: AOE damage on throw.
       bomb: new fields.SchemaField({
         damage:     new fields.NumberField({ initial: 0, min: 0, integer: true }),

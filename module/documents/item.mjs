@@ -1398,6 +1398,22 @@ export class AspectsofPowerItem extends Item {
         break;
       }
 
+      case 'barrier': {
+        const barrierHP = sys.barrier.value;
+        if (barrierHP > 0 && targetActor) {
+          await this._gmAction({
+            type: 'gmApplyRestoration',
+            targetActorUuid: targetActor.uuid,
+            amount: barrierHP,
+            resource: 'barrier',
+            barrierAffinities: [],
+            barrierSource: this.name,
+            speaker, rollMode,
+          });
+        }
+        break;
+      }
+
       case 'poison': {
         // Apply poison flag to the actor's next N attacks.
         const poisonData = {
@@ -1476,6 +1492,8 @@ export class AspectsofPowerItem extends Item {
         });
         return `${effectLabel}: ${parts.join(', ')} (${sys.buff.duration} rounds)`;
       }
+      case 'barrier':
+        return `${effectLabel}: ${sys.barrier.value} HP barrier`;
       case 'poison':
         return `${effectLabel}: ${sys.poison.damage} ${sys.poison.damageType} damage for ${sys.poison.duration} attacks`;
       case 'bomb':

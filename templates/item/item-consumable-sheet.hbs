@@ -158,6 +158,17 @@
       </div>
       {{/if}}
 
+      {{!-- Barrier Config --}}
+      {{#if (eq system.effectType "barrier")}}
+      <div class='effect-config'>
+        <h4>{{localize "ASPECTSOFPOWER.ConsumableEffect.barrier"}}</h4>
+        <div class='equip-field'>
+          <label>Barrier HP</label>
+          <input type='number' name='system.barrier.value' value='{{system.barrier.value}}' min='0' />
+        </div>
+      </div>
+      {{/if}}
+
       {{!-- Poison Config --}}
       {{#if (eq system.effectType "poison")}}
       <div class='effect-config'>

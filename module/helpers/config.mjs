@@ -180,6 +180,7 @@ ASPECTSOFPOWER.consumableEffectTypes = {
   buff:        'ASPECTSOFPOWER.ConsumableEffect.buff',
   poison:      'ASPECTSOFPOWER.ConsumableEffect.poison',
   bomb:        'ASPECTSOFPOWER.ConsumableEffect.bomb',
+  barrier:     'ASPECTSOFPOWER.ConsumableEffect.barrier',
   repairKit:   'ASPECTSOFPOWER.ConsumableEffect.repairKit',
   none:        'ASPECTSOFPOWER.ConsumableEffect.none',
 };

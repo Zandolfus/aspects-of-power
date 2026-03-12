@@ -271,6 +271,7 @@
       "buff": "Buff",
       "poison": "Poison",
       "bomb": "Bomb",
+      "barrier": "Barrier",
       "repairKit": "Repair Kit",
       "none": "None"
     }
