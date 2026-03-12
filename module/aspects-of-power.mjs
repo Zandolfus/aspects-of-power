@@ -499,17 +499,20 @@ Hooks.on('combatTurnChange', async (combat, _prior, current) => {
     const breakStat = DEBUFF_BREAK_STAT[debuffType];
     if (breakStat) {
       const statMod = actor.system.abilities?.[breakStat]?.mod ?? 0;
-      // Roll 1d20 + stat mod vs debuff roll total.
       const breakRoll = new Roll('1d20 + @mod', { mod: statMod });
       await breakRoll.evaluate();
       const breakLabel = game.i18n.localize(`ASPECTSOFPOWER.Ability.${breakStat}.long`);
 
-      if (breakRoll.total >= rollTotal) {
+      // Accumulate break progress across turns.
+      const previousProgress = flags.breakProgress ?? 0;
+      const newProgress = previousProgress + breakRoll.total;
+
+      if (newProgress >= rollTotal) {
         // Broke free!
         await effect.delete();
         await breakRoll.toMessage({
           speaker,
-          flavor: `${typeName} — ${game.i18n.localize('ASPECTSOFPOWER.Debuff.breakRoll')} (${breakLabel})`,
+          flavor: `${typeName} — ${game.i18n.localize('ASPECTSOFPOWER.Debuff.breakRoll')} (${breakLabel}) [${newProgress} / ${rollTotal}]`,
         });
         ChatMessage.create({
           speaker,
@@ -517,9 +520,11 @@ Hooks.on('combatTurnChange', async (combat, _prior, current) => {
         });
         continue; // Effect removed, skip turn-skip check.
       } else {
+        // Save cumulative progress on the effect.
+        await effect.setFlag('aspects-of-power', 'breakProgress', newProgress);
         await breakRoll.toMessage({
           speaker,
-          flavor: `${typeName} — ${game.i18n.localize('ASPECTSOFPOWER.Debuff.breakRoll')} (${breakLabel})`,
+          flavor: `${typeName} — ${game.i18n.localize('ASPECTSOFPOWER.Debuff.breakRoll')} (${breakLabel}) [${newProgress} / ${rollTotal}]`,
         });
         ChatMessage.create({
           speaker,
