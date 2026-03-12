@@ -276,6 +276,7 @@ export class AspectsofPowerItemSheet extends foundry.applications.api.Handlebars
         buffDuration:      Number(form.querySelector('[name="system.tagConfig.buffDuration"]')?.value) || 1,
         buffStackable:     form.querySelector('[name="system.tagConfig.buffStackable"]')?.checked ?? false,
         debuffEntries,
+        debuffType:        form.querySelector('[name="system.tagConfig.debuffType"]')?.value ?? 'none',
         debuffDuration:    Number(form.querySelector('[name="system.tagConfig.debuffDuration"]')?.value) || 1,
         debuffStackable:   form.querySelector('[name="system.tagConfig.debuffStackable"]')?.checked ?? false,
         debuffDealsDamage: form.querySelector('[name="system.tagConfig.debuffDealsDamage"]')?.checked ?? false,
