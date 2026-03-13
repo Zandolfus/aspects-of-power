@@ -1793,6 +1793,9 @@ export class AspectsofPowerItem extends Item {
       }
     }
 
+    // ── Consume a combat action (for movement segmentation) ──
+    game.aspectsofpower?.consumeAction?.(this.actor);
+
     // ── AOE branch: place template, detect targets, then deduct cost ──
     const isAoe = this.system.aoe?.enabled && tags.length > 0;
     if (isAoe) {

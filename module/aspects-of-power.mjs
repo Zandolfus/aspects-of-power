@@ -27,15 +27,20 @@ import { EquipmentSystem } from './systems/equipment.mjs';
 /* -------------------------------------------- */
 
 /**
- * Tracks cumulative movement distance (in feet) per combatant per turn.
- * Key: combatant ID, Value: total feet moved this turn.
- * Reset at the start of each combatant's turn via combatTurnChange.
+ * Tracks cumulative movement distance (in feet) per combatant for the
+ * current movement segment.  A "segment" is the window between two skill
+ * uses (or between turn-start and the first skill use).  The segment
+ * distance is capped at sprintRange.
+ *
+ * Key: combatant ID, Value: feet moved in the current segment.
+ * Reset when a skill is used (bumping the action counter) or when a new
+ * turn starts.
  */
-const _movementTracker = new Map();
+const _segmentMovement = new Map();
 
 /**
- * Tracks how many movement actions a combatant has used this turn (max 3).
- * Each token drag counts as one movement action.
+ * Tracks how many skill actions a combatant has used this turn (max 3).
+ * Movement itself does NOT consume an action — only skill rolls do.
  */
 const _moveActionTracker = new Map();
 
@@ -83,6 +88,27 @@ Hooks.once('init', function () {
     AspectsofPowerItem,
     rollItemMacro,
     getPositionalTags,
+    /**
+     * Called when a skill is used to consume an action and reset the movement
+     * segment for the given actor.  Returns the new action count, or null
+     * if no combat / combatant found.
+     * @param {Actor} actor
+     * @returns {number|null}
+     */
+    consumeAction(actor) {
+      const combat = game.combat;
+      if (!combat?.started) return null;
+      const token = actor.getActiveTokens()[0];
+      if (!token) return null;
+      const combatant = combat.combatants.find(
+        c => c.tokenId === token.id && c.sceneId === token.document.parent?.id
+      );
+      if (!combatant) return null;
+      const used = (_moveActionTracker.get(combatant.id) ?? 0) + 1;
+      _moveActionTracker.set(combatant.id, used);
+      _segmentMovement.set(combatant.id, 0); // reset segment for next move
+      return used;
+    },
   };
 
   // Add custom constants for configuration.
@@ -797,7 +823,7 @@ Hooks.on('renderTokenHUD', (hud, html, data) => {
  * Runs on every client so the preUpdateToken guard works locally.
  */
 Hooks.on('combatTurnChange', () => {
-  _movementTracker.clear();
+  _segmentMovement.clear();
   _moveActionTracker.clear();
 });
 
@@ -805,7 +831,7 @@ Hooks.on('combatTurnChange', () => {
  * Clean up the movement tracker when combat ends.
  */
 Hooks.on('deleteCombat', () => {
-  _movementTracker.clear();
+  _segmentMovement.clear();
   _moveActionTracker.clear();
 });
 
@@ -814,14 +840,18 @@ Hooks.on('deleteCombat', () => {
 /* -------------------------------------------- */
 
 /**
- * Intercept token movement to enforce stamina costs, maximum range, and
- * a 3-action-per-turn movement limit.
+ * Intercept token movement to enforce stamina costs and maximum range.
  *
- * Each token drag counts as one movement action (max 3 per turn).
- * Per action:
- *   Walk zone:   1 stamina per 5 ft, up to walkRange ft
+ * Movement is cumulative within a "segment" — the window between skill
+ * uses.  Players can move freely (via arrow keys, drags, etc.) until
+ * they hit the per-segment cap (sprintRange).  Using a skill starts a
+ * new segment by bumping the action counter and resetting segment
+ * distance.  Max 3 actions per turn.
+ *
+ * Per segment:
+ *   Walk zone:   1 stamina per 5 ft, up to walkRange ft cumulative
  *   Sprint zone: 3 stamina per 5 ft, from walkRange to sprintRange ft
- *   Beyond sprintRange: movement blocked.
+ *   Beyond sprintRange: movement blocked until a new segment starts.
  *
  * Only applies during active combat. GM moves are exempt.
  */
@@ -865,13 +895,11 @@ Hooks.on('preUpdateToken', (tokenDoc, changes, options, userId) => {
   const stamina     = actor.system.stamina;
 
   // Chilled: reduce movement speed by comparing endurance to debuff roll.
-  // Movement reduction = debuffRoll - enduranceMod (minimum 50% reduction).
   const chilledEffect = getActiveDebuff(actor, 'chilled');
   if (chilledEffect) {
     const debuffRoll   = chilledEffect.flags?.['aspects-of-power']?.debuffDamage ?? 0;
     const enduranceMod = actor.system.abilities?.endurance?.mod ?? 0;
     const reduction    = Math.max(0, debuffRoll - enduranceMod);
-    // Reduce walk/sprint ranges; if reduction >= walkRange, actor is effectively frozen.
     walkRange   = Math.max(0, walkRange - reduction);
     sprintRange = Math.max(0, sprintRange - reduction);
     if (walkRange <= 0 && sprintRange <= 0) {
@@ -880,10 +908,10 @@ Hooks.on('preUpdateToken', (tokenDoc, changes, options, userId) => {
     }
   }
 
-  // Check movement actions remaining (max 3 per turn).
+  // Check if the combatant has exhausted all 3 actions (no more movement allowed).
   const actionsUsed = _moveActionTracker.get(combatant.id) ?? 0;
   if (actionsUsed >= 3) {
-    ui.notifications.warn('No movement actions remaining this turn! (3/3 used)');
+    ui.notifications.warn('No movement remaining this turn! (3/3 actions used)');
     return false;
   }
 
@@ -903,17 +931,19 @@ Hooks.on('preUpdateToken', (tokenDoc, changes, options, userId) => {
   const moveSnapped = Math.round(moveFeet / 5) * 5;
   if (moveSnapped <= 0) return;
 
-  // Per-action distance cap (single move can't exceed sprintRange).
-  if (moveSnapped > sprintRange) {
-    ui.notifications.warn(`Maximum movement distance exceeded! (${Math.round(sprintRange)} ft max per action)`);
+  // Cumulative segment distance check — can't exceed sprintRange in one segment.
+  const segmentSoFar = _segmentMovement.get(combatant.id) ?? 0;
+  const newSegmentTotal = segmentSoFar + moveSnapped;
+  if (newSegmentTotal > sprintRange) {
+    const remaining = Math.max(0, sprintRange - segmentSoFar);
+    ui.notifications.warn(`Movement cap reached! (${remaining} ft remaining this segment, ${Math.round(sprintRange)} ft max)`);
     return false;
   }
 
-  // Calculate stamina cost for this action's distance.
-  // Walk zone: 0 → walkRange at 1 stamina/5ft.
-  // Sprint zone: walkRange → sprintRange at 3 stamina/5ft.
+  // Calculate stamina cost based on cumulative position in walk/sprint zones.
+  // Each 5ft step is walk (1 stamina) or sprint (3 stamina) based on cumulative distance.
   let staminaCost = 0;
-  for (let ft = 5; ft <= moveSnapped; ft += 5) {
+  for (let ft = segmentSoFar + 5; ft <= newSegmentTotal; ft += 5) {
     staminaCost += (ft <= walkRange) ? 1 : 3;
   }
 
@@ -923,21 +953,16 @@ Hooks.on('preUpdateToken', (tokenDoc, changes, options, userId) => {
     return false;
   }
 
-  // Update trackers synchronously, deduct stamina asynchronously.
-  const actionNum = actionsUsed + 1;
-  _moveActionTracker.set(combatant.id, actionNum);
-
-  const prevDistance  = _movementTracker.get(combatant.id) ?? 0;
-  _movementTracker.set(combatant.id, prevDistance + moveSnapped);
+  // Update segment tracker synchronously, deduct stamina asynchronously.
+  _segmentMovement.set(combatant.id, newSegmentTotal);
 
   const newStamina = stamina.value - staminaCost;
   Promise.resolve().then(async () => {
     await actor.update({ 'system.stamina.value': newStamina });
     ChatMessage.create({
       speaker: ChatMessage.getSpeaker({ actor }),
-      content: `<p><em>${actor.name} spends ${staminaCost} stamina on movement `
-             + `(${moveSnapped} ft, action ${actionNum}/3). `
-             + `Stamina: ${newStamina}/${stamina.max}</em></p>`,
+      content: `<p><em>${actor.name} moves ${moveSnapped} ft (${newSegmentTotal}/${Math.round(sprintRange)} ft this segment). `
+             + `Stamina: −${staminaCost} (${newStamina}/${stamina.max})</em></p>`,
     });
   });
 });
