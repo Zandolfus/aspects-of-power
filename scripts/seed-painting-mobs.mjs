@@ -37,7 +37,7 @@ const MONSTERS = [
         img: 'icons/magic/acid/projectile-faceted-glob.webp',
         system: {
           description: '<p>The ooze surges forward, slamming a pseudopod of caustic turpentine into the target.</p>',
-          skillType: 'Strength Weapon',
+          skillType: 'Active',
           skillCategory: 'combat',
           requiresSight: true,
           magicType: 'non-magical',
@@ -54,7 +54,7 @@ const MONSTERS = [
         img: 'icons/magic/acid/dissolve-bone-white.webp',
         system: {
           description: '<p>Corrosive turpentine seeps into the target, weakening their musculature.</p>',
-          skillType: 'Strength Weapon',
+          skillType: 'Active',
           skillCategory: 'combat',
           requiresSight: true,
           magicType: 'non-magical',
@@ -105,7 +105,7 @@ const MONSTERS = [
         img: 'icons/skills/melee/strike-polearm-light.webp',
         system: {
           description: '<p>The easel sweeps its sharpened legs in an arc, knocking the target backward.</p>',
-          skillType: 'Strength Weapon',
+          skillType: 'Active',
           skillCategory: 'combat',
           requiresSight: true,
           magicType: 'non-magical',
@@ -127,7 +127,7 @@ const MONSTERS = [
         img: 'icons/skills/melee/strike-hammer-destructive-orange.webp',
         system: {
           description: '<p>A heavy overhead slam with the easel\'s crossbar.</p>',
-          skillType: 'Strength Weapon',
+          skillType: 'Active',
           skillCategory: 'combat',
           requiresSight: true,
           magicType: 'non-magical',
@@ -206,7 +206,7 @@ const MONSTERS = [
         img: 'icons/weapons/ammunition/arrow-head-war-flight.webp',
         system: {
           description: '<p>The fiend fires a volley of hardened bristles at range.</p>',
-          skillType: 'Dexterity Weapon',
+          skillType: 'Active',
           skillCategory: 'combat',
           requiresSight: true,
           magicType: 'non-magical',
@@ -223,7 +223,7 @@ const MONSTERS = [
         img: 'icons/magic/light/explosion-star-large-orange.webp',
         system: {
           description: '<p>A burst of vivid pigment powder aimed at the target\'s eyes.</p>',
-          skillType: 'Dexterity Weapon',
+          skillType: 'Active',
           skillCategory: 'combat',
           requiresSight: true,
           magicType: 'non-magical',
@@ -381,7 +381,7 @@ const MONSTERS = [
         img: 'icons/skills/melee/unarmed-punch-fist.webp',
         system: {
           description: '<p>A lopsided, half-rendered fist crashes into the target with surprising force.</p>',
-          skillType: 'Strength Weapon',
+          skillType: 'Active',
           skillCategory: 'combat',
           requiresSight: true,
           magicType: 'non-magical',
@@ -398,7 +398,7 @@ const MONSTERS = [
         img: 'icons/magic/nature/root-vine-entangled-hand.webp',
         system: {
           description: '<p>Unfinished tendrils of paint lash out and root the target in place.</p>',
-          skillType: 'Strength Weapon',
+          skillType: 'Active',
           skillCategory: 'combat',
           requiresSight: true,
           magicType: 'non-magical',
@@ -485,7 +485,7 @@ const MONSTERS = [
         img: 'icons/magic/water/projectile-bolts-salvo-blue.webp',
         system: {
           description: '<p>The serpent spits a pressurized stream of black ink at its target.</p>',
-          skillType: 'Dexterity Weapon',
+          skillType: 'Active',
           skillCategory: 'combat',
           requiresSight: true,
           magicType: 'non-magical',
@@ -502,7 +502,7 @@ const MONSTERS = [
         img: 'icons/magic/water/barrier-ice-crystal-wall-jagged-blue.webp',
         system: {
           description: '<p>A burst of opaque ink fills the area, coating everything in blinding darkness.</p>',
-          skillType: 'Dexterity Weapon',
+          skillType: 'Active',
           skillCategory: 'combat',
           requiresSight: true,
           magicType: 'non-magical',
@@ -527,7 +527,7 @@ const MONSTERS = [
         img: 'icons/creatures/reptiles/snake-fangs-bite-green.webp',
         system: {
           description: '<p>The serpent coils around the target, squeezing tight with its ink-slick body.</p>',
-          skillType: 'Strength Weapon',
+          skillType: 'Active',
           skillCategory: 'combat',
           requiresSight: true,
           magicType: 'non-magical',
@@ -580,7 +580,7 @@ const MONSTERS = [
         img: 'icons/skills/melee/strike-hammer-destructive-purple.webp',
         system: {
           description: '<p>The golem heaves a massive palette slab overhead and slams it down, sending the target flying.</p>',
-          skillType: 'Strength Weapon',
+          skillType: 'Active',
           skillCategory: 'combat',
           requiresSight: true,
           magicType: 'non-magical',
@@ -602,7 +602,7 @@ const MONSTERS = [
         img: 'icons/skills/melee/strike-flail-destructive-orange.webp',
         system: {
           description: '<p>The golem brings both fists together on the target in a devastating pinch.</p>',
-          skillType: 'Strength Weapon',
+          skillType: 'Active',
           skillCategory: 'combat',
           requiresSight: true,
           magicType: 'non-magical',
