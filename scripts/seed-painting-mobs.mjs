@@ -34,7 +34,6 @@ const MONSTERS = [
       {
         name: 'Acidic Slam',
         type: 'skill',
-        img: 'icons/magic/acid/projectile-faceted-glob.webp',
         system: {
           description: '<p>The ooze surges forward, slamming a pseudopod of caustic turpentine into the target.</p>',
           skillType: 'Active',
@@ -51,7 +50,6 @@ const MONSTERS = [
       {
         name: 'Dissolving Touch',
         type: 'skill',
-        img: 'icons/magic/acid/dissolve-bone-white.webp',
         system: {
           description: '<p>Corrosive turpentine seeps into the target, weakening their musculature.</p>',
           skillType: 'Active',
@@ -74,7 +72,6 @@ const MONSTERS = [
       {
         name: 'Corrosive Membrane',
         type: 'item',
-        img: 'icons/magic/acid/barrier-bubble-green.webp',
         system: {
           description: '<p>A layer of semi-solid turpentine that absorbs impacts.</p>',
           slot: 'chest', rarity: 'uncommon', equipped: true,
@@ -102,7 +99,6 @@ const MONSTERS = [
       {
         name: 'Leg Sweep',
         type: 'skill',
-        img: 'icons/skills/melee/strike-polearm-light.webp',
         system: {
           description: '<p>The easel sweeps its sharpened legs in an arc, knocking the target backward.</p>',
           skillType: 'Active',
@@ -124,7 +120,6 @@ const MONSTERS = [
       {
         name: 'Frame Bash',
         type: 'skill',
-        img: 'icons/skills/melee/strike-hammer-destructive-orange.webp',
         system: {
           description: '<p>A heavy overhead slam with the easel\'s crossbar.</p>',
           skillType: 'Active',
@@ -141,7 +136,6 @@ const MONSTERS = [
       {
         name: 'Splinter Guard',
         type: 'skill',
-        img: 'icons/magic/defensive/shield-barrier-glowing-triangle-orange.webp',
         system: {
           description: '<p>The easel braces its frame, reinforcing itself with jagged splinters.</p>',
           skillType: 'Active',
@@ -162,7 +156,6 @@ const MONSTERS = [
       {
         name: 'Hardwood Frame',
         type: 'item',
-        img: 'icons/commodities/wood/bark-brown.webp',
         system: {
           description: '<p>Sturdy oak frame that serves as the easel\'s body.</p>',
           slot: 'chest', rarity: 'common', equipped: true,
@@ -175,7 +168,6 @@ const MONSTERS = [
       {
         name: 'Sharpened Leg-Spikes',
         type: 'item',
-        img: 'icons/weapons/polearms/spear-hooked-spike.webp',
         system: {
           description: '<p>Iron-tipped legs, sharpened to impale.</p>',
           slot: 'hands', rarity: 'common', equipped: true,
@@ -203,7 +195,6 @@ const MONSTERS = [
       {
         name: 'Bristle Dart',
         type: 'skill',
-        img: 'icons/weapons/ammunition/arrow-head-war-flight.webp',
         system: {
           description: '<p>The fiend fires a volley of hardened bristles at range.</p>',
           skillType: 'Active',
@@ -220,7 +211,6 @@ const MONSTERS = [
       {
         name: 'Blinding Pigment',
         type: 'skill',
-        img: 'icons/magic/light/explosion-star-large-orange.webp',
         system: {
           description: '<p>A burst of vivid pigment powder aimed at the target\'s eyes.</p>',
           skillType: 'Active',
@@ -242,7 +232,6 @@ const MONSTERS = [
       {
         name: 'Barbed Bristle Array',
         type: 'item',
-        img: 'icons/weapons/ammunition/arrows-bundle-steel.webp',
         system: {
           description: '<p>A cluster of razor-sharp bristles ready to be launched.</p>',
           slot: 'hands', rarity: 'uncommon', equipped: true,
@@ -258,7 +247,6 @@ const MONSTERS = [
       {
         name: 'Pigment-Stained Hide',
         type: 'item',
-        img: 'icons/equipment/chest/breastplate-leather-studded-brown.webp',
         system: {
           description: '<p>Hide matted with dried paint, surprisingly tough.</p>',
           slot: 'chest', rarity: 'common', equipped: true,
@@ -286,7 +274,6 @@ const MONSTERS = [
       {
         name: 'Psychic Brushstroke',
         type: 'skill',
-        img: 'icons/magic/control/hypnosis-mesmerism-swirl.webp',
         system: {
           description: '<p>The fresco projects a lance of concentrated thought, painting agony across the target\'s mind.</p>',
           skillType: 'Active',
@@ -303,7 +290,6 @@ const MONSTERS = [
       {
         name: 'Maddening Vista',
         type: 'skill',
-        img: 'icons/magic/control/fear-fright-shadow-monster-green.webp',
         system: {
           description: '<p>The fresco\'s surface warps into a terrifying panorama that overwhelms the viewer\'s sanity.</p>',
           skillType: 'Active',
@@ -325,7 +311,6 @@ const MONSTERS = [
       {
         name: 'Chromatic Pulse',
         type: 'skill',
-        img: 'icons/magic/light/explosion-star-large-purple.webp',
         system: {
           description: '<p>A rippling wave of prismatic energy radiates from the fresco, searing nearby minds.</p>',
           skillType: 'Active',
@@ -347,7 +332,6 @@ const MONSTERS = [
       {
         name: 'Gilded Frame',
         type: 'item',
-        img: 'icons/sundries/misc/mirror-steel.webp',
         system: {
           description: '<p>An ornate golden frame that channels magical energy.</p>',
           slot: 'chest', rarity: 'rare', equipped: true,
@@ -378,7 +362,6 @@ const MONSTERS = [
       {
         name: 'Malformed Fist',
         type: 'skill',
-        img: 'icons/skills/melee/unarmed-punch-fist.webp',
         system: {
           description: '<p>A lopsided, half-rendered fist crashes into the target with surprising force.</p>',
           skillType: 'Active',
@@ -395,7 +378,6 @@ const MONSTERS = [
       {
         name: 'Visceral Grasp',
         type: 'skill',
-        img: 'icons/magic/nature/root-vine-entangled-hand.webp',
         system: {
           description: '<p>Unfinished tendrils of paint lash out and root the target in place.</p>',
           skillType: 'Active',
@@ -416,7 +398,6 @@ const MONSTERS = [
       {
         name: 'Anguished Wail',
         type: 'skill',
-        img: 'icons/magic/sonic/scream-wail-pointed-orange.webp',
         system: {
           description: '<p>The abomination screams — a sound that exists partly as paint, partly as agony. The incomplete cry stuns nearby minds.</p>',
           skillType: 'Active',
@@ -438,7 +419,6 @@ const MONSTERS = [
       {
         name: 'Layered Paint Hide',
         type: 'item',
-        img: 'icons/equipment/chest/coat-collared-leather-brown.webp',
         system: {
           description: '<p>Thick layers of dried paint form an uneven shell over the abomination\'s torso.</p>',
           slot: 'chest', rarity: 'uncommon', equipped: true,
@@ -454,7 +434,6 @@ const MONSTERS = [
       {
         name: 'Misshapen Claws',
         type: 'item',
-        img: 'icons/creatures/claws/claw-bear-brown.webp',
         system: {
           description: '<p>Asymmetric claws, one far larger than the other — the artist never finished.</p>',
           slot: 'hands', rarity: 'uncommon', equipped: true,
@@ -482,7 +461,6 @@ const MONSTERS = [
       {
         name: 'Ink Jet',
         type: 'skill',
-        img: 'icons/magic/water/projectile-bolts-salvo-blue.webp',
         system: {
           description: '<p>The serpent spits a pressurized stream of black ink at its target.</p>',
           skillType: 'Active',
@@ -499,7 +477,6 @@ const MONSTERS = [
       {
         name: 'Ink Cloud',
         type: 'skill',
-        img: 'icons/magic/water/barrier-ice-crystal-wall-jagged-blue.webp',
         system: {
           description: '<p>A burst of opaque ink fills the area, coating everything in blinding darkness.</p>',
           skillType: 'Active',
@@ -524,7 +501,6 @@ const MONSTERS = [
       {
         name: 'Constrict',
         type: 'skill',
-        img: 'icons/creatures/reptiles/snake-fangs-bite-green.webp',
         system: {
           description: '<p>The serpent coils around the target, squeezing tight with its ink-slick body.</p>',
           skillType: 'Active',
@@ -546,7 +522,6 @@ const MONSTERS = [
       {
         name: 'Ink-Slick Scales',
         type: 'item',
-        img: 'icons/creatures/reptiles/snake-fangs-small-green.webp',
         system: {
           description: '<p>Iridescent scales that shimmer with liquid ink, deflecting blows.</p>',
           slot: 'chest', rarity: 'uncommon', equipped: true,
@@ -577,7 +552,6 @@ const MONSTERS = [
       {
         name: 'Palette Smash',
         type: 'skill',
-        img: 'icons/skills/melee/strike-hammer-destructive-purple.webp',
         system: {
           description: '<p>The golem heaves a massive palette slab overhead and slams it down, sending the target flying.</p>',
           skillType: 'Active',
@@ -599,7 +573,6 @@ const MONSTERS = [
       {
         name: 'Color Crush',
         type: 'skill',
-        img: 'icons/skills/melee/strike-flail-destructive-orange.webp',
         system: {
           description: '<p>The golem brings both fists together on the target in a devastating pinch.</p>',
           skillType: 'Active',
@@ -617,7 +590,6 @@ const MONSTERS = [
       {
         name: 'Lacquered Shell',
         type: 'item',
-        img: 'icons/equipment/chest/breastplate-banded-steel-gold.webp',
         system: {
           description: '<p>Dozens of dried palettes fused into a thick, lacquered carapace.</p>',
           slot: 'chest', rarity: 'rare', equipped: true,
@@ -633,7 +605,6 @@ const MONSTERS = [
       {
         name: 'Palette Blade',
         type: 'item',
-        img: 'icons/weapons/swords/sword-guard-bronze.webp',
         system: {
           description: '<p>A massive palette knife, scaled up to golem proportions. Its edge is caked with dried paint that chips on impact.</p>',
           slot: 'hands', rarity: 'uncommon', equipped: true,
@@ -661,7 +632,6 @@ const MONSTERS = [
       {
         name: 'Haunting Gaze',
         type: 'skill',
-        img: 'icons/magic/perception/eye-ringed-glow-angry-small-purple.webp',
         system: {
           description: '<p>The phantom locks eyes with its target. For an instant, the victim sees their own portrait — decaying.</p>',
           skillType: 'Active',
@@ -678,7 +648,6 @@ const MONSTERS = [
       {
         name: 'Painted Nightmare',
         type: 'skill',
-        img: 'icons/magic/control/debuff-chains-ropes-purple.webp',
         system: {
           description: '<p>The phantom drags the target\'s consciousness into a half-finished painting where nothing makes sense.</p>',
           skillType: 'Active',
@@ -700,7 +669,6 @@ const MONSTERS = [
       {
         name: 'Spectral Chill',
         type: 'skill',
-        img: 'icons/magic/water/snowflake-ice-snow-white.webp',
         system: {
           description: '<p>A wave of supernatural cold emanates from the phantom\'s canvas, slowing all who feel it.</p>',
           skillType: 'Active',
@@ -721,7 +689,6 @@ const MONSTERS = [
       {
         name: 'Ethereal Shroud',
         type: 'item',
-        img: 'icons/equipment/back/cape-layered-purple.webp',
         system: {
           description: '<p>A tattered canvas that flutters despite no wind, phasing in and out of reality.</p>',
           slot: 'chest', rarity: 'rare', equipped: true,
@@ -786,7 +753,7 @@ export function list() {
 /* ------------------------------------------------------------------ */
 
 async function _createWithItems(def, folder) {
-  const actorOpts = { ...def.actor };
+  const actorOpts = { ...def.actor, type: 'character' };
   if (folder) actorOpts.folder = folder;
 
   // Create the actor (stats + race level).
