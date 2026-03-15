@@ -371,13 +371,22 @@ export class AspectsofPowerItem extends Item {
     const promptContent = `<p><strong>${attackName}</strong> incoming (to-hit: ${hitTotal})</p>${defenseText}${reactionText}`;
 
     // Find the owning player.
-    const owners = Object.entries(targetActor.ownership ?? {})
-      .filter(([uid, level]) => level >= 3 && uid !== 'default')
-      .map(([uid]) => uid);
-    const playerOwner = owners.find(uid => {
-      const u = game.users.get(uid);
-      return u?.active && !u.isGM;
-    });
+    // Prefer the user whose assigned character IS this actor (definitive ownership).
+    // Fall back to explicit OWNER permission entries only if no character match.
+    const characterOwner = game.users.find(u =>
+      u.active && !u.isGM && u.character?.id === targetActor.id
+    );
+    let playerOwner = characterOwner?.id ?? null;
+
+    if (!playerOwner) {
+      const owners = Object.entries(targetActor.ownership ?? {})
+        .filter(([uid, level]) => level >= 3 && uid !== 'default')
+        .map(([uid]) => uid);
+      playerOwner = owners.find(uid => {
+        const u = game.users.get(uid);
+        return u?.active && !u.isGM;
+      }) ?? null;
+    }
 
     let result = { defend: false, reactionSkillId: null };
     if (playerOwner) {
@@ -465,7 +474,7 @@ export class AspectsofPowerItem extends Item {
     let total = 0;
     for (const effect of targetActor.allApplicableEffects()) {
       const flags = effect.flags?.['aspects-of-power'] ?? {};
-      if (!flags.debuffDamage) continue;
+      if (!flags.debuffDamage || !flags.dot) continue;
 
       const effectAffinities = flags.affinities ?? [];
       const effectMagicType  = flags.magicType ?? '';
