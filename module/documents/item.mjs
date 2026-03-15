@@ -370,23 +370,13 @@ export class AspectsofPowerItem extends Item {
 
     const promptContent = `<p><strong>${attackName}</strong> incoming (to-hit: ${hitTotal})</p>${defenseText}${reactionText}`;
 
-    // Find the owning player.
-    // Prefer the user whose assigned character IS this actor (definitive ownership).
-    // Fall back to explicit OWNER permission entries only if no character match.
+    // Find the owning player — only prompt the user whose assigned character
+    // IS this actor. Ownership permissions alone are not enough (players may
+    // have OWNER on NPCs/mobs without being the defender).
     const characterOwner = game.users.find(u =>
       u.active && !u.isGM && u.character?.id === targetActor.id
     );
-    let playerOwner = characterOwner?.id ?? null;
-
-    if (!playerOwner) {
-      const owners = Object.entries(targetActor.ownership ?? {})
-        .filter(([uid, level]) => level >= 3 && uid !== 'default')
-        .map(([uid]) => uid);
-      playerOwner = owners.find(uid => {
-        const u = game.users.get(uid);
-        return u?.active && !u.isGM;
-      }) ?? null;
-    }
+    const playerOwner = characterOwner?.id ?? null;
 
     let result = { defend: false, reactionSkillId: null };
     if (playerOwner) {
