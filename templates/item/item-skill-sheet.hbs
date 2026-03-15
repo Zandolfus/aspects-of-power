@@ -216,6 +216,20 @@
           <option value="physical" {{#if (eq system.roll.damageType "physical")}}selected{{/if}}>Physical (Armor)</option>
           <option value="magical" {{#if (eq system.roll.damageType "magical")}}selected{{/if}}>Magical (Veil)</option>
         </select>
+        <hr>
+        <label class='resource-label checkbox-label'>
+          <input type='checkbox' name='system.tagConfig.forcedMovement' {{#if system.tagConfig.forcedMovement}}checked{{/if}}>
+          {{localize "ASPECTSOFPOWER.ForcedMovement.label"}}
+        </label>
+        {{#if system.tagConfig.forcedMovement}}
+        <label class='resource-label'>{{localize "ASPECTSOFPOWER.ForcedMovement.direction"}}</label>
+        <select name='system.tagConfig.forcedMovementDir' data-dtype='String'>
+          <option value="push" {{#if (eq system.tagConfig.forcedMovementDir "push")}}selected{{/if}}>{{localize "ASPECTSOFPOWER.ForcedMovement.push"}}</option>
+          <option value="pull" {{#if (eq system.tagConfig.forcedMovementDir "pull")}}selected{{/if}}>{{localize "ASPECTSOFPOWER.ForcedMovement.pull"}}</option>
+        </select>
+        <label class='resource-label'>{{localize "ASPECTSOFPOWER.ForcedMovement.distance"}}</label>
+        <input type='number' name='system.tagConfig.forcedMovementDist' value='{{system.tagConfig.forcedMovementDist}}' min='5' step='5'>
+        {{/if}}
       </div>
       {{/if}}
 

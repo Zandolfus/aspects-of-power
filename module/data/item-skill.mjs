@@ -90,6 +90,11 @@ export class SkillData extends foundry.abstract.TypeDataModel {
         debuffDealsDamage:  new fields.BooleanField({ initial: false }),
         debuffDamageType:   new fields.StringField({ initial: 'physical' }),
 
+        // Forced movement: push or pull target on hit.
+        forcedMovement:     new fields.BooleanField({ initial: false }),
+        forcedMovementDir:  new fields.StringField({ initial: 'push' }),   // 'push' or 'pull'
+        forcedMovementDist: new fields.NumberField({ initial: 5, min: 5, integer: true }),
+
         // Barrier: mana-to-HP multiplier for barrier restoration skills.
         barrierMultiplier: new fields.NumberField({ initial: 1, min: 0 }),
 

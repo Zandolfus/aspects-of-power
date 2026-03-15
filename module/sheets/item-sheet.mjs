@@ -283,6 +283,11 @@ export class AspectsofPowerItemSheet extends foundry.applications.api.Handlebars
         debuffDamageType:  form.querySelector('[name="system.tagConfig.debuffDamageType"]')?.value ?? 'physical',
         debuffDirectional: form.querySelector('[name="system.tagConfig.debuffDirectional"]')?.checked ?? false,
 
+        // Forced movement.
+        forcedMovement:     form.querySelector('[name="system.tagConfig.forcedMovement"]')?.checked ?? false,
+        forcedMovementDir:  form.querySelector('[name="system.tagConfig.forcedMovementDir"]')?.value ?? 'push',
+        forcedMovementDist: Number(form.querySelector('[name="system.tagConfig.forcedMovementDist"]')?.value) || 5,
+
         // Barrier multiplier (mana-to-HP ratio).
         barrierMultiplier: Number(form.querySelector('[name="system.tagConfig.barrierMultiplier"]')?.value) || 1,
 

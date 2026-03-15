@@ -276,6 +276,18 @@ export class AspectsofPowerItem extends Item {
       ? `<p>Toughness: −${Math.min(effectiveToughness, damageAfterBarrier)}${affinityDR > 0 ? ` <em>(−${affinityDR} affinity)</em>` : ''}</p>`
       : '';
 
+    // Forced movement info for the button data attributes.
+    const fm = item.system.tagConfig ?? {};
+    const hasForcedMovement = fm.forcedMovement && isHit;
+    const fmDir  = fm.forcedMovementDir ?? 'push';
+    const fmDist = fm.forcedMovementDist ?? 5;
+    const fmLine = hasForcedMovement
+      ? `<p><strong>${game.i18n.localize('ASPECTSOFPOWER.ForcedMovement.label')}:</strong> ${game.i18n.localize(`ASPECTSOFPOWER.ForcedMovement.${fmDir}`)} ${fmDist} ft</p>`
+      : '';
+    const fmAttrs = hasForcedMovement
+      ? ` data-forced-dir="${fmDir}" data-forced-dist="${fmDist}" data-attacker-token-id="${attackerToken?.id ?? ''}" data-hit-total="${hitTotal}"`
+      : '';
+
     const gmContent = isHit
       ? `<div class="combat-result">
            <h3>${item.name} — ${resultBadge}</h3>
@@ -289,12 +301,13 @@ export class AspectsofPowerItem extends Item {
            ${barrierLine}
            ${toughnessLine}
            <p><strong>Final damage: ${displayDamage}</strong></p>
+           ${fmLine}
            <button class="apply-damage"
              data-actor-uuid="${targetActor.uuid}"
              data-damage="${preToughnessDmg}"
              data-toughness="${toughnessMod}"
              data-affinity-dr="${affinityDR}"
-             data-damage-type="${isPhysical ? 'physical' : 'magical'}"
+             data-damage-type="${isPhysical ? 'physical' : 'magical'}"${fmAttrs}
              style="margin-top:6px;width:100%;">
              Apply to ${targetActor.name}
            </button>

@@ -1073,12 +1073,103 @@ Hooks.on('renderChatMessageHTML', (message, html) => {
                + `${newHealth === 0 ? '<br><em>Incapacitated!</em>' : ''}</p>`,
       });
 
+      // ── Forced movement ──
+      const forcedDir  = btn.dataset.forcedDir;
+      const forcedDist = parseInt(btn.dataset.forcedDist, 10);
+      if (forcedDir && forcedDist > 0) {
+        await _applyForcedMovement(target, btn.dataset.attackerTokenId, forcedDir, forcedDist, parseInt(btn.dataset.hitTotal, 10) || 0);
+      }
+
       // Disable the button so it can't be double-applied.
       btn.disabled = true;
       btn.textContent = 'Applied';
     });
   });
 });
+
+/* -------------------------------------------- */
+/*  Forced Movement                             */
+/* -------------------------------------------- */
+
+/**
+ * Apply forced movement (push/pull) to a target after damage.
+ * The target rolls 1d20 + strength mod vs the attacker's hit total.
+ * If the target's roll >= hitTotal, they resist completely.
+ * Otherwise, they are moved the full configured distance.
+ *
+ * @param {Actor} targetActor      The target being pushed/pulled.
+ * @param {string} attackerTokenId The attacker's token ID (for direction).
+ * @param {string} dir             'push' or 'pull'.
+ * @param {number} distFt          Distance in feet.
+ * @param {number} hitTotal        The attacker's hit roll total.
+ */
+async function _applyForcedMovement(targetActor, attackerTokenId, dir, distFt, hitTotal) {
+  const targetToken = targetActor.getActiveTokens()[0];
+  if (!targetToken) return;
+
+  const scene = targetToken.document.parent;
+  const attackerTokenDoc = attackerTokenId ? scene?.tokens?.get(attackerTokenId) : null;
+  if (!attackerTokenDoc) return;
+
+  // Strength contest: target rolls 1d20 + strength mod vs hit total.
+  const strMod = targetActor.system.abilities?.strength?.mod ?? 0;
+  const strRoll = new Roll('1d20 + @str', { str: strMod });
+  await strRoll.evaluate();
+  await strRoll.toMessage({
+    speaker: ChatMessage.getSpeaker({ actor: targetActor }),
+    flavor: `${game.i18n.localize('ASPECTSOFPOWER.ForcedMovement.label')} — Strength Contest (vs ${hitTotal})`,
+  });
+
+  if (strRoll.total >= hitTotal) {
+    // Resisted!
+    ChatMessage.create({
+      speaker: ChatMessage.getSpeaker({ actor: targetActor }),
+      content: `<p><strong>${targetActor.name}</strong> ${game.i18n.localize('ASPECTSOFPOWER.ForcedMovement.resisted')} (${strRoll.total} vs ${hitTotal})</p>`,
+    });
+    return;
+  }
+
+  // Calculate direction vector.
+  const ax = attackerTokenDoc.x;
+  const ay = attackerTokenDoc.y;
+  const tx = targetToken.document.x;
+  const ty = targetToken.document.y;
+
+  let dx = tx - ax;
+  let dy = ty - ay;
+  const mag = Math.sqrt(dx * dx + dy * dy);
+  if (mag === 0) return; // tokens stacked, no direction
+
+  // Normalize.
+  dx /= mag;
+  dy /= mag;
+
+  // Push = away from attacker (same direction), Pull = toward attacker (reverse).
+  if (dir === 'pull') {
+    dx = -dx;
+    dy = -dy;
+  }
+
+  // Convert feet to pixels.
+  const pixelsPerFoot = canvas.grid.size / canvas.grid.distance;
+  const movePx = distFt * pixelsPerFoot;
+
+  // Calculate new position and snap to grid.
+  const rawX = tx + dx * movePx;
+  const rawY = ty + dy * movePx;
+  const snapped = canvas.grid.getSnappedPoint({ x: rawX, y: rawY }, { mode: CONST.GRID_SNAPPING_MODES.TOP_LEFT_VERTEX });
+
+  // Move the token (GM-side, bypasses preUpdateToken movement checks via GM exemption).
+  await targetToken.document.update({ x: snapped.x, y: snapped.y });
+
+  const dirLabel = dir === 'push'
+    ? game.i18n.localize('ASPECTSOFPOWER.ForcedMovement.pushed')
+    : game.i18n.localize('ASPECTSOFPOWER.ForcedMovement.pulled');
+  ChatMessage.create({
+    speaker: ChatMessage.getSpeaker({ actor: targetActor }),
+    content: `<p><strong>${targetActor.name}</strong> ${dirLabel} ${distFt} ft! (${strRoll.total} vs ${hitTotal})</p>`,
+  });
+}
 
 /* -------------------------------------------- */
 /*  Hotbar Macros                               */

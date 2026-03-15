@@ -165,6 +165,16 @@
       "progress": "Cleanse progress on",
       "cleansed": "cleansed from"
     },
+    "ForcedMovement": {
+      "label": "Forced Movement",
+      "direction": "Direction",
+      "push": "Push",
+      "pull": "Pull",
+      "distance": "Distance (ft)",
+      "resisted": "resists the forced movement!",
+      "pushed": "is pushed",
+      "pulled": "is pulled"
+    },
     "SkillComponent": {
       "requiresSight": "Requires Sight",
       "vocalComponent": "Vocal Component",
