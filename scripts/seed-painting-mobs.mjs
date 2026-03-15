@@ -25,8 +25,8 @@ const MONSTERS = [
       race: 'monster',
       raceLevel: 50,
       stats: {
-        vitality: 550, endurance: 450, strength: 400, dexterity: 150,
-        toughness: 450, intelligence: 5, willpower: 100, wisdom: 100, perception: 100,
+        vitality: 650, endurance: 536, strength: 450, dexterity: 150,
+        toughness: 500, intelligence: 5, willpower: 100, wisdom: 150, perception: 150,
       },
     },
     items: [
@@ -91,8 +91,8 @@ const MONSTERS = [
       race: 'monster',
       raceLevel: 50,
       stats: {
-        vitality: 350, endurance: 300, strength: 500, dexterity: 350,
-        toughness: 400, intelligence: 5, willpower: 50, wisdom: 50, perception: 200,
+        vitality: 450, endurance: 400, strength: 550, dexterity: 400,
+        toughness: 450, intelligence: 5, willpower: 80, wisdom: 80, perception: 276,
       },
     },
     items: [
@@ -187,8 +187,8 @@ const MONSTERS = [
       race: 'monster',
       raceLevel: 50,
       stats: {
-        vitality: 250, endurance: 250, strength: 100, dexterity: 500,
-        toughness: 150, intelligence: 200, willpower: 100, wisdom: 100, perception: 500,
+        vitality: 350, endurance: 300, strength: 150, dexterity: 600,
+        toughness: 200, intelligence: 200, willpower: 141, wisdom: 150, perception: 600,
       },
     },
     items: [
@@ -266,8 +266,8 @@ const MONSTERS = [
       race: 'monster',
       raceLevel: 50,
       stats: {
-        vitality: 300, endurance: 200, strength: 50, dexterity: 100,
-        toughness: 200, intelligence: 500, willpower: 500, wisdom: 400, perception: 200,
+        vitality: 350, endurance: 250, strength: 50, dexterity: 100,
+        toughness: 250, intelligence: 550, willpower: 541, wisdom: 400, perception: 200,
       },
     },
     items: [
@@ -354,8 +354,8 @@ const MONSTERS = [
       race: 'monster',
       raceLevel: 50,
       stats: {
-        vitality: 600, endurance: 350, strength: 500, dexterity: 200,
-        toughness: 350, intelligence: 50, willpower: 200, wisdom: 50, perception: 100,
+        vitality: 700, endurance: 400, strength: 550, dexterity: 200,
+        toughness: 400, intelligence: 50, willpower: 200, wisdom: 91, perception: 100,
       },
     },
     items: [
@@ -453,8 +453,8 @@ const MONSTERS = [
       race: 'monster',
       raceLevel: 50,
       stats: {
-        vitality: 300, endurance: 300, strength: 200, dexterity: 500,
-        toughness: 200, intelligence: 150, willpower: 100, wisdom: 100, perception: 500,
+        vitality: 350, endurance: 350, strength: 241, dexterity: 550,
+        toughness: 250, intelligence: 150, willpower: 100, wisdom: 100, perception: 600,
       },
     },
     items: [
@@ -544,8 +544,8 @@ const MONSTERS = [
       race: 'monster',
       raceLevel: 50,
       stats: {
-        vitality: 650, endurance: 400, strength: 600, dexterity: 100,
-        toughness: 500, intelligence: 5, willpower: 50, wisdom: 50, perception: 100,
+        vitality: 700, endurance: 450, strength: 650, dexterity: 100,
+        toughness: 536, intelligence: 5, willpower: 50, wisdom: 100, perception: 100,
       },
     },
     items: [
@@ -624,7 +624,7 @@ const MONSTERS = [
       race: 'monster',
       raceLevel: 50,
       stats: {
-        vitality: 200, endurance: 200, strength: 50, dexterity: 300,
+        vitality: 200, endurance: 241, strength: 50, dexterity: 300,
         toughness: 100, intelligence: 500, willpower: 500, wisdom: 450, perception: 350,
       },
     },
