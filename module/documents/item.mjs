@@ -403,9 +403,37 @@ export class AspectsofPowerItem extends Item {
           reactionSkills: reactionList,
         });
       });
-    } else {
-      // GM-owned target — prompt the GM directly.
+    } else if (game.user.isGM) {
+      // GM-owned target and we ARE the GM — show dialog locally.
       result = await this._showDefenseDialog(targetActor.name, promptContent, pool > 0, reactionList);
+    } else {
+      // GM-owned target but a player is attacking — route to GM via socket.
+      const requestId = foundry.utils.randomID();
+      const gmUser = game.users.find(u => u.isGM && u.active);
+      if (gmUser) {
+        result = await new Promise((resolve) => {
+          const timeout = setTimeout(() => { cleanup(); resolve({ defend: false, reactionSkillId: null }); }, 30000);
+          const handler = (response) => {
+            if (response.type !== 'defensePromptResponse' || response.requestId !== requestId) return;
+            cleanup();
+            resolve({ defend: response.defend, reactionSkillId: response.reactionSkillId ?? null });
+          };
+          const cleanup = () => {
+            clearTimeout(timeout);
+            game.socket.off('system.aspects-of-power', handler);
+          };
+          game.socket.on('system.aspects-of-power', handler);
+          game.socket.emit('system.aspects-of-power', {
+            type: 'defensePrompt',
+            targetUserId: gmUser.id,
+            targetName: targetActor.name,
+            promptContent,
+            requestId,
+            hasPool: pool > 0,
+            reactionSkills: reactionList,
+          });
+        });
+      }
     }
 
     return result;
