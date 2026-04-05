@@ -2,6 +2,15 @@ import { EquipmentSystem } from '../systems/equipment.mjs';
 import { getPositionalTags } from '../helpers/positioning.mjs';
 
 /**
+ * Check if an actor is an assigned player character (not just owned).
+ * @param {Actor} actor
+ * @returns {boolean}
+ */
+function _isPlayerCharacter(actor) {
+  return game.users.some(u => !u.isGM && u.active && u.character?.id === actor.id);
+}
+
+/**
  * Extend the basic Item with some very simple modifications.
  * @extends {Item}
  */
@@ -1534,7 +1543,7 @@ export class AspectsofPowerItem extends Item {
     let rollMode = game.settings.get('core', 'rollMode');
 
     // Non-player actors whisper all messages to GM only.
-    if (!this.actor.hasPlayerOwner) rollMode = CONST.DICE_ROLL_MODES.BLIND;
+    if (!_isPlayerCharacter(this.actor)) rollMode = CONST.DICE_ROLL_MODES.BLIND;
 
     // Determine target (self for restoration/buff, selected for poison).
     let targetActor = this.actor;
@@ -1708,7 +1717,7 @@ export class AspectsofPowerItem extends Item {
     const label    = `[${item.type}] ${item.name}`;
 
     // Non-player actors whisper all messages to GM only.
-    if (!this.actor.hasPlayerOwner) rollMode = CONST.DICE_ROLL_MODES.BLIND;
+    if (!_isPlayerCharacter(this.actor)) rollMode = CONST.DICE_ROLL_MODES.BLIND;
     const tags     = this.system.tags ?? [];
 
     // ── Parry-only mode: evaluate just the hit roll for comparison ─────

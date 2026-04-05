@@ -22,6 +22,13 @@ import { getPositionalTags } from './helpers/positioning.mjs';
 // Import systems.
 import { EquipmentSystem } from './systems/equipment.mjs';
 
+/**
+ * Check if an actor is an assigned player character (not just owned).
+ */
+function _isPlayerCharacter(actor) {
+  return game.users.some(u => !u.isGM && u.active && u.character?.id === actor.id);
+}
+
 /* -------------------------------------------- */
 /*  Movement Distance Tracker (per combat turn) */
 /* -------------------------------------------- */
@@ -371,7 +378,7 @@ Hooks.on('combatTurnChange', async (combat, _prior, current) => {
   const newValue = Math.min(stamina.max, stamina.value + regenAmt);
   await actor.update({ 'system.stamina.value': newValue });
 
-  const staminaWhisper = actor.hasPlayerOwner ? {} : { whisper: ChatMessage.getWhisperRecipients('GM') };
+  const staminaWhisper = _isPlayerCharacter(actor) ? {} : { whisper: ChatMessage.getWhisperRecipients('GM') };
   ChatMessage.create({
     speaker: ChatMessage.getSpeaker({ actor }),
     ...staminaWhisper,
@@ -396,7 +403,7 @@ Hooks.on('combatTurnChange', async (combat, _prior, current) => {
   const actor = combatant.actor;
   const updateData = {};
   const speaker = ChatMessage.getSpeaker({ actor });
-  const defPoolWhisper = actor.hasPlayerOwner ? {} : { whisper: ChatMessage.getWhisperRecipients('GM') };
+  const defPoolWhisper = _isPlayerCharacter(actor) ? {} : { whisper: ChatMessage.getWhisperRecipients('GM') };
 
   // Check for active sleep effects that modify mind defense restoration.
   const sleepEffects = getActiveDebuffs(actor, 'sleep');
@@ -510,7 +517,7 @@ Hooks.on('combatTurnChange', async (combat, _prior, current) => {
   if (!combatant?.actor) return;
   const actor = combatant.actor;
   const speaker = ChatMessage.getSpeaker({ actor });
-  const gmWhisper = actor.hasPlayerOwner ? {} : { whisper: ChatMessage.getWhisperRecipients('GM') };
+  const gmWhisper = _isPlayerCharacter(actor) ? {} : { whisper: ChatMessage.getWhisperRecipients('GM') };
 
   // Collect all active debuffs with a type.
   const typedDebuffs = actor.effects.filter(e =>
@@ -981,7 +988,7 @@ Hooks.on('preUpdateToken', (tokenDoc, changes, options, userId) => {
   _segmentMovement.set(combatant.id, newSegmentTotal);
 
   const newStamina = stamina.value - staminaCost;
-  const moveWhisper = actor.hasPlayerOwner ? {} : { whisper: ChatMessage.getWhisperRecipients('GM') };
+  const moveWhisper = _isPlayerCharacter(actor) ? {} : { whisper: ChatMessage.getWhisperRecipients('GM') };
   Promise.resolve().then(async () => {
     await actor.update({ 'system.stamina.value': newStamina });
     ChatMessage.create({
