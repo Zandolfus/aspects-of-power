@@ -158,6 +158,7 @@ export class AspectsofPowerItem extends Item {
    *   pool == 0       → full hit
    */
   async _handleAttackTag(item, rollData, hitRoll, dmgRoll, speaker, rollMode, label, targetTokenOverride = null) {
+    const whisperGM = !_isPlayerCharacter(this.actor) ? ChatMessage.getWhisperRecipients('GM') : undefined;
     const targetToken  = targetTokenOverride ?? game.user.targets.first() ?? null;
     const targetActor  = targetToken?.actor ?? null;
     if (!targetActor) return;
@@ -525,6 +526,10 @@ export class AspectsofPowerItem extends Item {
    * execute directly; otherwise send via socket.
    */
   async _gmAction(payload) {
+    // Automatically whisper GM-only for non-player actors.
+    if (!_isPlayerCharacter(this.actor)) {
+      payload.whisperGM = ChatMessage.getWhisperRecipients('GM');
+    }
     if (game.user.isGM) {
       await AspectsofPowerItem.executeGmAction(payload);
     } else {
@@ -537,6 +542,7 @@ export class AspectsofPowerItem extends Item {
    * @param {object} payload
    */
   static async executeGmAction(payload) {
+    const msgWhisper = payload.whisperGM ? { whisper: payload.whisperGM } : {};
     switch (payload.type) {
 
       case 'gmApplyRestoration': {
@@ -565,7 +571,7 @@ export class AspectsofPowerItem extends Item {
           await target.update(updateData);
           const ohNote = ohGain > 0 ? ` (+${ohGain} overhealth)` : '';
           ChatMessage.create({
-            speaker: payload.speaker, rollMode: payload.rollMode,
+            speaker: payload.speaker, ...msgWhisper,
             content: `<p><strong>${target.name}</strong> restores <strong>${healthGain}</strong> ${resLabel}${ohNote}. `
                    + `${resLabel}: ${newHealth} / ${pool.max}</p>`,
           });
@@ -638,7 +644,7 @@ export class AspectsofPowerItem extends Item {
 
           if (!accepted) {
             ChatMessage.create({
-              speaker: payload.speaker, rollMode: payload.rollMode,
+              speaker: payload.speaker, ...msgWhisper,
               content: `<p><strong>${target.name}</strong> declined the barrier.</p>`,
             });
             return;
@@ -680,7 +686,7 @@ export class AspectsofPowerItem extends Item {
 
           const replaced = existingEffect ? ' (replaced existing barrier)' : '';
           ChatMessage.create({
-            speaker: payload.speaker, rollMode: payload.rollMode,
+            speaker: payload.speaker, ...msgWhisper,
             content: `<p><strong>${target.name}</strong> gains a <strong>${barrierValue}</strong> point barrier${affText}${replaced}.</p>`,
           });
         } else {
@@ -688,7 +694,7 @@ export class AspectsofPowerItem extends Item {
           const actualGain  = newValue - pool.value;
           await target.update({ [`system.${resource}.value`]: newValue });
           ChatMessage.create({
-            speaker: payload.speaker, rollMode: payload.rollMode,
+            speaker: payload.speaker, ...msgWhisper,
             content: `<p><strong>${target.name}</strong> restores <strong>${actualGain}</strong> ${resLabel}. `
                    + `${resLabel}: ${newValue} / ${pool.max}</p>`,
           });
@@ -729,7 +735,7 @@ export class AspectsofPowerItem extends Item {
               'duration.startTurn': startTurn,
             });
             const mergedTotal = merged.reduce((sum, c) => sum + Number(c.value), 0);
-            ChatMessage.create({ speaker: payload.speaker, rollMode: payload.rollMode,
+            ChatMessage.create({ speaker: payload.speaker, ...msgWhisper,
               content: `<p>Buff on <strong>${target.name}</strong> stacked (total +${mergedTotal}) for ${newDuration} rounds.</p>`,
             });
           } else {
@@ -743,11 +749,11 @@ export class AspectsofPowerItem extends Item {
                 'duration.startRound': startRound,
                 'duration.startTurn': startTurn,
               });
-              ChatMessage.create({ speaker: payload.speaker, rollMode: payload.rollMode,
+              ChatMessage.create({ speaker: payload.speaker, ...msgWhisper,
                 content: `<p>Buff on <strong>${target.name}</strong> upgraded (total +${newTotal}, was +${currentTotal}).</p>`,
               });
             } else {
-              ChatMessage.create({ speaker: payload.speaker, rollMode: payload.rollMode,
+              ChatMessage.create({ speaker: payload.speaker, ...msgWhisper,
                 content: `<p>Existing buff on <strong>${target.name}</strong> is stronger (+${currentTotal}). No change.</p>`,
               });
             }
@@ -778,7 +784,7 @@ export class AspectsofPowerItem extends Item {
             const attr = c.key.replace('system.', '').replace('.value', '');
             return `${attr} +${c.value}`;
           }).join(', ');
-          ChatMessage.create({ speaker: payload.speaker, rollMode: payload.rollMode,
+          ChatMessage.create({ speaker: payload.speaker, ...msgWhisper,
             content: `<p><strong>${target.name}</strong> buffed: ${summary} for ${payload.duration} rounds.</p>`,
           });
         }
@@ -794,7 +800,7 @@ export class AspectsofPowerItem extends Item {
           ? materials.map(m => game.i18n.localize(CONFIG.ASPECTSOFPOWER.materialTypes[m] ?? m)).join(', ')
           : 'all';
         ChatMessage.create({
-          speaker: payload.speaker, rollMode: payload.rollMode,
+          speaker: payload.speaker, ...msgWhisper,
           content: `<p><strong>${payload.skillName}</strong> repairs <strong>${target.name}</strong>'s ${matLabel} equipment `
                  + `(+${restored} durability distributed across matching gear).</p>`,
         });
@@ -860,7 +866,7 @@ export class AspectsofPowerItem extends Item {
 
             await existing.update(updateData);
             const mergedTotal = merged.reduce((sum, c) => sum + Math.abs(Number(c.value)), 0);
-            ChatMessage.create({ speaker: payload.speaker, rollMode: payload.rollMode,
+            ChatMessage.create({ speaker: payload.speaker, ...msgWhisper,
               content: `<p>Debuff on <strong>${target.name}</strong> stacked (total -${mergedTotal}) for ${newDuration} rounds.</p>`,
             });
           } else {
@@ -870,7 +876,7 @@ export class AspectsofPowerItem extends Item {
             await target.createEmbeddedDocuments('ActiveEffect', [payload.effectData]);
 
             if (payload.statSummary) {
-              ChatMessage.create({ speaker: payload.speaker, rollMode: payload.rollMode,
+              ChatMessage.create({ speaker: payload.speaker, ...msgWhisper,
                 content: `<p><strong>${target.name}</strong> debuffed: ${payload.statSummary} for ${payload.duration} rounds.</p>`,
               });
             }
@@ -896,7 +902,7 @@ export class AspectsofPowerItem extends Item {
                 await EquipmentSystem.unequip(equippedItem);
               }
               const slotLabel = game.i18n.localize(`ASPECTSOFPOWER.Equip.Slot.${dSlot}`) || dSlot;
-              ChatMessage.create({ speaker: payload.speaker, rollMode: payload.rollMode,
+              ChatMessage.create({ speaker: payload.speaker, ...msgWhisper,
                 content: `<p><strong>${target.name}</strong> loses use of <strong>${slotLabel}</strong> slot!</p>`,
               });
             }
@@ -958,7 +964,7 @@ export class AspectsofPowerItem extends Item {
           );
 
         if (magicalDebuffs.length === 0) {
-          ChatMessage.create({ speaker: payload.speaker, rollMode: payload.rollMode,
+          ChatMessage.create({ speaker: payload.speaker, ...msgWhisper,
             content: `<p><em>${game.i18n.localize('ASPECTSOFPOWER.Cleanse.noDebuffs')}</em></p>`,
           });
           break;
@@ -993,7 +999,7 @@ export class AspectsofPowerItem extends Item {
           }
         }
 
-        ChatMessage.create({ speaker: payload.speaker, rollMode: payload.rollMode,
+        ChatMessage.create({ speaker: payload.speaker, ...msgWhisper,
           content: `<p><strong>${payload.skillName}</strong> cleanses <strong>${target.name}</strong> (roll: ${payload.rollTotal}):</p>`
                  + `<ul>${results.map(r => `<li>${r}</li>`).join('')}</ul>`,
         });
@@ -1025,6 +1031,7 @@ export class AspectsofPowerItem extends Item {
    * Restoration tag: restore health, mana, or stamina and route through GM.
    */
   async _handleRestorationTag(item, rollData, dmgRoll, speaker, rollMode, label, targetTokenOverride = null) {
+    const whisperGM = !_isPlayerCharacter(this.actor) ? ChatMessage.getWhisperRecipients('GM') : undefined;
     let amount     = Math.round(dmgRoll.total);
     const target   = this.system.tagConfig?.restorationTarget ?? 'selected';
     const resource = this.system.tagConfig?.restorationResource ?? 'health';
@@ -1044,7 +1051,7 @@ export class AspectsofPowerItem extends Item {
     }
 
     if (!targetActor) {
-      ChatMessage.create({ speaker, rollMode, content: `<p><em>No valid restoration target.</em></p>` });
+      ChatMessage.create({ speaker, rollMode, ...(whisperGM ? { whisper: whisperGM } : {}), content: `<p><em>No valid restoration target.</em></p>` });
       return;
     }
 
@@ -1077,10 +1084,11 @@ export class AspectsofPowerItem extends Item {
    * Values are roll-based: rollTotal * entry.value (multiplier, default 1).
    */
   async _handleBuffTag(item, rollData, dmgRoll, speaker, rollMode, label, targetTokenOverride = null) {
+    const whisperGM = !_isPlayerCharacter(this.actor) ? ChatMessage.getWhisperRecipients('GM') : undefined;
     const targetToken = targetTokenOverride ?? game.user.targets.first() ?? null;
     const targetActor = targetToken?.actor ?? null;
     if (!targetActor) {
-      ChatMessage.create({ speaker, rollMode, content: `<p><em>No target for buff.</em></p>` });
+      ChatMessage.create({ speaker, rollMode, ...(whisperGM ? { whisper: whisperGM } : {}), content: `<p><em>No target for buff.</em></p>` });
       return;
     }
 
@@ -1115,10 +1123,11 @@ export class AspectsofPowerItem extends Item {
    * DoT damage = raw roll total, bypasses mitigation.
    */
   async _handleDebuffTag(item, rollData, dmgRoll, speaker, rollMode, label, targetTokenOverride = null) {
+    const whisperGM = !_isPlayerCharacter(this.actor) ? ChatMessage.getWhisperRecipients('GM') : undefined;
     const targetToken = targetTokenOverride ?? game.user.targets.first() ?? null;
     const targetActor = targetToken?.actor ?? null;
     if (!targetActor) {
-      ChatMessage.create({ speaker, rollMode, content: `<p><em>No target for debuff.</em></p>` });
+      ChatMessage.create({ speaker, rollMode, ...(whisperGM ? { whisper: whisperGM } : {}), content: `<p><em>No target for debuff.</em></p>` });
       return;
     }
 
@@ -1221,6 +1230,7 @@ export class AspectsofPowerItem extends Item {
    * Targets the selected token (or self if no target). Routes through GM.
    */
   async _handleRepairTag(item, rollData, dmgRoll, speaker, rollMode, label, targetTokenOverride = null) {
+    const whisperGM = !_isPlayerCharacter(this.actor) ? ChatMessage.getWhisperRecipients('GM') : undefined;
     const amount = Math.round(dmgRoll.total);
 
     let targetActor;
@@ -1233,7 +1243,7 @@ export class AspectsofPowerItem extends Item {
     }
 
     if (!targetActor) {
-      ChatMessage.create({ speaker, rollMode, content: `<p><em>No valid repair target.</em></p>` });
+      ChatMessage.create({ speaker, rollMode, ...(whisperGM ? { whisper: whisperGM } : {}), content: `<p><em>No valid repair target.</em></p>` });
       return;
     }
 
@@ -1253,16 +1263,17 @@ export class AspectsofPowerItem extends Item {
    * until the budget is exhausted or all debuffs are processed.
    */
   async _handleCleanseTag(item, rollData, dmgRoll, speaker, rollMode, label, targetTokenOverride = null) {
+    const whisperGM = !_isPlayerCharacter(this.actor) ? ChatMessage.getWhisperRecipients('GM') : undefined;
     const targetToken = targetTokenOverride ?? game.user.targets.first() ?? null;
     const targetActor = targetToken?.actor ?? null;
     if (!targetActor) {
-      ChatMessage.create({ speaker, rollMode, content: `<p><em>${game.i18n.localize('ASPECTSOFPOWER.Cleanse.noTarget')}</em></p>` });
+      ChatMessage.create({ speaker, rollMode, ...(whisperGM ? { whisper: whisperGM } : {}), content: `<p><em>${game.i18n.localize('ASPECTSOFPOWER.Cleanse.noTarget')}</em></p>` });
       return;
     }
 
     // Only magical skills can cleanse.
     if ((this.system.magicType ?? 'non-magical') !== 'magical') {
-      ChatMessage.create({ speaker, rollMode, content: `<p><em>${game.i18n.localize('ASPECTSOFPOWER.Cleanse.nonMagical')}</em></p>` });
+      ChatMessage.create({ speaker, rollMode, ...(whisperGM ? { whisper: whisperGM } : {}), content: `<p><em>${game.i18n.localize('ASPECTSOFPOWER.Cleanse.nonMagical')}</em></p>` });
       return;
     }
 
@@ -1540,10 +1551,9 @@ export class AspectsofPowerItem extends Item {
     if (!confirmed) return;
 
     const speaker = ChatMessage.getSpeaker({ actor: this.actor });
-    let rollMode = game.settings.get('core', 'rollMode');
-
-    // Non-player actors whisper all messages to GM only.
-    if (!_isPlayerCharacter(this.actor)) rollMode = CONST.DICE_ROLL_MODES.BLIND;
+    const rollMode = game.settings.get('core', 'rollMode');
+    const gmOnly = !_isPlayerCharacter(this.actor);
+    const whisperGM = gmOnly ? ChatMessage.getWhisperRecipients('GM') : undefined;
 
     // Determine target (self for restoration/buff, selected for poison).
     let targetActor = this.actor;
@@ -1620,19 +1630,19 @@ export class AspectsofPowerItem extends Item {
         await this.actor.setFlag('aspects-of-power', 'appliedPoison', poisonData);
         chatContent = `<p><strong>${this.actor.name}</strong> applies <strong>${this.name}</strong> `
           + `(${sys.poison.damage} ${sys.poison.damageType} damage, ${sys.poison.duration} attacks).</p>`;
-        ChatMessage.create({ speaker, rollMode, content: chatContent });
+        ChatMessage.create({ speaker, rollMode, ...(whisperGM ? { whisper: whisperGM } : {}), content: chatContent });
         break;
       }
 
       case 'bomb': {
         chatContent = `<p><strong>${this.actor.name}</strong> throws <strong>${this.name}</strong> `
           + `(${sys.bomb.damage} ${sys.bomb.damageType} damage, ${sys.bomb.diameter}ft ${sys.bomb.shape}).</p>`;
-        ChatMessage.create({ speaker, rollMode, content: chatContent });
+        ChatMessage.create({ speaker, rollMode, ...(whisperGM ? { whisper: whisperGM } : {}), content: chatContent });
         break;
       }
 
       case 'none': {
-        ChatMessage.create({ speaker, rollMode, content: chatContent });
+        ChatMessage.create({ speaker, rollMode, ...(whisperGM ? { whisper: whisperGM } : {}), content: chatContent });
         break;
       }
     }
@@ -1713,11 +1723,10 @@ export class AspectsofPowerItem extends Item {
     const item     = this;
     const rollData = this.getRollData();
     const speaker  = ChatMessage.getSpeaker({ actor: this.actor });
-    let rollMode = game.settings.get('core', 'rollMode');
+    const rollMode = game.settings.get('core', 'rollMode');
     const label    = `[${item.type}] ${item.name}`;
-
-    // Non-player actors whisper all messages to GM only.
-    if (!_isPlayerCharacter(this.actor)) rollMode = CONST.DICE_ROLL_MODES.BLIND;
+    const gmOnly = !_isPlayerCharacter(this.actor);
+    const whisperGM = gmOnly ? ChatMessage.getWhisperRecipients('GM') : undefined;
     const tags     = this.system.tags ?? [];
 
     // ── Parry-only mode: evaluate just the hit roll for comparison ─────
@@ -1726,7 +1735,7 @@ export class AspectsofPowerItem extends Item {
       if (!hitFormula) return null;
       const hitRoll = new Roll(hitFormula, rollData);
       await hitRoll.evaluate();
-      await hitRoll.toMessage({ speaker, rollMode, flavor: `${label} — Parry` });
+      await hitRoll.toMessage({ speaker, rollMode, ...(whisperGM ? { whisper: whisperGM } : {}), flavor: `${label} — Parry` });
       return hitRoll;
     }
 
@@ -1799,7 +1808,7 @@ export class AspectsofPowerItem extends Item {
     if (isBarrier) {
       const maxMana = rollData.roll.resourcevalue;
       if (maxMana <= 0) {
-        ChatMessage.create({ speaker, rollMode, flavor: label, content: `Not enough ${rollData.roll.resource}` });
+        ChatMessage.create({ speaker, rollMode, ...(whisperGM ? { whisper: whisperGM } : {}), flavor: label, content: `Not enough ${rollData.roll.resource}` });
         return;
       }
       const chosenMana = await this._promptBarrierManaCost(maxMana);
@@ -1866,7 +1875,7 @@ export class AspectsofPowerItem extends Item {
     if (isAoe) {
       const casterToken = this.actor.getActiveTokens()?.[0];
       if (!casterToken) {
-        ChatMessage.create({ speaker, rollMode, content: '<p><em>No token found on canvas for AOE placement.</em></p>' });
+        ChatMessage.create({ speaker, rollMode, ...(whisperGM ? { whisper: whisperGM } : {}), content: '<p><em>No token found on canvas for AOE placement.</em></p>' });
         return dmgRoll;
       }
 
@@ -1881,8 +1890,8 @@ export class AspectsofPowerItem extends Item {
       }
 
       // Post roll results to chat.
-      if (hitRoll) await hitRoll.toMessage({ speaker, rollMode, flavor: `${label} — To Hit` });
-      await dmgRoll.toMessage({ speaker, rollMode, flavor: `${label} — Roll` });
+      if (hitRoll) await hitRoll.toMessage({ speaker, rollMode, ...(whisperGM ? { whisper: whisperGM } : {}), flavor: `${label} — To Hit` });
+      await dmgRoll.toMessage({ speaker, rollMode, ...(whisperGM ? { whisper: whisperGM } : {}), flavor: `${label} — Roll` });
 
       // Announce targets.
       if (targets.length > 0) {
@@ -1957,18 +1966,18 @@ export class AspectsofPowerItem extends Item {
 
       if (targetActor && targetDefKey && hitRoll) {
         await this._handleAttackTag(item, rollData, hitRoll, dmgRoll, speaker, rollMode, label);
-        await hitRoll.toMessage({ speaker, rollMode, flavor: `${label} — Attack` });
-        await dmgRoll.toMessage({ speaker, rollMode, flavor: `${label} — Damage` });
+        await hitRoll.toMessage({ speaker, rollMode, ...(whisperGM ? { whisper: whisperGM } : {}), flavor: `${label} — Attack` });
+        await dmgRoll.toMessage({ speaker, rollMode, ...(whisperGM ? { whisper: whisperGM } : {}), flavor: `${label} — Damage` });
       } else {
-        if (hitRoll) await hitRoll.toMessage({ speaker, rollMode, flavor: 'To Hit' });
-        await dmgRoll.toMessage({ speaker, rollMode, flavor: label });
+        if (hitRoll) await hitRoll.toMessage({ speaker, rollMode, ...(whisperGM ? { whisper: whisperGM } : {}), flavor: 'To Hit' });
+        await dmgRoll.toMessage({ speaker, rollMode, ...(whisperGM ? { whisper: whisperGM } : {}), flavor: label });
       }
       return dmgRoll;
     }
 
     // ── Post roll results to chat once (shared) ─────────────────────────
-    if (hitRoll) await hitRoll.toMessage({ speaker, rollMode, flavor: `${label} — To Hit` });
-    await dmgRoll.toMessage({ speaker, rollMode, flavor: `${label} — Roll` });
+    if (hitRoll) await hitRoll.toMessage({ speaker, rollMode, ...(whisperGM ? { whisper: whisperGM } : {}), flavor: `${label} — To Hit` });
+    await dmgRoll.toMessage({ speaker, rollMode, ...(whisperGM ? { whisper: whisperGM } : {}), flavor: `${label} — Roll` });
 
     // ── Dispatch to each tag handler (single-target) ─────────────────────
     const hitResults = new Map();
@@ -2021,6 +2030,7 @@ export class AspectsofPowerItem extends Item {
    * @private
    */
   async _executeChainedSkills(hitResults, aoeTargets, speaker, rollMode) {
+    const whisperGM = !_isPlayerCharacter(this.actor) ? ChatMessage.getWhisperRecipients('GM') : undefined;
     const chains = this.system.chainedSkills ?? [];
     if (chains.length === 0) return;
 
@@ -2053,8 +2063,8 @@ export class AspectsofPowerItem extends Item {
         await cDmgRoll.evaluate();
 
         // Post chained skill rolls to chat.
-        if (cHitRoll) await cHitRoll.toMessage({ speaker, rollMode, flavor: `${chainLabel} — To Hit` });
-        await cDmgRoll.toMessage({ speaker, rollMode, flavor: `${chainLabel} — Roll` });
+        if (cHitRoll) await cHitRoll.toMessage({ speaker, rollMode, ...(whisperGM ? { whisper: whisperGM } : {}), flavor: `${chainLabel} — To Hit` });
+        await cDmgRoll.toMessage({ speaker, rollMode, ...(whisperGM ? { whisper: whisperGM } : {}), flavor: `${chainLabel} — Roll` });
 
         // Dispatch each of the chained skill's own tags.
         const chainTags = chainedItem.system.tags ?? [];
