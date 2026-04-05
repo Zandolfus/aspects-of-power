@@ -535,6 +535,15 @@ Hooks.on('combatTurnChange', async (combat, _prior, current) => {
 
       if (newProgress >= rollTotal) {
         // Broke free!
+        // Remove Foundry blind status if breaking free of blind.
+        if (debuffType === 'blind') {
+          const tokens = actor.getActiveTokens();
+          for (const t of tokens) {
+            if (t.document.hasStatusEffect('blind')) {
+              await t.document.toggleActiveEffect({ id: 'blind', name: 'Blind', icon: 'icons/svg/blind.svg' }, { active: false });
+            }
+          }
+        }
         await effect.delete();
         await breakRoll.toMessage({
           speaker,
@@ -640,6 +649,18 @@ Hooks.on('combatTurnChange', async (combat, prior, _current) => {
     }
   }
   if (toDelete.length > 0) {
+    // Remove Foundry blind status if a blind debuff is expiring.
+    for (const id of toDelete) {
+      const effect = actor.effects.get(id);
+      if (effect?.flags?.['aspects-of-power']?.debuffType === 'blind') {
+        const tokens = actor.getActiveTokens();
+        for (const t of tokens) {
+          if (t.document.hasStatusEffect('blind')) {
+            await t.document.toggleActiveEffect({ id: 'blind', name: 'Blind', icon: 'icons/svg/blind.svg' }, { active: false });
+          }
+        }
+      }
+    }
     const names = toDelete.map(id => actor.effects.get(id)?.name).filter(Boolean);
     await actor.deleteEmbeddedDocuments('ActiveEffect', toDelete);
     ChatMessage.create({

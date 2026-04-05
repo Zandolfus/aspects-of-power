@@ -8,7 +8,9 @@
       "Bash(cd:*)",
       "Bash(gh search code:*)",
       "Bash(gh api:*)",
-      "Bash(where:*)"
+      "Bash(where:*)",
+      "Bash(find 'c:\\\\Users\\\\Vind Gnyr\\\\Documents\\\\Aspects of Power' -type f \\\\\\(-name *effect* -o -name *debuff* -o -name *mechanics* \\\\\\))",
+      "Bash(gh repo:*)"
     ]
   }
 }

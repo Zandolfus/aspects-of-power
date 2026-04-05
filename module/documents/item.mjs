@@ -866,8 +866,18 @@ export class AspectsofPowerItem extends Item {
               });
             }
 
-            // Dismembered: force-unequip items in the disabled slot.
+            // Blind: apply Foundry blind status to disable token vision.
             const dType = payload.effectData.flags?.['aspects-of-power']?.debuffType;
+            if (dType === 'blind') {
+              const tokens = target.getActiveTokens();
+              for (const t of tokens) {
+                if (!t.document.hasStatusEffect('blind')) {
+                  await t.document.toggleActiveEffect({ id: 'blind', name: 'Blind', icon: 'icons/svg/blind.svg' }, { active: true });
+                }
+              }
+            }
+
+            // Dismembered: force-unequip items in the disabled slot.
             const dSlot = payload.effectData.flags?.['aspects-of-power']?.dismemberedSlot;
             if (dType === 'dismembered' && dSlot) {
               const equippedInSlot = target.items.filter(
