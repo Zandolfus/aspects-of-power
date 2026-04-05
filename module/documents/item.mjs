@@ -1531,7 +1531,10 @@ export class AspectsofPowerItem extends Item {
     if (!confirmed) return;
 
     const speaker = ChatMessage.getSpeaker({ actor: this.actor });
-    const rollMode = game.settings.get('core', 'rollMode');
+    let rollMode = game.settings.get('core', 'rollMode');
+
+    // Non-player actors whisper all messages to GM only.
+    if (!this.actor.hasPlayerOwner) rollMode = CONST.DICE_ROLL_MODES.BLIND;
 
     // Determine target (self for restoration/buff, selected for poison).
     let targetActor = this.actor;
@@ -1701,8 +1704,11 @@ export class AspectsofPowerItem extends Item {
     const item     = this;
     const rollData = this.getRollData();
     const speaker  = ChatMessage.getSpeaker({ actor: this.actor });
-    const rollMode = game.settings.get('core', 'rollMode');
+    let rollMode = game.settings.get('core', 'rollMode');
     const label    = `[${item.type}] ${item.name}`;
+
+    // Non-player actors whisper all messages to GM only.
+    if (!this.actor.hasPlayerOwner) rollMode = CONST.DICE_ROLL_MODES.BLIND;
     const tags     = this.system.tags ?? [];
 
     // ── Parry-only mode: evaluate just the hit roll for comparison ─────

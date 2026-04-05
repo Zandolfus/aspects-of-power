@@ -371,9 +371,10 @@ Hooks.on('combatTurnChange', async (combat, _prior, current) => {
   const newValue = Math.min(stamina.max, stamina.value + regenAmt);
   await actor.update({ 'system.stamina.value': newValue });
 
-  // Chat message for troubleshooting — remove or whisper once stable.
+  const staminaWhisper = actor.hasPlayerOwner ? {} : { whisper: ChatMessage.getWhisperRecipients('GM') };
   ChatMessage.create({
     speaker: ChatMessage.getSpeaker({ actor }),
+    ...staminaWhisper,
     content: `<p><em>${actor.name} regenerates ${newValue - stamina.value} stamina (${regenPct}% of ${stamina.max}).</em></p>`,
   });
 });
@@ -395,6 +396,7 @@ Hooks.on('combatTurnChange', async (combat, _prior, current) => {
   const actor = combatant.actor;
   const updateData = {};
   const speaker = ChatMessage.getSpeaker({ actor });
+  const defPoolWhisper = actor.hasPlayerOwner ? {} : { whisper: ChatMessage.getWhisperRecipients('GM') };
 
   // Check for active sleep effects that modify mind defense restoration.
   const sleepEffects = getActiveDebuffs(actor, 'sleep');
@@ -421,7 +423,7 @@ Hooks.on('combatTurnChange', async (combat, _prior, current) => {
           if (!se.flags?.['aspects-of-power']?.sleepActive) {
             await se.setFlag('aspects-of-power', 'sleepActive', true);
             ChatMessage.create({
-              speaker,
+              speaker, ...defPoolWhisper,
               content: `<p><strong>${actor.name}</strong> ${game.i18n.localize('ASPECTSOFPOWER.Debuff.fellAsleep')}</p>`,
             });
           }
@@ -432,7 +434,7 @@ Hooks.on('combatTurnChange', async (combat, _prior, current) => {
           if (se.flags?.['aspects-of-power']?.sleepActive && targetPool >= (se.flags['aspects-of-power'].debuffDamage ?? 0)) {
             await se.delete();
             ChatMessage.create({
-              speaker,
+              speaker, ...defPoolWhisper,
               content: `<p><strong>${actor.name}</strong> ${game.i18n.localize('ASPECTSOFPOWER.Debuff.wokeUp')}</p>`,
             });
           }
@@ -508,6 +510,7 @@ Hooks.on('combatTurnChange', async (combat, _prior, current) => {
   if (!combatant?.actor) return;
   const actor = combatant.actor;
   const speaker = ChatMessage.getSpeaker({ actor });
+  const gmWhisper = actor.hasPlayerOwner ? {} : { whisper: ChatMessage.getWhisperRecipients('GM') };
 
   // Collect all active debuffs with a type.
   const typedDebuffs = actor.effects.filter(e =>
@@ -546,11 +549,11 @@ Hooks.on('combatTurnChange', async (combat, _prior, current) => {
         }
         await effect.delete();
         await breakRoll.toMessage({
-          speaker,
+          speaker, ...gmWhisper,
           flavor: `${typeName} — ${game.i18n.localize('ASPECTSOFPOWER.Debuff.breakRoll')} (${breakLabel}) [${newProgress} / ${rollTotal}]`,
         });
         ChatMessage.create({
-          speaker,
+          speaker, ...gmWhisper,
           content: `<p><strong>${actor.name}</strong> ${game.i18n.localize('ASPECTSOFPOWER.Debuff.broke')} <strong>${typeName}</strong>!</p>`,
         });
         continue; // Effect removed, skip turn-skip check.
@@ -558,11 +561,11 @@ Hooks.on('combatTurnChange', async (combat, _prior, current) => {
         // Save cumulative progress on the effect.
         await effect.setFlag('aspects-of-power', 'breakProgress', newProgress);
         await breakRoll.toMessage({
-          speaker,
+          speaker, ...gmWhisper,
           flavor: `${typeName} — ${game.i18n.localize('ASPECTSOFPOWER.Debuff.breakRoll')} (${breakLabel}) [${newProgress} / ${rollTotal}]`,
         });
         ChatMessage.create({
-          speaker,
+          speaker, ...gmWhisper,
           content: `<p><strong>${actor.name}</strong> ${game.i18n.localize('ASPECTSOFPOWER.Debuff.failedBreak')} <strong>${typeName}</strong>.</p>`,
         });
       }
@@ -571,7 +574,7 @@ Hooks.on('combatTurnChange', async (combat, _prior, current) => {
     // Announce turn-skipping debuffs.
     if (TURN_SKIP_DEBUFFS.includes(debuffType)) {
       ChatMessage.create({
-        speaker,
+        speaker, ...gmWhisper,
         content: `<p><strong>${actor.name}</strong> ${game.i18n.localize('ASPECTSOFPOWER.Debuff.cannotAct')} (${typeName})</p>`,
       });
     }
@@ -978,10 +981,12 @@ Hooks.on('preUpdateToken', (tokenDoc, changes, options, userId) => {
   _segmentMovement.set(combatant.id, newSegmentTotal);
 
   const newStamina = stamina.value - staminaCost;
+  const moveWhisper = actor.hasPlayerOwner ? {} : { whisper: ChatMessage.getWhisperRecipients('GM') };
   Promise.resolve().then(async () => {
     await actor.update({ 'system.stamina.value': newStamina });
     ChatMessage.create({
       speaker: ChatMessage.getSpeaker({ actor }),
+      ...moveWhisper,
       content: `<p><em>${actor.name} moves ${moveSnapped} ft (${newSegmentTotal}/${Math.round(sprintRange)} ft this segment). `
              + `Stamina: −${staminaCost} (${newStamina}/${stamina.max})</em></p>`,
     });
