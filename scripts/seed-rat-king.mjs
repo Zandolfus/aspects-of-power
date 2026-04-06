@@ -41,6 +41,7 @@ const RAT_KING = {
         roll: {
           dice: 'd12', abilities: 'strength', resource: 'stamina',
           cost: 25, diceBonus: 0.7, targetDefense: 'melee', damageType: 'physical',
+          type: 'str_weapon',
         },
       },
     },
@@ -57,6 +58,7 @@ const RAT_KING = {
         roll: {
           dice: 'd10', abilities: 'dexterity', resource: 'stamina',
           cost: 20, diceBonus: 0.5, targetDefense: 'melee', damageType: 'physical',
+          type: 'dex_weapon',
         },
         tagConfig: {
           forcedMovement: true,
@@ -78,6 +80,7 @@ const RAT_KING = {
         roll: {
           dice: 'd8', abilities: 'strength', resource: 'stamina',
           cost: 30, diceBonus: 0.5, targetDefense: 'melee', damageType: 'physical',
+          type: 'str_weapon',
         },
         tagConfig: {
           debuffType: 'weaken',

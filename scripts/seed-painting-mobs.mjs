@@ -44,6 +44,7 @@ const MONSTERS = [
           roll: {
             dice: 'd10', abilities: 'strength', resource: 'stamina',
             cost: 15, diceBonus: 0.5, targetDefense: 'melee', damageType: 'physical',
+            type: 'str_weapon',
           },
         },
       },
@@ -60,6 +61,7 @@ const MONSTERS = [
           roll: {
             dice: 'd8', abilities: 'strength', resource: 'stamina',
             cost: 25, diceBonus: 0.5, targetDefense: 'melee', damageType: 'physical',
+            type: 'str_weapon',
           },
           tagConfig: {
             debuffType: 'weaken',
@@ -109,6 +111,7 @@ const MONSTERS = [
           roll: {
             dice: 'd10', abilities: 'strength', resource: 'stamina',
             cost: 20, diceBonus: 0.5, targetDefense: 'melee', damageType: 'physical',
+            type: 'str_weapon',
           },
           tagConfig: {
             forcedMovement: true,
@@ -130,6 +133,7 @@ const MONSTERS = [
           roll: {
             dice: 'd12', abilities: 'strength', resource: 'stamina',
             cost: 20, diceBonus: 0.5, targetDefense: 'melee', damageType: 'physical',
+            type: 'str_weapon',
           },
         },
       },
@@ -205,6 +209,7 @@ const MONSTERS = [
           roll: {
             dice: 'd10', abilities: 'dexterity', resource: 'stamina',
             cost: 12, diceBonus: 0.5, targetDefense: 'ranged', damageType: 'physical',
+            type: 'phys_ranged',
           },
         },
       },
@@ -221,6 +226,7 @@ const MONSTERS = [
           roll: {
             dice: 'd8', abilities: 'dexterity', resource: 'stamina',
             cost: 25, diceBonus: 0.5, targetDefense: 'ranged', damageType: 'physical',
+            type: 'phys_ranged',
           },
           tagConfig: {
             debuffType: 'blind',
@@ -284,6 +290,7 @@ const MONSTERS = [
           roll: {
             dice: 'd10', abilities: 'intelligence', resource: 'mana',
             cost: 20, diceBonus: 0.5, targetDefense: 'mind', damageType: 'magical',
+            type: 'magic_projectile',
           },
         },
       },
@@ -301,6 +308,7 @@ const MONSTERS = [
           roll: {
             dice: 'd8', abilities: 'willpower', resource: 'mana',
             cost: 30, diceBonus: 0.5, targetDefense: 'mind', damageType: 'magical',
+            type: 'magic_projectile',
           },
           tagConfig: {
             debuffType: 'fear',
@@ -325,6 +333,7 @@ const MONSTERS = [
           roll: {
             dice: 'd8', abilities: 'intelligence', resource: 'mana',
             cost: 35, diceBonus: 0.5, targetDefense: 'mind', damageType: 'magical',
+            type: 'magic_projectile',
           },
         },
       },
@@ -372,6 +381,7 @@ const MONSTERS = [
           roll: {
             dice: 'd12', abilities: 'strength', resource: 'stamina',
             cost: 18, diceBonus: 0.5, targetDefense: 'melee', damageType: 'physical',
+            type: 'str_weapon',
           },
         },
       },
@@ -388,6 +398,7 @@ const MONSTERS = [
           roll: {
             dice: 'd10', abilities: 'strength', resource: 'stamina',
             cost: 25, diceBonus: 0.5, targetDefense: 'melee', damageType: 'physical',
+            type: 'str_weapon',
           },
           tagConfig: {
             debuffType: 'root',
@@ -408,6 +419,7 @@ const MONSTERS = [
           roll: {
             dice: 'd8', abilities: 'willpower', resource: 'stamina',
             cost: 30, diceBonus: 0.4, targetDefense: 'mind', damageType: 'physical',
+            type: 'magic_melee',
           },
           tagConfig: {
             debuffType: 'stun',
@@ -471,6 +483,7 @@ const MONSTERS = [
           roll: {
             dice: 'd10', abilities: 'dexterity', resource: 'stamina',
             cost: 12, diceBonus: 0.5, targetDefense: 'ranged', damageType: 'physical',
+            type: 'phys_ranged',
           },
         },
       },
@@ -491,6 +504,7 @@ const MONSTERS = [
           roll: {
             dice: 'd6', abilities: 'dexterity', resource: 'stamina',
             cost: 30, diceBonus: 0.5, targetDefense: 'ranged', damageType: 'physical',
+            type: 'phys_ranged',
           },
           tagConfig: {
             debuffType: 'blind',
@@ -511,6 +525,7 @@ const MONSTERS = [
           roll: {
             dice: 'd10', abilities: 'strength', resource: 'stamina',
             cost: 25, diceBonus: 0.4, targetDefense: 'melee', damageType: 'physical',
+            type: 'str_weapon',
           },
           tagConfig: {
             debuffType: 'immobilized',
@@ -562,6 +577,7 @@ const MONSTERS = [
           roll: {
             dice: 'd12', abilities: 'strength', resource: 'stamina',
             cost: 25, diceBonus: 0.5, targetDefense: 'melee', damageType: 'physical',
+            type: 'str_weapon',
           },
           tagConfig: {
             forcedMovement: true,
@@ -583,6 +599,7 @@ const MONSTERS = [
           roll: {
             dice: 'd12', abilities: 'strength', resource: 'stamina',
             cost: 20, diceBonus: 0.7, targetDefense: 'melee', damageType: 'physical',
+            type: 'str_weapon',
           },
         },
       },
@@ -642,6 +659,7 @@ const MONSTERS = [
           roll: {
             dice: 'd10', abilities: 'intelligence', resource: 'mana',
             cost: 18, diceBonus: 0.5, targetDefense: 'mind', damageType: 'magical',
+            type: 'magic_projectile',
           },
         },
       },
@@ -659,6 +677,7 @@ const MONSTERS = [
           roll: {
             dice: 'd8', abilities: 'willpower', resource: 'mana',
             cost: 35, diceBonus: 0.5, targetDefense: 'mind', damageType: 'magical',
+            type: 'magic_projectile',
           },
           tagConfig: {
             debuffType: 'hallucination',
@@ -678,6 +697,7 @@ const MONSTERS = [
           roll: {
             dice: 'd8', abilities: 'intelligence', resource: 'mana',
             cost: 25, diceBonus: 0.5, targetDefense: 'mind', damageType: 'magical',
+            type: 'magic_projectile',
           },
           tagConfig: {
             debuffType: 'chilled',
