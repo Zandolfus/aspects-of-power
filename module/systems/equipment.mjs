@@ -434,11 +434,14 @@ export class EquipmentSystem {
       return;
     }
 
-    // Durability changed — if it hit 0, remove effects; if restored from 0, re-sync.
+    // Durability changed — only act on threshold crossings (broke or repaired from broken).
     if (sys.durability?.value !== undefined && item.system.equipped) {
-      if (item.system.durability.value <= 0) {
+      const hasEffects = item.parent.effects.some(e => e.flags?.aspectsofpower?.itemSource === item.id);
+      if (item.system.durability.value <= 0 && hasEffects) {
+        // Just broke — remove effects.
         this._removeItemEffects(item);
-      } else {
+      } else if (item.system.durability.value > 0 && !hasEffects) {
+        // Restored from broken — re-sync effects.
         this._syncEffects(item);
       }
       return;
