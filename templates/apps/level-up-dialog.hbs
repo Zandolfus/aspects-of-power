@@ -52,9 +52,11 @@
           <div class="gains-row flexrow">
             <span class="gains-col-name">{{row.label}}</span>
             <span class="gains-col">+{{row.templateGain}}</span>
-            <span class="gains-col">
+            <span class="gains-col free-point-group">
+              <button type="button" class="free-point-dec" data-ability="{{row.key}}">−</button>
               <input type="number" class="free-point-input" data-ability="{{row.key}}"
                      value="{{row.freeGain}}" min="0" />
+              <button type="button" class="free-point-inc" data-ability="{{row.key}}">+</button>
             </span>
             <span class="gains-col gains-total">+{{row.total}}</span>
           </div>

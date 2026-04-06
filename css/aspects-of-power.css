@@ -1149,9 +1149,34 @@
   flex: 1;
   text-align: center;
 }
-.level-up-dialog .gains-col .free-point-input {
+.level-up-dialog .free-point-group {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+}
+.level-up-dialog .free-point-group .free-point-input {
   width: 42px;
   text-align: center;
+}
+.level-up-dialog .free-point-dec,
+.level-up-dialog .free-point-inc {
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  font-size: 14px;
+  line-height: 20px;
+  text-align: center;
+  cursor: pointer;
+  border: 1px solid #555;
+  background: #333;
+  color: #ccc;
+  border-radius: 3px;
+}
+.level-up-dialog .free-point-dec:hover,
+.level-up-dialog .free-point-inc:hover {
+  background: #555;
+  color: #fff;
 }
 .level-up-dialog .gains-total {
   font-weight: bold;

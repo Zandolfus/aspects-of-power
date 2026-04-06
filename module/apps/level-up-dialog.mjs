@@ -131,6 +131,22 @@ export class LevelUpDialog extends foundry.applications.api.HandlebarsApplicatio
       });
     });
 
+    // Free point +/- buttons.
+    this.element.querySelectorAll('.free-point-inc').forEach(el => {
+      el.addEventListener('click', () => {
+        const key = el.dataset.ability;
+        this.allocation[key] = (this.allocation[key] ?? 0) + 1;
+        this.render();
+      });
+    });
+    this.element.querySelectorAll('.free-point-dec').forEach(el => {
+      el.addEventListener('click', () => {
+        const key = el.dataset.ability;
+        this.allocation[key] = Math.max(0, (this.allocation[key] ?? 0) - 1);
+        this.render();
+      });
+    });
+
     // Confirm button.
     this.element.querySelector('.level-up-confirm')?.addEventListener('click', () => {
       this._applyLevelUp();
