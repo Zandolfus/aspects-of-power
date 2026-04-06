@@ -256,10 +256,10 @@ export class AspectsofPowerItem extends Item {
       }
     }
 
-    // Pre-toughness damage (after armor/veil and defense multiplier).
+    // Damage pipeline: raw → defense pool % → armor/veil → toughness.
     const rawDmg          = Math.round(dmgRoll.total);
-    const afterMitigation = Math.max(0, rawDmg - mitigation);
-    const preToughnessDmg = isHit ? Math.max(0, Math.round(afterMitigation * damageMultiplier)) : 0;
+    const afterDefense    = isHit ? Math.max(0, Math.round(rawDmg * damageMultiplier)) : 0;
+    const preToughnessDmg = Math.max(0, afterDefense - mitigation);
     const finalDamage     = isHit ? Math.max(0, preToughnessDmg - effectiveToughness) : 0;
 
     const resultBadge = isHit
