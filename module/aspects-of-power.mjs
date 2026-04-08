@@ -171,6 +171,68 @@ Hooks.once('init', function () {
     label: 'ASPECTSOFPOWER.SheetLabels.Item',
   });
 
+  // ── Mass Disposition Tool ──
+  /**
+   * Change disposition of multiple tokens at once.
+   * Call with no args to open a dialog, or pass options directly.
+   * @param {object} [opts]
+   * @param {'selected'|'scene'} [opts.scope='selected']
+   * @param {number} [opts.disposition] — CONST.TOKEN_DISPOSITIONS value
+   */
+  game.aspectsofpower.setDisposition = async function (opts) {
+    if (!game.user.isGM) { ui.notifications.warn('GM only.'); return; }
+
+    const dispositions = {
+      [CONST.TOKEN_DISPOSITIONS.SECRET]:   'Secret',
+      [CONST.TOKEN_DISPOSITIONS.HOSTILE]:   'Hostile',
+      [CONST.TOKEN_DISPOSITIONS.NEUTRAL]:   'Neutral',
+      [CONST.TOKEN_DISPOSITIONS.FRIENDLY]:  'Friendly',
+    };
+
+    if (opts?.disposition !== undefined) {
+      const tokens = opts.scope === 'scene'
+        ? canvas.tokens.placeables.map(t => t.document)
+        : canvas.tokens.controlled.map(t => t.document);
+      if (tokens.length === 0) { ui.notifications.warn('No tokens found.'); return; }
+      const updates = tokens.map(t => ({ _id: t.id, disposition: opts.disposition }));
+      await canvas.scene.updateEmbeddedDocuments('Token', updates);
+      ui.notifications.info(`Set ${tokens.length} token(s) to ${dispositions[opts.disposition]}.`);
+      return;
+    }
+
+    // Dialog mode.
+    const dispOptions = Object.entries(dispositions).map(([val, label]) =>
+      `<option value="${val}">${label}</option>`
+    ).join('');
+
+    const content = `<form>
+      <div class="form-group"><label>Scope</label>
+        <select name="scope">
+          <option value="selected">Selected Tokens</option>
+          <option value="scene">All Tokens on Scene</option>
+        </select>
+      </div>
+      <div class="form-group"><label>Disposition</label>
+        <select name="disposition">${dispOptions}</select>
+      </div>
+    </form>`;
+
+    await foundry.applications.api.DialogV2.wait({
+      window: { title: 'Set Token Disposition' },
+      content,
+      buttons: [{
+        action: 'apply', label: 'Apply', icon: 'fas fa-check', default: true,
+        callback: async (event, button, dialog) => {
+          const form = dialog.querySelector('form');
+          const scope = form.querySelector('[name="scope"]').value;
+          const disposition = Number(form.querySelector('[name="disposition"]').value);
+          await game.aspectsofpower.setDisposition({ scope, disposition });
+        },
+      }, { action: 'cancel', label: 'Cancel' }],
+      close: () => null,
+    });
+  };
+
   // Initialize the equipment system hooks.
   EquipmentSystem.initialize();
 
@@ -394,6 +456,55 @@ Hooks.on('combatTurnChange', async (combat, _prior, current) => {
     speaker: ChatMessage.getSpeaker({ actor }),
     ...staminaWhisper,
     content: `<p><em>${actor.name} regenerates ${newValue - stamina.value} stamina (${regenPct}% of ${stamina.max}).</em></p>`,
+  });
+});
+
+/* -------------------------------------------- */
+/*  Overhealth Decay — End of Turn              */
+/* -------------------------------------------- */
+
+/**
+ * Decay overhealth at the end of each combatant's turn.
+ * Decay amount = decayRate% of current overhealth.
+ * ActiveEffects with flag `aspects-of-power.overhealthDecayReduction` (flat number)
+ * reduce the decay amount.
+ * Only the GM executes to avoid duplicate writes.
+ */
+Hooks.on('combatTurnChange', async (combat, prior, _current) => {
+  if (!game.user.isGM) return;
+  if (!prior?.combatantId) return;
+
+  const combatant = combat.combatants.get(prior.combatantId);
+  if (!combatant?.actor) return;
+
+  const actor = combatant.actor;
+  const oh = actor.system.overhealth;
+  if (!oh || oh.value <= 0) return;
+
+  const decayPct = oh.decayRate ?? 10;
+  if (decayPct <= 0) return;
+
+  // Calculate base decay.
+  let decayAmt = Math.ceil(oh.value * (decayPct / 100));
+
+  // Check for decay reduction from effects.
+  for (const effect of actor.effects) {
+    if (effect.disabled) continue;
+    const reduction = effect.flags?.['aspects-of-power']?.overhealthDecayReduction ?? 0;
+    if (reduction > 0) decayAmt = Math.max(0, decayAmt - reduction);
+  }
+
+  if (decayAmt <= 0) return;
+
+  const newValue = Math.max(0, oh.value - decayAmt);
+  await actor.update({ 'system.overhealth.value': newValue });
+
+  const ohWhisper = _isPlayerCharacter(actor) ? {} : { whisper: ChatMessage.getWhisperRecipients('GM') };
+  ChatMessage.create({
+    speaker: ChatMessage.getSpeaker({ actor }),
+    ...ohWhisper,
+    content: `<p><em>${actor.name}'s overhealth decays by ${decayAmt} (${decayPct}%). `
+           + `Overhealth: ${newValue} / ${oh.cap ?? '?'}</em></p>`,
   });
 });
 
@@ -1243,21 +1354,34 @@ Hooks.on('updateActor', async (actor, changes, _options, userId) => {
   for (const token of actor.getActiveTokens()) {
     const doc = token.document;
     const originalImg = doc.getFlag('aspects-of-power', 'originalTokenImg');
+    const hadTint = doc.getFlag('aspects-of-power', 'woundedTint');
 
-    if (isWounded && woundedImg) {
-      // Swap to wounded image — save original first.
-      if (!originalImg) {
-        await doc.setFlag('aspects-of-power', 'originalTokenImg', doc.texture.src);
+    if (isWounded) {
+      if (woundedImg) {
+        // Swap to wounded image — save original first.
+        if (!originalImg) {
+          await doc.setFlag('aspects-of-power', 'originalTokenImg', doc.texture.src);
+        }
+        if (doc.texture.src !== woundedImg) {
+          await doc.update({ 'texture.src': woundedImg });
+        }
+      } else if (!hadTint) {
+        // No wounded image set — apply red tint fallback.
+        await doc.setFlag('aspects-of-power', 'woundedTint', true);
+        await doc.update({ 'texture.tint': '#ff4444' });
       }
-      if (doc.texture.src !== woundedImg) {
-        await doc.update({ 'texture.src': woundedImg });
+    } else {
+      // Healed above threshold — restore everything.
+      if (originalImg) {
+        if (doc.texture.src !== originalImg) {
+          await doc.update({ 'texture.src': originalImg });
+        }
+        await doc.unsetFlag('aspects-of-power', 'originalTokenImg');
       }
-    } else if (!isWounded && originalImg) {
-      // Restore original image.
-      if (doc.texture.src !== originalImg) {
-        await doc.update({ 'texture.src': originalImg });
+      if (hadTint) {
+        await doc.update({ 'texture.tint': '#ffffff' });
+        await doc.unsetFlag('aspects-of-power', 'woundedTint');
       }
-      await doc.unsetFlag('aspects-of-power', 'originalTokenImg');
     }
   }
 });
