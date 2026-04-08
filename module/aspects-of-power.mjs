@@ -253,6 +253,24 @@ Handlebars.registerHelper('includes', function (array, value) {
   return Array.isArray(array) && array.includes(value);
 });
 
+/**
+ * Simple math helper for templates: {{math a '*' b '/' c}}
+ * Supports +, -, *, /. Evaluates left-to-right.
+ */
+Handlebars.registerHelper('math', function (...args) {
+  args.pop(); // remove Handlebars options object
+  let result = Number(args[0]) || 0;
+  for (let i = 1; i < args.length; i += 2) {
+    const op = args[i];
+    const val = Number(args[i + 1]) || 0;
+    if (op === '+') result += val;
+    else if (op === '-') result -= val;
+    else if (op === '*') result *= val;
+    else if (op === '/') result = val !== 0 ? result / val : 0;
+  }
+  return Math.round(result);
+});
+
 /* -------------------------------------------- */
 /*  Compendium — Auto-type Create Button        */
 /* -------------------------------------------- */

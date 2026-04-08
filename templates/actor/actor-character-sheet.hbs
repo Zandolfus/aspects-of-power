@@ -12,85 +12,117 @@
     </div>
     <div class="header-fields">
       <h1 class="charname"><input name="name" type="text" value="{{actor.name}}" placeholder="Name"/></h1>
-      <div class="resources grid grid-3col">
 
-        <div class="resource flex-group-center">
-          <label for="system.health.value" class="resource-label">Health</label>
-          <div class="resource-content flexrow flex-center flex-between">
+      {{!-- ── Resource Bars ── --}}
+      <div class="resource-bars">
+        <div class="resource-bar-row resource-health">
+          <label class="bar-label">HP</label>
+          <div class="bar-track">
+            <div class="bar-fill bar-fill-health" style="width: {{#if (gt system.health.max 0)}}{{math system.health.value '/' system.health.max '*' 100}}{{else}}0{{/if}}%"></div>
+          </div>
+          <div class="bar-values">
             <input type="number" name="system.health.value" value="{{system.health.value}}" min="0"/>
-            <span> / {{system.health.max}}</span>
+            <span class="bar-separator">/</span>
+            <span class="bar-max">{{system.health.max}}</span>
           </div>
         </div>
 
-        <div class="resource flex-group-center">
-          <label for="system.mana.value" class="resource-label">Mana</label>
-          <div class="resource-content flexrow flex-center flex-between">
+        <div class="resource-bar-row resource-mana">
+          <label class="bar-label">MP</label>
+          <div class="bar-track">
+            <div class="bar-fill bar-fill-mana" style="width: {{#if (gt system.mana.max 0)}}{{math system.mana.value '/' system.mana.max '*' 100}}{{else}}0{{/if}}%"></div>
+          </div>
+          <div class="bar-values">
             <input type="number" name="system.mana.value" value="{{system.mana.value}}" min="0"/>
-            <span> / {{system.mana.max}}</span>
+            <span class="bar-separator">/</span>
+            <span class="bar-max">{{system.mana.max}}</span>
           </div>
         </div>
 
-        <div class="resource flex-group-center">
-          <label for="system.stamina.value" class="resource-label">Stamina</label>
-          <div class="resource-content flexrow flex-center flex-between">
+        <div class="resource-bar-row resource-stamina">
+          <label class="bar-label">SP</label>
+          <div class="bar-track">
+            <div class="bar-fill bar-fill-stamina" style="width: {{#if (gt system.stamina.max 0)}}{{math system.stamina.value '/' system.stamina.max '*' 100}}{{else}}0{{/if}}%"></div>
+          </div>
+          <div class="bar-values">
             <input type="number" name="system.stamina.value" value="{{system.stamina.value}}" min="0"/>
-            <span> / {{system.stamina.max}}</span>
+            <span class="bar-separator">/</span>
+            <span class="bar-max">{{system.stamina.max}}</span>
           </div>
         </div>
 
-        {{!-- Overhealth --}}
-        {{#if (gt system.overhealth.value 0)}}
-        <div class="resource flex-group-center resource-overhealth">
-          <label class="resource-label">Overhealth</label>
-          <div class="resource-content flexrow flex-center flex-between">
-            <span class="overhealth-value">{{system.overhealth.value}}</span>
-            <span> / {{system.overhealth.cap}}</span>
+        {{!-- Overhealth — always present, dims when empty --}}
+        <div class="resource-bar-row resource-overhealth {{#unless (gt system.overhealth.value 0)}}bar-empty{{/unless}}">
+          <label class="bar-label">OH</label>
+          <div class="bar-track">
+            <div class="bar-fill bar-fill-overhealth" style="width: {{#if (gt system.overhealth.cap 0)}}{{math system.overhealth.value '/' system.overhealth.cap '*' 100}}{{else}}0{{/if}}%"></div>
           </div>
-        </div>
-        {{/if}}
-
-        {{!-- Barrier --}}
-        {{#if (gt system.barrier.max 0)}}
-        <div class="resource flex-group-center resource-barrier">
-          <label class="resource-label">Barrier</label>
-          <div class="resource-content flexrow flex-center flex-between">
-            <span class="barrier-value">{{system.barrier.value}}</span>
-            <span> / {{system.barrier.max}}</span>
-          </div>
-          {{#if system.barrier.affinities.length}}
-          <div class="barrier-affinities">
-            {{#each system.barrier.affinities as |aff|}}
-              <span class="affinity-chip">{{aff}}</span>
-            {{/each}}
-          </div>
-          {{/if}}
-        </div>
-        {{/if}}
-
-        <div class="resource flex-group-center">
-          <label for="system.attributes.class.level" class="resource-label">Class Level</label>
-          <div class="resource-content flexrow flex-center flex-between">
-            <input type="number" name="system.attributes.class.level" value="{{system.attributes.class.level}}" min="0"/>
+          <div class="bar-values">
+            <span>{{system.overhealth.value}}</span>
+            <span class="bar-separator">/</span>
+            <span class="bar-max">{{system.overhealth.cap}}</span>
+            {{#if (gt system.overhealth.value 0)}}
+              <span class="bar-detail">({{system.overhealth.decayRate}}%/rnd)</span>
+            {{/if}}
           </div>
         </div>
 
-        <div class="resource flex-group-center">
-          <label for="system.attributes.race.level" class="resource-label">Race Level</label>
-          <div class="resource-content flexrow flex-center flex-between">
-            <input type="number" name="system.attributes.race.level" value="{{system.attributes.race.level}}" min="0"/>
+        {{!-- Barrier — always present, dims when empty --}}
+        <div class="resource-bar-row resource-barrier {{#unless (gt system.barrier.max 0)}}bar-empty{{/unless}}">
+          <label class="bar-label">BR</label>
+          <div class="bar-track">
+            <div class="bar-fill bar-fill-barrier" style="width: {{#if (gt system.barrier.max 0)}}{{math system.barrier.value '/' system.barrier.max '*' 100}}{{else}}0{{/if}}%"></div>
+          </div>
+          <div class="bar-values">
+            <span>{{system.barrier.value}}</span>
+            <span class="bar-separator">/</span>
+            <span class="bar-max">{{system.barrier.max}}</span>
+            {{#if system.barrier.affinities.length}}
+              {{#each system.barrier.affinities as |aff|}}
+                <span class="affinity-chip">{{aff}}</span>
+              {{/each}}
+            {{/if}}
+          </div>
+        </div>
+      </div>
+
+      {{!-- ── Defenses + Identity side by side ── --}}
+      <div class="header-bottom">
+        <div class="defense-block">
+          <div class="defense-row defense-mitigation">
+            <div class="defense-item">
+              <label>Armor</label>
+              <span>{{system.defense.armor.value}}</span>
+            </div>
+            <div class="defense-item">
+              <label>Veil</label>
+              <span>{{system.defense.veil.value}}</span>
+            </div>
+          </div>
+          <div class="defense-row defense-pools">
+            <div class="defense-item">
+              <label>Melee</label>
+              <span>{{system.defense.melee.pool}}/{{system.defense.melee.poolMax}}</span>
+            </div>
+            <div class="defense-item">
+              <label>Ranged</label>
+              <span>{{system.defense.ranged.pool}}/{{system.defense.ranged.poolMax}}</span>
+            </div>
+            <div class="defense-item">
+              <label>Mind</label>
+              <span>{{system.defense.mind.pool}}/{{system.defense.mind.poolMax}}</span>
+            </div>
+            <div class="defense-item">
+              <label>Soul</label>
+              <span>{{system.defense.soul.pool}}/{{system.defense.soul.poolMax}}</span>
+            </div>
           </div>
         </div>
 
-        <div class="resource flex-group-center">
-          <label for="system.attributes.profession.level" class="resource-label">Profession Level</label>
-          <div class="resource-content flexrow flex-center flex-between">
-            <input type="number" name="system.attributes.profession.level" value="{{system.attributes.profession.level}}" min="0"/>
-          </div>
-        </div>
-
-        <div class="resource flex-group-center">
-          <label class="resource-label">Class</label>
-          <div class="resource-content flexrow flex-center flex-between">
+        <div class="identity-block">
+          <div class="identity-row">
+            <label>Class</label>
+            <input type="number" name="system.attributes.class.level" value="{{system.attributes.class.level}}" min="0" class="identity-level"/>
             <span class="template-name">
               {{#if templateRefs.class.hasTemplate}}
                 <a class="template-link" data-template-id="{{templateRefs.class.templateId}}">{{templateRefs.class.templateName}}</a>
@@ -99,14 +131,11 @@
                 <em>{{system.attributes.class.name}}</em>
               {{/if}}
             </span>
-            <span class="resource-label flex-center">Rank</span>
-            <span>{{system.attributes.class.rank}}</span>
+            <span class="identity-rank">{{system.attributes.class.rank}}</span>
           </div>
-        </div>
-
-        <div class="resource flex-group-center">
-          <label class="resource-label">Race</label>
-          <div class="resource-content flexrow flex-center flex-between">
+          <div class="identity-row">
+            <label>Race</label>
+            <input type="number" name="system.attributes.race.level" value="{{system.attributes.race.level}}" min="0" class="identity-level"/>
             <span class="template-name">
               {{#if templateRefs.race.hasTemplate}}
                 <a class="template-link" data-template-id="{{templateRefs.race.templateId}}">{{templateRefs.race.templateName}}</a>
@@ -115,14 +144,11 @@
                 <em>{{system.attributes.race.name}}</em>
               {{/if}}
             </span>
-            <span class="resource-label flex-center">Rank</span>
-            <span>{{system.attributes.race.rank}}</span>
+            <span class="identity-rank">{{system.attributes.race.rank}}</span>
           </div>
-        </div>
-
-        <div class="resource flex-group-center">
-          <label class="resource-label">Profession</label>
-          <div class="resource-content flexrow flex-center flex-between">
+          <div class="identity-row">
+            <label>Prof</label>
+            <input type="number" name="system.attributes.profession.level" value="{{system.attributes.profession.level}}" min="0" class="identity-level"/>
             <span class="template-name">
               {{#if templateRefs.profession.hasTemplate}}
                 <a class="template-link" data-template-id="{{templateRefs.profession.templateId}}">{{templateRefs.profession.templateName}}</a>
@@ -131,64 +157,15 @@
                 <em>{{system.attributes.profession.name}}</em>
               {{/if}}
             </span>
-            <span class="resource-label flex-center">Rank</span>
-            <span>{{system.attributes.profession.rank}}</span>
+            <span class="identity-rank">{{system.attributes.profession.rank}}</span>
           </div>
-        </div>
-
-        {{!-- Level Up button + Free Points --}}
-        <div class="resource flex-group-center">
-          <button type="button" class="level-up-btn">
-            <i class="fas fa-arrow-up"></i> {{localize "ASPECTSOFPOWER.Level.levelUp"}}
-          </button>
-          {{#if (gt freePoints 0)}}
-            <span class="free-points-badge">{{localize "ASPECTSOFPOWER.Level.freePoints"}}: {{freePoints}}</span>
-          {{/if}}
-        </div>
-      </div>
-      <div class="resources grid grid-6col">
-        <div class="resource flex-group-center">
-          <label class="resource-label">Armor</label>
-          <div class="resource-content flexrow flex-center flex-between">
-            <span>{{system.defense.armor.value}}</span>
-          </div>
-        </div>
-        <div class="resource flex-group-center">
-          <label class="resource-label">Veil</label>
-          <div class="resource-content flexrow flex-center flex-between">
-            <span>{{system.defense.veil.value}}</span>
-          </div>
-        </div>
-        <div class="resource flex-group-center">
-          <label class="resource-label">Melee Defense</label>
-          <div class="resource-content flexrow flex-center flex-between">
-            <span>{{system.defense.melee.pool}}</span>
-            <span class="separator">/</span>
-            <span>{{system.defense.melee.poolMax}}</span>
-          </div>
-        </div>
-        <div class="resource flex-group-center">
-          <label class="resource-label">Ranged Defense</label>
-          <div class="resource-content flexrow flex-center flex-between">
-            <span>{{system.defense.ranged.pool}}</span>
-            <span class="separator">/</span>
-            <span>{{system.defense.ranged.poolMax}}</span>
-          </div>
-        </div>
-        <div class="resource flex-group-center">
-          <label class="resource-label">Mind Defense</label>
-          <div class="resource-content flexrow flex-center flex-between">
-            <span>{{system.defense.mind.pool}}</span>
-            <span class="separator">/</span>
-            <span>{{system.defense.mind.poolMax}}</span>
-          </div>
-        </div>
-        <div class="resource flex-group-center">
-          <label class="resource-label">Soul Defense</label>
-          <div class="resource-content flexrow flex-center flex-between">
-            <span>{{system.defense.soul.pool}}</span>
-            <span class="separator">/</span>
-            <span>{{system.defense.soul.poolMax}}</span>
+          <div class="identity-row identity-actions">
+            <button type="button" class="level-up-btn">
+              <i class="fas fa-arrow-up"></i> {{localize "ASPECTSOFPOWER.Level.levelUp"}}
+            </button>
+            {{#if (gt freePoints 0)}}
+              <span class="free-points-badge">{{localize "ASPECTSOFPOWER.Level.freePoints"}}: {{freePoints}}</span>
+            {{/if}}
           </div>
         </div>
       </div>

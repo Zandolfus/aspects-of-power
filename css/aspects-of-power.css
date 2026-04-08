@@ -267,17 +267,193 @@
 }
 .aspects-of-power .sheet-header .header-fields {
   flex: 1;
+  min-width: 0;
 }
 .aspects-of-power .sheet-header h1.charname {
-  height: 50px;
+  height: 30px;
   padding: 0px;
-  margin: 5px 0;
+  margin: 2px 0 4px;
   border-bottom: 0;
 }
 .aspects-of-power .sheet-header h1.charname input {
   width: 100%;
   height: 100%;
   margin: 0;
+}
+
+/* ── Resource Bars ── */
+.aspects-of-power .resource-bars {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-bottom: 6px;
+}
+.aspects-of-power .resource-bar-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  height: 20px;
+}
+.aspects-of-power .resource-bar-row.bar-empty {
+  opacity: 0.35;
+}
+.aspects-of-power .bar-label {
+  width: 24px;
+  font-weight: bold;
+  font-size: 11px;
+  text-align: right;
+  flex-shrink: 0;
+}
+.aspects-of-power .bar-track {
+  flex: 1;
+  height: 14px;
+  background: #333;
+  border-radius: 3px;
+  overflow: hidden;
+  border: 1px solid #555;
+}
+.aspects-of-power .bar-fill {
+  height: 100%;
+  border-radius: 2px;
+  transition: width 0.3s ease;
+}
+.aspects-of-power .bar-fill-health   { background: #c62828; }
+.aspects-of-power .bar-fill-mana     { background: #1565c0; }
+.aspects-of-power .bar-fill-stamina  { background: #f9a825; }
+.aspects-of-power .bar-fill-overhealth { background: #2e7d32; }
+.aspects-of-power .bar-fill-barrier  { background: #5c6bc0; }
+.aspects-of-power .bar-values {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  font-size: 12px;
+  min-width: 100px;
+  flex-shrink: 0;
+}
+.aspects-of-power .bar-values input[type="number"] {
+  width: 46px;
+  text-align: right;
+  height: 20px;
+  padding: 0 2px;
+  border: 1px solid #555;
+  background: #222;
+  color: #eee;
+}
+.aspects-of-power .bar-separator {
+  opacity: 0.5;
+}
+.aspects-of-power .bar-max {
+  opacity: 0.7;
+  min-width: 30px;
+}
+.aspects-of-power .bar-detail {
+  font-size: 10px;
+  opacity: 0.6;
+  margin-left: 2px;
+}
+.aspects-of-power .resource-health .bar-label { color: #ef5350; }
+.aspects-of-power .resource-mana .bar-label   { color: #42a5f5; }
+.aspects-of-power .resource-stamina .bar-label { color: #ffca28; }
+.aspects-of-power .resource-overhealth .bar-label { color: #66bb6a; }
+.aspects-of-power .resource-barrier .bar-label { color: #7986cb; }
+.aspects-of-power .resource-barrier .affinity-chip {
+  font-size: 9px;
+  padding: 0 4px;
+  background: #3949ab;
+  border-radius: 6px;
+  color: #c5cae9;
+  margin-left: 2px;
+}
+
+/* ── Header Bottom: Defenses + Identity ── */
+.aspects-of-power .header-bottom {
+  display: flex;
+  gap: 10px;
+}
+.aspects-of-power .defense-block {
+  flex: 1;
+  border: 1px solid #444;
+  border-radius: 4px;
+  padding: 4px 8px;
+  background: rgba(0,0,0,0.15);
+}
+.aspects-of-power .defense-row {
+  display: flex;
+  gap: 8px;
+  justify-content: space-around;
+}
+.aspects-of-power .defense-row + .defense-row {
+  margin-top: 2px;
+  padding-top: 2px;
+  border-top: 1px solid #3a3a3a;
+}
+.aspects-of-power .defense-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  min-width: 50px;
+}
+.aspects-of-power .defense-item label {
+  font-size: 10px;
+  font-weight: bold;
+  opacity: 0.7;
+  text-transform: uppercase;
+}
+.aspects-of-power .defense-item span {
+  font-size: 13px;
+  font-weight: bold;
+}
+.aspects-of-power .identity-block {
+  flex: 1;
+  border: 1px solid #444;
+  border-radius: 4px;
+  padding: 4px 8px;
+  background: rgba(0,0,0,0.15);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.aspects-of-power .identity-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+}
+.aspects-of-power .identity-row > label {
+  font-weight: bold;
+  width: 34px;
+  text-align: right;
+  flex-shrink: 0;
+  font-size: 11px;
+}
+.aspects-of-power .identity-level {
+  width: 38px;
+  height: 20px;
+  text-align: center;
+  padding: 0;
+  border: 1px solid #555;
+  background: #222;
+  color: #eee;
+}
+.aspects-of-power .identity-row .template-name {
+  flex: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.aspects-of-power .identity-rank {
+  font-weight: bold;
+  min-width: 16px;
+  text-align: center;
+  opacity: 0.8;
+}
+.aspects-of-power .identity-actions {
+  justify-content: flex-start;
+  margin-top: 2px;
+}
+.aspects-of-power .identity-actions .level-up-btn {
+  font-size: 11px;
+  padding: 2px 8px;
 }
 .aspects-of-power .sheet-tabs {
   flex: 0;
@@ -419,37 +595,7 @@
   font-weight: bold;
 }
 
-/* --- Overhealth --- */
-.aspects-of-power .resource-overhealth .resource-label {
-  color: #2e7d32;
-}
-.aspects-of-power .resource-overhealth .overhealth-value {
-  color: #2e7d32;
-  font-weight: bold;
-}
-
-/* --- Barrier --- */
-.aspects-of-power .resource-barrier .resource-label {
-  color: #1565c0;
-}
-.aspects-of-power .resource-barrier .barrier-value {
-  color: #1565c0;
-  font-weight: bold;
-}
-.aspects-of-power .barrier-affinities {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 3px;
-  margin-top: 2px;
-  justify-content: center;
-}
-.aspects-of-power .barrier-affinities .affinity-chip {
-  font-size: 0.7em;
-  padding: 1px 5px;
-  background: #bbdefb;
-  border-radius: 8px;
-  color: #0d47a1;
-}
+/* Legacy overhealth/barrier styles removed — now using resource-bar-row layout */
 .aspects-of-power .items-header {
   height: 28px;
   margin: 2px 0;
