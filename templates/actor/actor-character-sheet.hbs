@@ -61,9 +61,6 @@
             <span>{{system.overhealth.value}}</span>
             <span class="bar-separator">/</span>
             <span class="bar-max">{{system.overhealth.cap}}</span>
-            {{#if (gt system.overhealth.value 0)}}
-              <span class="bar-detail">({{system.overhealth.decayRate}}%/rnd)</span>
-            {{/if}}
           </div>
         </div>
 

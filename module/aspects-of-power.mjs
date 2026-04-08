@@ -478,21 +478,21 @@ Hooks.on('combatTurnChange', async (combat, _prior, current) => {
 });
 
 /* -------------------------------------------- */
-/*  Overhealth Decay — End of Turn              */
+/*  Overhealth Decay — Start of Turn            */
 /* -------------------------------------------- */
 
 /**
- * Decay overhealth at the end of each combatant's turn.
+ * Decay overhealth at the start of each combatant's turn.
  * Decay amount = decayRate% of current overhealth.
  * ActiveEffects with flag `aspects-of-power.overhealthDecayReduction` (flat number)
  * reduce the decay amount.
  * Only the GM executes to avoid duplicate writes.
+ * Whispers the decay message to the owning player (or GM for non-player actors).
  */
-Hooks.on('combatTurnChange', async (combat, prior, _current) => {
+Hooks.on('combatTurnChange', async (combat, _prior, current) => {
   if (!game.user.isGM) return;
-  if (!prior?.combatantId) return;
 
-  const combatant = combat.combatants.get(prior.combatantId);
+  const combatant = combat.combatants.get(current.combatantId);
   if (!combatant?.actor) return;
 
   const actor = combatant.actor;
@@ -517,10 +517,14 @@ Hooks.on('combatTurnChange', async (combat, prior, _current) => {
   const newValue = Math.max(0, oh.value - decayAmt);
   await actor.update({ 'system.overhealth.value': newValue });
 
-  const ohWhisper = _isPlayerCharacter(actor) ? {} : { whisper: ChatMessage.getWhisperRecipients('GM') };
+  // Whisper to the owning player, or GM for non-player actors.
+  const owner = game.users.find(u => !u.isGM && u.active && u.character?.id === actor.id);
+  const whisperTargets = owner
+    ? [owner.id, ...ChatMessage.getWhisperRecipients('GM').map(u => u.id)]
+    : ChatMessage.getWhisperRecipients('GM');
   ChatMessage.create({
     speaker: ChatMessage.getSpeaker({ actor }),
-    ...ohWhisper,
+    whisper: whisperTargets,
     content: `<p><em>${actor.name}'s overhealth decays by ${decayAmt} (${decayPct}%). `
            + `Overhealth: ${newValue} / ${oh.cap ?? '?'}</em></p>`,
   });
