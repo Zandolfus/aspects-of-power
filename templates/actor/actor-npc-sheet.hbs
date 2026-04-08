@@ -2,7 +2,14 @@
 
   {{!-- Sheet Header --}}
   <header class="sheet-header">
-    <img class="profile-img" src="{{actor.img}}" data-edit="img" title="{{actor.name}}" height="100" width="100"/>
+    <div class="profile-img-group">
+      <img class="profile-img" src="{{actor.img}}" data-edit="img" title="{{actor.name}}" height="100" width="100"/>
+      <div class="wounded-img-picker" title="Wounded token image (swaps at low HP)">
+        <img class="wounded-img {{#unless system.tokenImageWounded}}placeholder{{/unless}}"
+             src="{{#if system.tokenImageWounded}}{{system.tokenImageWounded}}{{else}}icons/svg/blood.svg{{/if}}"
+             data-field="system.tokenImageWounded" width="32" height="32"/>
+      </div>
+    </div>
     <div class="header-fields">
       <h1 class="charname"><input name="name" type="text" value="{{actor.name}}" placeholder="Name"/></h1>
       {{!-- The grid classes are defined in scss/global/_grid.scss. To use,

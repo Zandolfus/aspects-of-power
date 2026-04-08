@@ -26,6 +26,9 @@ export class NpcData extends foundry.abstract.TypeDataModel {
       biography: new fields.HTMLField({ initial: '' }),
       cr:        new fields.NumberField({ initial: 0, min: 0, integer: true }),
 
+      // Wounded token image — swaps token art when HP drops below threshold.
+      tokenImageWounded: new fields.StringField({ initial: '' }),
+
       // Base stamina regeneration per turn (percentage of max stamina).
       staminaRegen: new fields.NumberField({ initial: 5, min: 0 }),
 

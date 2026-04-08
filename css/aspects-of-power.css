@@ -235,10 +235,35 @@
   justify-content: flex-start;
   margin-bottom: 10px;
 }
-.aspects-of-power .sheet-header .profile-img {
+.aspects-of-power .sheet-header .profile-img-group {
   flex: 0 0 100px;
-  height: 100px;
   margin-right: 10px;
+  position: relative;
+}
+.aspects-of-power .sheet-header .profile-img {
+  width: 100px;
+  height: 100px;
+}
+.aspects-of-power .sheet-header .wounded-img-picker {
+  position: absolute;
+  bottom: -2px;
+  right: -2px;
+  cursor: pointer;
+  border: 1px solid #555;
+  border-radius: 3px;
+  background: #222;
+  padding: 1px;
+  line-height: 0;
+}
+.aspects-of-power .sheet-header .wounded-img-picker:hover {
+  border-color: #c33;
+  background: #333;
+}
+.aspects-of-power .sheet-header .wounded-img.placeholder {
+  opacity: 0.4;
+}
+.aspects-of-power .sheet-header .wounded-img-picker:hover .wounded-img.placeholder {
+  opacity: 0.8;
 }
 .aspects-of-power .sheet-header .header-fields {
   flex: 1;

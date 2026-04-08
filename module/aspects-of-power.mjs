@@ -118,6 +118,17 @@ Hooks.once('init', function () {
     },
   };
 
+  // ── System Settings ──
+  game.settings.register('aspects-of-power', 'woundedTokenThreshold', {
+    name: 'Wounded Token Threshold',
+    hint: 'HP percentage at or below which the token image swaps to the wounded variant (0 to disable).',
+    scope: 'world',
+    config: true,
+    type: Number,
+    default: 30,
+    range: { min: 0, max: 100, step: 5 },
+  });
+
   // Add custom constants for configuration.
   CONFIG.ASPECTSOFPOWER = ASPECTSOFPOWER;
 
@@ -1203,6 +1214,53 @@ async function _applyForcedMovement(targetActor, attackerTokenId, dir, distFt, h
     content: `<p><strong>${targetActor.name}</strong> ${dirLabel} ${distFt} ft! (${strRoll.total} vs ${hitTotal})</p>`,
   });
 }
+
+/* -------------------------------------------- */
+/*  Wounded Token Image Swap                    */
+/* -------------------------------------------- */
+
+/**
+ * Swap token image when an actor's HP crosses the wounded threshold.
+ * Only the GM executes to avoid duplicate updates.
+ * Stores the original image in a flag so it can be restored when healed.
+ */
+Hooks.on('updateActor', async (actor, changes, _options, userId) => {
+  if (!game.user.isGM) return;
+  if (game.userId !== userId && !changes.system?.health) return;
+
+  // Only react to health value changes.
+  const healthChange = changes.system?.health;
+  if (healthChange?.value === undefined) return;
+
+  const threshold = game.settings.get('aspects-of-power', 'woundedTokenThreshold');
+  if (threshold <= 0) return;
+
+  const health = actor.system.health;
+  const hpPct = (health.value / health.max) * 100;
+  const isWounded = hpPct <= threshold && health.value > 0;
+  const woundedImg = actor.system.tokenImageWounded;
+
+  for (const token of actor.getActiveTokens()) {
+    const doc = token.document;
+    const originalImg = doc.getFlag('aspects-of-power', 'originalTokenImg');
+
+    if (isWounded && woundedImg) {
+      // Swap to wounded image — save original first.
+      if (!originalImg) {
+        await doc.setFlag('aspects-of-power', 'originalTokenImg', doc.texture.src);
+      }
+      if (doc.texture.src !== woundedImg) {
+        await doc.update({ 'texture.src': woundedImg });
+      }
+    } else if (!isWounded && originalImg) {
+      // Restore original image.
+      if (doc.texture.src !== originalImg) {
+        await doc.update({ 'texture.src': originalImg });
+      }
+      await doc.unsetFlag('aspects-of-power', 'originalTokenImg');
+    }
+  }
+});
 
 /* -------------------------------------------- */
 /*  Hotbar Macros                               */

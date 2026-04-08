@@ -326,6 +326,15 @@ export class AspectsofPowerActorSheet extends foundry.applications.api.Handlebar
       });
     });
 
+    // Wounded token image picker.
+    this.element.querySelector('.wounded-img')?.addEventListener('click', async () => {
+      const current = this.actor.system.tokenImageWounded || '';
+      const fp = new FilePicker({ type: 'image', current, callback: async (path) => {
+        await this.actor.update({ 'system.tokenImageWounded': path });
+      }});
+      fp.browse();
+    });
+
     // Rollable abilities
     this.element.querySelectorAll('.rollable').forEach(el => {
       el.addEventListener('click', this._onRoll.bind(this));

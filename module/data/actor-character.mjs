@@ -37,6 +37,9 @@ export class CharacterData extends foundry.abstract.TypeDataModel {
 
       biography: new fields.HTMLField({ initial: '' }),
 
+      // Wounded token image — swaps token art when HP drops below threshold.
+      tokenImageWounded: new fields.StringField({ initial: '' }),
+
       attributes: new fields.SchemaField({
         class: new fields.SchemaField({
           level:      new fields.NumberField({ initial: 1, min: 0, integer: true }),

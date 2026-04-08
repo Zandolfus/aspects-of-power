@@ -11,7 +11,31 @@
       "Bash(where:*)",
       "Bash(find 'c:\\\\Users\\\\Vind Gnyr\\\\Documents\\\\Aspects of Power' -type f \\\\\\(-name *effect* -o -name *debuff* -o -name *mechanics* \\\\\\))",
       "Bash(gh repo:*)",
-      "WebSearch"
+      "WebSearch",
+      "WebFetch(domain:deepwiki.com)",
+      "Bash(gh auth:*)",
+      "Bash(curl -s \"https://raw.githubusercontent.com/Dez384/foundryvtt-blades-in-the-dark/master/module/blades.js\")",
+      "Bash(curl -sL \"https://raw.githubusercontent.com/foundryvtt/crucible/v14/module/documents/combat.mjs\")",
+      "Bash(curl -sL \"https://raw.githubusercontent.com/foundryvtt/crucible/v14/crucible.mjs\")",
+      "Bash(curl -sL \"https://github.com/foundryvtt/crucible/tree/v14/module/canvas\")",
+      "Bash(curl -sL \"https://raw.githubusercontent.com/foundryvtt/crucible/v14/module/models/combat-combat.mjs\")",
+      "Bash(curl -sL \"https://raw.githubusercontent.com/foundryvtt/crucible/v14/module/const/statuses.mjs\")",
+      "Bash(curl -sL \"https://raw.githubusercontent.com/foundryvtt/crucible/v14/module/documents/actor.mjs\")",
+      "Bash(curl -sL \"https://raw.githubusercontent.com/foundryvtt/crucible/v14/module/documents/scene.mjs\")",
+      "Bash(curl -sL \"https://raw.githubusercontent.com/foundryvtt/crucible/v14/module/models/actor-base.mjs\")",
+      "Bash(curl -sL \"https://raw.githubusercontent.com/foundryvtt/crucible/v14/module/models/_module.mjs\")",
+      "Bash(curl -sL \"https://raw.githubusercontent.com/foundryvtt/crucible/v14/module/canvas/_module.mjs\")",
+      "Bash(curl -sL \"https://raw.githubusercontent.com/foundryvtt/crucible/v14/module/documents/combatant.mjs\")",
+      "Bash(curl -sL \"https://raw.githubusercontent.com/foundryvtt/crucible/v14/module/canvas/token-ruler.mjs\")",
+      "Bash(curl -sL \"https://raw.githubusercontent.com/foundryvtt/crucible/v14/module/canvas/token.mjs\")",
+      "Bash(curl -sL \"https://raw.githubusercontent.com/foundryvtt/crucible/v14/module/const/actor.mjs\")",
+      "Bash(curl -sL \"https://raw.githubusercontent.com/foundryvtt/crucible/v14/module/hooks/_module.mjs\")",
+      "Bash(curl -sL \"https://raw.githubusercontent.com/foundryvtt/crucible/v14/system.json\")",
+      "Bash(curl -sL \"https://raw.githubusercontent.com/foundryvtt/crucible/v14/module/models/action.mjs\")",
+      "Bash(curl -sL \"https://raw.githubusercontent.com/foundryvtt/crucible/v14/module/models/combat-exploration.mjs\")",
+      "Bash(curl -sL \"https://raw.githubusercontent.com/foundryvtt/crucible/v14/module/documents/_module.mjs\")",
+      "Bash(node -e ':*)",
+      "Bash(python3 -c ':*)"
     ]
   }
 }
