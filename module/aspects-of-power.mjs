@@ -881,15 +881,21 @@ Hooks.on('deleteActiveEffect', async (effect, _options, _userId) => {
 /* -------------------------------------------- */
 
 /**
- * Delete AOE MeasuredTemplates whose duration (in rounds) has elapsed.
+ * Delete AOE regions/templates whose duration (in rounds) has elapsed.
+ * v14: uses Scene regions with aspects-of-power AOE flags.
+ * Falls back to MeasuredTemplate compat if regions aren't found.
  * Only the GM executes to avoid duplicate deletes.
  */
 Hooks.on('combatTurnChange', async (combat, prior, _current) => {
   if (!game.user.isGM) return;
 
+  // v14+: check regions for AOE flags.
   const toDelete = [];
-  for (const templateDoc of canvas.scene.templates) {
-    const flags = templateDoc.flags?.['aspects-of-power'] ?? {};
+  const collection = canvas.scene.regions ?? canvas.scene.templates;
+  if (!collection) return;
+
+  for (const doc of collection) {
+    const flags = doc.flags?.['aspects-of-power'] ?? {};
     if (!flags.aoe) continue;
 
     const duration = flags.templateDuration ?? 0;
@@ -897,15 +903,16 @@ Hooks.on('combatTurnChange', async (combat, prior, _current) => {
 
     const placedRound = flags.placedRound ?? 0;
     if (placedRound > 0 && combat.round - placedRound >= duration) {
-      toDelete.push(templateDoc.id);
+      toDelete.push(doc.id);
     }
   }
 
   if (toDelete.length > 0) {
-    await canvas.scene.deleteEmbeddedDocuments('MeasuredTemplate', toDelete);
+    const docType = canvas.scene.regions ? 'Region' : 'MeasuredTemplate';
+    await canvas.scene.deleteEmbeddedDocuments(docType, toDelete);
     ChatMessage.create({
       whisper: ChatMessage.getWhisperRecipients('GM'),
-      content: `<p>Expired ${toDelete.length} AOE template(s).</p>`,
+      content: `<p>Expired ${toDelete.length} AOE area(s).</p>`,
     });
   }
 });
