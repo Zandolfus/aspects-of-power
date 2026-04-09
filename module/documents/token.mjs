@@ -132,23 +132,52 @@ export class AspectsofPowerToken extends foundry.documents.TokenDocument {
     // Update tracker synchronously.
     AspectsofPowerToken._segmentMovement.set(combatantId, newSegmentTotal);
 
-    // Deduct stamina and post chat message asynchronously (don't block animation).
-    const _isPC = game.users.some(u => !u.isGM && u.active && u.character?.id === actor.id);
-    const moveWhisper = _isPC ? {} : { whisper: ChatMessage.getWhisperRecipients('GM') };
-    Promise.resolve().then(async () => {
-      await actor.update({ 'system.stamina.value': actor.system.stamina.value - staminaCost });
-      ChatMessage.create({
-        speaker: ChatMessage.getSpeaker({ actor }),
-        ...moveWhisper,
-        content: `<p><em>${actor.name} moves ${moveSnapped} ft (${newSegmentTotal}/${Math.round(sprintRange)} ft this segment). `
-               + `Stamina: −${staminaCost} (${actor.system.stamina.value - staminaCost}/${actor.system.stamina.max})</em></p>`,
-      });
-    });
+    // Queue stamina deduction — wait for animation to finish before updating.
+    // Multiple rapid moves accumulate; the timeout resets each time so only
+    // the final deduction fires.
+    const actorId = actor.id;
+    if (!AspectsofPowerToken._pendingStaminaUpdates) AspectsofPowerToken._pendingStaminaUpdates = new Map();
+    const pending = AspectsofPowerToken._pendingStaminaUpdates.get(actorId) ?? { cost: 0, lastMove: '', sprintRange: 0 };
+    pending.cost += staminaCost;
+    pending.lastMove = `${moveSnapped} ft (${newSegmentTotal}/${Math.round(sprintRange)} ft this segment)`;
+    pending.sprintRange = sprintRange;
+    AspectsofPowerToken._pendingStaminaUpdates.set(actorId, pending);
+
+    clearTimeout(AspectsofPowerToken._staminaTimeout);
+    AspectsofPowerToken._staminaTimeout = setTimeout(() => {
+      this._flushStaminaUpdates();
+    }, 500);
   }
 
   /* -------------------------------------------- */
   /*  Helpers                                     */
   /* -------------------------------------------- */
+
+  /**
+   * Flush all queued stamina deductions after movement animation settles.
+   */
+  async _flushStaminaUpdates() {
+    const updates = AspectsofPowerToken._pendingStaminaUpdates;
+    if (!updates?.size) return;
+
+    for (const [actorId, pending] of updates) {
+      const actor = game.actors.get(actorId);
+      if (!actor) continue;
+
+      const newStamina = Math.max(0, actor.system.stamina.value - pending.cost);
+      await actor.update({ 'system.stamina.value': newStamina });
+
+      const _isPC = game.users.some(u => !u.isGM && u.active && u.character?.id === actor.id);
+      const moveWhisper = _isPC ? {} : { whisper: ChatMessage.getWhisperRecipients('GM') };
+      ChatMessage.create({
+        speaker: ChatMessage.getSpeaker({ actor }),
+        ...moveWhisper,
+        content: `<p><em>${actor.name} moves ${pending.lastMove}. `
+               + `Stamina: −${pending.cost} (${newStamina}/${actor.system.stamina.max})</em></p>`,
+      });
+    }
+    updates.clear();
+  }
 
   _getMovementBlocker(actor) {
     const blockTypes = ['root', 'immobilized', 'frozen', 'sleep', 'stun', 'paralysis'];
