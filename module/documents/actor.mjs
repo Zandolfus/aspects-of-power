@@ -9,6 +9,17 @@ export class AspectsofPowerActor extends Actor {
   }
 
   /** @override */
+  prepareEmbeddedDocuments() {
+    // v14: tokenActiveEffectChanges must exist before applyActiveEffects is called.
+    // Core doesn't always initialize it for synthetic token actors.
+    const phases = CONFIG.ActiveEffect.phases ?? { initial: {}, final: {} };
+    this.tokenActiveEffectChanges ??= Object.fromEntries(
+      Object.keys(phases).map(p => [p, []])
+    );
+    super.prepareEmbeddedDocuments();
+  }
+
+  /** @override */
   prepareBaseData() {
     // Data modifications in this step occur before processing embedded
     // documents or derived data.
