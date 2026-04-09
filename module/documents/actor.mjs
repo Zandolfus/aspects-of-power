@@ -186,6 +186,10 @@ export class AspectsofPowerActor extends Actor {
     const effectiveDexMelee  = Math.max(0, dexMod - dexMeleeReduction);
     const effectiveDexRanged = Math.max(0, dexMod * 0.3 - dexRangedReduction);
 
+    // Armor and veil: entirely from equipment/effects (no base stat contribution).
+    systemData.defense.armor.value = effectBonus('system.defense.armor.value');
+    systemData.defense.veil.value  = effectBonus('system.defense.veil.value');
+
     systemData.defense.melee.value  = Math.round((effectiveDexMelee + systemData.abilities.strength.mod*.3)*1.1) + effectBonus('system.defense.melee.value');
     systemData.defense.ranged.value = Math.round((effectiveDexRanged + systemData.abilities.perception.mod)*1.1) + effectBonus('system.defense.ranged.value');
     systemData.defense.mind.value   = Math.round((systemData.abilities.intelligence.mod + systemData.abilities.wisdom.mod*.3)*1.1) + effectBonus('system.defense.mind.value');
