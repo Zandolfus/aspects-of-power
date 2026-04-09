@@ -1,6 +1,6 @@
 /**
  * Extended TokenDocument for Aspects of Power.
- * Handles movement enforcement via v14's movement API instead of preUpdateToken hooks.
+ * Handles movement enforcement via v14's movement API.
  * @extends {foundry.documents.TokenDocument}
  */
 export class AspectsofPowerToken extends foundry.documents.TokenDocument {
@@ -11,7 +11,6 @@ export class AspectsofPowerToken extends foundry.documents.TokenDocument {
 
   /**
    * Segment movement tracker — cumulative distance within the current action segment.
-   * Resets when a skill consumes an action via game.aspectsofpower.consumeAction().
    * @type {Map<string, number>}
    */
   static _segmentMovement = new Map();
@@ -22,9 +21,7 @@ export class AspectsofPowerToken extends foundry.documents.TokenDocument {
    */
   static _moveActionTracker = new Map();
 
-  /**
-   * Clear all movement trackers (called on turn change).
-   */
+  /** Clear all movement trackers (called on turn change). */
   static clearTrackers() {
     this._segmentMovement.clear();
     this._moveActionTracker.clear();
@@ -49,14 +46,17 @@ export class AspectsofPowerToken extends foundry.documents.TokenDocument {
    * Return false to cancel the movement.
    */
   _preUpdateMovement(movement, operation) {
-    // Exempt: no active combat.
+    // Only enforce during active combat.
     const combat = game.combat;
     if (!combat?.started) return;
+
+    // Only validate once per movement (first segment).
+    // Sub-segments (chain > 0) are part of the same move — let them through.
+    if (movement.chain?.length > 0) return;
 
     const actor = this.actor;
     if (!actor?.system) return;
 
-    // Identify combatant.
     const combatant = combat.combatants.find(
       c => c.tokenId === this.id && c.sceneId === this.parent?.id
     );
@@ -73,7 +73,7 @@ export class AspectsofPowerToken extends foundry.documents.TokenDocument {
     }
 
     // Calculate movement ranges (with chilled reduction).
-    let { walkRange, sprintRange } = this._getMovementRanges(actor);
+    const { walkRange, sprintRange } = this._getMovementRanges(actor);
     if (walkRange <= 0 && sprintRange <= 0) {
       ui.notifications.warn(`${actor.name} is frozen solid! (Chilled overcame Endurance)`);
       return false;
@@ -86,12 +86,7 @@ export class AspectsofPowerToken extends foundry.documents.TokenDocument {
       return false;
     }
 
-    // Only process on the first split (which carries the full movement cost).
-    // Subsequent splits are sub-segments that we don't need to re-check.
-    if (movement.chain?.length > 0) return;
-
-    // Distance from the movement cost (passed = already computed, pending = remaining).
-    // v14 movement cost is already in distance units (feet).
+    // Calculate distance from movement cost (v14 cost is in distance units).
     const totalCost = (movement.passed?.cost ?? 0) + (movement.pending?.cost ?? 0);
     const moveSnapped = Math.round(totalCost / 5) * 5;
     if (moveSnapped <= 0) return;
@@ -116,7 +111,7 @@ export class AspectsofPowerToken extends foundry.documents.TokenDocument {
       return false;
     }
 
-    // Store data for _onUpdateMovement to use.
+    // Store for _onUpdateMovement.
     this._pendingMovement = { combatantId: combatant.id, moveSnapped, newSegmentTotal, staminaCost, sprintRange };
   }
 
@@ -124,9 +119,8 @@ export class AspectsofPowerToken extends foundry.documents.TokenDocument {
    * v14 movement hook: called after a movement commits.
    * Deduct stamina and update segment tracker.
    */
-  async _onUpdateMovement(movement, operation, user) {
+  _onUpdateMovement(movement, operation, user) {
     if (!this._pendingMovement) return;
-    // Only the user who initiated the move should deduct costs.
     if (game.user.id !== user.id) return;
 
     const { combatantId, moveSnapped, newSegmentTotal, staminaCost, sprintRange } = this._pendingMovement;
@@ -135,21 +129,20 @@ export class AspectsofPowerToken extends foundry.documents.TokenDocument {
     const actor = this.actor;
     if (!actor) return;
 
-    // Update tracker.
+    // Update tracker synchronously.
     AspectsofPowerToken._segmentMovement.set(combatantId, newSegmentTotal);
 
-    // Deduct stamina.
-    const newStamina = actor.system.stamina.value - staminaCost;
-    await actor.update({ 'system.stamina.value': newStamina });
-
-    // Chat message.
+    // Deduct stamina and post chat message asynchronously (don't block animation).
     const _isPC = game.users.some(u => !u.isGM && u.active && u.character?.id === actor.id);
     const moveWhisper = _isPC ? {} : { whisper: ChatMessage.getWhisperRecipients('GM') };
-    ChatMessage.create({
-      speaker: ChatMessage.getSpeaker({ actor }),
-      ...moveWhisper,
-      content: `<p><em>${actor.name} moves ${moveSnapped} ft (${newSegmentTotal}/${Math.round(sprintRange)} ft this segment). `
-             + `Stamina: −${staminaCost} (${newStamina}/${actor.system.stamina.max})</em></p>`,
+    Promise.resolve().then(async () => {
+      await actor.update({ 'system.stamina.value': actor.system.stamina.value - staminaCost });
+      ChatMessage.create({
+        speaker: ChatMessage.getSpeaker({ actor }),
+        ...moveWhisper,
+        content: `<p><em>${actor.name} moves ${moveSnapped} ft (${newSegmentTotal}/${Math.round(sprintRange)} ft this segment). `
+               + `Stamina: −${staminaCost} (${actor.system.stamina.value - staminaCost}/${actor.system.stamina.max})</em></p>`,
+      });
     });
   }
 
@@ -157,10 +150,6 @@ export class AspectsofPowerToken extends foundry.documents.TokenDocument {
   /*  Helpers                                     */
   /* -------------------------------------------- */
 
-  /**
-   * Check if the actor has a debuff that blocks movement.
-   * @returns {ActiveEffect|undefined}
-   */
   _getMovementBlocker(actor) {
     const blockTypes = ['root', 'immobilized', 'frozen', 'sleep', 'stun', 'paralysis'];
     return actor.effects.find(e =>
@@ -168,15 +157,10 @@ export class AspectsofPowerToken extends foundry.documents.TokenDocument {
     );
   }
 
-  /**
-   * Get walk/sprint ranges, accounting for chilled debuff.
-   * @returns {{ walkRange: number, sprintRange: number }}
-   */
   _getMovementRanges(actor) {
     let walkRange = actor.system.walkRange ?? 0;
     let sprintRange = actor.system.sprintRange ?? 0;
 
-    // Chilled: reduce ranges.
     const chilledEffect = actor.effects.find(e =>
       !e.disabled && e.flags?.['aspects-of-power']?.debuffType === 'chilled'
     );
