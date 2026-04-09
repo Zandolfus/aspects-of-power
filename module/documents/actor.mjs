@@ -5,8 +5,6 @@
 export class AspectsofPowerActor extends Actor {
   /** @override */
   prepareData() {
-    // Ensure tokenActiveEffectChanges is initialized before AE application (v14 requirement).
-    this.tokenActiveEffectChanges ??= { initial: {}, final: {} };
     super.prepareData();
   }
 

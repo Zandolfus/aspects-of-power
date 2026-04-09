@@ -36,7 +36,10 @@
       "Bash(curl -sL \"https://raw.githubusercontent.com/foundryvtt/crucible/v14/module/documents/_module.mjs\")",
       "Bash(node -e ':*)",
       "Bash(python3 -c ':*)",
-      "Bash(gh issue:*)"
+      "Bash(gh issue:*)",
+      "Bash(cd /tmp)",
+      "WebFetch(domain:api.github.com)",
+      "WebFetch(domain:discord.com)"
     ]
   }
 }
