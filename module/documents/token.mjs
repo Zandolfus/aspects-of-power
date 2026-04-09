@@ -9,34 +9,60 @@ export class AspectsofPowerToken extends foundry.documents.TokenDocument {
   /*  Movement Enforcement                        */
   /* -------------------------------------------- */
 
-  /**
-   * Segment movement tracker — cumulative distance within the current action segment.
-   * @type {Map<string, number>}
-   */
+  /** Cumulative distance within the current action segment. @type {Map<string, number>} */
   static _segmentMovement = new Map();
 
-  /**
-   * Action tracker — how many skill-actions the combatant has used this turn.
-   * @type {Map<string, number>}
-   */
+  /** Skill-actions used this turn. @type {Map<string, number>} */
   static _moveActionTracker = new Map();
 
-  /** Clear all movement trackers (called on turn change). */
+  /** Accumulated stamina cost not yet committed to the database. @type {Map<string, number>} */
+  static _pendingStaminaCost = new Map();
+
+  /** Clear all movement trackers (called on turn change). Flushes pending stamina first. */
   static clearTrackers() {
+    this.flushStamina();
     this._segmentMovement.clear();
     this._moveActionTracker.clear();
   }
 
   /**
    * Consume an action for a combatant and reset their movement segment.
+   * Flushes pending stamina before resetting.
    * @param {string} combatantId
    * @returns {number} New action count.
    */
   static consumeAction(combatantId) {
+    this.flushStamina();
     const used = (this._moveActionTracker.get(combatantId) ?? 0) + 1;
     this._moveActionTracker.set(combatantId, used);
     this._segmentMovement.set(combatantId, 0);
     return used;
+  }
+
+  /**
+   * Commit all pending stamina costs to the database and post chat messages.
+   * Called on turn change, skill use, or any other boundary event.
+   */
+  static async flushStamina() {
+    if (!this._pendingStaminaCost.size) return;
+
+    for (const [actorId, cost] of this._pendingStaminaCost) {
+      if (cost <= 0) continue;
+      const actor = game.actors.get(actorId);
+      if (!actor) continue;
+
+      const newStamina = Math.max(0, actor.system.stamina.value - cost);
+      await actor.update({ 'system.stamina.value': newStamina });
+
+      const _isPC = game.users.some(u => !u.isGM && u.active && u.character?.id === actor.id);
+      const whisper = _isPC ? {} : { whisper: ChatMessage.getWhisperRecipients('GM') };
+      ChatMessage.create({
+        speaker: ChatMessage.getSpeaker({ actor }),
+        ...whisper,
+        content: `<p><em>${actor.name} spent ${cost} stamina on movement (${newStamina}/${actor.system.stamina.max})</em></p>`,
+      });
+    }
+    this._pendingStaminaCost.clear();
   }
 
   /* -------------------------------------------- */
@@ -100,13 +126,15 @@ export class AspectsofPowerToken extends foundry.documents.TokenDocument {
       return false;
     }
 
-    // Check stamina.
+    // Check stamina (account for pending costs not yet committed).
     const stamina = actor.system.stamina;
+    const pendingCost = AspectsofPowerToken._pendingStaminaCost.get(actor.id) ?? 0;
+    const availableStamina = stamina.value - pendingCost;
     let staminaCost = 0;
     for (let ft = segmentSoFar + 5; ft <= newSegmentTotal; ft += 5) {
       staminaCost += (ft <= walkRange) ? 1 : 3;
     }
-    if (staminaCost > stamina.value) {
+    if (staminaCost > availableStamina) {
       ui.notifications.warn('Insufficient stamina to move!');
       return false;
     }
@@ -132,52 +160,16 @@ export class AspectsofPowerToken extends foundry.documents.TokenDocument {
     // Update tracker synchronously.
     AspectsofPowerToken._segmentMovement.set(combatantId, newSegmentTotal);
 
-    // Queue stamina deduction — wait for animation to finish before updating.
-    // Multiple rapid moves accumulate; the timeout resets each time so only
-    // the final deduction fires.
+    // Track stamina cost locally — no database write during movement.
+    // Accumulates in _pendingStaminaCost and commits on turn change or skill use.
     const actorId = actor.id;
-    if (!AspectsofPowerToken._pendingStaminaUpdates) AspectsofPowerToken._pendingStaminaUpdates = new Map();
-    const pending = AspectsofPowerToken._pendingStaminaUpdates.get(actorId) ?? { cost: 0, lastMove: '', sprintRange: 0 };
-    pending.cost += staminaCost;
-    pending.lastMove = `${moveSnapped} ft (${newSegmentTotal}/${Math.round(sprintRange)} ft this segment)`;
-    pending.sprintRange = sprintRange;
-    AspectsofPowerToken._pendingStaminaUpdates.set(actorId, pending);
-
-    clearTimeout(AspectsofPowerToken._staminaTimeout);
-    AspectsofPowerToken._staminaTimeout = setTimeout(() => {
-      this._flushStaminaUpdates();
-    }, 500);
+    const existing = AspectsofPowerToken._pendingStaminaCost.get(actorId) ?? 0;
+    AspectsofPowerToken._pendingStaminaCost.set(actorId, existing + staminaCost);
   }
 
   /* -------------------------------------------- */
   /*  Helpers                                     */
   /* -------------------------------------------- */
-
-  /**
-   * Flush all queued stamina deductions after movement animation settles.
-   */
-  async _flushStaminaUpdates() {
-    const updates = AspectsofPowerToken._pendingStaminaUpdates;
-    if (!updates?.size) return;
-
-    for (const [actorId, pending] of updates) {
-      const actor = game.actors.get(actorId);
-      if (!actor) continue;
-
-      const newStamina = Math.max(0, actor.system.stamina.value - pending.cost);
-      await actor.update({ 'system.stamina.value': newStamina });
-
-      const _isPC = game.users.some(u => !u.isGM && u.active && u.character?.id === actor.id);
-      const moveWhisper = _isPC ? {} : { whisper: ChatMessage.getWhisperRecipients('GM') };
-      ChatMessage.create({
-        speaker: ChatMessage.getSpeaker({ actor }),
-        ...moveWhisper,
-        content: `<p><em>${actor.name} moves ${pending.lastMove}. `
-               + `Stamina: −${pending.cost} (${newStamina}/${actor.system.stamina.max})</em></p>`,
-      });
-    }
-    updates.clear();
-  }
 
   _getMovementBlocker(actor) {
     const blockTypes = ['root', 'immobilized', 'frozen', 'sleep', 'stun', 'paralysis'];
