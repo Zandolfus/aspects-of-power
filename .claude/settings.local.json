@@ -39,7 +39,16 @@
       "Bash(gh issue:*)",
       "Bash(cd /tmp)",
       "WebFetch(domain:api.github.com)",
-      "WebFetch(domain:discord.com)"
+      "WebFetch(domain:discord.com)",
+      "Bash(curl -s \"https://raw.githubusercontent.com/foundryvtt/crucible/v14/module/canvas/token.mjs\")",
+      "Bash(curl -s \"https://raw.githubusercontent.com/foundryvtt/crucible/v14/module/documents/actor.mjs\")",
+      "Bash(curl -s \"https://raw.githubusercontent.com/foundryvtt/crucible/v14/module/models/action.mjs\")",
+      "Bash(curl -s \"https://raw.githubusercontent.com/foundryvtt/crucible/v14/module/config/actions.mjs\")",
+      "Bash(curl -s \"https://api.github.com/repos/foundryvtt/crucible/git/trees/v14?recursive=1\")",
+      "Bash(curl -s \"https://raw.githubusercontent.com/foundryvtt/crucible/v14/module/hooks/action.mjs\")",
+      "Bash(curl -s \"https://raw.githubusercontent.com/foundryvtt/crucible/v14/module/dice/action-use-dialog.mjs\")",
+      "Bash(curl -s \"https://raw.githubusercontent.com/foundryvtt/crucible/v14/_source/talent/Movement_MqZKCMx5KrZQffGU.yml\")",
+      "Bash(curl -s \"https://raw.githubusercontent.com/foundryvtt/crucible/v14/module/const/action.mjs\")"
     ]
   }
 }

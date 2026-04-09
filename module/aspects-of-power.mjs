@@ -1065,6 +1065,182 @@ Hooks.on('deleteCombat', () => AspectsofPowerToken.clearTrackers());
 // Movement enforcement is now handled by AspectsofPowerToken._preUpdateMovement / _onUpdateMovement.
 
 /* -------------------------------------------- */
+/*  Persistent AOE — Token Enters Area          */
+/* -------------------------------------------- */
+
+/**
+ * When a token moves into a persistent AOE template/region, apply the
+ * stored effects to the entering token.
+ * Only the GM executes to avoid duplicate applications.
+ * Tracks affected tokens per round to prevent re-triggering on movement within the area.
+ */
+Hooks.on('updateToken', async (tokenDoc, changes, _options, _userId) => {
+  if (!game.user.isGM) return;
+  if (!('x' in changes) && !('y' in changes)) return;
+
+  const token = tokenDoc.object;
+  if (!token) return;
+  const center = token.center;
+
+  // Check all persistent AOE templates/regions on the scene.
+  const collection = canvas.scene.regions ?? canvas.scene.templates;
+  if (!collection) return;
+
+  for (const doc of collection) {
+    const flags = doc.flags?.['aspects-of-power'];
+    if (!flags?.persistent || !flags.persistentData) continue;
+
+    const pd = flags.persistentData;
+
+    // Already affected this round?
+    if ((pd.affectedTokens ?? []).includes(tokenDoc.id)) continue;
+
+    // Check containment — use region or template testPoint.
+    const obj = doc.object ?? canvas.templates?.get(doc.id);
+    if (!obj) continue;
+
+    let inside = false;
+    if (obj.testPoint) {
+      inside = obj.testPoint(center);
+    } else if (obj.shape) {
+      const localX = center.x - doc.x;
+      const localY = center.y - doc.y;
+      inside = obj.shape.contains(localX, localY);
+    }
+    if (!inside) continue;
+
+    // Disposition filter.
+    const tokenDisp = tokenDoc.disposition;
+    const casterDisp = pd.casterDisposition ?? CONST.TOKEN_DISPOSITIONS.NEUTRAL;
+    if (pd.targetingMode === 'enemies') {
+      if (casterDisp === CONST.TOKEN_DISPOSITIONS.FRIENDLY && tokenDisp !== CONST.TOKEN_DISPOSITIONS.HOSTILE) continue;
+      if (casterDisp === CONST.TOKEN_DISPOSITIONS.HOSTILE && tokenDisp !== CONST.TOKEN_DISPOSITIONS.FRIENDLY) continue;
+      if (casterDisp === CONST.TOKEN_DISPOSITIONS.NEUTRAL) continue;
+    } else if (pd.targetingMode === 'allies') {
+      if (tokenDisp !== casterDisp) continue;
+    }
+
+    // Mark as affected.
+    const newAffected = [...(pd.affectedTokens ?? []), tokenDoc.id];
+    await doc.update({ 'flags.aspects-of-power.persistentData.affectedTokens': newAffected });
+
+    // Apply effects via GM action.
+    const casterActor = await fromUuid(flags.casterActorUuid);
+    const targetActor = tokenDoc.actor;
+    if (!casterActor || !targetActor) continue;
+
+    const speaker = ChatMessage.getSpeaker({ actor: casterActor });
+    const rollTotal = pd.rollTotal ?? 0;
+    const hitTotal = pd.hitTotal ?? 0;
+
+    // Apply each tag from the stored persistent data.
+    for (const tag of (pd.tags ?? [])) {
+      if (tag === 'debuff' && pd.tagConfig?.debuffType && pd.tagConfig.debuffType !== 'none') {
+        // Build debuff effect data.
+        const debuffType = pd.tagConfig.debuffType;
+        const duration = pd.tagConfig.debuffDuration ?? 1;
+        const entries = (pd.tagConfig.debuffEntries ?? []).map(e => ({
+          key: `system.${e.attribute}.value`,
+          type: 'add',
+          value: -Math.round(rollTotal * (e.value || 1)),
+        }));
+        const dealsDmg = pd.tagConfig.debuffDealsDamage ?? false;
+        const dotType = pd.tagConfig.debuffDamageType ?? pd.damageType;
+
+        const effectData = {
+          name: `AOE: ${debuffType}`,
+          img: 'icons/svg/hazard.svg',
+          origin: flags.casterActorUuid,
+          'duration.rounds': duration,
+          'duration.startRound': game.combat?.round ?? 0,
+          'duration.startTurn': game.combat?.turn ?? 0,
+          disabled: false,
+          changes: entries,
+          flags: {
+            'aspects-of-power': {
+              debuffDamage: rollTotal,
+              debuffType,
+              casterActorUuid: flags.casterActorUuid,
+              ...(dealsDmg ? { dot: true, dotDamage: rollTotal, dotDamageType: dotType, applierActorUuid: flags.casterActorUuid } : {}),
+            },
+          },
+        };
+
+        await AspectsofPowerItem.executeGmAction({
+          type: 'gmApplyDebuff',
+          targetActorUuid: targetActor.uuid,
+          effectName: effectData.name,
+          originUuid: flags.casterActorUuid,
+          effectData,
+          duration,
+          stackable: pd.tagConfig.debuffStackable ?? false,
+          statSummary: entries.map(e => `${e.key.replace('system.', '').replace('.value', '')} ${e.value}`).join(', '),
+          speaker,
+        });
+      }
+
+      if (tag === 'attack' && rollTotal > 0) {
+        // Direct damage from persistent AOE.
+        ChatMessage.create({
+          whisper: ChatMessage.getWhisperRecipients('GM'),
+          content: `<p><strong>${targetActor.name}</strong> enters AOE zone — `
+                 + `<strong>${rollTotal}</strong> ${pd.damageType} damage incoming.</p>`
+                 + `<button class="apply-damage" data-actor-uuid="${targetActor.uuid}" `
+                 + `data-damage="${rollTotal}" data-toughness="${targetActor.system.abilities?.toughness?.mod ?? 0}" `
+                 + `data-damage-type="${pd.damageType}" data-affinity-dr="0">Apply Damage</button>`,
+        });
+      }
+
+      if (tag === 'buff' && (pd.tagConfig?.buffEntries ?? []).length > 0) {
+        const changes = pd.tagConfig.buffEntries.map(e => ({
+          key: `system.${e.attribute}.value`,
+          type: 'add',
+          value: Math.round(rollTotal * (e.value || 1)),
+        }));
+        await AspectsofPowerItem.executeGmAction({
+          type: 'gmApplyBuff',
+          targetActorUuid: targetActor.uuid,
+          effectName: `AOE Buff`,
+          originUuid: flags.casterActorUuid,
+          changes,
+          duration: pd.tagConfig.buffDuration ?? 1,
+          stackable: pd.tagConfig.buffStackable ?? false,
+          img: 'icons/svg/aura.svg',
+          speaker,
+        });
+      }
+    }
+
+    ChatMessage.create({
+      whisper: ChatMessage.getWhisperRecipients('GM'),
+      content: `<p><strong>${targetActor.name}</strong> entered persistent AOE area.</p>`,
+    });
+  }
+});
+
+/**
+ * Reset affected token lists on persistent AOEs at the start of each round.
+ * This allows tokens to be re-affected if they stay in the zone.
+ */
+Hooks.on('combatTurnChange', async (combat, _prior, current) => {
+  if (!game.user.isGM) return;
+
+  // Only reset on round change (turn 0).
+  if (current.turn !== 0) return;
+
+  const collection = canvas.scene.regions ?? canvas.scene.templates;
+  if (!collection) return;
+
+  for (const doc of collection) {
+    const flags = doc.flags?.['aspects-of-power'];
+    if (!flags?.persistent || !flags.persistentData) continue;
+    if ((flags.persistentData.affectedTokens ?? []).length > 0) {
+      await doc.update({ 'flags.aspects-of-power.persistentData.affectedTokens': [] });
+    }
+  }
+});
+
+/* -------------------------------------------- */
 /*  Apply Damage Button — GM Whisper            */
 /* -------------------------------------------- */
 

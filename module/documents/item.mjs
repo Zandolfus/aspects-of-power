@@ -1416,6 +1416,18 @@ export class AspectsofPowerItem extends Item {
             skillItemUuid: this.uuid,
             templateDuration: aoe.templateDuration,
             placedRound: game.combat?.round ?? 0,
+            // Persistent AOE: store effect data so entering tokens can be affected.
+            persistent: (aoe.templateDuration ?? 0) > 0,
+            persistentData: (aoe.templateDuration ?? 0) > 0 ? {
+              tags: this.system.tags ?? [],
+              tagConfig: this.system.tagConfig ?? {},
+              rollTotal: null, // set after roll evaluation
+              hitTotal: null,
+              damageType: this.system.roll?.damageType ?? 'physical',
+              targetingMode: aoe.targetingMode ?? 'all',
+              casterDisposition: this.actor.getActiveTokens()?.[0]?.document?.disposition ?? CONST.TOKEN_DISPOSITIONS.NEUTRAL,
+              affectedTokens: [], // token IDs already affected this round
+            } : null,
           },
         };
 
@@ -1887,6 +1899,15 @@ export class AspectsofPowerItem extends Item {
       const templateDoc = await this._placeAoeTemplate(casterToken);
       if (!templateDoc) return dmgRoll;
 
+      // Store roll totals on persistent AOE templates for later trigger.
+      const persistFlags = templateDoc.flags?.['aspects-of-power'];
+      if (persistFlags?.persistent && persistFlags.persistentData) {
+        await templateDoc.update({
+          'flags.aspects-of-power.persistentData.rollTotal': Math.round(dmgRoll.total),
+          'flags.aspects-of-power.persistentData.hitTotal': hitRoll ? Math.round(hitRoll.total) : null,
+        });
+      }
+
       // Detect qualifying tokens.
       const targets = this._getAoeTargets(templateDoc);
       if (targets.length === 0) {
@@ -1941,6 +1962,12 @@ export class AspectsofPowerItem extends Item {
 
       // Execute chained skills after all parent tags have resolved.
       await this._executeChainedSkills(hitResults, targets, speaker, rollMode);
+
+      // Mark initial targets as affected on persistent AOEs.
+      if (persistFlags?.persistent) {
+        const affectedIds = targets.map(t => t.id);
+        await templateDoc.update({ 'flags.aspects-of-power.persistentData.affectedTokens': affectedIds });
+      }
 
       // Deduct resource cost AFTER effects are applied.
       // Barrier skills defer cost deduction to executeGmAction (after target accepts).
