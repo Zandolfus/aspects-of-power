@@ -604,7 +604,7 @@
 
 /* Legacy overhealth/barrier styles removed — now using resource-bar-row layout */
 .aspects-of-power .items-header {
-  height: 28px;
+  height: 22px;
   margin: 2px 0;
   padding: 0;
   align-items: center;
@@ -613,7 +613,7 @@
   font-weight: bold;
 }
 .aspects-of-power .items-header > * {
-  font-size: 14px;
+  font-size: 12px;
   text-align: center;
 }
 .aspects-of-power .items-header .item-name {
@@ -640,7 +640,7 @@
   flex: 2;
   margin: 0;
   overflow: hidden;
-  font-size: 13px;
+  font-size: 12px;
   text-align: left;
   align-items: center;
   display: flex;
@@ -649,6 +649,7 @@
   margin: 0;
   white-space: nowrap;
   overflow-x: hidden;
+  font-size: 12px;
 }
 .aspects-of-power .items-list .item-controls {
   display: flex;
@@ -662,8 +663,9 @@
 }
 .aspects-of-power .items-list .item {
   align-items: center;
-  padding: 0 2px;
+  padding: 1px 2px;
   border-bottom: 1px solid #c9c7b8;
+  line-height: 1.2;
 }
 .aspects-of-power .items-list .item:last-child {
   border-bottom: none;
@@ -672,11 +674,15 @@
   color: #191813;
 }
 .aspects-of-power .items-list .item .item-name .item-image {
-  flex: 0 0 30px;
-  height: 30px;
-  background-size: 30px;
+  flex: 0 0 20px;
+  height: 20px;
+  background-size: 20px;
   border: none;
-  margin-right: 5px;
+  margin-right: 4px;
+}
+.aspects-of-power .items-list .item .item-name .item-image img {
+  width: 20px;
+  height: 20px;
 }
 .aspects-of-power .items-list .item-prop {
   text-align: center;
