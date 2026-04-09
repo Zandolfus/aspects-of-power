@@ -282,16 +282,17 @@ Hooks.once('init', function () {
   };
 
   // ── Folder context menu: Set Disposition ──
-  Hooks.on('getFolderContext', (html, contextOptions) => {
-    contextOptions.push({
+  Hooks.on('getFolderContextOptions', (application, menuItems) => {
+    menuItems.push({
       name: 'Set Disposition',
       icon: '<i class="fas fa-handshake"></i>',
-      condition: (li) => {
-        const folder = game.folders.get(li.dataset.folderId);
+      condition: (target) => {
+        const folderId = target.dataset.folderId ?? target.closest('[data-folder-id]')?.dataset.folderId;
+        const folder = game.folders.get(folderId);
         return game.user.isGM && folder?.type === 'Actor';
       },
-      callback: async (li) => {
-        const folderId = li.dataset.folderId;
+      callback: async (target) => {
+        const folderId = target.dataset.folderId ?? target.closest('[data-folder-id]')?.dataset.folderId;
         const folder = game.folders.get(folderId);
         if (!folder) return;
 

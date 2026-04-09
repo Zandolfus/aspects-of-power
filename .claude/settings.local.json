@@ -35,7 +35,8 @@
       "Bash(curl -sL \"https://raw.githubusercontent.com/foundryvtt/crucible/v14/module/models/combat-exploration.mjs\")",
       "Bash(curl -sL \"https://raw.githubusercontent.com/foundryvtt/crucible/v14/module/documents/_module.mjs\")",
       "Bash(node -e ':*)",
-      "Bash(python3 -c ':*)"
+      "Bash(python3 -c ':*)",
+      "Bash(gh issue:*)"
     ]
   }
 }
