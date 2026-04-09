@@ -269,8 +269,8 @@ Hooks.once('init', function () {
       },
       buttons: [{
         action: 'apply', label: 'Apply', icon: 'fas fa-check', default: true,
-        callback: async (event, button, dialog) => {
-          const form = dialog.querySelector('form');
+        callback: async (event, button) => {
+          const form = button.closest('.dialog-v2')?.querySelector('form') ?? button.form;
           const scope = form.querySelector('[name="scope"]').value;
           const disposition = Number(form.querySelector('[name="disposition"]').value);
           const folderId = form.querySelector('[name="folderId"]')?.value;
@@ -312,8 +312,9 @@ Hooks.once('init', function () {
             <select name="disposition">${dispOptions}</select></div></form>`,
           buttons: [{
             action: 'apply', label: 'Apply', icon: 'fas fa-check', default: true,
-            callback: async (event, button, dialog) => {
-              const disposition = Number(dialog.querySelector('[name="disposition"]').value);
+            callback: async (event, button) => {
+              const form = button.closest('.dialog-v2')?.querySelector('form') ?? button.form;
+              const disposition = Number(form.querySelector('[name="disposition"]').value);
               await game.aspectsofpower.setDisposition({ scope: 'folder', folderId, disposition });
             },
           }, { action: 'cancel', label: 'Cancel' }],
