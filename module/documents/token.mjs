@@ -86,8 +86,13 @@ export class AspectsofPowerToken extends foundry.documents.TokenDocument {
       return false;
     }
 
-    // Calculate move distance from pending waypoints.
-    const costFeet = (movement.pending?.cost ?? 0) * canvas.grid.distance;
+    // Only process on the first split (which carries the full movement cost).
+    // Subsequent splits are sub-segments that we don't need to re-check.
+    if (movement.chain?.length > 0) return;
+
+    // Distance from the movement cost (passed = already computed, pending = remaining).
+    const totalCost = (movement.passed?.cost ?? 0) + (movement.pending?.cost ?? 0);
+    const costFeet = totalCost * canvas.grid.distance;
     const moveSnapped = Math.round(costFeet / 5) * 5;
     if (moveSnapped <= 0) return;
 
@@ -121,7 +126,8 @@ export class AspectsofPowerToken extends foundry.documents.TokenDocument {
    */
   async _onUpdateMovement(movement, operation, user) {
     if (!this._pendingMovement) return;
-    if (!game.user.isGM && game.user.id !== user.id) return;
+    // Only the user who initiated the move should deduct costs.
+    if (game.user.id !== user.id) return;
 
     const { combatantId, moveSnapped, newSegmentTotal, staminaCost, sprintRange } = this._pendingMovement;
     delete this._pendingMovement;
