@@ -91,9 +91,9 @@ export class AspectsofPowerToken extends foundry.documents.TokenDocument {
     if (movement.chain?.length > 0) return;
 
     // Distance from the movement cost (passed = already computed, pending = remaining).
+    // v14 movement cost is already in distance units (feet).
     const totalCost = (movement.passed?.cost ?? 0) + (movement.pending?.cost ?? 0);
-    const costFeet = totalCost * canvas.grid.distance;
-    const moveSnapped = Math.round(costFeet / 5) * 5;
+    const moveSnapped = Math.round(totalCost / 5) * 5;
     if (moveSnapped <= 0) return;
 
     // Cumulative segment check.
