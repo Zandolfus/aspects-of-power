@@ -9,14 +9,19 @@ export class AspectsofPowerActor extends Actor {
   }
 
   /** @override */
-  prepareEmbeddedDocuments() {
-    // v14: tokenActiveEffectChanges must exist before applyActiveEffects is called.
-    // Core doesn't always initialize it for synthetic token actors.
+  applyActiveEffects(phase) {
+    // v14: initialize tokenActiveEffectChanges if core hasn't yet (synthetic actors).
     const phases = CONFIG.ActiveEffect.phases ?? { initial: {}, final: {} };
     this.tokenActiveEffectChanges ??= Object.fromEntries(
       Object.keys(phases).map(p => [p, []])
     );
-    super.prepareEmbeddedDocuments();
+
+    // Skip core's default mergeObject-based application — we process all
+    // effect changes manually in prepareDerivedData using our own contribution
+    // breakdown (equipment caps, blessing multipliers, titles, etc.).
+    // Core's default would crash on our leaf-value change keys (e.g.
+    // system.abilities.strength.value) because v14 deserializes values as
+    // primitives and mergeObject expects objects.
   }
 
   /** @override */
