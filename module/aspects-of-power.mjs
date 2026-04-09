@@ -173,10 +173,11 @@ Hooks.once('init', function () {
 
   // ── Mass Disposition Tool ──
   /**
-   * Change disposition of multiple tokens at once.
+   * Change disposition of multiple tokens/actors at once.
    * Call with no args to open a dialog, or pass options directly.
    * @param {object} [opts]
-   * @param {'selected'|'scene'} [opts.scope='selected']
+   * @param {'selected'|'scene'|'folder'} [opts.scope='selected']
+   * @param {string} [opts.folderId] — required when scope is 'folder'
    * @param {number} [opts.disposition] — CONST.TOKEN_DISPOSITIONS value
    */
   game.aspectsofpower.setDisposition = async function (opts) {
@@ -190,6 +191,35 @@ Hooks.once('init', function () {
     };
 
     if (opts?.disposition !== undefined) {
+      if (opts.scope === 'folder') {
+        // Update prototype token disposition on all actors in the folder (recursive).
+        const folder = game.folders.get(opts.folderId);
+        if (!folder) { ui.notifications.warn('Folder not found.'); return; }
+        const actors = folder.contents.filter(a => a.type === 'character' || a.type === 'npc');
+        // Also include subfolders.
+        const collectActors = (f) => {
+          let result = [...f.contents.filter(a => a.documentName === 'Actor')];
+          for (const sub of f.getSubfolders()) result = result.concat(collectActors(sub));
+          return result;
+        };
+        const allActors = collectActors(folder);
+        if (allActors.length === 0) { ui.notifications.warn('No actors in folder.'); return; }
+        for (const actor of allActors) {
+          await actor.update({ 'prototypeToken.disposition': opts.disposition });
+        }
+        // Also update any placed tokens from these actors on the current scene.
+        if (canvas.scene) {
+          const actorIds = new Set(allActors.map(a => a.id));
+          const sceneTokens = canvas.scene.tokens.filter(t => actorIds.has(t.actorId));
+          if (sceneTokens.length > 0) {
+            const updates = sceneTokens.map(t => ({ _id: t.id, disposition: opts.disposition }));
+            await canvas.scene.updateEmbeddedDocuments('Token', updates);
+          }
+        }
+        ui.notifications.info(`Set ${allActors.length} actor(s) to ${dispositions[opts.disposition]} (prototype + scene tokens).`);
+        return;
+      }
+
       const tokens = opts.scope === 'scene'
         ? canvas.tokens.placeables.map(t => t.document)
         : canvas.tokens.controlled.map(t => t.document);
@@ -200,7 +230,12 @@ Hooks.once('init', function () {
       return;
     }
 
-    // Dialog mode.
+    // Dialog mode — build folder options.
+    const folderOptions = game.folders
+      .filter(f => f.type === 'Actor')
+      .map(f => `<option value="${f.id}">${f.name}</option>`)
+      .join('');
+
     const dispOptions = Object.entries(dispositions).map(([val, label]) =>
       `<option value="${val}">${label}</option>`
     ).join('');
@@ -210,7 +245,11 @@ Hooks.once('init', function () {
         <select name="scope">
           <option value="selected">Selected Tokens</option>
           <option value="scene">All Tokens on Scene</option>
+          <option value="folder">Actor Folder</option>
         </select>
+      </div>
+      <div class="form-group folder-select" style="display:none"><label>Folder</label>
+        <select name="folderId">${folderOptions}</select>
       </div>
       <div class="form-group"><label>Disposition</label>
         <select name="disposition">${dispOptions}</select>
@@ -220,18 +259,68 @@ Hooks.once('init', function () {
     await foundry.applications.api.DialogV2.wait({
       window: { title: 'Set Token Disposition' },
       content,
+      render: (event, dialog) => {
+        const form = dialog.querySelector('form');
+        const scopeSelect = form.querySelector('[name="scope"]');
+        const folderGroup = form.querySelector('.folder-select');
+        scopeSelect.addEventListener('change', () => {
+          folderGroup.style.display = scopeSelect.value === 'folder' ? '' : 'none';
+        });
+      },
       buttons: [{
         action: 'apply', label: 'Apply', icon: 'fas fa-check', default: true,
         callback: async (event, button, dialog) => {
           const form = dialog.querySelector('form');
           const scope = form.querySelector('[name="scope"]').value;
           const disposition = Number(form.querySelector('[name="disposition"]').value);
-          await game.aspectsofpower.setDisposition({ scope, disposition });
+          const folderId = form.querySelector('[name="folderId"]')?.value;
+          await game.aspectsofpower.setDisposition({ scope, disposition, folderId });
         },
       }, { action: 'cancel', label: 'Cancel' }],
       close: () => null,
     });
   };
+
+  // ── Folder context menu: Set Disposition ──
+  Hooks.on('getFolderContext', (html, contextOptions) => {
+    contextOptions.push({
+      name: 'Set Disposition',
+      icon: '<i class="fas fa-handshake"></i>',
+      condition: (li) => {
+        const folder = game.folders.get(li.dataset.folderId);
+        return game.user.isGM && folder?.type === 'Actor';
+      },
+      callback: async (li) => {
+        const folderId = li.dataset.folderId;
+        const folder = game.folders.get(folderId);
+        if (!folder) return;
+
+        const dispositions = {
+          [CONST.TOKEN_DISPOSITIONS.SECRET]:  'Secret',
+          [CONST.TOKEN_DISPOSITIONS.HOSTILE]:  'Hostile',
+          [CONST.TOKEN_DISPOSITIONS.NEUTRAL]:  'Neutral',
+          [CONST.TOKEN_DISPOSITIONS.FRIENDLY]: 'Friendly',
+        };
+        const dispOptions = Object.entries(dispositions).map(([val, label]) =>
+          `<option value="${val}">${label}</option>`
+        ).join('');
+
+        await foundry.applications.api.DialogV2.wait({
+          window: { title: `Set Disposition — ${folder.name}` },
+          content: `<form><div class="form-group"><label>Disposition</label>
+            <select name="disposition">${dispOptions}</select></div></form>`,
+          buttons: [{
+            action: 'apply', label: 'Apply', icon: 'fas fa-check', default: true,
+            callback: async (event, button, dialog) => {
+              const disposition = Number(dialog.querySelector('[name="disposition"]').value);
+              await game.aspectsofpower.setDisposition({ scope: 'folder', folderId, disposition });
+            },
+          }, { action: 'cancel', label: 'Cancel' }],
+          close: () => null,
+        });
+      },
+    });
+  });
 
   // Initialize the equipment system hooks.
   EquipmentSystem.initialize();
