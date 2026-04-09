@@ -74,8 +74,8 @@ export class AspectsofPowerActor extends Actor {
         const k = match[1];
         if (e.flags?.aspectsofpower?.effectType === 'equipment')        contributions[k].equipment += val;
         else if (e.flags?.aspectsofpower?.effectCategory === 'blessing') {
-          if (c.mode === 1) contributions[k].blessingMultiplier *= val; // MULTIPLY
-          else              contributions[k].blessingAdd += val;        // ADD
+          if (c.type === 'multiply') contributions[k].blessingMultiplier *= val;
+          else                       contributions[k].blessingAdd += val;
         }
         else if (e.flags?.aspectsofpower?.effectCategory === 'title')    contributions[k].title += val;
         else                                                              contributions[k].other += val;

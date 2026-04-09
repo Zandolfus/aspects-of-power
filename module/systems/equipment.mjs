@@ -118,7 +118,7 @@ export class EquipmentSystem {
       if (!bonus.ability || !bonus.value) continue;
       changes.push({
         key: `system.abilities.${bonus.ability}.value`,
-        mode: 2, // CONST.ACTIVE_EFFECT_MODES.ADD
+        type: 'add',
         value: String(bonus.value),
         priority: 20,
       });

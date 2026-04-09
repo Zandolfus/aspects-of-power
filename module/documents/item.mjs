@@ -718,7 +718,7 @@ export class AspectsofPowerItem extends Item {
             // Stackable: merge new values into the existing effect's changes.
             const merged = [...(existing.changes ?? [])].map(c => ({ ...c }));
             for (const incoming of payload.changes) {
-              const match = merged.find(m => m.key === incoming.key && m.mode === incoming.mode);
+              const match = merged.find(m => m.key === incoming.key && m.type === incoming.type);
               if (match) {
                 match.value = Number(match.value) + Number(incoming.value);
               } else {
@@ -824,7 +824,7 @@ export class AspectsofPowerItem extends Item {
             // Merge stat changes: add incoming values to matching keys.
             const merged = [...(existing.changes ?? [])].map(c => ({ ...c }));
             for (const incoming of (payload.effectData.changes ?? [])) {
-              const match = merged.find(m => m.key === incoming.key && m.mode === incoming.mode);
+              const match = merged.find(m => m.key === incoming.key && m.type === incoming.type);
               if (match) {
                 match.value = Number(match.value) + Number(incoming.value);
               } else {
@@ -1100,7 +1100,7 @@ export class AspectsofPowerItem extends Item {
 
     const changes = entries.map(e => ({
       key:   `system.${e.attribute}.value`,
-      mode:  CONST.ACTIVE_EFFECT_MODES.ADD,
+      type:  'add',
       value: Math.round(rollTotal * (e.value || 1)),
     }));
 
@@ -1141,7 +1141,7 @@ export class AspectsofPowerItem extends Item {
     // Build stat-reduction changes (roll-based).
     const changes = entries.map(e => ({
       key:   `system.${e.attribute}.value`,
-      mode:  CONST.ACTIVE_EFFECT_MODES.ADD,
+      type:  'add',
       value: -Math.round(rollTotal * (e.value || 1)),
     }));
 
@@ -1585,7 +1585,7 @@ export class AspectsofPowerItem extends Item {
         if (sys.buff.entries.length > 0 && targetActor) {
           const changes = sys.buff.entries.map(e => ({
             key: `system.${e.attribute}.value`,
-            mode: CONST.ACTIVE_EFFECT_MODES.ADD,
+            type: 'add',
             value: e.value,
           }));
           const effectName = `${this.name} (Consumable)`;
