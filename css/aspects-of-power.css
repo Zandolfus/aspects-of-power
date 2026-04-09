@@ -649,7 +649,7 @@
   margin: 0;
   white-space: nowrap;
   overflow-x: hidden;
-  font-size: 14px;
+  font-size: 18px;
 }
 .aspects-of-power .items-list .item-controls {
   display: flex;
@@ -663,9 +663,9 @@
 }
 .aspects-of-power .items-list .item {
   align-items: center;
-  padding: 1px 2px;
+  padding: 2px 2px;
   border-bottom: 1px solid #c9c7b8;
-  line-height: 1.2;
+  min-height: 28px;
 }
 .aspects-of-power .items-list .item:last-child {
   border-bottom: none;
@@ -674,15 +674,15 @@
   color: #191813;
 }
 .aspects-of-power .items-list .item .item-name .item-image {
-  flex: 0 0 20px;
-  height: 20px;
-  background-size: 20px;
+  flex: 0 0 24px;
+  height: 24px;
+  background-size: 24px;
   border: none;
   margin-right: 4px;
 }
 .aspects-of-power .items-list .item .item-name .item-image img {
-  width: 20px;
-  height: 20px;
+  width: 24px;
+  height: 24px;
 }
 .aspects-of-power .items-list .item-prop {
   text-align: center;
