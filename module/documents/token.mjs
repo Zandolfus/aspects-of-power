@@ -40,7 +40,8 @@ export class AspectsofPowerToken extends foundry.documents.TokenDocument {
   }
 
   /**
-   * Commit all pending stamina costs to the database and post chat messages.
+   * Persist pending stamina costs to the database and post chat messages.
+   * In-memory values are already correct — this syncs the database + other clients.
    * Called on turn change, skill use, or any other boundary event.
    */
   static async flushStamina() {
@@ -51,15 +52,15 @@ export class AspectsofPowerToken extends foundry.documents.TokenDocument {
       const actor = game.actors.get(actorId);
       if (!actor) continue;
 
-      const newStamina = Math.max(0, actor.system.stamina.value - cost);
-      await actor.update({ 'system.stamina.value': newStamina });
+      // In-memory value already subtracted — just persist it.
+      await actor.update({ 'system.stamina.value': actor.system.stamina.value });
 
       const _isPC = game.users.some(u => !u.isGM && u.active && u.character?.id === actor.id);
       const whisper = _isPC ? {} : { whisper: ChatMessage.getWhisperRecipients('GM') };
       ChatMessage.create({
         speaker: ChatMessage.getSpeaker({ actor }),
         ...whisper,
-        content: `<p><em>${actor.name} spent ${cost} stamina on movement (${newStamina}/${actor.system.stamina.max})</em></p>`,
+        content: `<p><em>${actor.name} spent ${cost} stamina on movement (${actor.system.stamina.value}/${actor.system.stamina.max})</em></p>`,
       });
     }
     this._pendingStaminaCost.clear();
@@ -126,15 +127,13 @@ export class AspectsofPowerToken extends foundry.documents.TokenDocument {
       return false;
     }
 
-    // Check stamina (account for pending costs not yet committed).
+    // Check stamina (in-memory value already reflects pending movement costs).
     const stamina = actor.system.stamina;
-    const pendingCost = AspectsofPowerToken._pendingStaminaCost.get(actor.id) ?? 0;
-    const availableStamina = stamina.value - pendingCost;
     let staminaCost = 0;
     for (let ft = segmentSoFar + 5; ft <= newSegmentTotal; ft += 5) {
       staminaCost += (ft <= walkRange) ? 1 : 3;
     }
-    if (staminaCost > availableStamina) {
+    if (staminaCost > stamina.value) {
       ui.notifications.warn('Insufficient stamina to move!');
       return false;
     }
@@ -145,7 +144,8 @@ export class AspectsofPowerToken extends foundry.documents.TokenDocument {
 
   /**
    * v14 movement hook: called after a movement commits.
-   * Deduct stamina and update segment tracker.
+   * Mutates stamina in-memory for instant feedback, no database write.
+   * Actual persist happens on skill use or turn change via flushStamina().
    */
   _onUpdateMovement(movement, operation, user) {
     if (!this._pendingMovement) return;
@@ -157,14 +157,19 @@ export class AspectsofPowerToken extends foundry.documents.TokenDocument {
     const actor = this.actor;
     if (!actor) return;
 
-    // Update tracker synchronously.
+    // Update segment tracker.
     AspectsofPowerToken._segmentMovement.set(combatantId, newSegmentTotal);
 
-    // Track stamina cost locally — no database write during movement.
-    // Accumulates in _pendingStaminaCost and commits on turn change or skill use.
-    const actorId = actor.id;
-    const existing = AspectsofPowerToken._pendingStaminaCost.get(actorId) ?? 0;
-    AspectsofPowerToken._pendingStaminaCost.set(actorId, existing + staminaCost);
+    // Mutate stamina in-memory — no actor.update(), no prepareData().
+    actor._source.system.stamina.value -= staminaCost;
+    actor.system.stamina.value -= staminaCost;
+
+    // Track total pending cost for flushStamina() to persist later.
+    const existing = AspectsofPowerToken._pendingStaminaCost.get(actor.id) ?? 0;
+    AspectsofPowerToken._pendingStaminaCost.set(actor.id, existing + staminaCost);
+
+    // Lightweight sheet refresh (no full re-render).
+    if (actor.sheet?.rendered) actor.sheet.render(false);
   }
 
   /* -------------------------------------------- */

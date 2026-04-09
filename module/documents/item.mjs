@@ -1800,6 +1800,10 @@ export class AspectsofPowerItem extends Item {
       }
     }
 
+    // Flush any pending stamina costs from movement so resource checks are accurate.
+    const TokenClass = CONFIG.Token.documentClass;
+    if (TokenClass?.flushStamina) await TokenClass.flushStamina();
+
     // Build formulas (also populates rollData.roll.abilitymod and resourcevalue).
     const { hitFormula, dmgFormula } = this._buildRollFormulas(rollData);
 
