@@ -1,6 +1,7 @@
 // Import document classes.
 import { AspectsofPowerActor } from './documents/actor.mjs';
 import { AspectsofPowerItem } from './documents/item.mjs';
+import { AspectsofPowerToken } from './documents/token.mjs';
 // Import sheet classes.
 import { AspectsofPowerActorSheet } from './sheets/actor-sheet.mjs';
 import { AspectsofPowerItemSheet } from './sheets/item-sheet.mjs';
@@ -33,23 +34,7 @@ function _isPlayerCharacter(actor) {
 /*  Movement Distance Tracker (per combat turn) */
 /* -------------------------------------------- */
 
-/**
- * Tracks cumulative movement distance (in feet) per combatant for the
- * current movement segment.  A "segment" is the window between two skill
- * uses (or between turn-start and the first skill use).  The segment
- * distance is capped at sprintRange.
- *
- * Key: combatant ID, Value: feet moved in the current segment.
- * Reset when a skill is used (bumping the action counter) or when a new
- * turn starts.
- */
-const _segmentMovement = new Map();
-
-/**
- * Tracks how many skill actions a combatant has used this turn (max 3).
- * Movement itself does NOT consume an action — only skill rolls do.
- */
-const _moveActionTracker = new Map();
+// Movement trackers are now on AspectsofPowerToken (module/documents/token.mjs).
 
 /* -------------------------------------------- */
 /*  Debuff Helpers                              */
@@ -111,10 +96,7 @@ Hooks.once('init', function () {
         c => c.tokenId === token.id && c.sceneId === token.document.parent?.id
       );
       if (!combatant) return null;
-      const used = (_moveActionTracker.get(combatant.id) ?? 0) + 1;
-      _moveActionTracker.set(combatant.id, used);
-      _segmentMovement.set(combatant.id, 0); // reset segment for next move
-      return used;
+      return AspectsofPowerToken.consumeAction(combatant.id);
     },
   };
 
@@ -144,6 +126,10 @@ Hooks.once('init', function () {
   // Define custom Document classes
   CONFIG.Actor.documentClass = AspectsofPowerActor;
   CONFIG.Item.documentClass = AspectsofPowerItem;
+  CONFIG.Token.documentClass = AspectsofPowerToken;
+
+  // v14: auto-delete ActiveEffects when their duration expires.
+  CONFIG.ActiveEffect.expiryAction = 'delete';
 
   // Register TypeDataModel classes — these replace template.json schema definitions
   CONFIG.Actor.dataModels = {
@@ -779,16 +765,7 @@ Hooks.on('combatTurnChange', async (combat, _prior, current) => {
       const newProgress = previousProgress + breakRoll.total;
 
       if (newProgress >= rollTotal) {
-        // Broke free!
-        // Remove Foundry blind status if breaking free of blind.
-        if (debuffType === 'blind') {
-          const tokens = actor.getActiveTokens();
-          for (const t of tokens) {
-            if (t.document.hasStatusEffect('blind')) {
-              await t.document.toggleActiveEffect({ id: 'blind', name: 'Blind', img: 'icons/svg/blind.svg' }, { active: false });
-            }
-          }
-        }
+        // Broke free! Delete triggers deleteActiveEffect hook for blind cleanup.
         await effect.delete();
         await breakRoll.toMessage({
           speaker, ...gmWhisper,
@@ -867,50 +844,34 @@ Hooks.on('combatTurnChange', async (combat, _prior, current) => {
 });
 
 /* -------------------------------------------- */
-/*  Effect Expiry — Duration Tracking           */
+/*  Effect Expiry — v14 Auto-Delete Cleanup     */
 /* -------------------------------------------- */
 
 /**
- * Delete ActiveEffects whose duration (in rounds) has elapsed.
- * Effects expire at the end of the TARGET's turn — so we only check
- * the combatant whose turn just ended (the "prior" combatant).
- * Only the GM executes to avoid duplicate deletes.
+ * v14: CONFIG.ActiveEffect.expiryAction = 'delete' handles duration-based
+ * deletion automatically. This hook cleans up side-effects (blind status,
+ * dismembered slots) when any ActiveEffect is deleted.
  */
-Hooks.on('combatTurnChange', async (combat, prior, _current) => {
+Hooks.on('deleteActiveEffect', async (effect, _options, _userId) => {
   if (!game.user.isGM) return;
-  if (!prior?.combatantId) return;
+  const actor = effect.parent;
+  if (!actor || !(actor instanceof Actor)) return;
 
-  const combatant = combat.combatants.get(prior.combatantId);
-  if (!combatant?.actor) return;
-
-  const actor = combatant.actor;
-  const toDelete = [];
-  for (const effect of actor.effects) {
-    const dur = effect.duration;
-    if (!dur.rounds || dur.rounds <= 0) continue;
-    const startRound = dur.startRound ?? 0;
-    if (startRound > 0 && combat.round - startRound >= dur.rounds) {
-      toDelete.push(effect.id);
-    }
-  }
-  if (toDelete.length > 0) {
-    // Remove Foundry blind status if a blind debuff is expiring.
-    for (const id of toDelete) {
-      const effect = actor.effects.get(id);
-      if (effect?.flags?.['aspects-of-power']?.debuffType === 'blind') {
-        const tokens = actor.getActiveTokens();
-        for (const t of tokens) {
-          if (t.document.hasStatusEffect('blind')) {
-            await t.document.toggleActiveEffect({ id: 'blind', name: 'Blind', img: 'icons/svg/blind.svg' }, { active: false });
-          }
-        }
+  // Remove Foundry blind status if a blind debuff was deleted.
+  if (effect.flags?.['aspects-of-power']?.debuffType === 'blind') {
+    for (const t of actor.getActiveTokens()) {
+      if (t.document.hasStatusEffect('blind')) {
+        await t.document.toggleActiveEffect({ id: 'blind', name: 'Blind', img: 'icons/svg/blind.svg' }, { active: false });
       }
     }
-    const names = toDelete.map(id => actor.effects.get(id)?.name).filter(Boolean);
-    await actor.deleteEmbeddedDocuments('ActiveEffect', toDelete);
+  }
+
+  // Post expiry notification for effects that had a duration.
+  const dur = effect.duration;
+  if (dur?.rounds > 0) {
     ChatMessage.create({
       whisper: ChatMessage.getWhisperRecipients('GM'),
-      content: `<p>Expired effects on <strong>${actor.name}</strong>: ${names.join(', ')}</p>`,
+      content: `<p>Expired: <strong>${effect.name}</strong> on ${actor.name}</p>`,
     });
   }
 });
@@ -1085,155 +1046,16 @@ Hooks.on('renderTokenHUD', (hud, html, data) => {
 /* -------------------------------------------- */
 
 /**
- * Clear cumulative movement distance when a new turn starts.
- * Runs on every client so the preUpdateToken guard works locally.
+ * Clear movement trackers on turn change and combat end.
  */
-Hooks.on('combatTurnChange', () => {
-  _segmentMovement.clear();
-  _moveActionTracker.clear();
-});
-
-/**
- * Clean up the movement tracker when combat ends.
- */
-Hooks.on('deleteCombat', () => {
-  _segmentMovement.clear();
-  _moveActionTracker.clear();
-});
+Hooks.on('combatTurnChange', () => AspectsofPowerToken.clearTrackers());
+Hooks.on('deleteCombat', () => AspectsofPowerToken.clearTrackers());
 
 /* -------------------------------------------- */
 /*  Stamina-based Movement Cost & Limits        */
 /* -------------------------------------------- */
 
-/**
- * Intercept token movement to enforce stamina costs and maximum range.
- *
- * Movement is cumulative within a "segment" — the window between skill
- * uses.  Players can move freely (via arrow keys, drags, etc.) until
- * they hit the per-segment cap (sprintRange).  Using a skill starts a
- * new segment by bumping the action counter and resetting segment
- * distance.  Max 3 actions per turn.
- *
- * Per segment:
- *   Walk zone:   1 stamina per 5 ft, up to walkRange ft cumulative
- *   Sprint zone: 3 stamina per 5 ft, from walkRange to sprintRange ft
- *   Beyond sprintRange: movement blocked until a new segment starts.
- *
- * Only applies during active combat. GM moves are exempt.
- */
-Hooks.on('preUpdateToken', (tokenDoc, changes, options, userId) => {
-  // Only process position changes.
-  if (!('x' in changes) && !('y' in changes)) return;
-
-  // Only the user who initiated the move should evaluate this.
-  if (game.user.id !== userId) return;
-
-  // Exempt: no active combat.
-  const combat = game.combat;
-  if (!combat?.started) return;
-
-  // Exempt: the mover is a GM.
-  if (game.user.isGM) return;
-
-  // Identify the combatant for this token.
-  const combatant = combat.combatants.find(
-    c => c.tokenId === tokenDoc.id && c.sceneId === tokenDoc.parent?.id
-  );
-  if (!combatant) return;
-
-  const actor = tokenDoc.actor;
-  if (!actor?.system) return;
-
-  // Block movement for root, immobilized, frozen, sleep, stun, paralysis debuffs.
-  const moveBlocker = getActiveDebuff(actor, ['root', 'immobilized', 'frozen', 'sleep', 'stun', 'paralysis']);
-  if (moveBlocker) {
-    const typeName = game.i18n.localize(
-      CONFIG.ASPECTSOFPOWER.debuffTypes[moveBlocker.flags['aspects-of-power'].debuffType] ?? 'Debuff'
-    );
-    ui.notifications.warn(`${actor.name} ${game.i18n.localize('ASPECTSOFPOWER.Debuff.cannotMove')} (${typeName})`);
-    return false;
-  }
-
-  let walkRange = actor.system.walkRange;
-  if (!walkRange || walkRange <= 0) return;
-
-  let sprintRange = actor.system.sprintRange;
-  const stamina     = actor.system.stamina;
-
-  // Chilled: reduce movement speed by comparing endurance to debuff roll.
-  const chilledEffect = getActiveDebuff(actor, 'chilled');
-  if (chilledEffect) {
-    const debuffRoll   = chilledEffect.flags?.['aspects-of-power']?.debuffDamage ?? 0;
-    const enduranceMod = actor.system.abilities?.endurance?.mod ?? 0;
-    const reduction    = Math.max(0, debuffRoll - enduranceMod);
-    walkRange   = Math.max(0, walkRange - reduction);
-    sprintRange = Math.max(0, sprintRange - reduction);
-    if (walkRange <= 0 && sprintRange <= 0) {
-      ui.notifications.warn(`${actor.name} is frozen solid! (Chilled overcame Endurance)`);
-      return false;
-    }
-  }
-
-  // Check if the combatant has exhausted all 3 actions (no more movement allowed).
-  const actionsUsed = _moveActionTracker.get(combatant.id) ?? 0;
-  if (actionsUsed >= 3) {
-    ui.notifications.warn('No movement remaining this turn! (3/3 actions used)');
-    return false;
-  }
-
-  // Calculate the distance of this move in feet.
-  const oldX = tokenDoc.x;
-  const oldY = tokenDoc.y;
-  const newX = changes.x ?? oldX;
-  const newY = changes.y ?? oldY;
-
-  const dx = newX - oldX;
-  const dy = newY - oldY;
-  const distancePx   = Math.sqrt(dx * dx + dy * dy);
-  const pixelsPerFoot = canvas.grid.size / canvas.grid.distance;
-  const moveFeet     = distancePx / pixelsPerFoot;
-
-  // Snap to 5ft increments.
-  const moveSnapped = Math.round(moveFeet / 5) * 5;
-  if (moveSnapped <= 0) return;
-
-  // Cumulative segment distance check — can't exceed sprintRange in one segment.
-  const segmentSoFar = _segmentMovement.get(combatant.id) ?? 0;
-  const newSegmentTotal = segmentSoFar + moveSnapped;
-  if (newSegmentTotal > sprintRange) {
-    const remaining = Math.max(0, sprintRange - segmentSoFar);
-    ui.notifications.warn(`Movement cap reached! (${remaining} ft remaining this segment, ${Math.round(sprintRange)} ft max)`);
-    return false;
-  }
-
-  // Calculate stamina cost based on cumulative position in walk/sprint zones.
-  // Each 5ft step is walk (1 stamina) or sprint (3 stamina) based on cumulative distance.
-  let staminaCost = 0;
-  for (let ft = segmentSoFar + 5; ft <= newSegmentTotal; ft += 5) {
-    staminaCost += (ft <= walkRange) ? 1 : 3;
-  }
-
-  // Check sufficient stamina.
-  if (staminaCost > stamina.value) {
-    ui.notifications.warn('Insufficient stamina to move!');
-    return false;
-  }
-
-  // Update segment tracker synchronously, deduct stamina asynchronously.
-  _segmentMovement.set(combatant.id, newSegmentTotal);
-
-  const newStamina = stamina.value - staminaCost;
-  const moveWhisper = _isPlayerCharacter(actor) ? {} : { whisper: ChatMessage.getWhisperRecipients('GM') };
-  Promise.resolve().then(async () => {
-    await actor.update({ 'system.stamina.value': newStamina });
-    ChatMessage.create({
-      speaker: ChatMessage.getSpeaker({ actor }),
-      ...moveWhisper,
-      content: `<p><em>${actor.name} moves ${moveSnapped} ft (${newSegmentTotal}/${Math.round(sprintRange)} ft this segment). `
-             + `Stamina: −${staminaCost} (${newStamina}/${stamina.max})</em></p>`,
-    });
-  });
-});
+// Movement enforcement is now handled by AspectsofPowerToken._preUpdateMovement / _onUpdateMovement.
 
 /* -------------------------------------------- */
 /*  Apply Damage Button — GM Whisper            */
