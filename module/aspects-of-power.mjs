@@ -785,7 +785,7 @@ Hooks.on('combatTurnChange', async (combat, _prior, current) => {
           const tokens = actor.getActiveTokens();
           for (const t of tokens) {
             if (t.document.hasStatusEffect('blind')) {
-              await t.document.toggleActiveEffect({ id: 'blind', name: 'Blind', icon: 'icons/svg/blind.svg' }, { active: false });
+              await t.document.toggleActiveEffect({ id: 'blind', name: 'Blind', img: 'icons/svg/blind.svg' }, { active: false });
             }
           }
         }
@@ -901,7 +901,7 @@ Hooks.on('combatTurnChange', async (combat, prior, _current) => {
         const tokens = actor.getActiveTokens();
         for (const t of tokens) {
           if (t.document.hasStatusEffect('blind')) {
-            await t.document.toggleActiveEffect({ id: 'blind', name: 'Blind', icon: 'icons/svg/blind.svg' }, { active: false });
+            await t.document.toggleActiveEffect({ id: 'blind', name: 'Blind', img: 'icons/svg/blind.svg' }, { active: false });
           }
         }
       }

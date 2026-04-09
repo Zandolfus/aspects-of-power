@@ -887,7 +887,7 @@ export class AspectsofPowerItem extends Item {
               const tokens = target.getActiveTokens();
               for (const t of tokens) {
                 if (!t.document.hasStatusEffect('blind')) {
-                  await t.document.toggleActiveEffect({ id: 'blind', name: 'Blind', icon: 'icons/svg/blind.svg' }, { active: true });
+                  await t.document.toggleActiveEffect({ id: 'blind', name: 'Blind', img: 'icons/svg/blind.svg' }, { active: true });
                 }
               }
             }
