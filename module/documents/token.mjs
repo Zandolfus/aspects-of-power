@@ -53,9 +53,6 @@ export class AspectsofPowerToken extends foundry.documents.TokenDocument {
     const combat = game.combat;
     if (!combat?.started) return;
 
-    // Exempt: GM moves.
-    if (game.user.isGM) return;
-
     const actor = this.actor;
     if (!actor?.system) return;
 
