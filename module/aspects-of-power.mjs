@@ -907,20 +907,15 @@ Hooks.on('deleteActiveEffect', async (effect, _options, _userId) => {
 /* -------------------------------------------- */
 
 /**
- * Delete AOE regions/templates whose duration (in rounds) has elapsed.
- * v14: uses Scene regions with aspects-of-power AOE flags.
- * Falls back to MeasuredTemplate compat if regions aren't found.
+ * Delete AOE Regions whose duration (in rounds) has elapsed.
  * Only the GM executes to avoid duplicate deletes.
  */
 Hooks.on('combatTurnChange', async (combat, prior, _current) => {
   if (!game.user.isGM) return;
+  if (!canvas.scene?.regions) return;
 
-  // v14+: check regions for AOE flags.
   const toDelete = [];
-  const collection = canvas.scene.regions ?? canvas.scene.templates;
-  if (!collection) return;
-
-  for (const doc of collection) {
+  for (const doc of canvas.scene.regions) {
     const flags = doc.flags?.['aspects-of-power'] ?? {};
     if (!flags.aoe) continue;
 
@@ -934,8 +929,7 @@ Hooks.on('combatTurnChange', async (combat, prior, _current) => {
   }
 
   if (toDelete.length > 0) {
-    const docType = canvas.scene.regions ? 'Region' : 'MeasuredTemplate';
-    await canvas.scene.deleteEmbeddedDocuments(docType, toDelete);
+    await canvas.scene.deleteEmbeddedDocuments('Region', toDelete);
     ChatMessage.create({
       whisper: ChatMessage.getWhisperRecipients('GM'),
       content: `<p>Expired ${toDelete.length} AOE area(s).</p>`,
@@ -1105,7 +1099,7 @@ async function _triggerPersistentAoe(tokenDoc, force = false) {
   if (!token) return false;
   const center = token.center;
 
-  const collection = canvas.scene.regions ?? canvas.scene.templates;
+  const collection = canvas.scene.regions;
   if (!collection) return false;
 
   let triggered = false;
@@ -1120,18 +1114,9 @@ async function _triggerPersistentAoe(tokenDoc, force = false) {
     if (!force && (pd.affectedTokens ?? []).includes(tokenDoc.id)) continue;
 
     // Check containment.
-    const obj = doc.object ?? canvas.templates?.get(doc.id);
-    if (!obj) continue;
-
-    let inside = false;
-    if (obj.testPoint) {
-      inside = obj.testPoint(center);
-    } else if (obj.shape) {
-      const localX = center.x - doc.x;
-      const localY = center.y - doc.y;
-      inside = obj.shape.contains(localX, localY);
-    }
-    if (!inside) continue;
+    const obj = doc;
+    // v14: RegionDocument#testPoint with elevated point.
+    if (!doc.testPoint({ x: center.x, y: center.y, elevation: tokenDoc.elevation ?? 0 })) continue;
 
     // Disposition filter.
     const tokenDisp = tokenDoc.disposition;
@@ -1263,7 +1248,7 @@ Hooks.on('combatTurnChange', async (combat, _prior, current) => {
   // Clear this token from persistent AOE affected lists so they can re-trigger,
   // but only for AOEs placed BEFORE this round (skip same-round to avoid double-hit on cast).
   const currentRound = combat.round;
-  const collection = canvas.scene.regions ?? canvas.scene.templates;
+  const collection = canvas.scene.regions;
   if (collection) {
     for (const doc of collection) {
       const flags = doc.flags?.['aspects-of-power'];

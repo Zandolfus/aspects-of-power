@@ -48,7 +48,10 @@
       "Bash(curl -s \"https://raw.githubusercontent.com/foundryvtt/crucible/v14/module/hooks/action.mjs\")",
       "Bash(curl -s \"https://raw.githubusercontent.com/foundryvtt/crucible/v14/module/dice/action-use-dialog.mjs\")",
       "Bash(curl -s \"https://raw.githubusercontent.com/foundryvtt/crucible/v14/_source/talent/Movement_MqZKCMx5KrZQffGU.yml\")",
-      "Bash(curl -s \"https://raw.githubusercontent.com/foundryvtt/crucible/v14/module/const/action.mjs\")"
+      "Bash(curl -s \"https://raw.githubusercontent.com/foundryvtt/crucible/v14/module/const/action.mjs\")",
+      "Bash(python -c \"import sys,json; data=json.load\\(sys.stdin\\); [print\\(x['path']\\) for x in data.get\\('tree',[]\\) if 'region' in x['path'].lower\\(\\) or 'Region' in x['path'] or 'aoe' in x['path'].lower\\(\\) or 'template' in x['path'].lower\\(\\)]\")",
+      "Bash(python -c \"import sys,json; [print\\(b['name']\\) for b in json.load\\(sys.stdin\\)]\")",
+      "Bash(python -c \"import sys,json; data=json.load\\(sys.stdin\\); [print\\(x['path']\\) for x in data.get\\('tree',[]\\) if 'region' in x['path'].lower\\(\\)]\")"
     ]
   }
 }

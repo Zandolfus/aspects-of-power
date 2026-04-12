@@ -1304,7 +1304,7 @@ export class AspectsofPowerItem extends Item {
   }
 
   /**
-   * Interactively place a MeasuredTemplate for an AOE skill.
+   * Interactively place an AOE Region for an AOE skill.
    * Supports circle, cone, ray, and rectangle shapes.
    *
    * Circle/Rect: preview follows cursor, click to place center.
@@ -1315,46 +1315,78 @@ export class AspectsofPowerItem extends Item {
    * the top-left corner, offset so the click is the center.
    *
    * @param {Token} casterToken  The caster's canvas token.
-   * @returns {Promise<MeasuredTemplateDocument|null>}
+   * @returns {Promise<RegionDocument|null>}
+   */
+  /**
+   * Place an AOE Region on the scene via interactive click placement.
+   * v14: uses Scene Regions instead of MeasuredTemplates.
+   * @returns {RegionDocument|null}
    */
   async _placeAoeTemplate(casterToken) {
     const aoe = this.system.aoe;
     const shape = aoe.shape ?? 'circle';
     const castingRange = this.actor.system.castingRange ?? 0;
-    const pixelsPerFoot = canvas.grid.size / canvas.grid.distance;
-    const castingRangePx = castingRange * pixelsPerFoot;
+    const pxPerFt = canvas.grid.size / canvas.grid.distance;
+    const castingRangePx = castingRange * pxPerFt;
     const fillColor = this._getAoeColor();
     const cc = casterToken.center;
 
-    // Cone/Ray originate from the caster — validate reach vs casting range up front.
+    // Cone/Ray originate from the caster — validate reach vs casting range.
     const isDirected = (shape === 'cone' || shape === 'ray');
     if (isDirected && aoe.diameter > castingRange) {
       ui.notifications.warn(game.i18n.localize('ASPECTSOFPOWER.AOE.outOfRange'));
       return null;
     }
 
-    // Rect centering: origin is a corner, so offset by half the side length.
-    const rectSidePx = aoe.diameter * pixelsPerFoot;
+    const rectSidePx = aoe.diameter * pxPerFt;
     const rectHalfPx = rectSidePx / 2;
 
-    // Build shape-specific preview template data.
-    let previewData;
-    if (shape === 'circle') {
-      previewData = { t: 'circle', distance: aoe.diameter / 2, x: 0, y: 0, fillColor };
-    } else if (shape === 'cone') {
-      previewData = { t: 'cone', distance: aoe.diameter, angle: aoe.angle, direction: 0, x: cc.x, y: cc.y, fillColor };
-    } else if (shape === 'ray') {
-      previewData = { t: 'ray', distance: aoe.diameter, width: aoe.width, direction: 0, x: cc.x, y: cc.y, fillColor };
-    } else {
-      // rect: Foundry rect = square. distance = diagonal, direction = 45° for grid alignment.
-      previewData = { t: 'rect', distance: Math.hypot(aoe.diameter, aoe.diameter), direction: 45, x: 0, y: 0, fillColor };
-    }
+    // Preview graphics overlay.
+    const preview = new PIXI.Graphics();
+    preview.alpha = 0.4;
+    canvas.stage.addChild(preview);
 
-    const templateDoc = new MeasuredTemplateDocument(previewData, { parent: canvas.scene });
-    const template = new CONFIG.MeasuredTemplate.objectClass(templateDoc);
-    template.draw();
-    template.layer.activate();
-    template.layer.preview.addChild(template);
+    const drawPreview = (pos) => {
+      preview.clear();
+      preview.beginFill(foundry.utils.Color.from(fillColor), 0.4);
+
+      if (shape === 'circle') {
+        const radiusPx = (aoe.diameter / 2) * pxPerFt;
+        preview.drawCircle(pos.x, pos.y, radiusPx);
+      } else if (shape === 'cone') {
+        // Draw cone as a triangle from caster toward cursor.
+        const dx = pos.x - cc.x;
+        const dy = pos.y - cc.y;
+        const dir = Math.atan2(dy, dx);
+        const halfAngle = (aoe.angle / 2) * (Math.PI / 180);
+        const radiusPx = aoe.diameter * pxPerFt;
+        preview.moveTo(cc.x, cc.y);
+        preview.lineTo(cc.x + Math.cos(dir - halfAngle) * radiusPx, cc.y + Math.sin(dir - halfAngle) * radiusPx);
+        preview.lineTo(cc.x + Math.cos(dir + halfAngle) * radiusPx, cc.y + Math.sin(dir + halfAngle) * radiusPx);
+        preview.closePath();
+      } else if (shape === 'ray') {
+        // Draw ray as a rotated rectangle from caster toward cursor.
+        const dx = pos.x - cc.x;
+        const dy = pos.y - cc.y;
+        const dir = Math.atan2(dy, dx);
+        const lengthPx = aoe.diameter * pxPerFt;
+        const widthPx = (aoe.width ?? 5) * pxPerFt;
+        const hw = widthPx / 2;
+        const perpX = -Math.sin(dir) * hw;
+        const perpY = Math.cos(dir) * hw;
+        const endX = cc.x + Math.cos(dir) * lengthPx;
+        const endY = cc.y + Math.sin(dir) * lengthPx;
+        preview.moveTo(cc.x + perpX, cc.y + perpY);
+        preview.lineTo(endX + perpX, endY + perpY);
+        preview.lineTo(endX - perpX, endY - perpY);
+        preview.lineTo(cc.x - perpX, cc.y - perpY);
+        preview.closePath();
+      } else {
+        // Rectangle: centered on cursor.
+        preview.drawRect(pos.x - rectHalfPx, pos.y - rectHalfPx, rectSidePx, rectSidePx);
+      }
+      preview.endFill();
+    };
 
     let resolved = false;
 
@@ -1362,21 +1394,7 @@ export class AspectsofPowerItem extends Item {
       const onPointerMove = (event) => {
         const pos = event.data?.getLocalPosition(canvas.app.stage)
                     ?? canvas.mousePosition ?? { x: 0, y: 0 };
-
-        if (isDirected) {
-          // Cone/Ray: origin stays at caster, direction follows cursor.
-          const dx = pos.x - cc.x;
-          const dy = pos.y - cc.y;
-          const direction = Math.toDegrees(Math.atan2(dy, dx));
-          template.document.updateSource({ direction });
-        } else if (shape === 'rect') {
-          // Rectangle: center the square on cursor (offset origin by half side).
-          template.document.updateSource({ x: pos.x - rectHalfPx, y: pos.y - rectHalfPx });
-        } else {
-          // Circle: center on cursor.
-          template.document.updateSource({ x: pos.x, y: pos.y });
-        }
-        template.refresh();
+        drawPreview(pos);
       };
 
       const onPointerDown = async (event) => {
@@ -1384,7 +1402,7 @@ export class AspectsofPowerItem extends Item {
         const pos = event.data?.getLocalPosition(canvas.app.stage)
                     ?? canvas.mousePosition ?? { x: 0, y: 0 };
 
-        // Range validation for placed shapes (circle/rect: distance from caster to click).
+        // Range validation for placed shapes.
         if (!isDirected) {
           const dist = Math.sqrt((pos.x - cc.x) ** 2 + (pos.y - cc.y) ** 2);
           if (dist > castingRangePx) {
@@ -1396,48 +1414,58 @@ export class AspectsofPowerItem extends Item {
         resolved = true;
         cleanup();
 
-        // Finalize position on the preview document, then export via toObject().
-        if (isDirected) {
+        // Build the Region shape data.
+        let shapeData;
+        if (shape === 'circle') {
+          shapeData = { type: 'circle', x: pos.x, y: pos.y, radius: (aoe.diameter / 2) * pxPerFt };
+        } else if (shape === 'cone') {
           const dx = pos.x - cc.x;
           const dy = pos.y - cc.y;
-          template.document.updateSource({ direction: Math.toDegrees(Math.atan2(dy, dx)) });
-        } else if (shape === 'rect') {
-          template.document.updateSource({ x: pos.x - rectHalfPx, y: pos.y - rectHalfPx });
+          const rotation = Math.toDegrees(Math.atan2(dy, dx));
+          shapeData = { type: 'cone', x: cc.x, y: cc.y, radius: aoe.diameter * pxPerFt, angle: aoe.angle, rotation };
+        } else if (shape === 'ray') {
+          const dx = pos.x - cc.x;
+          const dy = pos.y - cc.y;
+          const rotation = Math.toDegrees(Math.atan2(dy, dx));
+          shapeData = { type: 'line', x: cc.x, y: cc.y, length: aoe.diameter * pxPerFt, width: (aoe.width ?? 5) * pxPerFt, rotation };
         } else {
-          template.document.updateSource({ x: pos.x, y: pos.y });
+          // Rectangle centered on click.
+          shapeData = { type: 'rectangle', x: pos.x - rectHalfPx, y: pos.y - rectHalfPx, width: rectSidePx, height: rectSidePx, rotation: 0 };
         }
 
-        // Export the fully-configured preview as a plain object for persistence.
-        const finalData = template.document.toObject();
-        finalData.flags = {
-          'aspects-of-power': {
-            aoe: true,
-            casterActorUuid: this.actor.uuid,
-            skillItemUuid: this.uuid,
-            templateDuration: aoe.templateDuration,
-            placedRound: game.combat?.round ?? 0,
-            // Persistent AOE: store effect data so entering tokens can be affected.
-            persistent: (aoe.templateDuration ?? 0) > 0,
-            persistentData: (aoe.templateDuration ?? 0) > 0 ? {
-              tags: this.system.tags ?? [],
-              tagConfig: this.system.tagConfig ?? {},
-              rollTotal: null, // set after roll evaluation
-              hitTotal: null,
-              damageType: this.system.roll?.damageType ?? 'physical',
-              targetingMode: aoe.targetingMode ?? 'all',
-              casterDisposition: this.actor.getActiveTokens()?.[0]?.document?.disposition ?? CONST.TOKEN_DISPOSITIONS.NEUTRAL,
-              affectedTokens: [], // token IDs already affected this round
-            } : null,
+        const regionData = {
+          name: `${this.name} AOE`,
+          color: fillColor,
+          visibility: 2, // ALWAYS visible
+          shapes: [shapeData],
+          flags: {
+            'aspects-of-power': {
+              aoe: true,
+              casterActorUuid: this.actor.uuid,
+              skillItemUuid: this.uuid,
+              templateDuration: aoe.templateDuration,
+              placedRound: game.combat?.round ?? 0,
+              persistent: (aoe.templateDuration ?? 0) > 0,
+              persistentData: (aoe.templateDuration ?? 0) > 0 ? {
+                tags: this.system.tags ?? [],
+                tagConfig: this.system.tagConfig ?? {},
+                rollTotal: null,
+                hitTotal: null,
+                damageType: this.system.roll?.damageType ?? 'physical',
+                targetingMode: aoe.targetingMode ?? 'all',
+                casterDisposition: this.actor.getActiveTokens()?.[0]?.document?.disposition ?? CONST.TOKEN_DISPOSITIONS.NEUTRAL,
+                affectedTokens: [],
+              } : null,
+            },
           },
         };
 
-        const [created] = await canvas.scene.createEmbeddedDocuments('MeasuredTemplate', [finalData]);
-        // Brief delay so the template object renders and testPoint() is available.
+        const [created] = await canvas.scene.createEmbeddedDocuments('Region', [regionData]);
         await new Promise(r => setTimeout(r, 50));
         resolve(created);
       };
 
-      const onCancel = (event) => {
+      const onCancel = () => {
         if (resolved) return;
         resolved = true;
         cleanup();
@@ -1445,13 +1473,11 @@ export class AspectsofPowerItem extends Item {
         resolve(null);
       };
 
-      const onKeyDown = (event) => {
-        if (event.key === 'Escape') onCancel(event);
-      };
+      const onKeyDown = (event) => { if (event.key === 'Escape') onCancel(); };
 
       const cleanup = () => {
-        template.layer.preview.removeChild(template);
-        template.destroy();
+        canvas.stage.removeChild(preview);
+        preview.destroy();
         canvas.stage.off('pointermove', onPointerMove);
         canvas.stage.off('pointerdown', onPointerDown);
         canvas.stage.off('rightdown', onCancel);
@@ -1467,21 +1493,16 @@ export class AspectsofPowerItem extends Item {
   }
 
   /**
-   * Find all tokens within a placed MeasuredTemplate, filtered by the
-   * skill's AOE targeting mode (all / enemies / allies).
-   * Uses Foundry v13's testPoint() for containment testing across all shapes.
-   *
-   * @param {MeasuredTemplateDocument} templateDoc
+   * Find all tokens within a placed AOE Region, filtered by targeting mode.
+   * v14: uses RegionDocument#testPoint for containment testing.
+   * @param {RegionDocument} regionDoc
    * @returns {Token[]}
    */
-  _getAoeTargets(templateDoc) {
+  _getAoeTargets(regionDoc) {
     const targetingMode = this.system.aoe.targetingMode ?? 'all';
     const casterToken = this.actor.getActiveTokens()?.[0] ?? null;
     const casterDisp = casterToken?.document?.disposition ?? CONST.TOKEN_DISPOSITIONS.NEUTRAL;
 
-    // Get the rendered template object for containment testing.
-    const templateObject = canvas.templates.get(templateDoc.id)
-                         ?? templateDoc.object;
     const qualifying = [];
 
     for (const token of canvas.tokens.placeables) {
@@ -1489,22 +1510,8 @@ export class AspectsofPowerItem extends Item {
 
       const center = token.center;
 
-      // Use Foundry v13's testPoint (canvas-space coords) for all template types.
-      if (templateObject?.testPoint) {
-        if (!templateObject.testPoint(center)) continue;
-      } else {
-        // Fallback: manual check using shape.contains (template-local coords).
-        const shape = templateObject?.shape;
-        const localX = center.x - templateDoc.x;
-        const localY = center.y - templateDoc.y;
-        if (shape) {
-          if (!shape.contains(localX, localY)) continue;
-        } else {
-          const pixelsPerFoot = canvas.grid.size / canvas.grid.distance;
-          const radiusPx = templateDoc.distance * pixelsPerFoot;
-          if (localX * localX + localY * localY > radiusPx * radiusPx) continue;
-        }
-      }
+      // v14: use RegionDocument#testPoint with elevated point.
+      if (!regionDoc.testPoint({ x: center.x, y: center.y, elevation: token.document.elevation ?? 0 })) continue;
 
       // Disposition filter.
       if (targetingMode === 'enemies') {
@@ -1975,9 +1982,9 @@ export class AspectsofPowerItem extends Item {
         await this.actor.update({ [`system.${resource}.value`]: newResVal });
       }
 
-      // Remove instantaneous templates (duration = 0).
+      // Remove instantaneous AOE regions (duration = 0).
       if ((this.system.aoe.templateDuration ?? 0) === 0) {
-        await canvas.scene.deleteEmbeddedDocuments('MeasuredTemplate', [templateDoc.id]);
+        await canvas.scene.deleteEmbeddedDocuments('Region', [templateDoc.id]);
       }
 
       return dmgRoll;
