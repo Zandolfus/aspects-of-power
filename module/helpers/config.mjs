@@ -91,6 +91,7 @@ ASPECTSOFPOWER.debuffTypes = {
   enraged:       'ASPECTSOFPOWER.Debuff.enraged',
   hallucination: 'ASPECTSOFPOWER.Debuff.hallucination',
   dismembered:   'ASPECTSOFPOWER.Debuff.dismembered',
+  slip:          'ASPECTSOFPOWER.Debuff.slip',
 };
 
 ASPECTSOFPOWER.professionTags = {

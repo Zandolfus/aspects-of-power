@@ -99,6 +99,23 @@ export class AspectsofPowerToken extends foundry.documents.TokenDocument {
       return false;
     }
 
+    // Slip: attempting to move triggers a fall — movement zeroed for this segment.
+    const slipEffect = actor.effects.find(e =>
+      !e.disabled && e.flags?.['aspects-of-power']?.debuffType === 'slip'
+    );
+    if (slipEffect) {
+      // Zero out remaining movement for this segment (will reset on next skill/action).
+      AspectsofPowerToken._segmentMovement.set(combatant.id, Infinity);
+      const _isPC = game.users.some(u => !u.isGM && u.active && u.character?.id === actor.id);
+      const whisper = _isPC ? {} : { whisper: ChatMessage.getWhisperRecipients('GM') };
+      ChatMessage.create({
+        speaker: ChatMessage.getSpeaker({ actor }),
+        ...whisper,
+        content: `<p><strong>${actor.name}</strong> slips and falls prone! Movement ended.</p>`,
+      });
+      return false;
+    }
+
     // Calculate movement ranges (with chilled reduction).
     const { walkRange, sprintRange } = this._getMovementRanges(actor);
     if (walkRange <= 0 && sprintRange <= 0) {

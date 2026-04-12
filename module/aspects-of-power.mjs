@@ -727,6 +727,7 @@ const DEBUFF_BREAK_STAT = {
   taunt:     'intelligence',
   charm:     'willpower',
   enraged:   'wisdom',
+  slip:      'dexterity',  // also breaks with strength at 1.5x threshold
 };
 
 const TURN_SKIP_DEBUFFS = ['stun', 'paralysis', 'sleep', 'immobilized'];
@@ -739,6 +740,7 @@ Hooks.on('combatTurnChange', async (combat, _prior, current) => {
   const actor = combatant.actor;
   const speaker = ChatMessage.getSpeaker({ actor });
   const gmWhisper = _isPlayerCharacter(actor) ? {} : { whisper: ChatMessage.getWhisperRecipients('GM') };
+
 
   // Collect all active debuffs with a type.
   const typedDebuffs = actor.effects.filter(e =>
@@ -755,21 +757,45 @@ Hooks.on('combatTurnChange', async (combat, _prior, current) => {
     // Check if this debuff has a break stat.
     const breakStat = DEBUFF_BREAK_STAT[debuffType];
     if (breakStat) {
-      const statMod = actor.system.abilities?.[breakStat]?.mod ?? 0;
+      // Slip: dual-stat break — try dexterity (normal threshold) then strength (1.5x threshold).
+      // Use the better roll.
+      let statMod, breakLabel, breakThreshold;
+      if (debuffType === 'slip') {
+        const dexMod = actor.system.abilities?.dexterity?.mod ?? 0;
+        const strMod = actor.system.abilities?.strength?.mod ?? 0;
+        // Dexterity breaks at normal threshold, strength at 1.5x.
+        // Use whichever gives the actor a better chance.
+        const dexEffective = dexMod;  // vs rollTotal
+        const strEffective = strMod;  // vs rollTotal * 1.5
+        // Pick the stat that gets closer to breaking relative to its threshold.
+        if (dexEffective >= strEffective * (1 / 1.5)) {
+          statMod = dexMod;
+          breakLabel = game.i18n.localize('ASPECTSOFPOWER.Ability.dexterity.long');
+          breakThreshold = rollTotal;
+        } else {
+          statMod = strMod;
+          breakLabel = game.i18n.localize('ASPECTSOFPOWER.Ability.strength.long');
+          breakThreshold = Math.round(rollTotal * 1.5);
+        }
+      } else {
+        statMod = actor.system.abilities?.[breakStat]?.mod ?? 0;
+        breakLabel = game.i18n.localize(`ASPECTSOFPOWER.Ability.${breakStat}.long`);
+        breakThreshold = rollTotal;
+      }
+
       const breakRoll = new Roll('1d20 + @mod', { mod: statMod });
       await breakRoll.evaluate();
-      const breakLabel = game.i18n.localize(`ASPECTSOFPOWER.Ability.${breakStat}.long`);
 
       // Accumulate break progress across turns.
       const previousProgress = flags.breakProgress ?? 0;
       const newProgress = previousProgress + breakRoll.total;
 
-      if (newProgress >= rollTotal) {
-        // Broke free! Delete triggers deleteActiveEffect hook for blind cleanup.
+      if (newProgress >= breakThreshold) {
+        // Broke free! Delete triggers deleteActiveEffect hook for cleanup.
         await effect.delete();
         await breakRoll.toMessage({
           speaker, ...gmWhisper,
-          flavor: `${typeName} — ${game.i18n.localize('ASPECTSOFPOWER.Debuff.breakRoll')} (${breakLabel}) [${newProgress} / ${rollTotal}]`,
+          flavor: `${typeName} — ${game.i18n.localize('ASPECTSOFPOWER.Debuff.breakRoll')} (${breakLabel}) [${newProgress} / ${breakThreshold}]`,
         });
         ChatMessage.create({
           speaker, ...gmWhisper,
@@ -781,7 +807,7 @@ Hooks.on('combatTurnChange', async (combat, _prior, current) => {
         await effect.setFlag('aspects-of-power', 'breakProgress', newProgress);
         await breakRoll.toMessage({
           speaker, ...gmWhisper,
-          flavor: `${typeName} — ${game.i18n.localize('ASPECTSOFPOWER.Debuff.breakRoll')} (${breakLabel}) [${newProgress} / ${rollTotal}]`,
+          flavor: `${typeName} — ${game.i18n.localize('ASPECTSOFPOWER.Debuff.breakRoll')} (${breakLabel}) [${newProgress} / ${breakThreshold}]`,
         });
         ChatMessage.create({
           speaker, ...gmWhisper,
@@ -1069,22 +1095,20 @@ Hooks.on('deleteCombat', () => AspectsofPowerToken.clearTrackers());
 /* -------------------------------------------- */
 
 /**
- * When a token moves into a persistent AOE template/region, apply the
- * stored effects to the entering token.
- * Only the GM executes to avoid duplicate applications.
- * Tracks affected tokens per round to prevent re-triggering on movement within the area.
+ * Check if a token is inside a persistent AOE area and apply its effects.
+ * Shared by the updateToken hook (entering area) and the turn-start hook
+ * (standing in area at start of turn).
+ * Returns true if the AOE triggered.
  */
-Hooks.on('updateToken', async (tokenDoc, changes, _options, _userId) => {
-  if (!game.user.isGM) return;
-  if (!('x' in changes) && !('y' in changes)) return;
-
+async function _triggerPersistentAoe(tokenDoc, force = false) {
   const token = tokenDoc.object;
-  if (!token) return;
+  if (!token) return false;
   const center = token.center;
 
-  // Check all persistent AOE templates/regions on the scene.
   const collection = canvas.scene.regions ?? canvas.scene.templates;
-  if (!collection) return;
+  if (!collection) return false;
+
+  let triggered = false;
 
   for (const doc of collection) {
     const flags = doc.flags?.['aspects-of-power'];
@@ -1092,10 +1116,10 @@ Hooks.on('updateToken', async (tokenDoc, changes, _options, _userId) => {
 
     const pd = flags.persistentData;
 
-    // Already affected this round?
-    if ((pd.affectedTokens ?? []).includes(tokenDoc.id)) continue;
+    // Already affected this round? (Skip unless forced — turn start always re-applies.)
+    if (!force && (pd.affectedTokens ?? []).includes(tokenDoc.id)) continue;
 
-    // Check containment — use region or template testPoint.
+    // Check containment.
     const obj = doc.object ?? canvas.templates?.get(doc.id);
     if (!obj) continue;
 
@@ -1120,23 +1144,22 @@ Hooks.on('updateToken', async (tokenDoc, changes, _options, _userId) => {
       if (tokenDisp !== casterDisp) continue;
     }
 
-    // Mark as affected.
-    const newAffected = [...(pd.affectedTokens ?? []), tokenDoc.id];
-    await doc.update({ 'flags.aspects-of-power.persistentData.affectedTokens': newAffected });
+    // Mark as affected (if not already).
+    if (!(pd.affectedTokens ?? []).includes(tokenDoc.id)) {
+      const newAffected = [...(pd.affectedTokens ?? []), tokenDoc.id];
+      await doc.update({ 'flags.aspects-of-power.persistentData.affectedTokens': newAffected });
+    }
 
-    // Apply effects via GM action.
+    // Apply effects.
     const casterActor = await fromUuid(flags.casterActorUuid);
     const targetActor = tokenDoc.actor;
     if (!casterActor || !targetActor) continue;
 
     const speaker = ChatMessage.getSpeaker({ actor: casterActor });
     const rollTotal = pd.rollTotal ?? 0;
-    const hitTotal = pd.hitTotal ?? 0;
 
-    // Apply each tag from the stored persistent data.
     for (const tag of (pd.tags ?? [])) {
       if (tag === 'debuff' && pd.tagConfig?.debuffType && pd.tagConfig.debuffType !== 'none') {
-        // Build debuff effect data.
         const debuffType = pd.tagConfig.debuffType;
         const duration = pd.tagConfig.debuffDuration ?? 1;
         const entries = (pd.tagConfig.debuffEntries ?? []).map(e => ({
@@ -1180,10 +1203,9 @@ Hooks.on('updateToken', async (tokenDoc, changes, _options, _userId) => {
       }
 
       if (tag === 'attack' && rollTotal > 0) {
-        // Direct damage from persistent AOE.
         ChatMessage.create({
           whisper: ChatMessage.getWhisperRecipients('GM'),
-          content: `<p><strong>${targetActor.name}</strong> enters AOE zone — `
+          content: `<p><strong>${targetActor.name}</strong> in AOE zone — `
                  + `<strong>${rollTotal}</strong> ${pd.damageType} damage incoming.</p>`
                  + `<button class="apply-damage" data-actor-uuid="${targetActor.uuid}" `
                  + `data-damage="${rollTotal}" data-toughness="${targetActor.system.abilities?.toughness?.mod ?? 0}" `
@@ -1211,33 +1233,57 @@ Hooks.on('updateToken', async (tokenDoc, changes, _options, _userId) => {
       }
     }
 
-    ChatMessage.create({
-      whisper: ChatMessage.getWhisperRecipients('GM'),
-      content: `<p><strong>${targetActor.name}</strong> entered persistent AOE area.</p>`,
-    });
+    triggered = true;
   }
+
+  return triggered;
+}
+
+/**
+ * When a token moves into a persistent AOE area, apply its effects.
+ */
+Hooks.on('updateToken', async (tokenDoc, changes, _options, _userId) => {
+  if (!game.user.isGM) return;
+  if (!('x' in changes) && !('y' in changes)) return;
+  await _triggerPersistentAoe(tokenDoc, false);
 });
 
 /**
- * Reset affected token lists on persistent AOEs at the start of each round.
- * This allows tokens to be re-affected if they stay in the zone.
+ * At the start of each combatant's turn, re-trigger any persistent AOE
+ * they're currently standing in. This clears their "affected this round"
+ * flag first (so they can be re-hit) and forces the trigger.
  */
 Hooks.on('combatTurnChange', async (combat, _prior, current) => {
   if (!game.user.isGM) return;
 
-  // Only reset on round change (turn 0).
-  if (current.turn !== 0) return;
+  const combatant = combat.combatants.get(current.combatantId);
+  if (!combatant?.token) return;
+  const tokenDoc = combatant.token;
 
+  // Clear this token from persistent AOE affected lists so they can re-trigger,
+  // but only for AOEs placed BEFORE this round (skip same-round to avoid double-hit on cast).
+  const currentRound = combat.round;
   const collection = canvas.scene.regions ?? canvas.scene.templates;
-  if (!collection) return;
+  if (collection) {
+    for (const doc of collection) {
+      const flags = doc.flags?.['aspects-of-power'];
+      if (!flags?.persistent || !flags.persistentData) continue;
 
-  for (const doc of collection) {
-    const flags = doc.flags?.['aspects-of-power'];
-    if (!flags?.persistent || !flags.persistentData) continue;
-    if ((flags.persistentData.affectedTokens ?? []).length > 0) {
-      await doc.update({ 'flags.aspects-of-power.persistentData.affectedTokens': [] });
+      // Skip AOEs placed this round — initial cast already applied effects.
+      const placedRound = flags.placedRound ?? 0;
+      if (placedRound >= currentRound) continue;
+
+      const affected = flags.persistentData.affectedTokens ?? [];
+      if (affected.includes(tokenDoc.id)) {
+        await doc.update({
+          'flags.aspects-of-power.persistentData.affectedTokens': affected.filter(id => id !== tokenDoc.id),
+        });
+      }
     }
   }
+
+  // Now check if they're standing in any persistent AOE and re-apply.
+  await _triggerPersistentAoe(tokenDoc, true);
 });
 
 /* -------------------------------------------- */
