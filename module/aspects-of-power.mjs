@@ -1187,7 +1187,6 @@ async function _triggerPersistentAoe(tokenDoc, force = false) {
         });
       }
       triggered = true;
-      continue; // Zone effect handled — skip tag processing for this region.
     }
 
     for (const tag of (pd.tags ?? [])) {
