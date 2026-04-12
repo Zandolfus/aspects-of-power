@@ -256,11 +256,25 @@ export class AspectsofPowerItem extends Item {
       }
     }
 
-    // Damage pipeline: raw → defense pool % → armor/veil → toughness.
+    // Damage pipeline: raw → defense pool % → barrier (pre-armor) → armor/veil → toughness.
     const rawDmg          = Math.round(dmgRoll.total);
     const afterDefense    = isHit ? Math.max(0, Math.round(rawDmg * damageMultiplier)) : 0;
-    const preToughnessDmg = Math.max(0, afterDefense - mitigation);
+
+    // Barrier absorbs before armor/veil — it takes raw (post-defense-pool) damage.
+    const barrierValue = targetActor.system.barrier?.value ?? 0;
+    let barrierLine = '';
+    let barrierAbsorbs = 0;
+    let afterBarrier = afterDefense;
+    if (isHit && barrierValue > 0) {
+      barrierAbsorbs = Math.min(barrierValue, afterDefense);
+      afterBarrier = afterDefense - barrierAbsorbs;
+      barrierLine = `<p>Barrier absorbs: ${barrierAbsorbs} / ${barrierValue}${barrierAbsorbs >= barrierValue ? ' <em>(breaks)</em>' : ''}</p>`;
+    }
+
+    // Armor/veil reduces whatever got through the barrier.
+    const preToughnessDmg = Math.max(0, afterBarrier - mitigation);
     const finalDamage     = isHit ? Math.max(0, preToughnessDmg - effectiveToughness) : 0;
+    const displayDamage   = finalDamage;
 
     const resultBadge = isHit
       ? `<strong style="color:green;">HIT</strong>`
@@ -270,20 +284,8 @@ export class AspectsofPowerItem extends Item {
       ? `<p>Attack: ${hitTotal} vs ${targetActor.name}</p>`
       : '';
 
-    // Barrier preview.
-    const barrierValue = targetActor.system.barrier?.value ?? 0;
-    let barrierLine = '';
-    let damageAfterBarrier = preToughnessDmg;
-    let displayDamage = finalDamage;
-    if (isHit && barrierValue > 0) {
-      const barrierAbsorbs = Math.min(barrierValue, preToughnessDmg);
-      damageAfterBarrier = preToughnessDmg - barrierAbsorbs;
-      displayDamage = Math.max(0, damageAfterBarrier - effectiveToughness);
-      barrierLine = `<p>Barrier absorbs: ${barrierAbsorbs} / ${barrierValue}${barrierAbsorbs >= barrierValue ? ' <em>(breaks)</em>' : ''}</p>`;
-    }
-
-    const toughnessLine = damageAfterBarrier > 0
-      ? `<p>Toughness: −${Math.min(effectiveToughness, damageAfterBarrier)}${affinityDR > 0 ? ` <em>(−${affinityDR} affinity)</em>` : ''}</p>`
+    const toughnessLine = preToughnessDmg > 0
+      ? `<p>Toughness: −${Math.min(effectiveToughness, preToughnessDmg)}${affinityDR > 0 ? ` <em>(−${affinityDR} affinity)</em>` : ''}</p>`
       : '';
 
     // Forced movement info for the button data attributes.

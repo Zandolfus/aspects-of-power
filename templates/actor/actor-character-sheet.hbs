@@ -61,6 +61,9 @@
             <span>{{system.overhealth.value}}</span>
             <span class="bar-separator">/</span>
             <span class="bar-max">{{system.overhealth.cap}}</span>
+            {{#if (gt system.overhealth.value 0)}}
+              <a class="clear-overhealth" title="Remove Overhealth"><i class="fas fa-times-circle"></i></a>
+            {{/if}}
           </div>
         </div>
 
@@ -78,6 +81,9 @@
               {{#each system.barrier.affinities as |aff|}}
                 <span class="affinity-chip">{{aff}}</span>
               {{/each}}
+            {{/if}}
+            {{#if (gt system.barrier.max 0)}}
+              <a class="clear-barrier" title="Remove Barrier"><i class="fas fa-times-circle"></i></a>
             {{/if}}
           </div>
         </div>

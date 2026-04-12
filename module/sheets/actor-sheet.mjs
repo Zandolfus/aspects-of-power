@@ -339,6 +339,21 @@ export class AspectsofPowerActorSheet extends foundry.applications.api.Handlebar
       fp.browse();
     });
 
+    // Clear overhealth button.
+    this.element.querySelector('.clear-overhealth')?.addEventListener('click', async () => {
+      await this.actor.update({ 'system.overhealth.value': 0 });
+    });
+
+    // Clear barrier button.
+    this.element.querySelector('.clear-barrier')?.addEventListener('click', async () => {
+      await this.actor.update({ 'system.barrier.value': 0, 'system.barrier.max': 0 });
+      // Also delete the barrier ActiveEffect.
+      const barrierEffect = this.actor.effects.find(e =>
+        !e.disabled && e.flags?.aspectsofpower?.effectType === 'barrier'
+      );
+      if (barrierEffect) await barrierEffect.delete();
+    });
+
     // Rollable abilities
     this.element.querySelectorAll('.rollable').forEach(el => {
       el.addEventListener('click', this._onRoll.bind(this));

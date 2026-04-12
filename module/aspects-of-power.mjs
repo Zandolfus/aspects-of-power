@@ -1359,10 +1359,14 @@ Hooks.on('renderChatMessageHTML', (message, html) => {
         }
       }
 
-      // Degrade durability on equipped items that provide the relevant defense.
-      const effectiveTough = Math.max(0, toughnessMod - affinityDR);
-      const totalDamage = Math.max(0, preToughnessDmg - effectiveTough);
-      await EquipmentSystem.degradeDurability(target, totalDamage, damageType);
+      // Degrade durability only on damage that passed through barriers.
+      // Barrier damage doesn't hit equipment.
+      if (!barrierAbsorbed || remaining > 0) {
+        const effectiveTough = Math.max(0, toughnessMod - affinityDR);
+        const damageAfterBarrier = barrierAbsorbed ? Math.max(0, preToughnessDmg - (barrier?.value ?? 0)) : preToughnessDmg;
+        const totalDamage = Math.max(0, damageAfterBarrier - effectiveTough);
+        if (totalDamage > 0) await EquipmentSystem.degradeDurability(target, totalDamage, damageType);
+      }
 
       const breakdown = parts.length ? ` (${parts.join(', ')})` : '';
       const actualHpLoss = health.value - newHealth;

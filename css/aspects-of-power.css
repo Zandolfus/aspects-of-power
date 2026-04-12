@@ -363,6 +363,18 @@
 .aspects-of-power .resource-stamina .bar-label { color: #ffca28; }
 .aspects-of-power .resource-overhealth .bar-label { color: #66bb6a; }
 .aspects-of-power .resource-barrier .bar-label { color: #7986cb; }
+.aspects-of-power .clear-overhealth,
+.aspects-of-power .clear-barrier {
+  cursor: pointer;
+  opacity: 0.4;
+  margin-left: 4px;
+  font-size: 11px;
+}
+.aspects-of-power .clear-overhealth:hover,
+.aspects-of-power .clear-barrier:hover {
+  opacity: 1;
+  color: #ef5350;
+}
 .aspects-of-power .resource-barrier .affinity-chip {
   font-size: 9px;
   padding: 0 4px;
