@@ -775,9 +775,7 @@ export class AspectsofPowerItem extends Item {
               name:   payload.effectName,
               img:    payload.img,
               origin: payload.originUuid,
-              'duration.rounds': payload.duration,
-              'duration.startRound': startRound,
-              'duration.startTurn': startTurn,
+              duration: { rounds: payload.duration, startRound, startTurn },
               disabled: false,
               changes: payload.changes,
             }]);
@@ -875,9 +873,10 @@ export class AspectsofPowerItem extends Item {
               content: `<p>Debuff on <strong>${target.name}</strong> stacked${stackInfo} for ${newDuration} rounds.</p>`,
             });
           } else {
-            // No existing — create new effect.
-            payload.effectData['duration.startRound'] = startRound;
-            payload.effectData['duration.startTurn'] = startTurn;
+            // No existing — create new effect. Use nested duration object for v14.
+            if (!payload.effectData.duration) payload.effectData.duration = {};
+            payload.effectData.duration.startRound = startRound;
+            payload.effectData.duration.startTurn = startTurn;
             await target.createEmbeddedDocuments('ActiveEffect', [payload.effectData]);
 
             if (payload.statSummary) {
@@ -1156,7 +1155,7 @@ export class AspectsofPowerItem extends Item {
       name:        effectName,
       img:         item.img ?? 'icons/svg/downgrade.svg',
       origin:      this.uuid,
-      'duration.rounds': duration,
+      duration:    { rounds: duration },
       disabled:    false,
       changes,
       description: dealsDmg

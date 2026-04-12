@@ -21,8 +21,7 @@ export function onManageActiveEffect(event, owner) {
           }),
           img: 'icons/svg/aura.svg',
           origin: owner.uuid,
-          'duration.rounds':
-            sectionType === 'temporary' ? 1 : undefined,
+          duration: sectionType === 'temporary' ? { rounds: 1 } : {},
           disabled: sectionType === 'inactive',
           flags: isCategory ? { aspectsofpower: { effectCategory: sectionType } } : {},
         },

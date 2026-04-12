@@ -783,7 +783,7 @@ Hooks.on('combatTurnChange', async (combat, _prior, current) => {
         breakThreshold = rollTotal;
       }
 
-      const breakRoll = new Roll('1d20 + @mod', { mod: statMod });
+      const breakRoll = new Roll('(1d20 / 100) * @mod + @mod', { mod: statMod });
       await breakRoll.evaluate();
 
       // Accumulate break progress across turns.
@@ -1159,9 +1159,7 @@ async function _triggerPersistentAoe(tokenDoc, force = false) {
           name: `AOE: ${debuffType}`,
           img: 'icons/svg/hazard.svg',
           origin: flags.casterActorUuid,
-          'duration.rounds': duration,
-          'duration.startRound': game.combat?.round ?? 0,
-          'duration.startTurn': game.combat?.turn ?? 0,
+          duration: { rounds: duration, startRound: game.combat?.round ?? 0, startTurn: game.combat?.turn ?? 0 },
           disabled: false,
           changes: entries,
           flags: {
@@ -1421,7 +1419,7 @@ async function _applyForcedMovement(targetActor, attackerTokenId, dir, distFt, h
 
   // Strength contest: target rolls 1d20 + strength mod vs hit total.
   const strMod = targetActor.system.abilities?.strength?.mod ?? 0;
-  const strRoll = new Roll('1d20 + @str', { str: strMod });
+  const strRoll = new Roll('(1d20 / 100) * @str + @str', { str: strMod });
   await strRoll.evaluate();
   await strRoll.toMessage({
     speaker: ChatMessage.getSpeaker({ actor: targetActor }),
