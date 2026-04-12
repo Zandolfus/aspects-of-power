@@ -321,7 +321,8 @@ export class AspectsofPowerActorSheet extends foundry.applications.api.Handlebar
     // Active Effect management
     this.element.querySelectorAll('.effect-control').forEach(el => {
       el.addEventListener('click', ev => {
-        const row      = ev.currentTarget.closest('li');
+        const row = ev.currentTarget.closest('li') ?? ev.currentTarget.closest('.debuff-card');
+        if (!row) return;
         const document = row.dataset.parentId === this.actor.id
           ? this.actor
           : this.actor.items.get(row.dataset.parentId);
