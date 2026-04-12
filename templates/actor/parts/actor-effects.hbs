@@ -3,7 +3,7 @@
     <li class="items-header flexrow" data-effect-type="{{section.type}}" data-parent-id="{{@root.actor.id}}" >
       <h3 class="item-name effect-name flexrow">{{localize section.label}}</h3>
       <div class="effect-source">{{localize "ASPECTSOFPOWER.Effect.Source"}}</div>
-      <div class="effect-source">{{localize "EFFECT.TabDuration"}}</div>
+      <div class="effect-source">Duration</div>
       <div class="item-controls effect-controls flexrow">
         <a class="effect-control" data-action="create" title="{{localize 'DOCUMENT.Create' type="Effect"}}">
           <i class="fas fa-plus"></i> {{localize "DOCUMENT.New" type="Effect"}}
@@ -39,10 +39,10 @@
 </ol>
 
 {{!-- Debuffs Section — separate display with combat-relevant info --}}
-{{#if debuffs.length}}
+{{#if @root.debuffs.length}}
 <div class="debuffs-section">
   <h3 class="debuffs-header">Active Debuffs</h3>
-  {{#each debuffs as |debuff|}}
+  {{#each @root.debuffs as |debuff|}}
     <div class="debuff-card" data-effect-id="{{debuff.id}}" data-parent-id="{{debuff.parent.id}}">
       <div class="debuff-card-header">
         <img src="{{debuff.img}}" width="20" height="20"/>
