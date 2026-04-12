@@ -13,71 +13,79 @@
 
     <ol class="item-list">
     {{#each section.effects as |effect|}}
-      {{#with (lookup effect.flags "aspects-of-power") as |aopFlags|}}
-      <li class="item effect flexcol" data-effect-id="{{effect.id}}" data-parent-id="{{effect.parent.id}}">
-        <div class="effect-row flexrow">
-          <div class="item-name effect-name flexrow">
-            <img class="item-image" src="{{effect.img}}"/>
-            <h4>{{effect.name}}</h4>
-          </div>
-          <div class="effect-source">{{effect.sourceName}}</div>
-          <div class="effect-duration">{{effect.duration.label}}</div>
-          <div class="item-controls effect-controls flexrow">
-            <a class="effect-control" data-action="toggle" title="{{localize 'ASPECTSOFPOWER.Effect.Toggle'}}">
-              <i class="fas {{#if effect.disabled}}fa-check{{else}}fa-times{{/if}}"></i>
-            </a>
-            <a class="effect-control" data-action="edit" title="{{localize 'DOCUMENT.Update' type="Effect"}}">
-              <i class="fas fa-edit"></i>
-            </a>
-            <a class="effect-control" data-action="delete" title="{{localize 'DOCUMENT.Delete' type="Effect"}}">
-              <i class="fas fa-trash"></i>
-            </a>
-          </div>
+      <li class="item effect flexrow" data-effect-id="{{effect.id}}" data-parent-id="{{effect.parent.id}}">
+        <div class="item-name effect-name flexrow">
+          <img class="item-image" src="{{effect.img}}"/>
+          <h4>{{effect.name}}</h4>
         </div>
-        {{#if aopFlags}}
-          {{#if aopFlags.debuffType}}
-            {{#unless (eq aopFlags.debuffType "none")}}
-            <div class="effect-debuff-details">
-              <span class="debuff-badge">{{localize (lookup @root.config.debuffTypes aopFlags.debuffType)}}</span>
-              {{#if aopFlags.debuffDamage}}
-                <span class="debuff-stat">Roll: {{aopFlags.debuffDamage}}</span>
-              {{/if}}
-              {{#if aopFlags.breakProgress}}
-                <span class="debuff-stat break-progress">Break: {{aopFlags.breakProgress}} / {{aopFlags.debuffDamage}}</span>
-              {{/if}}
-              {{#if aopFlags.dot}}
-                <span class="debuff-stat dot-indicator">DoT: {{aopFlags.dotDamage}} {{aopFlags.dotDamageType}}/rnd</span>
-              {{/if}}
-            </div>
-            {{/unless}}
-          {{/if}}
-        {{/if}}
-      </li>
-      {{else}}
-      <li class="item effect flexcol" data-effect-id="{{effect.id}}" data-parent-id="{{effect.parent.id}}">
-        <div class="effect-row flexrow">
-          <div class="item-name effect-name flexrow">
-            <img class="item-image" src="{{effect.img}}"/>
-            <h4>{{effect.name}}</h4>
-          </div>
-          <div class="effect-source">{{effect.sourceName}}</div>
-          <div class="effect-duration">{{effect.duration.label}}</div>
-          <div class="item-controls effect-controls flexrow">
-            <a class="effect-control" data-action="toggle" title="{{localize 'ASPECTSOFPOWER.Effect.Toggle'}}">
-              <i class="fas {{#if effect.disabled}}fa-check{{else}}fa-times{{/if}}"></i>
-            </a>
-            <a class="effect-control" data-action="edit" title="{{localize 'DOCUMENT.Update' type="Effect"}}">
-              <i class="fas fa-edit"></i>
-            </a>
-            <a class="effect-control" data-action="delete" title="{{localize 'DOCUMENT.Delete' type="Effect"}}">
-              <i class="fas fa-trash"></i>
-            </a>
-          </div>
+        <div class="effect-source">{{effect.sourceName}}</div>
+        <div class="effect-duration">{{effect.duration.label}}</div>
+        <div class="item-controls effect-controls flexrow">
+          <a class="effect-control" data-action="toggle" title="{{localize 'ASPECTSOFPOWER.Effect.Toggle'}}">
+            <i class="fas {{#if effect.disabled}}fa-check{{else}}fa-times{{/if}}"></i>
+          </a>
+          <a class="effect-control" data-action="edit" title="{{localize 'DOCUMENT.Update' type="Effect"}}">
+            <i class="fas fa-edit"></i>
+          </a>
+          <a class="effect-control" data-action="delete" title="{{localize 'DOCUMENT.Delete' type="Effect"}}">
+            <i class="fas fa-trash"></i>
+          </a>
         </div>
       </li>
-      {{/with}}
 
     {{/each}}
     </ol>
   {{/each}}
 </ol>
+
+{{!-- Debuffs Section — separate display with combat-relevant info --}}
+{{#if debuffs.length}}
+<div class="debuffs-section">
+  <h3 class="debuffs-header">Active Debuffs</h3>
+  {{#each debuffs as |debuff|}}
+    <div class="debuff-card" data-effect-id="{{debuff.id}}" data-parent-id="{{debuff.parent.id}}">
+      <div class="debuff-card-header">
+        <img src="{{debuff.img}}" width="20" height="20"/>
+        <span class="debuff-card-name">{{debuff.name}}</span>
+        <span class="debuff-type-badge">{{debuff.typeLabel}}</span>
+        <div class="debuff-card-controls">
+          <a class="effect-control" data-action="delete" title="Remove"><i class="fas fa-trash"></i></a>
+        </div>
+      </div>
+      <div class="debuff-card-body">
+        {{#if debuff.rollTotal}}
+          <div class="debuff-field">
+            <label>Roll</label>
+            <span>{{debuff.rollTotal}}</span>
+          </div>
+        {{/if}}
+        {{#if debuff.breakStat}}
+          <div class="debuff-field">
+            <label>Break</label>
+            <span class="break-value">{{debuff.breakProgress}} / {{debuff.breakThreshold}}</span>
+            <span class="break-stat-label">({{debuff.breakStatLabel}})</span>
+          </div>
+        {{/if}}
+        {{#if debuff.dot}}
+          <div class="debuff-field dot-field">
+            <label>DoT</label>
+            <span>{{debuff.dotDamage}} {{debuff.dotType}}/rnd</span>
+          </div>
+        {{/if}}
+        {{#if debuff.duration}}
+          <div class="debuff-field">
+            <label>Duration</label>
+            <span>{{debuff.duration}}</span>
+          </div>
+        {{/if}}
+        {{#if debuff.statChanges.length}}
+          <div class="debuff-field">
+            <label>Stats</label>
+            <span>{{debuff.statSummary}}</span>
+          </div>
+        {{/if}}
+      </div>
+    </div>
+  {{/each}}
+</div>
+{{/if}}

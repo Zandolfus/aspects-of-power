@@ -723,39 +723,81 @@
 .aspects-of-power .effects .item .effect-controls {
   border: none;
 }
-.aspects-of-power .effects .item.effect {
-  padding: 2px;
+/* ── Debuff Cards ── */
+.aspects-of-power .debuffs-section {
+  margin-top: 8px;
 }
-.aspects-of-power .effect-row {
-  align-items: center;
+.aspects-of-power .debuffs-header {
+  font-size: 14px;
+  font-weight: bold;
+  padding: 4px 8px;
+  background: rgba(198, 40, 40, 0.2);
+  border: 1px solid #c62828;
+  border-radius: 4px 4px 0 0;
+  color: #ef5350;
 }
-.aspects-of-power .effect-debuff-details {
+.aspects-of-power .debuff-card {
+  border: 1px solid #444;
+  border-top: none;
+  background: rgba(0,0,0,0.15);
+  padding: 6px 8px;
+}
+.aspects-of-power .debuff-card:last-child {
+  border-radius: 0 0 4px 4px;
+}
+.aspects-of-power .debuff-card-header {
   display: flex;
-  gap: 8px;
-  padding: 2px 8px 4px 28px;
-  font-size: 11px;
   align-items: center;
-  flex-wrap: wrap;
+  gap: 6px;
 }
-.aspects-of-power .debuff-badge {
+.aspects-of-power .debuff-card-name {
+  font-weight: bold;
+  font-size: 13px;
+  flex: 1;
+}
+.aspects-of-power .debuff-type-badge {
   background: #c62828;
   color: #fff;
-  padding: 1px 6px;
+  padding: 1px 8px;
   border-radius: 3px;
   font-weight: bold;
   font-size: 10px;
   text-transform: uppercase;
 }
-.aspects-of-power .debuff-stat {
-  color: #ccc;
-  background: rgba(0,0,0,0.2);
-  padding: 1px 5px;
-  border-radius: 3px;
+.aspects-of-power .debuff-card-controls {
+  font-size: 11px;
+  opacity: 0.6;
 }
-.aspects-of-power .break-progress {
+.aspects-of-power .debuff-card-controls:hover {
+  opacity: 1;
+}
+.aspects-of-power .debuff-card-body {
+  display: flex;
+  gap: 12px;
+  padding: 4px 0 0 26px;
+  font-size: 11px;
+  flex-wrap: wrap;
+}
+.aspects-of-power .debuff-field {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+}
+.aspects-of-power .debuff-field label {
+  font-weight: bold;
+  opacity: 0.7;
+  font-size: 10px;
+  text-transform: uppercase;
+}
+.aspects-of-power .debuff-field .break-value {
   color: #ffca28;
+  font-weight: bold;
 }
-.aspects-of-power .dot-indicator {
+.aspects-of-power .debuff-field .break-stat-label {
+  opacity: 0.6;
+  font-size: 10px;
+}
+.aspects-of-power .debuff-field.dot-field span {
   color: #ef5350;
 }
 /* Casting range toggle in Token HUD */

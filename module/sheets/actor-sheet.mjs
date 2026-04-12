@@ -69,6 +69,9 @@ export class AspectsofPowerActorSheet extends foundry.applications.api.Handlebar
       this.actor.allApplicableEffects()
     );
 
+    // Prepare debuff data for dedicated display.
+    context.debuffs = this._prepareDebuffs();
+
     return context;
   }
 
@@ -502,5 +505,75 @@ export class AspectsofPowerActorSheet extends foundry.applications.api.Handlebar
       });
       return roll;
     }
+  }
+
+  /**
+   * Prepare debuff effect data for the dedicated debuffs display.
+   * Extracts combat-relevant info from ActiveEffects with debuff flags.
+   * @returns {object[]}
+   */
+  _prepareDebuffs() {
+    const breakStats = {
+      root: 'strength', paralysis: 'vitality', fear: 'willpower',
+      taunt: 'intelligence', charm: 'willpower', enraged: 'wisdom',
+      slip: 'dexterity',
+    };
+
+    const debuffs = [];
+    for (const effect of this.actor.effects) {
+      if (effect.disabled) continue;
+      const flags = effect.flags?.['aspects-of-power'];
+      if (!flags?.debuffType || flags.debuffType === 'none') continue;
+
+      const debuffType = flags.debuffType;
+      const rollTotal = flags.debuffDamage ?? 0;
+      const breakStat = breakStats[debuffType] ?? null;
+      let breakThreshold = rollTotal;
+      let breakStatLabel = breakStat
+        ? game.i18n.localize(CONFIG.ASPECTSOFPOWER.abilities[breakStat] ?? breakStat)
+        : null;
+
+      // Slip: show both break paths.
+      if (debuffType === 'slip') {
+        breakStatLabel = `Dex or Str×1.5`;
+      }
+
+      // Stat changes summary.
+      const changes = effect.changes ?? [];
+      const statChanges = changes.filter(c => c.key.startsWith('system.abilities.'));
+      const statSummary = statChanges.map(c => {
+        const attr = c.key.replace('system.abilities.', '').replace('.value', '');
+        const label = game.i18n.localize(CONFIG.ASPECTSOFPOWER.abilities[attr] ?? attr);
+        return `${label} ${c.value > 0 ? '+' : ''}${c.value}`;
+      }).join(', ');
+
+      // Duration label.
+      const dur = effect.duration;
+      let duration = '';
+      if (dur?.rounds > 0) {
+        const remaining = Math.max(0, (dur.startRound ?? 0) + dur.rounds - (game.combat?.round ?? 0));
+        duration = `${remaining} rnd${remaining !== 1 ? 's' : ''} left`;
+      }
+
+      debuffs.push({
+        id: effect.id,
+        parent: effect.parent,
+        name: effect.name,
+        img: effect.img,
+        typeLabel: game.i18n.localize(CONFIG.ASPECTSOFPOWER.debuffTypes[debuffType] ?? debuffType),
+        rollTotal,
+        breakStat,
+        breakStatLabel,
+        breakProgress: flags.breakProgress ?? 0,
+        breakThreshold,
+        dot: flags.dot ?? false,
+        dotDamage: flags.dotDamage ?? 0,
+        dotType: flags.dotDamageType ?? 'physical',
+        duration,
+        statChanges,
+        statSummary,
+      });
+    }
+    return debuffs;
   }
 }
