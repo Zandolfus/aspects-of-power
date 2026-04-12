@@ -727,7 +727,6 @@ const DEBUFF_BREAK_STAT = {
   taunt:     'intelligence',
   charm:     'willpower',
   enraged:   'wisdom',
-  slip:      'dexterity',  // also breaks with strength at 1.5x threshold
 };
 
 const TURN_SKIP_DEBUFFS = ['stun', 'paralysis', 'sleep', 'immobilized'];
@@ -1142,6 +1141,54 @@ async function _triggerPersistentAoe(tokenDoc, force = false) {
 
     const speaker = ChatMessage.getSpeaker({ actor: casterActor });
     const rollTotal = pd.rollTotal ?? 0;
+
+    // Zone effects (slippery, difficult terrain) — handled separately from tags.
+    const zoneEffect = pd.zoneEffect ?? 'none';
+    if (zoneEffect === 'slippery') {
+      // Dex check: (d20/100) * dexMod + dexMod vs rollTotal.
+      const dexMod = targetActor.system.abilities?.dexterity?.mod ?? 0;
+      const d20 = Math.floor(Math.random() * 20) + 1;
+      const checkValue = Math.round((d20 / 100) * dexMod + dexMod);
+      const passed = checkValue >= rollTotal;
+      const _isPC = game.users.some(u => !u.isGM && u.active && u.character?.id === targetActor.id);
+      const whisper = _isPC ? {} : { whisper: ChatMessage.getWhisperRecipients('GM') };
+
+      if (!passed) {
+        ChatMessage.create({
+          speaker: ChatMessage.getSpeaker({ actor: targetActor }),
+          ...whisper,
+          content: `<p><strong>${targetActor.name}</strong> ${game.i18n.localize('ASPECTSOFPOWER.Zone.slipped')} (${checkValue} vs ${rollTotal})</p>`,
+        });
+        // Apply prone debuff.
+        const proneData = {
+          name: 'Prone',
+          img: 'icons/svg/falling.svg',
+          origin: flags.casterActorUuid,
+          duration: { rounds: 1, startRound: game.combat?.round ?? 0, startTurn: game.combat?.turn ?? 0 },
+          disabled: false,
+          changes: [],
+          flags: { 'aspects-of-power': { debuffDamage: 0, debuffType: 'immobilized', casterActorUuid: flags.casterActorUuid } },
+        };
+        await AspectsofPowerItem.executeGmAction({
+          type: 'gmApplyDebuff',
+          targetActorUuid: targetActor.uuid,
+          effectName: proneData.name,
+          originUuid: flags.casterActorUuid,
+          effectData: proneData,
+          duration: 1,
+          stackable: false,
+          speaker,
+        });
+      } else {
+        ChatMessage.create({
+          speaker: ChatMessage.getSpeaker({ actor: targetActor }),
+          ...whisper,
+          content: `<p><strong>${targetActor.name}</strong> ${game.i18n.localize('ASPECTSOFPOWER.Zone.keptFooting')} (${checkValue} vs ${rollTotal})</p>`,
+        });
+      }
+      triggered = true;
+      continue; // Zone effect handled — skip tag processing for this region.
+    }
 
     for (const tag of (pd.tags ?? [])) {
       if (tag === 'debuff' && pd.tagConfig?.debuffType && pd.tagConfig.debuffType !== 'none') {

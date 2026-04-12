@@ -91,7 +91,15 @@ ASPECTSOFPOWER.debuffTypes = {
   enraged:       'ASPECTSOFPOWER.Debuff.enraged',
   hallucination: 'ASPECTSOFPOWER.Debuff.hallucination',
   dismembered:   'ASPECTSOFPOWER.Debuff.dismembered',
-  slip:          'ASPECTSOFPOWER.Debuff.slip',
+};
+
+/**
+ * Zone effects for persistent AOE regions.
+ */
+ASPECTSOFPOWER.zoneEffects = {
+  none:             'ASPECTSOFPOWER.Zone.none',
+  slippery:         'ASPECTSOFPOWER.Zone.slippery',
+  difficultTerrain: 'ASPECTSOFPOWER.Zone.difficultTerrain',
 };
 
 ASPECTSOFPOWER.professionTags = {

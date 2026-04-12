@@ -1457,6 +1457,7 @@ export class AspectsofPowerItem extends Item {
                 hitTotal: null,
                 damageType: this.system.roll?.damageType ?? 'physical',
                 targetingMode: aoe.targetingMode ?? 'all',
+                zoneEffect: aoe.zoneEffect ?? 'none',
                 casterDisposition: this.actor.getActiveTokens()?.[0]?.document?.disposition ?? CONST.TOKEN_DISPOSITIONS.NEUTRAL,
                 affectedTokens: [],
               } : null,

@@ -145,6 +145,13 @@
         <input type='number' name='system.aoe.templateDuration'
                value='{{system.aoe.templateDuration}}' min='0' step='1' />
         <span class='hint'>{{localize "ASPECTSOFPOWER.AOE.templateDurationHint"}}</span>
+
+        <label class='resource-label'>{{localize "ASPECTSOFPOWER.Zone.label"}}</label>
+        <select name='system.aoe.zoneEffect'>
+          {{#each config.zoneEffects as |label key|}}
+            <option value='{{key}}' {{#if (eq key ../system.aoe.zoneEffect)}}selected{{/if}}>{{localize label}}</option>
+          {{/each}}
+        </select>
         {{/if}}
       </div>
       {{/if}}

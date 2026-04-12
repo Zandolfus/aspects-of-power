@@ -159,6 +159,14 @@
       "enragedMsg": "is enraged!",
       "weakened": "is weakened!"
     },
+    "Zone": {
+      "none": "None",
+      "slippery": "Slippery",
+      "difficultTerrain": "Difficult Terrain",
+      "label": "Zone Effect",
+      "slipped": "slips and falls prone!",
+      "keptFooting": "keeps their footing."
+    },
     "Cleanse": {
       "noTarget": "No target for cleanse.",
       "noDebuffs": "No cleansable debuffs on target.",

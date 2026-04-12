@@ -55,6 +55,7 @@ export class SkillData extends foundry.abstract.TypeDataModel {
         angle:            new fields.NumberField({ initial: 53, min: 1, max: 360 }),
         targetingMode:    new fields.StringField({ initial: 'all' }),
         templateDuration: new fields.NumberField({ initial: 0, min: 0, integer: true }),
+        zoneEffect:       new fields.StringField({ initial: 'none' }),
       }),
 
       // Skill component flags — determine which debuffs block this skill.

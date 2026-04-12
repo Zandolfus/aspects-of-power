@@ -99,37 +99,6 @@ export class AspectsofPowerToken extends foundry.documents.TokenDocument {
       return false;
     }
 
-    // Slip: roll dex check vs debuff roll. Fail = fall prone, movement ends.
-    const slipEffect = actor.effects.find(e =>
-      !e.disabled && e.flags?.['aspects-of-power']?.debuffType === 'slip'
-    );
-    if (slipEffect) {
-      const debuffRoll = slipEffect.flags?.['aspects-of-power']?.debuffDamage ?? 0;
-      const dexMod = actor.system.abilities?.dexterity?.mod ?? 0;
-      // Ability check formula: (d20/100) * mod + mod
-      const checkValue = (Math.floor(Math.random() * 20) + 1) / 100 * dexMod + dexMod;
-      const passed = Math.round(checkValue) >= debuffRoll;
-
-      const _isPC = game.users.some(u => !u.isGM && u.active && u.character?.id === actor.id);
-      const whisper = _isPC ? {} : { whisper: ChatMessage.getWhisperRecipients('GM') };
-
-      if (!passed) {
-        AspectsofPowerToken._segmentMovement.set(combatant.id, Infinity);
-        ChatMessage.create({
-          speaker: ChatMessage.getSpeaker({ actor }),
-          ...whisper,
-          content: `<p><strong>${actor.name}</strong> slips and falls prone! (${Math.round(checkValue)} vs ${debuffRoll}) Movement ended.</p>`,
-        });
-        return false;
-      } else {
-        ChatMessage.create({
-          speaker: ChatMessage.getSpeaker({ actor }),
-          ...whisper,
-          content: `<p><strong>${actor.name}</strong> keeps their footing. (${Math.round(checkValue)} vs ${debuffRoll})</p>`,
-        });
-      }
-    }
-
     // Calculate movement ranges (with chilled reduction).
     const { walkRange, sprintRange } = this._getMovementRanges(actor);
     if (walkRange <= 0 && sprintRange <= 0) {

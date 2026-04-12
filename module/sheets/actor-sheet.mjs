@@ -531,7 +531,6 @@ export class AspectsofPowerActorSheet extends foundry.applications.api.Handlebar
     const breakStats = {
       root: 'strength', paralysis: 'vitality', fear: 'willpower',
       taunt: 'intelligence', charm: 'willpower', enraged: 'wisdom',
-      slip: 'dexterity',
     };
 
     const debuffs = [];
