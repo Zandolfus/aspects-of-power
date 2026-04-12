@@ -1437,11 +1437,22 @@ export class AspectsofPowerItem extends Item {
           shapeData = { type: 'rectangle', x: pos.x - rectHalfPx, y: pos.y - rectHalfPx, width: rectSidePx, height: rectSidePx, rotation: 0 };
         }
 
+        // Build region behaviors (e.g., difficult terrain uses native modifyMovementCost).
+        const behaviors = [];
+        if ((aoe.zoneEffect ?? 'none') === 'difficultTerrain') {
+          behaviors.push({
+            type: 'modifyMovementCost',
+            name: 'Difficult Terrain',
+            system: { difficulties: { walk: 2, crawl: 2, swim: 2, climb: 2 } },
+          });
+        }
+
         const regionData = {
           name: `${this.name} AOE`,
           color: fillColor,
           visibility: 2, // ALWAYS visible
           shapes: [shapeData],
+          behaviors,
           flags: {
             'aspects-of-power': {
               aoe: true,

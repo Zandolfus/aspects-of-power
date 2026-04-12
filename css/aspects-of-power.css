@@ -735,6 +735,12 @@
 .aspects-of-power .effects .item .effect-controls {
   border: none;
 }
+/* ── Token Ruler Stamina Cost ── */
+.waypoint-label .stamina-cost {
+  color: #ffca28;
+  font-weight: bold;
+}
+
 /* ── Debuff Cards ── */
 .aspects-of-power .debuffs-section {
   margin-top: 8px;

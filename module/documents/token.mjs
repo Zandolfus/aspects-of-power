@@ -99,13 +99,6 @@ export class AspectsofPowerToken extends foundry.documents.TokenDocument {
       return false;
     }
 
-    // Calculate movement ranges (with chilled reduction).
-    const { walkRange, sprintRange } = this._getMovementRanges(actor);
-    if (walkRange <= 0 && sprintRange <= 0) {
-      ui.notifications.warn(`${actor.name} is frozen solid! (Chilled overcame Endurance)`);
-      return false;
-    }
-
     // Check action limit.
     const actionsUsed = AspectsofPowerToken._moveActionTracker.get(combatant.id) ?? 0;
     if (actionsUsed >= 3) {
@@ -113,30 +106,29 @@ export class AspectsofPowerToken extends foundry.documents.TokenDocument {
       return false;
     }
 
-    // Calculate distance from movement cost (v14 cost is in distance units).
-    const totalCost = (movement.passed?.cost ?? 0) + (movement.pending?.cost ?? 0);
-    const moveSnapped = Math.round(totalCost / 5) * 5;
-    if (moveSnapped <= 0) return;
-
-    // Cumulative segment check.
-    const segmentSoFar = AspectsofPowerToken._segmentMovement.get(combatant.id) ?? 0;
-    const newSegmentTotal = segmentSoFar + moveSnapped;
-    if (newSegmentTotal > sprintRange) {
-      const remaining = Math.max(0, sprintRange - segmentSoFar);
-      ui.notifications.warn(`Movement cap reached! (${remaining} ft remaining this segment, ${Math.round(sprintRange)} ft max)`);
+    // The cost function (_getMovementCostFunction on the canvas Token) already
+    // returns stamina cost (not raw distance) and returns Infinity beyond sprint range.
+    // movement.passed.cost + movement.pending.cost = total stamina cost for this move.
+    const staminaCost = (movement.passed?.cost ?? 0) + (movement.pending?.cost ?? 0);
+    if (!isFinite(staminaCost)) {
+      ui.notifications.warn('Movement cap reached!');
       return false;
     }
+    if (staminaCost <= 0) return;
 
     // Check stamina (in-memory value already reflects pending movement costs).
     const stamina = actor.system.stamina;
-    let staminaCost = 0;
-    for (let ft = segmentSoFar + 5; ft <= newSegmentTotal; ft += 5) {
-      staminaCost += (ft <= walkRange) ? 1 : 3;
-    }
     if (staminaCost > stamina.value) {
       ui.notifications.warn('Insufficient stamina to move!');
       return false;
     }
+
+    // Calculate distance for the chat message.
+    const { sprintRange } = this._getMovementRanges(actor);
+    const segmentSoFar = AspectsofPowerToken._segmentMovement.get(combatant.id) ?? 0;
+    const moveDist = (movement.passed?.distance ?? 0) + (movement.pending?.distance ?? 0);
+    const moveSnapped = Math.round(moveDist / 5) * 5;
+    const newSegmentTotal = segmentSoFar + moveSnapped;
 
     // Store for _onUpdateMovement.
     this._pendingMovement = { combatantId: combatant.id, moveSnapped, newSegmentTotal, staminaCost, sprintRange };

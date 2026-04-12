@@ -2,6 +2,8 @@
 import { AspectsofPowerActor } from './documents/actor.mjs';
 import { AspectsofPowerItem } from './documents/item.mjs';
 import { AspectsofPowerToken } from './documents/token.mjs';
+import { AspectsofPowerTokenObject } from './canvas/token.mjs';
+import { AspectsofPowerTokenRuler } from './canvas/token-ruler.mjs';
 // Import sheet classes.
 import { AspectsofPowerActorSheet } from './sheets/actor-sheet.mjs';
 import { AspectsofPowerItemSheet } from './sheets/item-sheet.mjs';
@@ -135,6 +137,8 @@ Hooks.once('init', function () {
   CONFIG.Actor.documentClass = AspectsofPowerActor;
   CONFIG.Item.documentClass = AspectsofPowerItem;
   CONFIG.Token.documentClass = AspectsofPowerToken;
+  CONFIG.Token.objectClass = AspectsofPowerTokenObject;
+  CONFIG.Token.rulerClass = AspectsofPowerTokenRuler;
 
   // v14: auto-delete ActiveEffects when their duration expires.
   CONFIG.ActiveEffect.expiryAction = 'delete';
