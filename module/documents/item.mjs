@@ -1884,6 +1884,15 @@ export class AspectsofPowerItem extends Item {
       }
     }
 
+    // Enraged: increase melee damage by the enraged bonus %.
+    const enragedBonus = this.actor.system.enragedDamageBonus ?? 0;
+    if (enragedBonus > 0 && dmgRoll) {
+      const rollType = rollData.roll.type;
+      if (rollType === 'str_weapon' || rollType === 'dex_weapon' || rollType === 'magic_melee') {
+        dmgRoll._total = Math.round(dmgRoll.total * (1 + enragedBonus));
+      }
+    }
+
     const resource  = rollData.roll.resource;
     const newResVal = Math.max(0, Math.round(rollData.roll.resourcevalue - rollData.roll.cost));
 

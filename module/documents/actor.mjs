@@ -162,38 +162,93 @@ export class AspectsofPowerActor extends Actor {
       return sum;
     };
 
-    // Check for root/immobilized debuffs that reduce dexterity application to defenses.
-    let dexMeleeReduction = 0;
-    let dexRangedReduction = 0;
+    // ── Debuff impacts on defenses ──
+    // Collect all active debuffs and their defense modifications.
+    let zeroMelee = false, zeroRanged = false, zeroMind = false;
+    let dexReduction = 0;       // Root: flat reduction to dex contribution
+    let perceptionReduction = 0; // Blind: flat reduction to perception contribution
+    let allDefensePctReduction = 0; // Slow: % reduction to all defenses
+    let meleeRangedPctReduction = 0; // Enraged: % reduction to melee/ranged
+
     for (const effect of this.effects) {
       if (effect.disabled) continue;
       const flags = effect.flags?.['aspects-of-power'];
       if (!flags?.debuffType) continue;
+      const roll = flags.debuffDamage ?? 0;
 
-      if (flags.debuffType === 'root') {
-        // Root reduces dexterity contribution by the debuff roll amount.
-        const reduction = flags.debuffDamage ?? 0;
-        dexMeleeReduction += reduction;
-        dexRangedReduction += reduction;
-      } else if (flags.debuffType === 'immobilized' || flags.debuffType === 'frozen') {
-        // Immobilized/Frozen zeroes out melee & ranged defense entirely.
-        dexMeleeReduction = Infinity;
-        dexRangedReduction = Infinity;
+      switch (flags.debuffType) {
+        case 'stun':
+          zeroMelee = zeroRanged = zeroMind = true;
+          break;
+        case 'paralysis':
+        case 'immobilized':
+        case 'frozen':
+          zeroMelee = zeroRanged = true;
+          break;
+        case 'sleep':
+          zeroMelee = zeroRanged = zeroMind = true;
+          break;
+        case 'root':
+          dexReduction += roll;
+          break;
+        case 'blind':
+          perceptionReduction += roll;
+          break;
+        case 'deafened':
+          // 50% of debuff roll reduces perception contribution.
+          perceptionReduction += Math.round(roll * 0.5);
+          break;
+        case 'enraged':
+          // 20% of defense or debuff roll, whichever is lower (applied as % later).
+          meleeRangedPctReduction += Math.min(20, roll);
+          break;
+        // Slow: NYI — will reduce all defenses by a calculated amount.
+        // case 'slow':
+        //   allDefensePctReduction += Math.max(0, roll - (systemData.abilities.endurance.mod ?? 0));
+        //   break;
       }
     }
 
     const dexMod = systemData.abilities.dexterity.mod;
-    const effectiveDexMelee  = Math.max(0, dexMod - dexMeleeReduction);
-    const effectiveDexRanged = Math.max(0, dexMod * 0.3 - dexRangedReduction);
+    const perMod = systemData.abilities.perception.mod;
+    const strMod = systemData.abilities.strength.mod;
+    const intMod = systemData.abilities.intelligence.mod;
+    const wisMod = systemData.abilities.wisdom.mod;
+    const wilMod = systemData.abilities.willpower.mod;
+
+    const effectiveDex = Math.max(0, dexMod - dexReduction);
+    const effectivePer = Math.max(0, perMod - perceptionReduction);
 
     // Armor and veil: entirely from equipment/effects (no base stat contribution).
     systemData.defense.armor.value = effectBonus('system.defense.armor.value');
     systemData.defense.veil.value  = effectBonus('system.defense.veil.value');
 
-    systemData.defense.melee.value  = Math.round((effectiveDexMelee + systemData.abilities.strength.mod*.3)*1.1) + effectBonus('system.defense.melee.value');
-    systemData.defense.ranged.value = Math.round((effectiveDexRanged + systemData.abilities.perception.mod)*1.1) + effectBonus('system.defense.ranged.value');
-    systemData.defense.mind.value   = Math.round((systemData.abilities.intelligence.mod + systemData.abilities.wisdom.mod*.3)*1.1) + effectBonus('system.defense.mind.value');
-    systemData.defense.soul.value   = Math.round((systemData.abilities.wisdom.mod + systemData.abilities.willpower.mod*.3)*1.1) + effectBonus('system.defense.soul.value');
+    // Base defense calculations.
+    let meleeVal  = Math.round((effectiveDex + strMod * 0.3) * 1.1) + effectBonus('system.defense.melee.value');
+    let rangedVal = Math.round((effectiveDex * 0.3 + effectivePer) * 1.1) + effectBonus('system.defense.ranged.value');
+    let mindVal   = Math.round((intMod + wisMod * 0.3) * 1.1) + effectBonus('system.defense.mind.value');
+    let soulVal   = Math.round((wisMod + wilMod * 0.3) * 1.1) + effectBonus('system.defense.soul.value');
+
+    // Enraged: reduce melee/ranged by percentage.
+    if (meleeRangedPctReduction > 0) {
+      meleeVal  = Math.round(meleeVal * (1 - meleeRangedPctReduction / 100));
+      rangedVal = Math.round(rangedVal * (1 - meleeRangedPctReduction / 100));
+    }
+
+    // Zero-out overrides (stun/paralysis/sleep/immobilized/frozen).
+    if (zeroMelee)  meleeVal = 0;
+    if (zeroRanged) rangedVal = 0;
+    if (zeroMind)   mindVal = 0;
+
+    systemData.defense.melee.value  = meleeVal;
+    systemData.defense.ranged.value = rangedVal;
+    systemData.defense.mind.value   = mindVal;
+    systemData.defense.soul.value   = soulVal;
+
+    // Store enraged damage bonus for use in roll formulas.
+    systemData.enragedDamageBonus = meleeRangedPctReduction > 0
+      ? Math.min(20, meleeRangedPctReduction) / 100
+      : 0;
 
     // Defense pools: max = 2× calculated value. Clamp current pool to max.
     for (const defKey of ['melee', 'ranged', 'mind', 'soul']) {
