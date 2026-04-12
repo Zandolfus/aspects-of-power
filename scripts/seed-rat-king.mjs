@@ -131,7 +131,7 @@ const RAT_KING = {
       type: 'item',
       system: {
         description: '<p>Hundreds of razor-sharp teeth across dozens of maws, constantly growing and resharpening.</p>',
-        slot: 'hands', rarity: 'uncommon', equipped: true,
+        slot: 'weaponry', rarity: 'uncommon', equipped: true,
         material: 'bone', weight: 2,
         durability: { value: 180, max: 180 },
         armorBonus: 0, veilBonus: 0,

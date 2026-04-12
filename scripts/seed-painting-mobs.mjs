@@ -174,7 +174,7 @@ const MONSTERS = [
         type: 'item',
         system: {
           description: '<p>Iron-tipped legs, sharpened to impale.</p>',
-          slot: 'hands', rarity: 'common', equipped: true,
+          slot: 'weaponry', rarity: 'common', equipped: true,
           material: 'metal', weight: 3,
           durability: { value: 100, max: 100 },
           armorBonus: 0, veilBonus: 0,
@@ -240,7 +240,7 @@ const MONSTERS = [
         type: 'item',
         system: {
           description: '<p>A cluster of razor-sharp bristles ready to be launched.</p>',
-          slot: 'hands', rarity: 'uncommon', equipped: true,
+          slot: 'weaponry', rarity: 'uncommon', equipped: true,
           material: 'metal', weight: 2,
           durability: { value: 80, max: 80 },
           armorBonus: 0, veilBonus: 0,
@@ -448,7 +448,7 @@ const MONSTERS = [
         type: 'item',
         system: {
           description: '<p>Asymmetric claws, one far larger than the other — the artist never finished.</p>',
-          slot: 'hands', rarity: 'uncommon', equipped: true,
+          slot: 'weaponry', rarity: 'uncommon', equipped: true,
           material: 'metal', weight: 4,
           durability: { value: 100, max: 100 },
           armorBonus: 0, veilBonus: 0,
@@ -624,7 +624,7 @@ const MONSTERS = [
         type: 'item',
         system: {
           description: '<p>A massive palette knife, scaled up to golem proportions. Its edge is caked with dried paint that chips on impact.</p>',
-          slot: 'hands', rarity: 'uncommon', equipped: true,
+          slot: 'weaponry', rarity: 'uncommon', equipped: true,
           material: 'metal', weight: 10,
           durability: { value: 150, max: 150 },
           armorBonus: 0, veilBonus: 0,

@@ -101,6 +101,14 @@ Hooks.once('init', function () {
   };
 
   // ── System Settings ──
+  game.settings.register('aspects-of-power', 'migrationVersion', {
+    name: 'Migration Version',
+    scope: 'world',
+    config: false,
+    type: String,
+    default: '0',
+  });
+
   game.settings.register('aspects-of-power', 'woundedTokenThreshold', {
     name: 'Wounded Token Threshold',
     hint: 'HP percentage at or below which the token image swaps to the wounded variant (0 to disable).',
@@ -395,7 +403,33 @@ Hooks.on('renderCompendium', (app, html) => {
 /*  Ready Hook                                  */
 /* -------------------------------------------- */
 
-Hooks.once('ready', function () {
+Hooks.once('ready', async function () {
+  // ── One-time migrations ──
+  if (game.user.isGM) {
+    const migrationVersion = game.settings.get('aspects-of-power', 'migrationVersion') ?? '0';
+    if (foundry.utils.isNewerVersion('2.1.1', migrationVersion)) {
+      // Migrate equipment slot 'hands' → 'weaponry'.
+      let migrated = 0;
+      for (const actor of game.actors) {
+        for (const item of actor.items) {
+          if (item.type === 'item' && item.system.slot === 'hands') {
+            await item.update({ 'system.slot': 'weaponry' });
+            migrated++;
+          }
+        }
+      }
+      // Also migrate unowned items in the Items sidebar.
+      for (const item of game.items) {
+        if (item.type === 'item' && item.system.slot === 'hands') {
+          await item.update({ 'system.slot': 'weaponry' });
+          migrated++;
+        }
+      }
+      if (migrated > 0) ui.notifications.info(`Migration: renamed ${migrated} equipment slot(s) from "hands" to "weaponry".`);
+      await game.settings.set('aspects-of-power', 'migrationVersion', '2.1.1');
+    }
+  }
+
   // Wait to register hotbar drop hook on ready so that modules could register earlier if they want to
   Hooks.on('hotbarDrop', (bar, data, slot) => {
     if (data.type !== 'Item') return;

@@ -248,7 +248,7 @@ ASPECTSOFPOWER.equipmentSlots = {
   bracelet: { label: 'ASPECTSOFPOWER.Equip.Slot.bracelet', max: 2 },
   ring:     { label: 'ASPECTSOFPOWER.Equip.Slot.ring',     max: 10 },
   earring:  { label: 'ASPECTSOFPOWER.Equip.Slot.earring',  max: 1 },
-  hands:    { label: 'ASPECTSOFPOWER.Equip.Slot.hands',    max: 2 },
+  weaponry: { label: 'ASPECTSOFPOWER.Equip.Slot.weaponry',  max: 2 },
 };
 
 /**

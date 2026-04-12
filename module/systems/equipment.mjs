@@ -57,12 +57,12 @@ export class EquipmentSystem {
     );
 
     // Two-handed items require 2 free hand slots.
-    if (slot === 'hands' && item.system.twoHanded) {
+    if (slot === 'weaponry' && item.system.twoHanded) {
       if (equippedInSlot.length > 0) {
         ui.notifications.warn(game.i18n.localize('ASPECTSOFPOWER.Equip.needsTwoHands'));
         return false;
       }
-    } else if (slot === 'hands') {
+    } else if (slot === 'weaponry') {
       // One-handed: check if a two-handed item is already equipped.
       const twoHanderEquipped = equippedInSlot.some(i => i.system.twoHanded);
       if (twoHanderEquipped || equippedInSlot.length >= slotDef.max) {
@@ -351,7 +351,7 @@ export class EquipmentSystem {
     // Weapons (hands slot) are excluded — they degrade via their own damage-limit mechanic.
     const eligible = actor.items.filter(i => {
       if (i.type !== 'item' || !i.system.equipped || !i.system.slot) return false;
-      if (i.system.slot === 'hands') return false;
+      if (i.system.slot === 'weaponry') return false;
       if (i.system.durability.max <= 0 || i.system.durability.value <= 0) return false;
       if (damageType === 'magical') return (i.system.veilBonus ?? 0) > 0;
       return (i.system.armorBonus ?? 0) > 0; // physical (default)
@@ -377,12 +377,12 @@ export class EquipmentSystem {
   /**
    * Degrade a weapon's durability when raw damage exceeds its damage limit.
    * Damage limit = 3 × weapon progress. Durability loss = rawDamage − limit.
-   * @param {Item} weapon      The weapon item (must be in the 'hands' slot).
+   * @param {Item} weapon      The weapon item (must be in the 'weaponry' slot).
    * @param {number} rawDamage The unmitigated damage dealt by the attack.
    */
   static async degradeWeaponOnAttack(weapon, rawDamage) {
     if (!weapon || weapon.type !== 'item') return;
-    if (weapon.system.slot !== 'hands') return;
+    if (weapon.system.slot !== 'weaponry') return;
     if (weapon.system.durability.max <= 0 || weapon.system.durability.value <= 0) return;
 
     const damageLimit = 3 * (weapon.system.progress ?? 0);

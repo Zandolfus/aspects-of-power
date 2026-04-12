@@ -85,8 +85,8 @@
           </select>
         </div>
 
-        {{!-- Two-Handed (only for hands slot) --}}
-        {{#if (eq system.slot "hands")}}
+        {{!-- Two-Handed (only for weaponry slot) --}}
+        {{#if (eq system.slot "weaponry")}}
           <label class="equip-field two-handed-toggle">
             <input type="checkbox" name="system.twoHanded" {{checked system.twoHanded}} />
             {{localize "ASPECTSOFPOWER.Equip.twoHanded"}}
