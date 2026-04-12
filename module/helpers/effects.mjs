@@ -6,7 +6,8 @@
 export function onManageActiveEffect(event, owner) {
   event.preventDefault();
   const a = event.currentTarget;
-  const li = a.closest('li');
+  const li = a.closest('li') ?? a.closest('.debuff-card');
+  if (!li) return;
   const effect = li.dataset.effectId
     ? owner.effects.get(li.dataset.effectId)
     : null;
