@@ -845,31 +845,34 @@ export class AspectsofPowerItem extends Item {
               'duration.startRound': startRound,
               'duration.startTurn': startTurn,
             };
-            if (payload.effectData.flags?.['aspects-of-power']?.dot) {
-              const existingAopFlags = existing.flags?.['aspects-of-power'] ?? {};
+            // Stack debuffDamage (break threshold) and DoT flags.
+            const existingAopFlags = existing.flags?.['aspects-of-power'] ?? {};
+            const incomingAopFlags = payload.effectData.flags?.['aspects-of-power'] ?? {};
+            const existingDebuffDmg = existingAopFlags.debuffDamage ?? 0;
+            const incomingDebuffDmg = incomingAopFlags.debuffDamage ?? 0;
+            const newDebuffDamage = existingDebuffDmg + incomingDebuffDmg;
+            const mergedFlags = { ...existingAopFlags, debuffDamage: newDebuffDamage };
+
+            // Reset break progress on stack (threshold increased, progress resets).
+            mergedFlags.breakProgress = 0;
+
+            if (incomingAopFlags.dot) {
               const existingDot = existingAopFlags.dotDamage ?? 0;
-              const incomingDot = payload.effectData.flags['aspects-of-power'].dotDamage ?? 0;
-              const newTotalDot = existingDot + incomingDot;
-              const dotType     = payload.effectData.flags['aspects-of-power'].dotDamageType;
-              // Use a full nested flags object to avoid dot-notation issues with
-              // hyphenated namespace keys (aspects-of-power) in Foundry's expandObject.
-              updateData.flags = {
-                'aspects-of-power': {
-                  ...existingAopFlags,
-                  dot:              true,
-                  dotDamage:        newTotalDot,
-                  debuffDamage:     newTotalDot,
-                  dotDamageType:    dotType,
-                  applierActorUuid: payload.effectData.flags['aspects-of-power'].applierActorUuid,
-                },
-              };
-              updateData.description = `Deals <strong>${newTotalDot}</strong> ${dotType} damage per round (bypasses armor &amp; veil; reduced by Toughness).`;
+              const incomingDot = incomingAopFlags.dotDamage ?? 0;
+              mergedFlags.dot = true;
+              mergedFlags.dotDamage = existingDot + incomingDot;
+              mergedFlags.dotDamageType = incomingAopFlags.dotDamageType;
+              mergedFlags.applierActorUuid = incomingAopFlags.applierActorUuid;
+              updateData.description = `Deals <strong>${mergedFlags.dotDamage}</strong> ${mergedFlags.dotDamageType} damage per round (bypasses armor &amp; veil; reduced by Toughness).`;
             }
+
+            updateData.flags = { 'aspects-of-power': mergedFlags };
 
             await existing.update(updateData);
             const mergedTotal = merged.reduce((sum, c) => sum + Math.abs(Number(c.value)), 0);
+            const stackInfo = mergedTotal > 0 ? ` (stat total -${mergedTotal})` : ` (strength ${newDebuffDamage})`;
             ChatMessage.create({ speaker: payload.speaker, ...msgWhisper,
-              content: `<p>Debuff on <strong>${target.name}</strong> stacked (total -${mergedTotal}) for ${newDuration} rounds.</p>`,
+              content: `<p>Debuff on <strong>${target.name}</strong> stacked${stackInfo} for ${newDuration} rounds.</p>`,
             });
           } else {
             // No existing — create new effect.
