@@ -1570,7 +1570,7 @@ export class AspectsofPowerItem extends Item {
     if (!confirmed) return;
 
     const speaker = ChatMessage.getSpeaker({ actor: this.actor });
-    const rollMode = game.settings.get('core', 'rollMode');
+    const rollMode = game.settings.get('core', 'messageMode');
     const gmOnly = !_isPlayerCharacter(this.actor);
     const whisperGM = gmOnly ? ChatMessage.getWhisperRecipients('GM') : undefined;
 
@@ -1742,7 +1742,7 @@ export class AspectsofPowerItem extends Item {
     const item     = this;
     const rollData = this.getRollData();
     const speaker  = ChatMessage.getSpeaker({ actor: this.actor });
-    const rollMode = game.settings.get('core', 'rollMode');
+    const rollMode = game.settings.get('core', 'messageMode');
     const label    = `[${item.type}] ${item.name}`;
     const gmOnly = !_isPlayerCharacter(this.actor);
     const whisperGM = gmOnly ? ChatMessage.getWhisperRecipients('GM') : undefined;
