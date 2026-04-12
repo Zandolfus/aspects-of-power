@@ -1142,53 +1142,6 @@ async function _triggerPersistentAoe(tokenDoc, force = false) {
     const speaker = ChatMessage.getSpeaker({ actor: casterActor });
     const rollTotal = pd.rollTotal ?? 0;
 
-    // Zone effects (slippery, difficult terrain) — handled separately from tags.
-    const zoneEffect = pd.zoneEffect ?? 'none';
-    if (zoneEffect === 'slippery') {
-      // Dex check: (d20/100) * dexMod + dexMod vs rollTotal.
-      const dexMod = targetActor.system.abilities?.dexterity?.mod ?? 0;
-      const d20 = Math.floor(Math.random() * 20) + 1;
-      const checkValue = Math.round((d20 / 100) * dexMod + dexMod);
-      const passed = checkValue >= rollTotal;
-      const _isPC = game.users.some(u => !u.isGM && u.active && u.character?.id === targetActor.id);
-      const whisper = _isPC ? {} : { whisper: ChatMessage.getWhisperRecipients('GM') };
-
-      if (!passed) {
-        ChatMessage.create({
-          speaker: ChatMessage.getSpeaker({ actor: targetActor }),
-          ...whisper,
-          content: `<p><strong>${targetActor.name}</strong> ${game.i18n.localize('ASPECTSOFPOWER.Zone.slipped')} (${checkValue} vs ${rollTotal})</p>`,
-        });
-        // Apply prone debuff.
-        const proneData = {
-          name: 'Prone',
-          img: 'icons/svg/falling.svg',
-          origin: flags.casterActorUuid,
-          duration: { rounds: 1, startRound: game.combat?.round ?? 0, startTurn: game.combat?.turn ?? 0 },
-          disabled: false,
-          changes: [],
-          flags: { 'aspects-of-power': { debuffDamage: 0, debuffType: 'immobilized', casterActorUuid: flags.casterActorUuid } },
-        };
-        await AspectsofPowerItem.executeGmAction({
-          type: 'gmApplyDebuff',
-          targetActorUuid: targetActor.uuid,
-          effectName: proneData.name,
-          originUuid: flags.casterActorUuid,
-          effectData: proneData,
-          duration: 1,
-          stackable: false,
-          speaker,
-        });
-      } else {
-        ChatMessage.create({
-          speaker: ChatMessage.getSpeaker({ actor: targetActor }),
-          ...whisper,
-          content: `<p><strong>${targetActor.name}</strong> ${game.i18n.localize('ASPECTSOFPOWER.Zone.keptFooting')} (${checkValue} vs ${rollTotal})</p>`,
-        });
-      }
-      triggered = true;
-    }
-
     for (const tag of (pd.tags ?? [])) {
       if (tag === 'debuff' && pd.tagConfig?.debuffType && pd.tagConfig.debuffType !== 'none') {
         const debuffType = pd.tagConfig.debuffType;
@@ -1269,11 +1222,93 @@ async function _triggerPersistentAoe(tokenDoc, force = false) {
 }
 
 /**
- * When a token moves into a persistent AOE area, apply its effects.
+ * Check zone effects (slippery, difficult terrain) on every movement.
+ * These fire independently from persistent AOE tag effects — no per-round limit.
+ */
+async function _checkZoneEffects(tokenDoc) {
+  const token = tokenDoc.object;
+  if (!token) return;
+  const center = token.center;
+  const collection = canvas.scene.regions;
+  if (!collection) return;
+
+  for (const doc of collection) {
+    const flags = doc.flags?.['aspects-of-power'];
+    if (!flags?.persistent || !flags.persistentData) continue;
+    const pd = flags.persistentData;
+    const zoneEffect = pd.zoneEffect ?? 'none';
+    if (zoneEffect === 'none') continue;
+
+    // Containment check.
+    if (!doc.testPoint({ x: center.x, y: center.y, elevation: tokenDoc.elevation ?? 0 })) continue;
+
+    // Disposition filter.
+    const tokenDisp = tokenDoc.disposition;
+    const casterDisp = pd.casterDisposition ?? CONST.TOKEN_DISPOSITIONS.NEUTRAL;
+    if (pd.targetingMode === 'enemies') {
+      if (casterDisp === CONST.TOKEN_DISPOSITIONS.FRIENDLY && tokenDisp !== CONST.TOKEN_DISPOSITIONS.HOSTILE) continue;
+      if (casterDisp === CONST.TOKEN_DISPOSITIONS.HOSTILE && tokenDisp !== CONST.TOKEN_DISPOSITIONS.FRIENDLY) continue;
+      if (casterDisp === CONST.TOKEN_DISPOSITIONS.NEUTRAL) continue;
+    } else if (pd.targetingMode === 'allies') {
+      if (tokenDisp !== casterDisp) continue;
+    }
+
+    const targetActor = tokenDoc.actor;
+    if (!targetActor) continue;
+    const rollTotal = pd.rollTotal ?? 0;
+    const _isPC = game.users.some(u => !u.isGM && u.active && u.character?.id === targetActor.id);
+    const whisper = _isPC ? {} : { whisper: ChatMessage.getWhisperRecipients('GM') };
+
+    if (zoneEffect === 'slippery') {
+      const dexMod = targetActor.system.abilities?.dexterity?.mod ?? 0;
+      const d20 = Math.floor(Math.random() * 20) + 1;
+      const checkValue = Math.round((d20 / 100) * dexMod + dexMod);
+      const passed = checkValue >= rollTotal;
+
+      if (!passed) {
+        ChatMessage.create({
+          speaker: ChatMessage.getSpeaker({ actor: targetActor }),
+          ...whisper,
+          content: `<p><strong>${targetActor.name}</strong> ${game.i18n.localize('ASPECTSOFPOWER.Zone.slipped')} (${checkValue} vs ${rollTotal})</p>`,
+        });
+        const proneData = {
+          name: 'Prone',
+          img: 'icons/svg/falling.svg',
+          origin: flags.casterActorUuid,
+          duration: { rounds: 1, startRound: game.combat?.round ?? 0, startTurn: game.combat?.turn ?? 0 },
+          disabled: false,
+          changes: [],
+          flags: { 'aspects-of-power': { debuffDamage: 0, debuffType: 'immobilized', casterActorUuid: flags.casterActorUuid } },
+        };
+        await AspectsofPowerItem.executeGmAction({
+          type: 'gmApplyDebuff',
+          targetActorUuid: targetActor.uuid,
+          effectName: proneData.name,
+          originUuid: flags.casterActorUuid,
+          effectData: proneData,
+          duration: 1,
+          stackable: false,
+          speaker: ChatMessage.getSpeaker({ actor: targetActor }),
+        });
+      } else {
+        ChatMessage.create({
+          speaker: ChatMessage.getSpeaker({ actor: targetActor }),
+          ...whisper,
+          content: `<p><strong>${targetActor.name}</strong> ${game.i18n.localize('ASPECTSOFPOWER.Zone.keptFooting')} (${checkValue} vs ${rollTotal})</p>`,
+        });
+      }
+    }
+    // Future: difficult terrain handling here.
+  }
+}
+
+/**
+ * When a token moves, check zone effects (every movement) and persistent AOE tags (once per round).
  */
 Hooks.on('updateToken', async (tokenDoc, changes, _options, _userId) => {
   if (!game.user.isGM) return;
   if (!('x' in changes) && !('y' in changes)) return;
+  await _checkZoneEffects(tokenDoc);
   await _triggerPersistentAoe(tokenDoc, false);
 });
 
