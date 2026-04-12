@@ -723,6 +723,41 @@
 .aspects-of-power .effects .item .effect-controls {
   border: none;
 }
+.aspects-of-power .effects .item.effect {
+  padding: 2px;
+}
+.aspects-of-power .effect-row {
+  align-items: center;
+}
+.aspects-of-power .effect-debuff-details {
+  display: flex;
+  gap: 8px;
+  padding: 2px 8px 4px 28px;
+  font-size: 11px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+.aspects-of-power .debuff-badge {
+  background: #c62828;
+  color: #fff;
+  padding: 1px 6px;
+  border-radius: 3px;
+  font-weight: bold;
+  font-size: 10px;
+  text-transform: uppercase;
+}
+.aspects-of-power .debuff-stat {
+  color: #ccc;
+  background: rgba(0,0,0,0.2);
+  padding: 1px 5px;
+  border-radius: 3px;
+}
+.aspects-of-power .break-progress {
+  color: #ffca28;
+}
+.aspects-of-power .dot-indicator {
+  color: #ef5350;
+}
 /* Casting range toggle in Token HUD */
 .control-icon[data-action="toggle-casting-range"].active {
   color: #4488ff;
