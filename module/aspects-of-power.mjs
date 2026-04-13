@@ -18,6 +18,7 @@ import { ClassData } from './data/item-class.mjs';
 import { ProfessionData } from './data/item-profession.mjs';
 import { AugmentData } from './data/item-augment.mjs';
 import { ConsumableData } from './data/item-consumable.mjs';
+import { AopEffectData } from './data/effect-base.mjs';
 // Import helper/utility classes and constants.
 import { preloadHandlebarsTemplates } from './helpers/templates.mjs';
 import { ASPECTSOFPOWER } from './helpers/config.mjs';
@@ -142,6 +143,9 @@ Hooks.once('init', function () {
 
   // v14: auto-delete ActiveEffects when their duration expires.
   CONFIG.ActiveEffect.expiryAction = 'delete';
+
+  // Register AE TypeDataModel — all effects use the 'base' type.
+  CONFIG.ActiveEffect.dataModels = { base: AopEffectData };
 
   // Register TypeDataModel classes — these replace template.json schema definitions
   CONFIG.Actor.dataModels = {
