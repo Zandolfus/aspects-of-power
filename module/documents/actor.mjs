@@ -376,4 +376,193 @@ export class AspectsofPowerActor extends Actor {
       }
     }
   }
+
+  /* -------------------------------------------- */
+  /*  Turn Lifecycle                              */
+  /* -------------------------------------------- */
+
+  /**
+   * Called at the start of this actor's combat turn.
+   * Consolidates stamina regen, overhealth decay, defense pool reset,
+   * debuff break rolls, and turn-skip announcements.
+   * @param {Combat} combat
+   * @param {object} context  { combatantId }
+   */
+  async onStartTurn(combat, context) {
+    const systemData = this.system;
+    const speaker = ChatMessage.getSpeaker({ actor: this });
+    const _isPC = game.users.some(u => !u.isGM && u.active && u.character?.id === this.id);
+    const gmWhisper = _isPC ? {} : { whisper: ChatMessage.getWhisperRecipients('GM') };
+    const updateData = {};
+
+    // ── 1. Stamina Regeneration ──
+    const stamina = systemData.stamina;
+    const regenPct = systemData.staminaRegen ?? 5;
+    const regenAmt = Math.floor(stamina.max * (regenPct / 100));
+    if (stamina.value < stamina.max) {
+      const newStamina = Math.min(stamina.max, stamina.value + regenAmt);
+      const gained = newStamina - stamina.value;
+      updateData['system.stamina.value'] = newStamina;
+      ChatMessage.create({
+        speaker, ...gmWhisper,
+        content: `<p><em>${this.name} regenerates ${gained} stamina (${regenPct}% of ${stamina.max}).</em></p>`,
+      });
+    }
+
+    // ── 2. Overhealth Decay ──
+    const oh = systemData.overhealth;
+    if (oh?.value > 0) {
+      const decayPct = oh.decayRate ?? 10;
+      if (decayPct > 0) {
+        let decayAmt = Math.ceil(oh.value * (decayPct / 100));
+        for (const effect of this.effects) {
+          if (effect.disabled) continue;
+          const reduction = effect.system?.overhealthDecayReduction ?? 0;
+          if (reduction > 0) decayAmt = Math.max(0, decayAmt - reduction);
+        }
+        if (decayAmt > 0) {
+          const newOh = Math.max(0, oh.value - decayAmt);
+          updateData['system.overhealth.value'] = newOh;
+          const owner = game.users.find(u => !u.isGM && u.active && u.character?.id === this.id);
+          const ohWhisper = owner
+            ? [owner.id, ...ChatMessage.getWhisperRecipients('GM').map(u => u.id)]
+            : ChatMessage.getWhisperRecipients('GM');
+          ChatMessage.create({
+            speaker, whisper: ohWhisper,
+            content: `<p><em>${this.name}'s overhealth decays by ${decayAmt} (${decayPct}%). `
+                   + `Overhealth: ${newOh} / ${oh.cap ?? '?'}</em></p>`,
+          });
+        }
+      }
+    }
+
+    // ── 3. Defense Pool Reset + Sleep Mechanics ──
+    const sleepEffects = this.effects.filter(e =>
+      !e.disabled && e.system?.debuffType === 'sleep'
+    );
+    const sleepDrain = sleepEffects.reduce((sum, e) =>
+      sum + (e.system?.debuffDamage ?? 0), 0);
+
+    for (const defKey of ['melee', 'ranged', 'mind', 'soul']) {
+      const poolMax = systemData.defense[defKey]?.poolMax ?? 0;
+      let targetPool = poolMax;
+
+      if (defKey === 'mind' && sleepDrain > 0) {
+        const currentPool = systemData.defense.mind?.pool ?? 0;
+        const normalRestoration = poolMax - currentPool;
+        const reducedRestoration = Math.max(0, normalRestoration - sleepDrain);
+        targetPool = currentPool + reducedRestoration;
+
+        if (targetPool <= 0) {
+          targetPool = 0;
+          for (const se of sleepEffects) {
+            if (!se.system?.sleepActive) {
+              await se.update({ 'system.sleepActive': true });
+              ChatMessage.create({
+                speaker, ...gmWhisper,
+                content: `<p><strong>${this.name}</strong> ${game.i18n.localize('ASPECTSOFPOWER.Debuff.fellAsleep')}</p>`,
+              });
+            }
+          }
+        } else {
+          for (const se of sleepEffects) {
+            if (se.system?.sleepActive && targetPool >= (se.system?.debuffDamage ?? 0)) {
+              await se.delete();
+              ChatMessage.create({
+                speaker, ...gmWhisper,
+                content: `<p><strong>${this.name}</strong> ${game.i18n.localize('ASPECTSOFPOWER.Debuff.wokeUp')}</p>`,
+              });
+            }
+          }
+        }
+      }
+
+      if ((systemData.defense[defKey]?.pool ?? 0) !== targetPool) {
+        updateData[`system.defense.${defKey}.pool`] = targetPool;
+      }
+    }
+
+    // Reset reactions.
+    const reactions = systemData.reactions;
+    if (reactions && reactions.value !== reactions.max) {
+      updateData['system.reactions.value'] = reactions.max;
+    }
+
+    // ── 4. Debuff Break Rolls ──
+    const DEBUFF_BREAK_STAT = {
+      root: 'strength', paralysis: 'vitality', fear: 'willpower',
+      taunt: 'intelligence', charm: 'willpower', enraged: 'wisdom',
+    };
+    const TURN_SKIP_DEBUFFS = ['stun', 'paralysis', 'sleep', 'immobilized'];
+
+    const typedDebuffs = this.effects.filter(e =>
+      !e.disabled && e.system?.debuffType && e.system.debuffType !== 'none'
+    );
+
+    for (const effect of typedDebuffs) {
+      const sys = effect.system;
+      const debuffType = sys.debuffType;
+      const rollTotal = sys.debuffDamage ?? 0;
+      const typeName = game.i18n.localize(CONFIG.ASPECTSOFPOWER.debuffTypes[debuffType] ?? debuffType);
+
+      const breakStat = DEBUFF_BREAK_STAT[debuffType];
+      if (breakStat) {
+        let statMod, breakLabel, breakThreshold;
+        statMod = this.system.abilities?.[breakStat]?.mod ?? 0;
+        breakLabel = game.i18n.localize(`ASPECTSOFPOWER.Ability.${breakStat}.long`);
+        breakThreshold = rollTotal;
+
+        const breakRoll = new Roll('(1d20 / 100) * @mod + @mod', { mod: statMod });
+        await breakRoll.evaluate();
+
+        const previousProgress = sys.breakProgress ?? 0;
+        const newProgress = previousProgress + breakRoll.total;
+
+        if (newProgress >= breakThreshold) {
+          await effect.delete();
+          await breakRoll.toMessage({
+            speaker, ...gmWhisper,
+            flavor: `${typeName} — ${game.i18n.localize('ASPECTSOFPOWER.Debuff.breakRoll')} (${breakLabel}) [${newProgress} / ${breakThreshold}]`,
+          });
+          ChatMessage.create({
+            speaker, ...gmWhisper,
+            content: `<p><strong>${this.name}</strong> ${game.i18n.localize('ASPECTSOFPOWER.Debuff.broke')} <strong>${typeName}</strong>!</p>`,
+          });
+          continue;
+        } else {
+          await effect.update({ 'system.breakProgress': newProgress });
+          await breakRoll.toMessage({
+            speaker, ...gmWhisper,
+            flavor: `${typeName} — ${game.i18n.localize('ASPECTSOFPOWER.Debuff.breakRoll')} (${breakLabel}) [${newProgress} / ${breakThreshold}]`,
+          });
+          ChatMessage.create({
+            speaker, ...gmWhisper,
+            content: `<p><strong>${this.name}</strong> ${game.i18n.localize('ASPECTSOFPOWER.Debuff.failedBreak')} <strong>${typeName}</strong>.</p>`,
+          });
+        }
+      }
+
+      if (TURN_SKIP_DEBUFFS.includes(debuffType)) {
+        ChatMessage.create({
+          speaker, ...gmWhisper,
+          content: `<p><strong>${this.name}</strong> ${game.i18n.localize('ASPECTSOFPOWER.Debuff.cannotAct')} (${typeName})</p>`,
+        });
+      }
+    }
+
+    // ── 5. Apply batched updates ──
+    if (Object.keys(updateData).length > 0) {
+      await this.update(updateData);
+    }
+  }
+
+  /**
+   * Called at the end of this actor's combat turn.
+   * Handles AOE region expiry.
+   * @param {Combat} combat
+   * @param {object} context  { combatantId }
+   */
+  async onEndTurn(combat, context) {
+    // AOE region expiry is handled by a separate hook since it's scene-level, not actor-level.
+  }
 }

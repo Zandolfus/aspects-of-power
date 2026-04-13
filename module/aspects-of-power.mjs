@@ -609,169 +609,24 @@ Hooks.on('renderActiveEffectConfig', (app, element, _options) => {
 });
 
 /* -------------------------------------------- */
-/*  Stamina Regeneration — Start of Turn        */
+/*  Turn Lifecycle — Consolidated               */
 /* -------------------------------------------- */
 
 /**
- * Regenerate stamina at the start of each combatant's turn.
- * The regen rate is stored on the actor as system.staminaRegen (percentage of max).
- * Only the GM executes the update to avoid duplicate writes.
- */
-Hooks.on('combatTurnChange', async (combat, _prior, current) => {
-  if (!game.user.isGM) return;
-
-  const combatant = combat.combatants.get(current.combatantId);
-  if (!combatant?.actor) return;
-
-  const actor   = combatant.actor;
-  const stamina = actor.system.stamina;
-  const regenPct = actor.system.staminaRegen ?? 5;
-  const regenAmt = Math.floor(stamina.max * (regenPct / 100));
-
-  // Already at max — nothing to do.
-  if (stamina.value >= stamina.max) return;
-
-  const newValue = Math.min(stamina.max, stamina.value + regenAmt);
-  await actor.update({ 'system.stamina.value': newValue });
-
-  const staminaWhisper = _isPlayerCharacter(actor) ? {} : { whisper: ChatMessage.getWhisperRecipients('GM') };
-  ChatMessage.create({
-    speaker: ChatMessage.getSpeaker({ actor }),
-    ...staminaWhisper,
-    content: `<p><em>${actor.name} regenerates ${newValue - stamina.value} stamina (${regenPct}% of ${stamina.max}).</em></p>`,
-  });
-});
-
-/* -------------------------------------------- */
-/*  Overhealth Decay — Start of Turn            */
-/* -------------------------------------------- */
-
-/**
- * Decay overhealth at the start of each combatant's turn.
- * Decay amount = decayRate% of current overhealth.
- * ActiveEffects with flag `aspects-of-power.overhealthDecayReduction` (flat number)
- * reduce the decay amount.
+ * Consolidated turn-start hook. Delegates to actor.onStartTurn()
+ * which handles stamina regen, overhealth decay, defense pools,
+ * debuff break rolls, and turn-skip announcements.
  * Only the GM executes to avoid duplicate writes.
- * Whispers the decay message to the owning player (or GM for non-player actors).
  */
 Hooks.on('combatTurnChange', async (combat, _prior, current) => {
   if (!game.user.isGM) return;
-
   const combatant = combat.combatants.get(current.combatantId);
   if (!combatant?.actor) return;
-
-  const actor = combatant.actor;
-  const oh = actor.system.overhealth;
-  if (!oh || oh.value <= 0) return;
-
-  const decayPct = oh.decayRate ?? 10;
-  if (decayPct <= 0) return;
-
-  // Calculate base decay.
-  let decayAmt = Math.ceil(oh.value * (decayPct / 100));
-
-  // Check for decay reduction from effects.
-  for (const effect of actor.effects) {
-    if (effect.disabled) continue;
-    const reduction = effect.system?.overhealthDecayReduction ?? 0;
-    if (reduction > 0) decayAmt = Math.max(0, decayAmt - reduction);
-  }
-
-  if (decayAmt <= 0) return;
-
-  const newValue = Math.max(0, oh.value - decayAmt);
-  await actor.update({ 'system.overhealth.value': newValue });
-
-  // Whisper to the owning player, or GM for non-player actors.
-  const owner = game.users.find(u => !u.isGM && u.active && u.character?.id === actor.id);
-  const whisperTargets = owner
-    ? [owner.id, ...ChatMessage.getWhisperRecipients('GM').map(u => u.id)]
-    : ChatMessage.getWhisperRecipients('GM');
-  ChatMessage.create({
-    speaker: ChatMessage.getSpeaker({ actor }),
-    whisper: whisperTargets,
-    content: `<p><em>${actor.name}'s overhealth decays by ${decayAmt} (${decayPct}%). `
-           + `Overhealth: ${newValue} / ${oh.cap ?? '?'}</em></p>`,
-  });
+  await combatant.actor.onStartTurn(combat, current);
 });
 
-/* -------------------------------------------- */
-/*  Defense Pool Reset — Combatant's Turn        */
-/* -------------------------------------------- */
-
-/**
- * Reset defense pools and reactions at the start of each combatant's turn.
- * Only the GM executes the update to avoid duplicate writes.
- */
-Hooks.on('combatTurnChange', async (combat, _prior, current) => {
-  if (!game.user.isGM) return;
-
-  const combatant = combat.combatants.get(current.combatantId);
-  if (!combatant?.actor) return;
-
-  const actor = combatant.actor;
-  const updateData = {};
-  const speaker = ChatMessage.getSpeaker({ actor });
-  const defPoolWhisper = _isPlayerCharacter(actor) ? {} : { whisper: ChatMessage.getWhisperRecipients('GM') };
-
-  // Check for active sleep effects that modify mind defense restoration.
-  const sleepEffects = getActiveDebuffs(actor, 'sleep');
-  // Sum of all active sleep debuff rolls that reduce mind defense restoration.
-  const sleepDrain = sleepEffects.reduce((sum, e) =>
-    sum + (e.system?.debuffDamage ?? 0), 0);
-
-  for (const defKey of ['melee', 'ranged', 'mind', 'soul']) {
-    const poolMax = actor.system.defense[defKey]?.poolMax ?? 0;
-    let targetPool = poolMax;
-
-    // Sleep reduces mind defense restoration.
-    if (defKey === 'mind' && sleepDrain > 0) {
-      const currentPool = actor.system.defense.mind?.pool ?? 0;
-      const normalRestoration = poolMax - currentPool;
-      const reducedRestoration = Math.max(0, normalRestoration - sleepDrain);
-      targetPool = currentPool + reducedRestoration;
-
-      // Check if sleep activates (mind pool stays at 0).
-      if (targetPool <= 0) {
-        targetPool = 0;
-        // Flag sleep as "active" (target is now asleep).
-        for (const se of sleepEffects) {
-          if (!se.system?.sleepActive) {
-            await se.update({ 'system.sleepActive': true });
-            ChatMessage.create({
-              speaker, ...defPoolWhisper,
-              content: `<p><strong>${actor.name}</strong> ${game.i18n.localize('ASPECTSOFPOWER.Debuff.fellAsleep')}</p>`,
-            });
-          }
-        }
-      } else {
-        // Mind defense recovered past sleep threshold — wake up.
-        for (const se of sleepEffects) {
-          if (se.system?.sleepActive && targetPool >= (se.system?.debuffDamage ?? 0)) {
-            await se.delete();
-            ChatMessage.create({
-              speaker, ...defPoolWhisper,
-              content: `<p><strong>${actor.name}</strong> ${game.i18n.localize('ASPECTSOFPOWER.Debuff.wokeUp')}</p>`,
-            });
-          }
-        }
-      }
-    }
-
-    if ((actor.system.defense[defKey]?.pool ?? 0) !== targetPool) {
-      updateData[`system.defense.${defKey}.pool`] = targetPool;
-    }
-  }
-  // Reset reactions to max.
-  const reactions = actor.system.reactions;
-  if (reactions && reactions.value !== reactions.max) {
-    updateData['system.reactions.value'] = reactions.max;
-  }
-  if (Object.keys(updateData).length > 0) {
-    await actor.update(updateData);
-  }
-});
-
+// Overhealth decay, defense pool reset, and debuff enforcement are now
+// consolidated in AspectsofPowerActor.onStartTurn() above.
 /**
  * Initialize defense pools and reactions when combat starts.
  */
@@ -787,129 +642,6 @@ Hooks.on('combatStart', async (combat) => {
     }
     updateData['system.reactions.value'] = actor.system.reactions?.max ?? 1;
     await actor.update(updateData);
-  }
-});
-
-/* -------------------------------------------- */
-/*  Debuff Enforcement — Turn Start             */
-/* -------------------------------------------- */
-
-/**
- * At the start of a combatant's turn, enforce turn-skipping debuffs (stun, paralysis,
- * sleep, immobilized) and process auto-roll break checks for applicable debuffs.
- *
- * Break mechanics by debuff type:
- *   root       → Strength roll vs debuff roll total
- *   stun       → Does not break (expires by duration)
- *   paralysis  → Vitality roll vs debuff roll total
- *   fear       → Willpower roll vs debuff roll total (flee is GM-enforced)
- *   taunt      → Intelligence roll vs debuff roll total
- *   charm      → Willpower roll vs debuff roll total
- *   enraged    → Wisdom roll vs debuff roll total
- *   sleep      → Handled separately (mind defense recovery system)
- */
-const DEBUFF_BREAK_STAT = {
-  root:      'strength',
-  paralysis: 'vitality',
-  fear:      'willpower',
-  taunt:     'intelligence',
-  charm:     'willpower',
-  enraged:   'wisdom',
-};
-
-const TURN_SKIP_DEBUFFS = ['stun', 'paralysis', 'sleep', 'immobilized'];
-
-Hooks.on('combatTurnChange', async (combat, _prior, current) => {
-  if (!game.user.isGM) return;
-
-  const combatant = combat.combatants.get(current.combatantId);
-  if (!combatant?.actor) return;
-  const actor = combatant.actor;
-  const speaker = ChatMessage.getSpeaker({ actor });
-  const gmWhisper = _isPlayerCharacter(actor) ? {} : { whisper: ChatMessage.getWhisperRecipients('GM') };
-
-
-  // Collect all active debuffs with a type.
-  const typedDebuffs = actor.effects.filter(e =>
-    !e.disabled && e.system?.debuffType
-    && e.system.debuffType !== 'none'
-  );
-
-  for (const effect of typedDebuffs) {
-    const flags      = effect.system;
-    const debuffType = flags.debuffType;
-    const rollTotal  = flags.debuffDamage ?? 0;
-    const typeName   = game.i18n.localize(CONFIG.ASPECTSOFPOWER.debuffTypes[debuffType] ?? debuffType);
-
-    // Check if this debuff has a break stat.
-    const breakStat = DEBUFF_BREAK_STAT[debuffType];
-    if (breakStat) {
-      // Slip: dual-stat break — try dexterity (normal threshold) then strength (1.5x threshold).
-      // Use the better roll.
-      let statMod, breakLabel, breakThreshold;
-      if (debuffType === 'slip') {
-        const dexMod = actor.system.abilities?.dexterity?.mod ?? 0;
-        const strMod = actor.system.abilities?.strength?.mod ?? 0;
-        // Dexterity breaks at normal threshold, strength at 1.5x.
-        // Use whichever gives the actor a better chance.
-        const dexEffective = dexMod;  // vs rollTotal
-        const strEffective = strMod;  // vs rollTotal * 1.5
-        // Pick the stat that gets closer to breaking relative to its threshold.
-        if (dexEffective >= strEffective * (1 / 1.5)) {
-          statMod = dexMod;
-          breakLabel = game.i18n.localize('ASPECTSOFPOWER.Ability.dexterity.long');
-          breakThreshold = rollTotal;
-        } else {
-          statMod = strMod;
-          breakLabel = game.i18n.localize('ASPECTSOFPOWER.Ability.strength.long');
-          breakThreshold = Math.round(rollTotal * 1.5);
-        }
-      } else {
-        statMod = actor.system.abilities?.[breakStat]?.mod ?? 0;
-        breakLabel = game.i18n.localize(`ASPECTSOFPOWER.Ability.${breakStat}.long`);
-        breakThreshold = rollTotal;
-      }
-
-      const breakRoll = new Roll('(1d20 / 100) * @mod + @mod', { mod: statMod });
-      await breakRoll.evaluate();
-
-      // Accumulate break progress across turns.
-      const previousProgress = flags.breakProgress ?? 0;
-      const newProgress = previousProgress + breakRoll.total;
-
-      if (newProgress >= breakThreshold) {
-        // Broke free! Delete triggers deleteActiveEffect hook for cleanup.
-        await effect.delete();
-        await breakRoll.toMessage({
-          speaker, ...gmWhisper,
-          flavor: `${typeName} — ${game.i18n.localize('ASPECTSOFPOWER.Debuff.breakRoll')} (${breakLabel}) [${newProgress} / ${breakThreshold}]`,
-        });
-        ChatMessage.create({
-          speaker, ...gmWhisper,
-          content: `<p><strong>${actor.name}</strong> ${game.i18n.localize('ASPECTSOFPOWER.Debuff.broke')} <strong>${typeName}</strong>!</p>`,
-        });
-        continue; // Effect removed, skip turn-skip check.
-      } else {
-        // Save cumulative progress on the effect.
-        await effect.update({ 'system.breakProgress': newProgress });
-        await breakRoll.toMessage({
-          speaker, ...gmWhisper,
-          flavor: `${typeName} — ${game.i18n.localize('ASPECTSOFPOWER.Debuff.breakRoll')} (${breakLabel}) [${newProgress} / ${breakThreshold}]`,
-        });
-        ChatMessage.create({
-          speaker, ...gmWhisper,
-          content: `<p><strong>${actor.name}</strong> ${game.i18n.localize('ASPECTSOFPOWER.Debuff.failedBreak')} <strong>${typeName}</strong>.</p>`,
-        });
-      }
-    }
-
-    // Announce turn-skipping debuffs.
-    if (TURN_SKIP_DEBUFFS.includes(debuffType)) {
-      ChatMessage.create({
-        speaker, ...gmWhisper,
-        content: `<p><strong>${actor.name}</strong> ${game.i18n.localize('ASPECTSOFPOWER.Debuff.cannotAct')} (${typeName})</p>`,
-      });
-    }
   }
 });
 
