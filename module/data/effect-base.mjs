@@ -5,7 +5,7 @@ const { fields } = foundry.data;
  * Replaces the dual flag namespaces (aspects-of-power / aspectsofpower)
  * with a proper typed schema.
  */
-export class AopEffectData extends foundry.abstract.TypeDataModel {
+export class AopEffectData extends foundry.data.ActiveEffectTypeDataModel {
   static defineSchema() {
     const schema = super.defineSchema();
     Object.assign(schema, {
