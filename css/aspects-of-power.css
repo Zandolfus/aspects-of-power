@@ -822,6 +822,24 @@
 .aspects-of-power .debuff-field.dot-field span {
   color: #ef5350;
 }
+.aspects-of-power .break-free-btn {
+  margin-top: 4px;
+  padding: 2px 10px;
+  font-size: 11px;
+  font-weight: bold;
+  cursor: pointer;
+  border: 1px solid #ffca28;
+  background: rgba(255, 202, 40, 0.15);
+  color: #ffca28;
+  border-radius: 3px;
+}
+.aspects-of-power .break-free-btn:hover {
+  background: rgba(255, 202, 40, 0.3);
+  color: #fff;
+}
+.aspects-of-power .break-free-btn i {
+  margin-right: 4px;
+}
 /* Casting range toggle in Token HUD */
 .control-icon[data-action="toggle-casting-range"].active {
   color: #4488ff;

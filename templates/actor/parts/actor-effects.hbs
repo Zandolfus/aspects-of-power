@@ -84,6 +84,13 @@
             <span>{{debuff.statSummary}}</span>
           </div>
         {{/if}}
+        {{#if debuff.breakStat}}
+          <button type="button" class="break-free-btn" data-effect-id="{{debuff.id}}"
+                  data-break-stat="{{debuff.breakStat}}" data-threshold="{{debuff.breakThreshold}}"
+                  title="Spend an action to attempt breaking free">
+            <i class="fas fa-fist-raised"></i> Break Free
+          </button>
+        {{/if}}
       </div>
     </div>
   {{/each}}

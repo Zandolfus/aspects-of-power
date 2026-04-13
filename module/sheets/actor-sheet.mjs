@@ -355,6 +355,17 @@ export class AspectsofPowerActorSheet extends foundry.applications.api.Handlebar
       if (barrierEffect) await barrierEffect.delete();
     });
 
+    // Break Free buttons on debuff cards.
+    this.element.querySelectorAll('.break-free-btn').forEach(el => {
+      el.addEventListener('click', async (ev) => {
+        ev.preventDefault();
+        const effectId = el.dataset.effectId;
+        const effect = this.actor.effects.get(effectId);
+        if (!effect) return;
+        await this._onBreakFree(effect);
+      });
+    });
+
     // Rollable abilities
     this.element.querySelectorAll('.rollable').forEach(el => {
       el.addEventListener('click', this._onRoll.bind(this));
@@ -493,6 +504,89 @@ export class AspectsofPowerActorSheet extends foundry.applications.api.Handlebar
     }
 
     return super._onDropItem(event, data);
+  }
+
+  /**
+   * Attempt to break free from a debuff by spending a combat action.
+   * Uses the same ability check formula as turn-start break rolls.
+   * @param {ActiveEffect} effect  The debuff effect to break from.
+   */
+  async _onBreakFree(effect) {
+    const actor = this.actor;
+    const sys = effect.system;
+    const debuffType = sys.debuffType;
+    const rollTotal = sys.debuffDamage ?? 0;
+    const typeName = game.i18n.localize(CONFIG.ASPECTSOFPOWER.debuffTypes[debuffType] ?? debuffType);
+
+    // Must be in combat to spend an action.
+    const combat = game.combat;
+    if (!combat?.started) {
+      ui.notifications.warn('Must be in active combat to attempt breaking free.');
+      return;
+    }
+
+    // Consume an action.
+    const actionResult = game.aspectsofpower?.consumeAction?.(actor);
+    if (actionResult === null) {
+      ui.notifications.warn('No combatant found for this actor.');
+      return;
+    }
+    if (actionResult > 3) {
+      ui.notifications.warn('No actions remaining this turn!');
+      return;
+    }
+
+    // Determine break stat.
+    const BREAK_STATS = {
+      root: 'strength', paralysis: 'vitality', fear: 'willpower',
+      taunt: 'intelligence', charm: 'willpower', enraged: 'wisdom',
+    };
+    const breakStat = BREAK_STATS[debuffType];
+    if (!breakStat) {
+      ui.notifications.warn(`${typeName} cannot be broken through force of will.`);
+      return;
+    }
+
+    const statMod = actor.system.abilities?.[breakStat]?.mod ?? 0;
+    const breakLabel = game.i18n.localize(CONFIG.ASPECTSOFPOWER.abilities[breakStat] ?? breakStat);
+    const breakThreshold = rollTotal;
+
+    // Roll the break check.
+    const breakRoll = new Roll('(1d20 / 100) * @mod + @mod', { mod: statMod });
+    await breakRoll.evaluate();
+
+    const previousProgress = sys.breakProgress ?? 0;
+    const newProgress = previousProgress + breakRoll.total;
+    const speaker = ChatMessage.getSpeaker({ actor });
+
+    if (newProgress >= breakThreshold) {
+      // Broke free!
+      await effect.delete();
+      await breakRoll.toMessage({
+        speaker,
+        flavor: `<strong>${actor.name}</strong> strains against the ${typeName}... <em>and breaks free!</em> `
+              + `(${breakLabel}: ${Math.round(newProgress)} / ${breakThreshold})`,
+      });
+      ChatMessage.create({
+        speaker,
+        content: `<p><strong>${actor.name}</strong> shatters the hold of <strong>${typeName}</strong>! `
+               + `<em>Action ${actionResult}/3 spent.</em></p>`,
+      });
+    } else {
+      // Failed — save progress.
+      await effect.update({ 'system.breakProgress': newProgress });
+      await breakRoll.toMessage({
+        speaker,
+        flavor: `<strong>${actor.name}</strong> struggles against the ${typeName}... <em>but it holds firm.</em> `
+              + `(${breakLabel}: ${Math.round(newProgress)} / ${breakThreshold})`,
+      });
+      ChatMessage.create({
+        speaker,
+        content: `<p><strong>${actor.name}</strong> fails to break free of <strong>${typeName}</strong>. `
+               + `Progress: ${Math.round(newProgress)} / ${breakThreshold}. `
+               + `<em>Action ${actionResult}/3 spent.</em></p>`,
+      });
+    }
   }
 
   /**
