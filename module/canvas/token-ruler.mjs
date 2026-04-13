@@ -23,9 +23,19 @@ export class AspectsofPowerTokenRuler extends foundry.canvas.placeables.tokens.T
 
     // The cost is already in stamina (from our _getMovementCostFunction).
     const cost = waypoint.measurement?.cost ?? 0;
+    const sprintRange = actor.system.sprintRange ?? 0;
+    const TokenClass = CONFIG.Token.documentClass;
+    const combatant = combat.combatants.find(
+      c => c.tokenId === this.token.document.id && c.sceneId === this.token.document.parent?.id
+    );
+    const segmentSoFar = combatant ? (TokenClass._segmentMovement?.get(combatant.id) ?? 0) : 0;
+    const distanceMoved = waypoint.measurement?.distance ?? 0;
+    const remaining = Math.max(0, Math.round(sprintRange - segmentSoFar - distanceMoved));
+
     context.stamina = {
       display: true,
       cost: isFinite(cost) ? Math.round(cost) : '---',
+      remaining,
     };
 
     return context;

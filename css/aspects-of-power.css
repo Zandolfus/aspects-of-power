@@ -740,6 +740,10 @@
   color: #ffca28;
   font-weight: bold;
 }
+.waypoint-label .remaining-movement {
+  color: #aaa;
+  font-size: 0.85em;
+}
 
 /* ── Debuff Cards ── */
 .aspects-of-power .debuffs-section {
