@@ -286,14 +286,14 @@ Hooks.once('init', function () {
   // ── Folder context menu: Set Disposition ──
   Hooks.on('getFolderContextOptions', (application, menuItems) => {
     menuItems.push({
-      name: 'Set Disposition',
+      label: 'Set Disposition',
       icon: '<i class="fas fa-handshake"></i>',
-      condition: (target) => {
+      visible: (target) => {
         const folderId = target.dataset.folderId ?? target.closest('[data-folder-id]')?.dataset.folderId;
         const folder = game.folders.get(folderId);
         return game.user.isGM && folder?.type === 'Actor';
       },
-      callback: async (target) => {
+      onClick: async (target) => {
         const folderId = target.dataset.folderId ?? target.closest('[data-folder-id]')?.dataset.folderId;
         const folder = game.folders.get(folderId);
         if (!folder) return;
