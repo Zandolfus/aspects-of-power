@@ -1186,16 +1186,20 @@ Hooks.on('renderChatMessageHTML', (message, html) => {
       if (!game.user.isGM) return;
 
       const actorUuid  = btn.dataset.actorUuid;
-      const preToughnessDmg = parseInt(btn.dataset.damage, 10);
+      const incomingDmg = parseInt(btn.dataset.damage, 10);
       const toughnessMod = parseInt(btn.dataset.toughness, 10) || 0;
       const affinityDR   = parseInt(btn.dataset.affinityDr, 10) || 0;
       const damageType = btn.dataset.damageType || 'physical';
       const target     = await fromUuid(actorUuid);
-      if (!target || isNaN(preToughnessDmg)) return;
+      if (!target || isNaN(incomingDmg)) return;
 
-      // --- Damage routing: Barrier → Toughness → Overhealth → HP ---
-      // Toughness and affinity DR only apply to damage that passes through barriers.
-      let remaining = preToughnessDmg;
+      const isPhysical = damageType === 'physical';
+      const mitigation = isPhysical
+        ? (target.system.defense.armor?.value ?? 0)
+        : (target.system.defense.veil?.value ?? 0);
+
+      // --- Damage routing: Barrier → Armor/Veil → Toughness → Overhealth → HP ---
+      let remaining = incomingDmg;
       const updateData = {};
       const parts = [];
       let barrierAbsorbed = false;
@@ -1223,7 +1227,14 @@ Hooks.on('renderChatMessageHTML', (message, html) => {
         parts.push(`Barrier: −${absorbed}${newBarrierVal === 0 ? ' (broken)' : ''}`);
       }
 
-      // 2. Toughness (with affinity DR) reduces whatever got through the barrier.
+      // 2. Armor/Veil reduces whatever got through the barrier.
+      if (remaining > 0 && mitigation > 0) {
+        const mitigated = Math.min(mitigation, remaining);
+        remaining = Math.max(0, remaining - mitigation);
+        parts.push(`${isPhysical ? 'Armor' : 'Veil'}: −${mitigated}`);
+      }
+
+      // 3. Toughness (with affinity DR) reduces whatever got through armor.
       if (remaining > 0) {
         const effectiveToughness = Math.max(0, toughnessMod - affinityDR);
         const toughnessReduced = Math.min(effectiveToughness, remaining);
@@ -1261,23 +1272,22 @@ Hooks.on('renderChatMessageHTML', (message, html) => {
       }
 
       // Degrade durability only on damage that passed through barriers.
-      // Barrier damage doesn't hit equipment.
       if (!barrierAbsorbed || remaining > 0) {
         const effectiveTough = Math.max(0, toughnessMod - affinityDR);
-        const damageAfterBarrier = barrierAbsorbed ? Math.max(0, preToughnessDmg - (barrier?.value ?? 0)) : preToughnessDmg;
-        const totalDamage = Math.max(0, damageAfterBarrier - effectiveTough);
-        if (totalDamage > 0) await EquipmentSystem.degradeDurability(target, totalDamage, damageType);
+        const postBarrierDmg = barrierAbsorbed ? Math.max(0, incomingDmg - (barrier?.value ?? 0)) : incomingDmg;
+        const totalDurabilityDmg = Math.max(0, postBarrierDmg - mitigation - effectiveTough);
+        if (totalDurabilityDmg > 0) await EquipmentSystem.degradeDurability(target, totalDurabilityDmg, damageType);
       }
 
       const breakdown = parts.length ? ` (${parts.join(', ')})` : '';
       const actualHpLoss = health.value - newHealth;
-      const newBarrierValue = barrierAbsorbed ? Math.max(0, barrier.value - Math.min(barrier.value, preToughnessDmg)) : 0;
+      const barrierRemaining = barrierAbsorbed ? Math.max(0, barrier.value - Math.min(barrier.value, incomingDmg)) : 0;
       const barrierLine = barrierAbsorbed
-        ? `<br>Barrier: ${newBarrierValue} / ${barrier.max} remaining`
+        ? `<br>Barrier: ${barrierRemaining} / ${barrier.max} remaining`
         : '';
       ChatMessage.create({
         whisper: ChatMessage.getWhisperRecipients('GM'),
-        content: `<p><strong>${target.name}</strong> takes <strong>${preToughnessDmg}</strong> incoming damage${breakdown}.`
+        content: `<p><strong>${target.name}</strong> takes <strong>${incomingDmg}</strong> incoming damage${breakdown}.`
                + `<br>HP damage: ${actualHpLoss} &nbsp;|&nbsp; Health: ${newHealth} / ${health.max}${barrierLine}`
                + `${newHealth === 0 ? '<br><em>Incapacitated!</em>' : ''}</p>`,
       });

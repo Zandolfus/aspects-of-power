@@ -316,7 +316,7 @@ export class AspectsofPowerItem extends Item {
            ${fmLine}
            <button class="apply-damage"
              data-actor-uuid="${targetActor.uuid}"
-             data-damage="${preToughnessDmg}"
+             data-damage="${afterDefense}"
              data-toughness="${toughnessMod}"
              data-affinity-dr="${affinityDR}"
              data-damage-type="${isPhysical ? 'physical' : 'magical'}"${fmAttrs}
