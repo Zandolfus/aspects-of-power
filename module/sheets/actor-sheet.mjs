@@ -350,7 +350,7 @@ export class AspectsofPowerActorSheet extends foundry.applications.api.Handlebar
       await this.actor.update({ 'system.barrier.value': 0, 'system.barrier.max': 0 });
       // Also delete the barrier ActiveEffect.
       const barrierEffect = this.actor.effects.find(e =>
-        !e.disabled && e.flags?.aspectsofpower?.effectType === 'barrier'
+        !e.disabled && e.system?.effectType === 'barrier'
       );
       if (barrierEffect) await barrierEffect.delete();
     });
@@ -537,11 +537,11 @@ export class AspectsofPowerActorSheet extends foundry.applications.api.Handlebar
     const debuffs = [];
     for (const effect of this.actor.effects) {
       if (effect.disabled) continue;
-      const flags = effect.flags?.['aspects-of-power'];
-      if (!flags?.debuffType || flags.debuffType === 'none') continue;
+      const sys = effect.system;
+      if (!sys?.debuffType || sys.debuffType === 'none') continue;
 
-      const debuffType = flags.debuffType;
-      const rollTotal = flags.debuffDamage ?? 0;
+      const debuffType = sys.debuffType;
+      const rollTotal = sys.debuffDamage ?? 0;
       const breakStat = breakStats[debuffType] ?? null;
       let breakThreshold = rollTotal;
       let breakStatLabel = breakStat
@@ -579,11 +579,11 @@ export class AspectsofPowerActorSheet extends foundry.applications.api.Handlebar
         rollTotal,
         breakStat,
         breakStatLabel,
-        breakProgress: flags.breakProgress ?? 0,
+        breakProgress: sys.breakProgress ?? 0,
         breakThreshold,
-        dot: flags.dot ?? false,
-        dotDamage: flags.dotDamage ?? 0,
-        dotType: flags.dotDamageType ?? 'physical',
+        dot: sys.dot ?? false,
+        dotDamage: sys.dotDamage ?? 0,
+        dotType: sys.dotDamageType ?? 'physical',
         duration,
         statChanges,
         statSummary,

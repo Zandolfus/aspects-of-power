@@ -37,8 +37,8 @@ export class EquipmentSystem {
     // Dismembered: check if the target slot is disabled by a dismembered debuff.
     const dismembered = actor.effects.find(e =>
       !e.disabled
-      && e.flags?.['aspects-of-power']?.debuffType === 'dismembered'
-      && e.flags?.['aspects-of-power']?.dismemberedSlot === slot
+      && e.system?.debuffType === 'dismembered'
+      && e.system?.dismemberedSlot === slot
     );
     if (dismembered) {
       ui.notifications.warn(`Cannot equip to ${slot} — dismembered!`);
@@ -205,7 +205,7 @@ export class EquipmentSystem {
     if (!actor) return;
 
     const toDelete = actor.effects
-      .filter(e => e.flags?.aspectsofpower?.itemSource === item.id)
+      .filter(e => e.system?.itemSource === item.id)
       .map(e => e.id);
 
     if (toDelete.length > 0) {
@@ -435,7 +435,7 @@ export class EquipmentSystem {
 
     // Durability changed — only act on threshold crossings (broke or repaired from broken).
     if (sys.durability?.value !== undefined && item.system.equipped) {
-      const hasEffects = item.parent.effects.some(e => e.flags?.aspectsofpower?.itemSource === item.id);
+      const hasEffects = item.parent.effects.some(e => e.system?.itemSource === item.id);
       if (item.system.durability.value <= 0 && hasEffects) {
         // Just broke — remove effects.
         this._removeItemEffects(item);
@@ -483,7 +483,7 @@ export class EquipmentSystem {
     // Equipped equipment deleted — remove its effects by ID.
     if (item.type === 'item' && item.system.equipped) {
       const toDelete = actor.effects
-        .filter(e => e.flags?.aspectsofpower?.itemSource === item.id)
+        .filter(e => e.system?.itemSource === item.id)
         .map(e => e.id);
       if (toDelete.length > 0) {
         actor.deleteEmbeddedDocuments('ActiveEffect', toDelete);

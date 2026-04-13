@@ -93,7 +93,7 @@ export class AspectsofPowerToken extends foundry.documents.TokenDocument {
     const moveBlocker = this._getMovementBlocker(actor);
     if (moveBlocker) {
       const typeName = game.i18n.localize(
-        CONFIG.ASPECTSOFPOWER.debuffTypes[moveBlocker.flags['aspects-of-power'].debuffType] ?? 'Debuff'
+        CONFIG.ASPECTSOFPOWER.debuffTypes[moveBlocker.system?.debuffType] ?? 'Debuff'
       );
       ui.notifications.warn(`${actor.name} ${game.i18n.localize('ASPECTSOFPOWER.Debuff.cannotMove')} (${typeName})`);
       return false;
@@ -171,7 +171,7 @@ export class AspectsofPowerToken extends foundry.documents.TokenDocument {
   _getMovementBlocker(actor) {
     const blockTypes = ['root', 'immobilized', 'frozen', 'sleep', 'stun', 'paralysis'];
     return actor.effects.find(e =>
-      !e.disabled && blockTypes.includes(e.flags?.['aspects-of-power']?.debuffType)
+      !e.disabled && blockTypes.includes(e.system?.debuffType)
     );
   }
 
@@ -180,10 +180,10 @@ export class AspectsofPowerToken extends foundry.documents.TokenDocument {
     let sprintRange = actor.system.sprintRange ?? 0;
 
     const chilledEffect = actor.effects.find(e =>
-      !e.disabled && e.flags?.['aspects-of-power']?.debuffType === 'chilled'
+      !e.disabled && e.system?.debuffType === 'chilled'
     );
     if (chilledEffect) {
-      const debuffRoll   = chilledEffect.flags?.['aspects-of-power']?.debuffDamage ?? 0;
+      const debuffRoll   = chilledEffect.system?.debuffDamage ?? 0;
       const enduranceMod = actor.system.abilities?.endurance?.mod ?? 0;
       const reduction    = Math.max(0, debuffRoll - enduranceMod);
       walkRange   = Math.max(0, walkRange - reduction);

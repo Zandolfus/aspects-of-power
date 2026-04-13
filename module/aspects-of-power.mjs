@@ -53,7 +53,7 @@ function getActiveDebuff(actor, types) {
   if (!actor?.effects) return undefined;
   const typeArr = Array.isArray(types) ? types : [types];
   return actor.effects.find(e =>
-    !e.disabled && typeArr.includes(e.flags?.['aspects-of-power']?.debuffType)
+    !e.disabled && typeArr.includes(e.system?.debuffType)
   );
 }
 
@@ -67,7 +67,7 @@ function getActiveDebuffs(actor, types) {
   if (!actor?.effects) return [];
   const typeArr = Array.isArray(types) ? types : [types];
   return actor.effects.filter(e =>
-    !e.disabled && typeArr.includes(e.flags?.['aspects-of-power']?.debuffType)
+    !e.disabled && typeArr.includes(e.system?.debuffType)
   );
 }
 
@@ -673,7 +673,7 @@ Hooks.on('combatTurnChange', async (combat, _prior, current) => {
   // Check for decay reduction from effects.
   for (const effect of actor.effects) {
     if (effect.disabled) continue;
-    const reduction = effect.flags?.['aspects-of-power']?.overhealthDecayReduction ?? 0;
+    const reduction = effect.system?.overhealthDecayReduction ?? 0;
     if (reduction > 0) decayAmt = Math.max(0, decayAmt - reduction);
   }
 
@@ -718,7 +718,7 @@ Hooks.on('combatTurnChange', async (combat, _prior, current) => {
   const sleepEffects = getActiveDebuffs(actor, 'sleep');
   // Sum of all active sleep debuff rolls that reduce mind defense restoration.
   const sleepDrain = sleepEffects.reduce((sum, e) =>
-    sum + (e.flags?.['aspects-of-power']?.debuffDamage ?? 0), 0);
+    sum + (e.system?.debuffDamage ?? 0), 0);
 
   for (const defKey of ['melee', 'ranged', 'mind', 'soul']) {
     const poolMax = actor.system.defense[defKey]?.poolMax ?? 0;
@@ -736,8 +736,8 @@ Hooks.on('combatTurnChange', async (combat, _prior, current) => {
         targetPool = 0;
         // Flag sleep as "active" (target is now asleep).
         for (const se of sleepEffects) {
-          if (!se.flags?.['aspects-of-power']?.sleepActive) {
-            await se.setFlag('aspects-of-power', 'sleepActive', true);
+          if (!se.system?.sleepActive) {
+            await se.update({ 'system.sleepActive': true });
             ChatMessage.create({
               speaker, ...defPoolWhisper,
               content: `<p><strong>${actor.name}</strong> ${game.i18n.localize('ASPECTSOFPOWER.Debuff.fellAsleep')}</p>`,
@@ -747,7 +747,7 @@ Hooks.on('combatTurnChange', async (combat, _prior, current) => {
       } else {
         // Mind defense recovered past sleep threshold — wake up.
         for (const se of sleepEffects) {
-          if (se.flags?.['aspects-of-power']?.sleepActive && targetPool >= (se.flags['aspects-of-power'].debuffDamage ?? 0)) {
+          if (se.system?.sleepActive && targetPool >= (se.system?.debuffDamage ?? 0)) {
             await se.delete();
             ChatMessage.create({
               speaker, ...defPoolWhisper,
@@ -831,12 +831,12 @@ Hooks.on('combatTurnChange', async (combat, _prior, current) => {
 
   // Collect all active debuffs with a type.
   const typedDebuffs = actor.effects.filter(e =>
-    !e.disabled && e.flags?.['aspects-of-power']?.debuffType
-    && e.flags['aspects-of-power'].debuffType !== 'none'
+    !e.disabled && e.system?.debuffType
+    && e.system.debuffType !== 'none'
   );
 
   for (const effect of typedDebuffs) {
-    const flags      = effect.flags['aspects-of-power'];
+    const flags      = effect.system;
     const debuffType = flags.debuffType;
     const rollTotal  = flags.debuffDamage ?? 0;
     const typeName   = game.i18n.localize(CONFIG.ASPECTSOFPOWER.debuffTypes[debuffType] ?? debuffType);
@@ -891,7 +891,7 @@ Hooks.on('combatTurnChange', async (combat, _prior, current) => {
         continue; // Effect removed, skip turn-skip check.
       } else {
         // Save cumulative progress on the effect.
-        await effect.setFlag('aspects-of-power', 'breakProgress', newProgress);
+        await effect.update({ 'system.breakProgress': newProgress });
         await breakRoll.toMessage({
           speaker, ...gmWhisper,
           flavor: `${typeName} — ${game.i18n.localize('ASPECTSOFPOWER.Debuff.breakRoll')} (${breakLabel}) [${newProgress} / ${breakThreshold}]`,
@@ -933,10 +933,10 @@ Hooks.on('combatTurnChange', async (combat, _prior, current) => {
   for (const c of combat.combatants) {
     if (!c.actor) continue;
     for (const effect of c.actor.effects) {
-      const flags = effect.flags?.['aspects-of-power'] ?? {};
-      if (!flags.dot || flags.applierActorUuid !== applierUuid || effect.disabled) continue;
+      const sys = effect.system ?? {};
+      if (!sys.dot || sys.applierActorUuid !== applierUuid || effect.disabled) continue;
 
-      const rawDamage = flags.dotDamage ?? 0;
+      const rawDamage = sys.dotDamage ?? 0;
       if (rawDamage <= 0) continue;
 
       const toughnessMod = c.actor.system.abilities?.toughness?.mod ?? 0;
@@ -971,7 +971,7 @@ Hooks.on('deleteActiveEffect', async (effect, _options, _userId) => {
   if (!actor || !(actor instanceof Actor)) return;
 
   // Remove Foundry blind status if a blind debuff was deleted.
-  if (effect.flags?.['aspects-of-power']?.debuffType === 'blind') {
+  if (effect.system?.debuffType === 'blind') {
     for (const t of actor.getActiveTokens()) {
       if (t.document.hasStatusEffect('blind')) {
         await t.document.toggleActiveEffect({ id: 'blind', name: 'Blind', img: 'icons/svg/blind.svg' }, { active: false });
@@ -1469,7 +1469,7 @@ Hooks.on('renderChatMessageHTML', (message, html) => {
       // 1. Barrier absorbs first (if present). No toughness/DR on this portion.
       const barrier = target.system.barrier;
       const barrierEffect = target.effects.find(e =>
-        !e.disabled && e.flags?.aspectsofpower?.effectType === 'barrier'
+        !e.disabled && e.system?.effectType === 'barrier'
       );
       if (barrier?.value > 0 && barrierEffect) {
         const absorbed = Math.min(barrier.value, remaining);
@@ -1483,7 +1483,7 @@ Hooks.on('renderChatMessageHTML', (message, html) => {
         } else {
           // Update the effect's barrier data.
           await barrierEffect.update({
-            'flags.aspectsofpower.barrierData.value': newBarrierVal,
+            'system.barrierData.value': newBarrierVal,
           });
         }
         parts.push(`Barrier: −${absorbed}${newBarrierVal === 0 ? ' (broken)' : ''}`);

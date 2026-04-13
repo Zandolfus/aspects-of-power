@@ -72,13 +72,13 @@ export class AspectsofPowerActor extends Actor {
         if (!match || !contributions[match[1]]) continue;
         const val = Number(c.value) || 0;
         const k = match[1];
-        if (e.flags?.aspectsofpower?.effectType === 'equipment')        contributions[k].equipment += val;
-        else if (e.flags?.aspectsofpower?.effectCategory === 'blessing') {
+        if (e.system?.effectType === 'equipment')        contributions[k].equipment += val;
+        else if (e.system?.effectCategory === 'blessing') {
           if (c.type === 'multiply') contributions[k].blessingMultiplier *= val;
           else                       contributions[k].blessingAdd += val;
         }
-        else if (e.flags?.aspectsofpower?.effectCategory === 'title')    contributions[k].title += val;
-        else                                                              contributions[k].other += val;
+        else if (e.system?.effectCategory === 'title')    contributions[k].title += val;
+        else                                               contributions[k].other += val;
       }
     }
 
@@ -172,11 +172,11 @@ export class AspectsofPowerActor extends Actor {
 
     for (const effect of this.effects) {
       if (effect.disabled) continue;
-      const flags = effect.flags?.['aspects-of-power'];
-      if (!flags?.debuffType) continue;
-      const roll = flags.debuffDamage ?? 0;
+      const sys = effect.system;
+      if (!sys?.debuffType || sys.debuffType === 'none') continue;
+      const roll = sys.debuffDamage ?? 0;
 
-      switch (flags.debuffType) {
+      switch (sys.debuffType) {
         case 'stun':
           zeroMelee = zeroRanged = zeroMind = true;
           break;
@@ -276,10 +276,10 @@ export class AspectsofPowerActor extends Actor {
     // Find the active barrier effect and populate system.barrier for the sheet.
     if (systemData.barrier) {
       const barrierEffect = this.effects.find(e =>
-        !e.disabled && e.flags?.aspectsofpower?.effectType === 'barrier'
+        !e.disabled && e.system?.effectType === 'barrier'
       );
       if (barrierEffect) {
-        const bd = barrierEffect.flags.aspectsofpower.barrierData ?? {};
+        const bd = barrierEffect.system?.barrierData ?? {};
         systemData.barrier.value = bd.value ?? 0;
         systemData.barrier.max = bd.max ?? 0;
         systemData.barrier.affinities = bd.affinities ?? [];

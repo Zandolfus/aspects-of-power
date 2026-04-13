@@ -40,10 +40,10 @@ export class AspectsofPowerTokenObject extends foundry.canvas.placeables.Token {
 
     // Apply chilled reduction.
     const chilledEffect = actor.effects.find(e =>
-      !e.disabled && e.flags?.['aspects-of-power']?.debuffType === 'chilled'
+      !e.disabled && e.system?.debuffType === 'chilled'
     );
     if (chilledEffect) {
-      const debuffRoll = chilledEffect.flags?.['aspects-of-power']?.debuffDamage ?? 0;
+      const debuffRoll = chilledEffect.system?.debuffDamage ?? 0;
       const enduranceMod = actor.system.abilities?.endurance?.mod ?? 0;
       const reduction = Math.max(0, debuffRoll - enduranceMod);
       walkRange = Math.max(0, walkRange - reduction);

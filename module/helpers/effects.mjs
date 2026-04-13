@@ -75,7 +75,7 @@ export function prepareActiveEffectCategories(effects) {
 
   // Iterate over active effects, classifying them into categories
   for (let e of effects) {
-    const cat = e.flags?.aspectsofpower?.effectCategory;
+    const cat = e.system?.effectCategory;
     if (cat === 'blessing') {
       categories.blessing.effects.push(e);
     } else if (cat === 'title') {

@@ -503,22 +503,20 @@ export class AspectsofPowerItem extends Item {
 
     let total = 0;
     for (const effect of targetActor.allApplicableEffects()) {
-      const flags = effect.flags?.['aspects-of-power'] ?? {};
-      if (!flags.debuffDamage || !flags.dot) continue;
+      const sys = effect.system ?? {};
+      if (!sys.debuffDamage || !sys.dot) continue;
 
-      const effectAffinities = flags.affinities ?? [];
-      const effectMagicType  = flags.magicType ?? '';
-      const effectDirections = flags.directions ?? [];  // [] = non-directional
+      const effectAffinities = sys.affinities ?? [];
+      const effectMagicType  = sys.magicType ?? '';
+      const effectDirections = sys.directions ?? [];
 
       const sharesAffinity  = skillAffinities.some(a => effectAffinities.includes(a));
       const sharesMagicType = skillMagicType && skillMagicType === effectMagicType;
       if (!(sharesAffinity || sharesMagicType)) continue;
 
-      // Directional constraint: if the debuff recorded specific directions, the
-      // attacker must currently be in one of those positions.
       if (effectDirections.length > 0 && !currentPositions.some(p => effectDirections.includes(p))) continue;
 
-      total += flags.debuffDamage;
+      total += sys.debuffDamage;
     }
     return total;
   }
@@ -586,7 +584,7 @@ export class AspectsofPowerItem extends Item {
 
           // Check for existing barrier effect.
           const existingEffect = target.effects.find(e =>
-            !e.disabled && e.flags?.aspectsofpower?.effectType === 'barrier'
+            !e.disabled && e.system?.effectType === 'barrier'
           );
 
           // Prompt the target's owner to accept. If the target is an NPC, GM decides.
@@ -600,7 +598,7 @@ export class AspectsofPowerItem extends Item {
 
           // Build confirmation prompt content.
           const existingNote = existingEffect
-            ? `<p class="hint">This will replace the current barrier (${existingEffect.flags.aspectsofpower.barrierData?.value ?? 0} / ${existingEffect.flags.aspectsofpower.barrierData?.max ?? 0}).</p>`
+            ? `<p class="hint">This will replace the current barrier (${existingEffect.system?.barrierData?.value ?? 0} / ${existingEffect.system?.barrierData?.max ?? 0}).</p>`
             : '';
           const promptContent = `<p>Apply a <strong>${barrierValue}</strong> HP barrier${affText} from <strong>${source}</strong>?</p>${existingNote}`;
 
@@ -842,28 +840,26 @@ export class AspectsofPowerItem extends Item {
               'duration.startRound': startRound,
               'duration.startTurn': startTurn,
             };
-            // Stack debuffDamage (break threshold) and DoT flags.
-            const existingAopFlags = existing.flags?.['aspects-of-power'] ?? {};
-            const incomingAopFlags = payload.effectData.flags?.['aspects-of-power'] ?? {};
-            const existingDebuffDmg = existingAopFlags.debuffDamage ?? 0;
-            const incomingDebuffDmg = incomingAopFlags.debuffDamage ?? 0;
+            // Stack debuffDamage (break threshold) and DoT via system fields.
+            const existingSys = existing.system ?? {};
+            const incomingSys = payload.effectData.system ?? {};
+            const existingDebuffDmg = existingSys.debuffDamage ?? 0;
+            const incomingDebuffDmg = incomingSys.debuffDamage ?? 0;
             const newDebuffDamage = existingDebuffDmg + incomingDebuffDmg;
-            const mergedFlags = { ...existingAopFlags, debuffDamage: newDebuffDamage };
 
-            // Reset break progress on stack (threshold increased, progress resets).
-            mergedFlags.breakProgress = 0;
+            const systemUpdate = { debuffDamage: newDebuffDamage, breakProgress: 0 };
 
-            if (incomingAopFlags.dot) {
-              const existingDot = existingAopFlags.dotDamage ?? 0;
-              const incomingDot = incomingAopFlags.dotDamage ?? 0;
-              mergedFlags.dot = true;
-              mergedFlags.dotDamage = existingDot + incomingDot;
-              mergedFlags.dotDamageType = incomingAopFlags.dotDamageType;
-              mergedFlags.applierActorUuid = incomingAopFlags.applierActorUuid;
-              updateData.description = `Deals <strong>${mergedFlags.dotDamage}</strong> ${mergedFlags.dotDamageType} damage per round (bypasses armor &amp; veil; reduced by Toughness).`;
+            if (incomingSys.dot) {
+              const existingDot = existingSys.dotDamage ?? 0;
+              const incomingDot = incomingSys.dotDamage ?? 0;
+              systemUpdate.dot = true;
+              systemUpdate.dotDamage = existingDot + incomingDot;
+              systemUpdate.dotDamageType = incomingSys.dotDamageType;
+              systemUpdate.applierActorUuid = incomingSys.applierActorUuid;
+              updateData.description = `Deals <strong>${systemUpdate.dotDamage}</strong> ${systemUpdate.dotDamageType} damage per round (bypasses armor &amp; veil; reduced by Toughness).`;
             }
 
-            updateData.flags = { 'aspects-of-power': mergedFlags };
+            updateData.system = systemUpdate;
 
             await existing.update(updateData);
             const mergedTotal = merged.reduce((sum, c) => sum + Math.abs(Number(c.value)), 0);
@@ -885,7 +881,7 @@ export class AspectsofPowerItem extends Item {
             }
 
             // Blind: apply Foundry blind status to disable token vision.
-            const dType = payload.effectData.flags?.['aspects-of-power']?.debuffType;
+            const dType = payload.effectData.system?.debuffType;
             if (dType === 'blind') {
               const tokens = target.getActiveTokens();
               for (const t of tokens) {
@@ -896,7 +892,7 @@ export class AspectsofPowerItem extends Item {
             }
 
             // Dismembered: force-unequip items in the disabled slot.
-            const dSlot = payload.effectData.flags?.['aspects-of-power']?.dismemberedSlot;
+            const dSlot = payload.effectData.system?.dismemberedSlot;
             if (dType === 'dismembered' && dSlot) {
               const equippedInSlot = target.items.filter(
                 i => i.type === 'item' && i.system.equipped && i.system.slot === dSlot
@@ -958,12 +954,12 @@ export class AspectsofPowerItem extends Item {
         const magicalDebuffs = target.effects
           .filter(e => {
             if (e.disabled) return false;
-            const flags = e.flags?.['aspects-of-power'];
-            if (!flags?.debuffType || flags.debuffType === 'none') return false;
-            return flags.magicType === 'magical';
+            const sys = e.system;
+            if (!sys?.debuffType || sys.debuffType === 'none') return false;
+            return sys.magicType === 'magical';
           })
           .sort((a, b) =>
-            (b.flags['aspects-of-power'].debuffDamage ?? 0) - (a.flags['aspects-of-power'].debuffDamage ?? 0)
+            (b.system?.debuffDamage ?? 0) - (a.system?.debuffDamage ?? 0)
           );
 
         if (magicalDebuffs.length === 0) {
@@ -978,11 +974,11 @@ export class AspectsofPowerItem extends Item {
         const results = [];
         for (const effect of magicalDebuffs) {
           if (budget <= 0) break;
-          const flags = effect.flags['aspects-of-power'];
-          const threshold = flags.debuffDamage ?? 0;
-          const previousProgress = flags.breakProgress ?? 0;
+          const sys = effect.system;
+          const threshold = sys.debuffDamage ?? 0;
+          const previousProgress = sys.breakProgress ?? 0;
           const typeName = game.i18n.localize(
-            CONFIG.ASPECTSOFPOWER.debuffTypes[flags.debuffType] ?? flags.debuffType
+            CONFIG.ASPECTSOFPOWER.debuffTypes[sys.debuffType] ?? sys.debuffType
           );
 
           // Add full budget to this effect's progress.
@@ -996,7 +992,7 @@ export class AspectsofPowerItem extends Item {
             results.push(`<strong>${typeName}</strong> ${game.i18n.localize('ASPECTSOFPOWER.Cleanse.cleansed')} <strong>${target.name}</strong>! [${newProgress} / ${threshold}]`);
           } else {
             // Partial progress — consume entire budget.
-            await effect.setFlag('aspects-of-power', 'breakProgress', newProgress);
+            await effect.update({ 'system.breakProgress': newProgress });
             budget = 0;
             results.push(`${game.i18n.localize('ASPECTSOFPOWER.Cleanse.progress')} <strong>${typeName}</strong>: [${newProgress} / ${threshold}]`);
           }
@@ -1788,7 +1784,7 @@ export class AspectsofPowerItem extends Item {
       const _hasDebuff = (types) => {
         const arr = Array.isArray(types) ? types : [types];
         return this.actor.effects.find(e =>
-          !e.disabled && arr.includes(e.flags?.['aspects-of-power']?.debuffType)
+          !e.disabled && arr.includes(e.system?.debuffType)
         );
       };
 
@@ -1796,7 +1792,7 @@ export class AspectsofPowerItem extends Item {
       const skipDebuff = _hasDebuff(['stun', 'sleep', 'paralysis']);
       if (skipDebuff) {
         const typeName = game.i18n.localize(
-          CONFIG.ASPECTSOFPOWER.debuffTypes[skipDebuff.flags['aspects-of-power'].debuffType] ?? 'Debuff'
+          CONFIG.ASPECTSOFPOWER.debuffTypes[skipDebuff.system?.debuffType] ?? 'Debuff'
         );
         ui.notifications.warn(`${this.actor.name} ${game.i18n.localize('ASPECTSOFPOWER.Debuff.cannotAct')} (${typeName})`);
         return;
@@ -1875,7 +1871,7 @@ export class AspectsofPowerItem extends Item {
     // ── Apply debuff modifiers to roll totals ─────────────────────────
     // Blind: reduce to-hit by amount perception was overcome.
     if (rollData._blindDebuff && hitRoll) {
-      const debuffRoll    = rollData._blindDebuff.flags?.['aspects-of-power']?.debuffDamage ?? 0;
+      const debuffRoll    = rollData._blindDebuff.system?.debuffDamage ?? 0;
       const perceptionMod = this.actor.system.abilities?.perception?.mod ?? 0;
       const hitReduction  = Math.max(0, debuffRoll - perceptionMod);
       if (hitReduction > 0) {
@@ -1885,7 +1881,7 @@ export class AspectsofPowerItem extends Item {
 
     // Weaken: reduce damage by the debuff's strength modifier reduction.
     if (rollData._weakenDebuff && dmgRoll) {
-      const debuffRoll   = rollData._weakenDebuff.flags?.['aspects-of-power']?.debuffDamage ?? 0;
+      const debuffRoll   = rollData._weakenDebuff.system?.debuffDamage ?? 0;
       const strengthMod  = this.actor.system.abilities?.strength?.mod ?? 0;
       const dmgReduction = Math.max(0, debuffRoll - strengthMod);
       if (dmgReduction > 0) {
