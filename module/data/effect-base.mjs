@@ -7,7 +7,8 @@ const { fields } = foundry.data;
  */
 export class AopEffectData extends foundry.abstract.TypeDataModel {
   static defineSchema() {
-    return {
+    const schema = super.defineSchema();
+    Object.assign(schema, {
       // ── Effect category & source ──
       effectCategory: new fields.StringField({ initial: '' }),       // blessing, title, temporary, passive, inactive
       effectType:     new fields.StringField({ initial: '' }),       // equipment, barrier, or empty
@@ -42,6 +43,7 @@ export class AopEffectData extends foundry.abstract.TypeDataModel {
       dismemberedSlot:          new fields.StringField({ initial: '' }),
       sleepActive:              new fields.BooleanField({ initial: false }),
       overhealthDecayReduction: new fields.NumberField({ initial: 0 }),
-    };
+    });
+    return schema;
   }
 }
