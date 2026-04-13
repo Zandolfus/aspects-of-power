@@ -265,6 +265,44 @@
 .aspects-of-power .sheet-header .wounded-img-picker:hover .wounded-img.placeholder {
   opacity: 0.8;
 }
+.aspects-of-power .sheet-header .progress-btn-picker {
+  position: absolute;
+  bottom: -2px;
+  left: -2px;
+  cursor: pointer;
+  border: 1px solid #555;
+  border-radius: 3px;
+  background: #222;
+  padding: 3px 4px;
+  font-size: 14px;
+  color: #aaa;
+  line-height: 1;
+}
+.aspects-of-power .sheet-header .progress-btn-picker:hover {
+  border-color: #ffca28;
+  color: #ffca28;
+  background: #333;
+}
+.progress-roll-result {
+  padding: 4px 0;
+}
+.progress-roll-details {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-top: 4px;
+  font-size: 12px;
+}
+.progress-roll-details .progress-final {
+  font-size: 14px;
+  margin-top: 2px;
+}
+.progress-nat-success .progress-final strong {
+  color: #ffca28;
+}
+.progress-nat-failure .progress-final strong {
+  color: #ef5350;
+}
 .aspects-of-power .sheet-header .header-fields {
   flex: 1;
   min-width: 0;

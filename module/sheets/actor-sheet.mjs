@@ -355,6 +355,11 @@ export class AspectsofPowerActorSheet extends foundry.applications.api.Handlebar
       if (barrierEffect) await barrierEffect.delete();
     });
 
+    // Progress roll button.
+    this.element.querySelector('.progress-roll-btn')?.addEventListener('click', async () => {
+      await this._onProgressRoll();
+    });
+
     // Break Free buttons on debuff cards.
     this.element.querySelectorAll('.break-free-btn').forEach(el => {
       el.addEventListener('click', async (ev) => {
@@ -504,6 +509,87 @@ export class AspectsofPowerActorSheet extends foundry.applications.api.Handlebar
     }
 
     return super._onDropItem(event, data);
+  }
+
+  /**
+   * Open a dialog to select an ability, then roll a progress check.
+   * Formula: ability check ((d20/100) * mod + mod) modified by a d100 percentage.
+   * Natural 100 on d100 = critical success. Natural 1 = critical failure.
+   */
+  async _onProgressRoll() {
+    const actor = this.actor;
+    const abilities = CONFIG.ASPECTSOFPOWER.abilities;
+
+    // Build ability options.
+    const abilityOptions = Object.entries(abilities)
+      .map(([key, label]) => `<option value="${key}">${game.i18n.localize(label)}</option>`)
+      .join('');
+
+    const content = `<form>
+      <div class="form-group">
+        <label>Ability</label>
+        <select name="ability">${abilityOptions}</select>
+      </div>
+    </form>`;
+
+    await foundry.applications.api.DialogV2.wait({
+      window: { title: `Progress Roll — ${actor.name}` },
+      content,
+      buttons: [{
+        action: 'roll', label: 'Roll', icon: 'fas fa-dice-d20', default: true,
+        callback: async (event, button) => {
+          const form = button.closest('.dialog-v2')?.querySelector('form') ?? button.form;
+          const abilityKey = form.querySelector('[name="ability"]').value;
+          const abilityLabel = game.i18n.localize(abilities[abilityKey] ?? abilityKey);
+          const mod = actor.system.abilities?.[abilityKey]?.mod ?? 0;
+
+          // Roll the ability check.
+          const abilityRoll = new Roll('(1d20 / 100) * @mod + @mod', { mod });
+          await abilityRoll.evaluate();
+          const abilityResult = Math.round(abilityRoll.total);
+
+          // Roll the d100 variance.
+          const d100Roll = new Roll('1d100');
+          await d100Roll.evaluate();
+          const d100 = d100Roll.total;
+
+          // Apply d100 as a percentage modifier.
+          const finalResult = Math.round(abilityResult * (d100 / 100));
+
+          // Determine special outcomes.
+          const isNatSuccess = d100 === 100;
+          const isNatFailure = d100 === 1;
+
+          let flavor, cssClass;
+          if (isNatSuccess) {
+            flavor = `<strong>${actor.name}</strong> attempts progress with <strong>${abilityLabel}</strong>... `
+                   + `<span style="color:#ffca28;font-size:1.2em;">&#9733; Natural Success! &#9733;</span>`;
+            cssClass = 'progress-nat-success';
+          } else if (isNatFailure) {
+            flavor = `<strong>${actor.name}</strong> attempts progress with <strong>${abilityLabel}</strong>... `
+                   + `<span style="color:#ef5350;font-size:1.2em;">&#10008; Natural Failure! &#10008;</span>`;
+            cssClass = 'progress-nat-failure';
+          } else {
+            flavor = `<strong>${actor.name}</strong> attempts progress with <strong>${abilityLabel}</strong>.`;
+            cssClass = '';
+          }
+
+          const speaker = ChatMessage.getSpeaker({ actor });
+          ChatMessage.create({
+            speaker,
+            content: `<div class="progress-roll-result ${cssClass}">
+              ${flavor}
+              <div class="progress-roll-details">
+                <span>${abilityLabel} Check: <strong>${abilityResult}</strong></span>
+                <span>Variance (d100): <strong>${d100}%</strong></span>
+                <span class="progress-final">Final Result: <strong>${finalResult}</strong></span>
+              </div>
+            </div>`,
+          });
+        },
+      }, { action: 'cancel', label: 'Cancel' }],
+      close: () => null,
+    });
   }
 
   /**
