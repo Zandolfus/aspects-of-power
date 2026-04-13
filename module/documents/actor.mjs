@@ -395,6 +395,26 @@ export class AspectsofPowerActor extends Actor {
     const gmWhisper = _isPC ? {} : { whisper: ChatMessage.getWhisperRecipients('GM') };
     const updateData = {};
 
+    // ── 0. Effect Expiry — delete effects whose duration has elapsed ──
+    const currentRound = combat.round;
+    const toExpire = [];
+    for (const effect of this.effects) {
+      const dur = effect.duration;
+      if (!dur?.rounds || dur.rounds <= 0) continue;
+      const startRound = dur.startRound ?? 0;
+      if (startRound > 0 && currentRound - startRound >= dur.rounds) {
+        toExpire.push(effect);
+      }
+    }
+    if (toExpire.length > 0) {
+      const names = toExpire.map(e => e.name).filter(Boolean);
+      await this.deleteEmbeddedDocuments('ActiveEffect', toExpire.map(e => e.id));
+      ChatMessage.create({
+        whisper: ChatMessage.getWhisperRecipients('GM'),
+        content: `<p>Expired effects on <strong>${this.name}</strong>: ${names.join(', ')}</p>`,
+      });
+    }
+
     // ── 1. Stamina Regeneration ──
     const stamina = systemData.stamina;
     const regenPct = systemData.staminaRegen ?? 5;

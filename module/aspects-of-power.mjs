@@ -141,8 +141,10 @@ Hooks.once('init', function () {
   CONFIG.Token.objectClass = AspectsofPowerTokenObject;
   CONFIG.Token.rulerClass = AspectsofPowerTokenRuler;
 
-  // v14: auto-delete ActiveEffects when their duration expires.
-  CONFIG.ActiveEffect.expiryAction = 'delete';
+  // We handle effect expiry manually in onStartTurn to avoid race conditions
+  // with Foundry's built-in #deleteExpiredEffects (which tries to delete effects
+  // that our break rolls already removed).
+  CONFIG.ActiveEffect.expiryAction = 'none';
 
   // Register AE TypeDataModel — all effects use the 'base' type.
   CONFIG.ActiveEffect.dataModels = { base: AopEffectData };
