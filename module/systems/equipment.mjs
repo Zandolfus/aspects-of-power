@@ -188,11 +188,10 @@ export class EquipmentSystem {
       origin: item.uuid,
       disabled: false,
       changes,
-      flags: {
-        aspectsofpower: {
-          itemSource: item.id,
-          effectType: 'equipment',
-        },
+      type: 'base',
+      system: {
+        itemSource: item.id,
+        effectType: 'equipment',
       },
     }]);
   }

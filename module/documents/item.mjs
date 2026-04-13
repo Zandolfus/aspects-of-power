@@ -672,16 +672,15 @@ export class AspectsofPowerItem extends Item {
             name: `Barrier: ${source}`,
             img: 'icons/magic/defensive/shield-barrier-glowing-blue.webp',
             disabled: false,
-            flags: {
-              aspectsofpower: {
-                effectType: 'barrier',
-                effectCategory: 'temporary',
-                barrierData: {
-                  value: barrierValue,
-                  max: barrierValue,
-                  affinities,
-                  source,
-                },
+            type: 'base',
+            system: {
+              effectType: 'barrier',
+              effectCategory: 'temporary',
+              barrierData: {
+                value: barrierValue,
+                max: barrierValue,
+                affinities,
+                source,
               },
             },
           }]);
@@ -1196,18 +1195,17 @@ export class AspectsofPowerItem extends Item {
       if (!dismemberedSlot) return; // cancelled
     }
 
-    // Always store affinity metadata so attack skills can match against this debuff.
-    effectData.flags = {
-      'aspects-of-power': {
-        debuffDamage: rollTotal,
-        debuffType,
-        casterActorUuid: this.actor.uuid,
-        affinities: this.system.affinities ?? [],
-        magicType: this.system.magicType ?? 'non-magical',
-        directions,
-        ...(dismemberedSlot ? { dismemberedSlot } : {}),
-        ...(dealsDmg ? { dot: true, dotDamage: rollTotal, dotDamageType: dmgType, applierActorUuid: this.actor.uuid } : {}),
-      },
+    // Store debuff metadata in the AE TypeDataModel system fields.
+    effectData.type = 'base';
+    effectData.system = {
+      debuffDamage: rollTotal,
+      debuffType,
+      casterActorUuid: this.actor.uuid,
+      affinities: this.system.affinities ?? [],
+      magicType: this.system.magicType ?? 'non-magical',
+      directions,
+      ...(dismemberedSlot ? { dismemberedSlot } : {}),
+      ...(dealsDmg ? { dot: true, dotDamage: rollTotal, dotDamageType: dmgType, applierActorUuid: this.actor.uuid } : {}),
     };
 
     const statSummary = entries.length > 0

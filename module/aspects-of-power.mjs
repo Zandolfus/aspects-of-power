@@ -436,6 +436,52 @@ Hooks.once('ready', async function () {
       if (migrated > 0) ui.notifications.info(`Migration: renamed ${migrated} equipment slot(s) from "hands" to "weaponry".`);
       await game.settings.set('aspects-of-power', 'migrationVersion', '2.1.1');
     }
+
+    // Migration 2.2.0: Move ActiveEffect flag data into system fields (AE TypeDataModel).
+    if (foundry.utils.isNewerVersion('2.2.0', migrationVersion)) {
+      let migrated = 0;
+      const migrateEffect = async (effect) => {
+        const aopFlags = effect.flags?.['aspects-of-power'] ?? {};
+        const nohyphenFlags = effect.flags?.aspectsofpower ?? {};
+        const merged = { ...nohyphenFlags, ...aopFlags };
+        if (Object.keys(merged).length === 0) return;
+
+        const systemUpdate = {};
+        const fieldMap = [
+          'effectCategory', 'effectType', 'itemSource', 'debuffType', 'debuffDamage',
+          'breakProgress', 'dot', 'dotDamage', 'dotDamageType', 'applierActorUuid',
+          'casterActorUuid', 'affinities', 'magicType', 'directions',
+          'dismemberedSlot', 'sleepActive', 'overhealthDecayReduction',
+        ];
+        for (const key of fieldMap) {
+          if (merged[key] !== undefined) systemUpdate[`system.${key}`] = merged[key];
+        }
+        // Barrier data is nested.
+        if (merged.barrierData) systemUpdate['system.barrierData'] = merged.barrierData;
+
+        if (Object.keys(systemUpdate).length > 0) {
+          systemUpdate.type = 'base';
+          await effect.update(systemUpdate);
+          migrated++;
+        }
+      };
+
+      // Migrate effects on actors.
+      for (const actor of game.actors) {
+        for (const effect of actor.effects) await migrateEffect(effect);
+        // Effects on owned items.
+        for (const item of actor.items) {
+          for (const effect of item.effects) await migrateEffect(effect);
+        }
+      }
+      // Migrate effects on unowned items.
+      for (const item of game.items) {
+        for (const effect of item.effects) await migrateEffect(effect);
+      }
+
+      if (migrated > 0) ui.notifications.info(`Migration: moved ${migrated} ActiveEffect flag(s) to system fields.`);
+      await game.settings.set('aspects-of-power', 'migrationVersion', '2.2.0');
+    }
   }
 
   // Wait to register hotbar drop hook on ready so that modules could register earlier if they want to
@@ -1203,13 +1249,12 @@ async function _triggerPersistentAoe(tokenDoc, force = false) {
           duration: { rounds: duration, startRound: game.combat?.round ?? 0, startTurn: game.combat?.turn ?? 0 },
           disabled: false,
           changes: entries,
-          flags: {
-            'aspects-of-power': {
-              debuffDamage: rollTotal,
-              debuffType,
-              casterActorUuid: flags.casterActorUuid,
-              ...(dealsDmg ? { dot: true, dotDamage: rollTotal, dotDamageType: dotType, applierActorUuid: flags.casterActorUuid } : {}),
-            },
+          type: 'base',
+          system: {
+            debuffDamage: rollTotal,
+            debuffType,
+            casterActorUuid: flags.casterActorUuid,
+            ...(dealsDmg ? { dot: true, dotDamage: rollTotal, dotDamageType: dotType, applierActorUuid: flags.casterActorUuid } : {}),
           },
         };
 
@@ -1320,7 +1365,8 @@ async function _checkZoneEffects(tokenDoc) {
           duration: { rounds: 1, startRound: game.combat?.round ?? 0, startTurn: game.combat?.turn ?? 0 },
           disabled: false,
           changes: [],
-          flags: { 'aspects-of-power': { debuffDamage: 0, debuffType: 'immobilized', casterActorUuid: flags.casterActorUuid } },
+          type: 'base',
+          system: { debuffDamage: 0, debuffType: 'immobilized', casterActorUuid: flags.casterActorUuid },
         };
         await AspectsofPowerItem.executeGmAction({
           type: 'gmApplyDebuff',

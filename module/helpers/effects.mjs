@@ -24,7 +24,8 @@ export function onManageActiveEffect(event, owner) {
           origin: owner.uuid,
           duration: sectionType === 'temporary' ? { rounds: 1 } : {},
           disabled: sectionType === 'inactive',
-          flags: isCategory ? { aspectsofpower: { effectCategory: sectionType } } : {},
+          type: 'base',
+          system: isCategory ? { effectCategory: sectionType } : {},
         },
       ]);
     }
