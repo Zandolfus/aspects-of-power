@@ -296,6 +296,13 @@ export class AspectsofPowerActor extends Actor {
     // Collect tags from race/class/profession (cached) + equipped items.
     this._collectTags(systemData);
 
+    // ── Passive Tag Bonuses ──
+    // 'armored' tag adds flat armor. 'ethereal' tag adds flat veil.
+    const armoredValue = systemData.collectedTags?.get('armored')?.value ?? 0;
+    if (armoredValue > 0) systemData.defense.armor.value += armoredValue;
+    const etherealValue = systemData.collectedTags?.get('ethereal')?.value ?? 0;
+    if (etherealValue > 0) systemData.defense.veil.value += etherealValue;
+
     // Make separate methods for each Actor type (character, npc, etc.) to keep
     // things organized.
     this._prepareCharacterData(actorData);

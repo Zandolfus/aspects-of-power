@@ -519,7 +519,16 @@ export class AspectsofPowerItem extends Item {
    * @returns {number}
    */
   _getAffinityDRReduction(targetActor, attackerToken = null, targetToken = null) {
-    const skillAffinities = this.system.affinities ?? [];
+    // Merge skill affinities with actor's innate affinities from tags.
+    const skillAffinities = [...(this.system.affinities ?? [])];
+    if (this.actor?.system?.collectedTags) {
+      for (const [tagId, data] of this.actor.system.collectedTags) {
+        if (data.category === 'affinity') {
+          const affinityName = tagId.replace('-affinity', '');
+          if (!skillAffinities.includes(affinityName)) skillAffinities.push(affinityName);
+        }
+      }
+    }
     const skillMagicType  = this.system.magicType ?? '';
     if (!skillAffinities.length && !skillMagicType) return 0;
 
@@ -833,6 +842,33 @@ export class AspectsofPowerItem extends Item {
       case 'gmApplyDebuff': {
         const target = await fromUuid(payload.targetActorUuid);
         if (!target) return;
+
+        // ── Immunity check ──
+        const debuffTypeCheck = payload.effectData?.system?.debuffType ?? 'none';
+        if (target.isImmuneTo?.(debuffTypeCheck)) {
+          ChatMessage.create({
+            speaker: payload.speaker, ...msgWhisper,
+            content: `<p><strong>${target.name}</strong> is immune to <strong>${game.i18n.localize(CONFIG.ASPECTSOFPOWER.debuffTypes[debuffTypeCheck] ?? debuffTypeCheck)}</strong>!</p>`,
+          });
+          break;
+        }
+
+        // ── Resistance check — reduce duration ──
+        if (payload.effectData && payload.duration) {
+          const resistance = target.getResistance?.(debuffTypeCheck) ?? 0;
+          if (resistance > 0 && payload.effectData.system?.debuffDamage) {
+            // Flat reduction to debuff strength (break threshold).
+            payload.effectData.system.debuffDamage = Math.max(0, payload.effectData.system.debuffDamage - resistance);
+            if (payload.effectData.system.debuffDamage <= 0) {
+              ChatMessage.create({
+                speaker: payload.speaker, ...msgWhisper,
+                content: `<p><strong>${target.name}</strong> resists <strong>${game.i18n.localize(CONFIG.ASPECTSOFPOWER.debuffTypes[debuffTypeCheck] ?? debuffTypeCheck)}</strong> entirely! (resistance: ${resistance})</p>`,
+              });
+              break;
+            }
+          }
+        }
+
         const combat = game.combat;
         const startRound = combat?.round ?? 0;
         const startTurn  = combat?.turn ?? 0;
