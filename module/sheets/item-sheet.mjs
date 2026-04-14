@@ -742,6 +742,7 @@ export class AspectsofPowerItemSheet extends foundry.applications.api.Handlebars
       const tagId = tagSelect.value;
       if (!tagId) return;
       const value = Number(valueInput.value) || 0;
+      console.log('TAG ADD: item=', this.item.name, 'uuid=', this.item.uuid, 'tagId=', tagId);
       const existing = this.item.system.systemTags ?? [];
       // Don't add duplicates.
       if (existing.some(t => t.id === tagId)) {
