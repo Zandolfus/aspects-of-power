@@ -504,9 +504,11 @@ export class AspectsofPowerActorSheet extends foundry.applications.api.Handlebar
         [`system.attributes.${type}.name`]: item.name,
         [`system.attributes.${type}.cachedTags`]: item.system.systemTags ?? [],
       };
-      console.log('TEMPLATE ASSIGN update:', JSON.stringify(updateData));
-      const result = await this.actor.update(updateData);
-      console.log('TEMPLATE ASSIGN result:', result, 'actor id:', this.actor.id, 'isToken:', this.actor.isToken);
+      // For unlinked tokens, update the world actor so data persists.
+      const targetActor = this.actor.isToken
+        ? game.actors.get(this.actor.id) ?? this.actor
+        : this.actor;
+      await targetActor.update(updateData);
       const typeLabel = game.i18n.localize(CONFIG.ASPECTSOFPOWER.levelTypes[type]);
       ui.notifications.info(`${this.actor.name}: ${typeLabel} ${game.i18n.localize('ASPECTSOFPOWER.Level.templateAssigned')} ${item.name}`);
       return;
