@@ -46,18 +46,30 @@ export class CharacterData extends foundry.abstract.TypeDataModel {
           name:       new fields.StringField({ initial: 'Uninitiated' }),
           templateId: new fields.StringField({ initial: '' }),
           rank:       new fields.StringField({ initial: 'G' }),
+          cachedTags: new fields.ArrayField(new fields.SchemaField({
+            id: new fields.StringField({ initial: '' }),
+            value: new fields.NumberField({ initial: 0 }),
+          }), { initial: [] }),
         }),
         race: new fields.SchemaField({
           level:      new fields.NumberField({ initial: 0, min: 0, integer: true }),
           name:       new fields.StringField({ initial: 'Human' }),
           templateId: new fields.StringField({ initial: '' }),
           rank:       new fields.StringField({ initial: 'G' }),
+          cachedTags: new fields.ArrayField(new fields.SchemaField({
+            id: new fields.StringField({ initial: '' }),
+            value: new fields.NumberField({ initial: 0 }),
+          }), { initial: [] }),
         }),
         profession: new fields.SchemaField({
           level:      new fields.NumberField({ initial: 0, min: 0, integer: true }),
           name:       new fields.StringField({ initial: 'Uninitiated' }),
           templateId: new fields.StringField({ initial: '' }),
           rank:       new fields.StringField({ initial: 'G' }),
+          cachedTags: new fields.ArrayField(new fields.SchemaField({
+            id: new fields.StringField({ initial: '' }),
+            value: new fields.NumberField({ initial: 0 }),
+          }), { initial: [] }),
         }),
       }),
 

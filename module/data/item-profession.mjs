@@ -28,6 +28,12 @@ export class ProfessionData extends foundry.abstract.TypeDataModel {
 
       // Free points gained per level within this rank.
       freePointsPerLevel: new fields.NumberField({ initial: 0, min: 0, integer: true }),
+
+      // System tags.
+      systemTags: new fields.ArrayField(new fields.SchemaField({
+        id:    new fields.StringField({ initial: '' }),
+        value: new fields.NumberField({ initial: 0 }),
+      }), { initial: [] }),
     };
   }
 }

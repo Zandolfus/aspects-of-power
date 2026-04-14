@@ -44,6 +44,12 @@ export class RaceData extends foundry.abstract.TypeDataModel {
         A: freePointsField(),
         S: freePointsField(),
       }),
+
+      // System tags (affinities, immunities, resistances, gates, passives).
+      systemTags: new fields.ArrayField(new fields.SchemaField({
+        id:    new fields.StringField({ initial: '' }),
+        value: new fields.NumberField({ initial: 0 }),
+      }), { initial: [] }),
     };
   }
 }

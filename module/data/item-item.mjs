@@ -48,6 +48,12 @@ export class ItemItemData extends foundry.abstract.TypeDataModel {
       // Skill IDs this item grants access to when equipped.
       grantedSkills: new fields.ArrayField(new fields.StringField(), { initial: [] }),
 
+      // System tags (affinities, resistances, passives from equipment).
+      systemTags: new fields.ArrayField(new fields.SchemaField({
+        id:    new fields.StringField({ initial: '' }),
+        value: new fields.NumberField({ initial: 0 }),
+      }), { initial: [] }),
+
       // Repair kit fields.
       isRepairKit:  new fields.BooleanField({ initial: false }),
       repairAmount: new fields.NumberField({ initial: 25, min: 0, integer: true }),
