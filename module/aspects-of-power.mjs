@@ -331,6 +331,25 @@ Hooks.once('init', function () {
   // Initialize the equipment system hooks.
   EquipmentSystem.initialize();
 
+  // ── Auto-sync cached tags when a template item's systemTags change ──
+  Hooks.on('updateItem', (item, changes, _options, _userId) => {
+    if (!game.user.isGM) return;
+    if (!changes.system?.systemTags) return;
+    if (!['race', 'class', 'profession'].includes(item.type)) return;
+
+    // Find all actors that reference this item as a template and update their cached tags.
+    for (const actor of game.actors) {
+      for (const type of ['race', 'class', 'profession']) {
+        const attr = actor.system.attributes?.[type];
+        if (!attr?.templateId) continue;
+        // templateId is a UUID — compare against the item's UUID.
+        if (attr.templateId === item.uuid) {
+          actor.update({ [`system.attributes.${type}.cachedTags`]: item.system.systemTags ?? [] });
+        }
+      }
+    }
+  });
+
   // Preload Handlebars templates.
   return preloadHandlebarsTemplates();
 });
