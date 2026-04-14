@@ -99,39 +99,35 @@ export class AspectsofPowerToken extends foundry.documents.TokenDocument {
       return false;
     }
 
-    // Check action limit.
-    const actionsUsed = AspectsofPowerToken._moveActionTracker.get(combatant.id) ?? 0;
-    if (actionsUsed >= 3) {
-      ui.notifications.warn('No movement remaining this turn! (3/3 actions used)');
-      return false;
-    }
-
-    // The cost function (_getMovementCostFunction on the canvas Token) already
-    // returns stamina cost (not raw distance) and returns Infinity beyond sprint range.
-    // movement.passed.cost + movement.pending.cost = total stamina cost for this move.
+    // The cost function returns stamina cost and Infinity when all 3 actions are exhausted.
     const staminaCost = (movement.passed?.cost ?? 0) + (movement.pending?.cost ?? 0);
     if (!isFinite(staminaCost)) {
-      ui.notifications.warn('Movement cap reached!');
+      ui.notifications.warn('No more actions available this turn! (3/3 used)');
       return false;
     }
     if (staminaCost <= 0) return;
 
-    // Check stamina (in-memory value already reflects pending movement costs).
+    // Check stamina.
     const stamina = actor.system.stamina;
     if (staminaCost > stamina.value) {
       ui.notifications.warn('Insufficient stamina to move!');
       return false;
     }
 
-    // Calculate distance for the chat message.
-    const { sprintRange } = this._getMovementRanges(actor);
+    // Calculate how many actions this move consumes by checking how many
+    // sprint-range boundaries are crossed.
+    const { walkRange, sprintRange } = this._getMovementRanges(actor);
     const segmentSoFar = AspectsofPowerToken._segmentMovement.get(combatant.id) ?? 0;
     const moveDist = (movement.passed?.distance ?? 0) + (movement.pending?.distance ?? 0);
     const moveSnapped = Math.round(moveDist / 5) * 5;
-    const newSegmentTotal = segmentSoFar + moveSnapped;
+    const totalDist = segmentSoFar + moveSnapped;
+
+    // Count how many full sprint ranges this move covers (each = 1 action).
+    const actionsFromMovement = Math.floor(totalDist / sprintRange);
+    const newSegmentTotal = totalDist % sprintRange || (totalDist > 0 && totalDist === sprintRange * actionsFromMovement ? 0 : totalDist % sprintRange);
 
     // Store for _onUpdateMovement.
-    this._pendingMovement = { combatantId: combatant.id, moveSnapped, newSegmentTotal, staminaCost, sprintRange };
+    this._pendingMovement = { combatantId: combatant.id, moveSnapped, newSegmentTotal, staminaCost, sprintRange, actionsFromMovement };
   }
 
   /**
@@ -143,14 +139,29 @@ export class AspectsofPowerToken extends foundry.documents.TokenDocument {
     if (!this._pendingMovement) return;
     if (game.user.id !== user.id) return;
 
-    const { combatantId, moveSnapped, newSegmentTotal, staminaCost, sprintRange } = this._pendingMovement;
+    const { combatantId, moveSnapped, newSegmentTotal, staminaCost, sprintRange, actionsFromMovement } = this._pendingMovement;
     delete this._pendingMovement;
 
     const actor = this.actor;
     if (!actor) return;
 
-    // Update segment tracker.
+    // Update segment tracker (reset to position within current segment).
     AspectsofPowerToken._segmentMovement.set(combatantId, newSegmentTotal);
+
+    // Consume actions for each sprint-range boundary crossed.
+    if (actionsFromMovement > 0) {
+      const currentActions = AspectsofPowerToken._moveActionTracker.get(combatantId) ?? 0;
+      const newActions = currentActions + actionsFromMovement;
+      AspectsofPowerToken._moveActionTracker.set(combatantId, newActions);
+
+      const _isPC = game.users.some(u => !u.isGM && u.active && u.character?.id === actor.id);
+      const whisper = _isPC ? {} : { whisper: ChatMessage.getWhisperRecipients('GM') };
+      ChatMessage.create({
+        speaker: ChatMessage.getSpeaker({ actor }),
+        ...whisper,
+        content: `<p><em>${actor.name} used ${actionsFromMovement} movement action${actionsFromMovement > 1 ? 's' : ''} (${newActions}/3 actions used).</em></p>`,
+      });
+    }
 
     // Mutate stamina in-memory — no actor.update(), no prepareData().
     actor._source.system.stamina.value -= staminaCost;

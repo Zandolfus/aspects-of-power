@@ -53,10 +53,12 @@
             <span class="gains-col-name">{{row.label}}</span>
             <span class="gains-col">+{{row.templateGain}}</span>
             <span class="gains-col free-point-group">
-              <button type="button" class="free-point-dec" data-ability="{{row.key}}">−</button>
+              <button type="button" class="free-point-dec" data-ability="{{row.key}}" {{#unless row.freeGain}}disabled{{/unless}}>−</button>
               <input type="number" class="free-point-input" data-ability="{{row.key}}"
                      value="{{row.freeGain}}" min="0" />
-              <button type="button" class="free-point-inc" data-ability="{{row.key}}">+</button>
+              {{#if @root.remainingPoints}}
+                <button type="button" class="free-point-inc" data-ability="{{row.key}}">+</button>
+              {{/if}}
             </span>
             <span class="gains-col gains-total">+{{row.total}}</span>
           </div>

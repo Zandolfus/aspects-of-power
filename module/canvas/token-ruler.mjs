@@ -29,13 +29,19 @@ export class AspectsofPowerTokenRuler extends foundry.canvas.placeables.tokens.T
       c => c.tokenId === this.token.document.id && c.sceneId === this.token.document.parent?.id
     );
     const segmentSoFar = combatant ? (TokenClass._segmentMovement?.get(combatant.id) ?? 0) : 0;
+    const actionsUsed = combatant ? (TokenClass._moveActionTracker?.get(combatant.id) ?? 0) : 0;
     const distanceMoved = waypoint.measurement?.distance ?? 0;
-    const remaining = Math.max(0, Math.round(sprintRange - segmentSoFar - distanceMoved));
+    const totalDist = segmentSoFar + distanceMoved;
+    const actionsFromMove = Math.floor(totalDist / sprintRange);
+    const currentAction = actionsUsed + actionsFromMove + 1;
+    const distInSegment = totalDist % sprintRange;
+    const remaining = Math.max(0, Math.round(sprintRange - distInSegment));
 
     context.stamina = {
       display: true,
       cost: isFinite(cost) ? Math.round(cost) : '---',
       remaining,
+      action: Math.min(currentAction, 3),
     };
 
     return context;

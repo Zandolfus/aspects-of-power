@@ -346,6 +346,10 @@
                  {{#if system.tagConfig.debuffStackable}}checked{{/if}} />
           Stackable
         </label>
+        <label class='resource-label'>Attack Scaling</label>
+        <input type='number' name='system.tagConfig.debuffScaleWithAttack'
+               value='{{system.tagConfig.debuffScaleWithAttack}}' min='0' max='1' step='0.05'
+               title='0 = no scaling. 0.5 = debuff is 50% of attack damage.' />
         <label class='resource-label dot-toggle'>
           <input type='checkbox' name='system.tagConfig.debuffDirectional'
                  {{#if system.tagConfig.debuffDirectional}}checked{{/if}} />

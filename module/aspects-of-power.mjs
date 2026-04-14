@@ -503,7 +503,11 @@ Hooks.once('ready', async function () {
         buttons.push({ action: 'defend', label: 'Defend', icon: 'fas fa-shield-alt', default: true });
       }
       for (const rs of (payload.reactionSkills ?? [])) {
-        buttons.push({ action: `reaction:${rs.id}`, label: rs.name, icon: 'fas fa-bolt' });
+        if (rs.available) {
+          buttons.push({ action: `reaction:${rs.id}`, label: rs.name, icon: 'fas fa-bolt' });
+        } else {
+          buttons.push({ action: `reaction:${rs.id}`, label: `${rs.name} (no reactions)`, icon: 'fas fa-bolt', disabled: true });
+        }
       }
       buttons.push({ action: 'takeHit', label: 'Take Hit' });
 
@@ -931,8 +935,11 @@ async function _triggerPersistentAoe(tokenDoc, force = false) {
 
     const pd = flags.persistentData;
 
-    // Already affected this round? (Skip unless forced — turn start always re-applies.)
-    if (!force && (pd.affectedTokens ?? []).includes(tokenDoc.id)) continue;
+    // Check if already affected this round. affectedTokens is now {tokenId: round}.
+    const affectedMap = pd.affectedTokens ?? {};
+    const lastAffectedRound = affectedMap[tokenDoc.id] ?? -1;
+    const currentRound = game.combat?.round ?? 0;
+    if (lastAffectedRound >= currentRound) continue;
 
     // Check containment.
     const obj = doc;
@@ -950,11 +957,9 @@ async function _triggerPersistentAoe(tokenDoc, force = false) {
       if (tokenDisp !== casterDisp) continue;
     }
 
-    // Mark as affected (if not already).
-    if (!(pd.affectedTokens ?? []).includes(tokenDoc.id)) {
-      const newAffected = [...(pd.affectedTokens ?? []), tokenDoc.id];
-      await doc.update({ 'flags.aspects-of-power.persistentData.affectedTokens': newAffected });
-    }
+    // Mark as affected this round.
+    const updatedMap = { ...(pd.affectedTokens ?? {}), [tokenDoc.id]: currentRound };
+    await doc.update({ 'flags.aspects-of-power.persistentData.affectedTokens': updatedMap });
 
     // Apply effects.
     const casterActor = await fromUuid(flags.casterActorUuid);
@@ -1146,29 +1151,9 @@ Hooks.on('combatTurnChange', async (combat, _prior, current) => {
   if (!combatant?.token) return;
   const tokenDoc = combatant.token;
 
-  // Clear this token from persistent AOE affected lists so they can re-trigger,
-  // but only for AOEs placed BEFORE this round (skip same-round to avoid double-hit on cast).
-  const currentRound = combat.round;
-  const collection = canvas.scene.regions;
-  if (collection) {
-    for (const doc of collection) {
-      const flags = doc.flags?.['aspects-of-power'];
-      if (!flags?.persistent || !flags.persistentData) continue;
-
-      // Skip AOEs placed this round — initial cast already applied effects.
-      const placedRound = flags.placedRound ?? 0;
-      if (placedRound >= currentRound) continue;
-
-      const affected = flags.persistentData.affectedTokens ?? [];
-      if (affected.includes(tokenDoc.id)) {
-        await doc.update({
-          'flags.aspects-of-power.persistentData.affectedTokens': affected.filter(id => id !== tokenDoc.id),
-        });
-      }
-    }
-  }
-
-  // Now check if they're standing in any persistent AOE and re-apply.
+  // Re-trigger persistent AOEs on the token at turn start.
+  // The round-based tracking in affectedTokens prevents same-round double-dipping.
+  // force=true bypasses the affected check so turn-start always evaluates.
   await _triggerPersistentAoe(tokenDoc, true);
 });
 
@@ -1287,8 +1272,8 @@ Hooks.on('renderChatMessageHTML', (message, html) => {
         : '';
       ChatMessage.create({
         whisper: ChatMessage.getWhisperRecipients('GM'),
-        content: `<p><strong>${target.name}</strong> takes <strong>${incomingDmg}</strong> incoming damage${breakdown}.`
-               + `<br>HP damage: ${actualHpLoss} &nbsp;|&nbsp; Health: ${newHealth} / ${health.max}${barrierLine}`
+        content: `<p><strong>${target.name}</strong> takes <strong>${actualHpLoss}</strong> health damage.${breakdown ? `<br>${breakdown}` : ''}`
+               + `<br>Health: ${newHealth} / ${health.max}${barrierLine}`
                + `${newHealth === 0 ? '<br><em>Incapacitated!</em>' : ''}</p>`,
       });
 

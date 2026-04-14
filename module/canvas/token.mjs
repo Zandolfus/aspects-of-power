@@ -56,15 +56,20 @@ export class AspectsofPowerTokenObject extends foundry.canvas.placeables.Token {
     // Get terrain cost function for stacking with difficult terrain.
     const terrainCostFn = CONFIG.Token.movement.TerrainData.getMovementCostFunction(this.document, options);
 
-    // Accumulated distance within this cost function evaluation.
+    // Accumulated distance and actions within this cost function evaluation.
     let accumulated = segmentSoFar;
+    let actions = TokenClass._moveActionTracker?.get(combatant.id) ?? 0;
 
     return (from, to, distance, segment) => {
       // Apply terrain modifiers first (e.g., difficult terrain doubles distance).
       const terrainCost = terrainCostFn(from, to, distance, segment);
 
-      // Check if we've exceeded sprint range.
-      if (accumulated + terrainCost > sprintRange) return Infinity;
+      // Check if this step would exceed sprint range — if so, consume an action and reset.
+      if (accumulated + terrainCost > sprintRange) {
+        actions++;
+        if (actions >= 3) return Infinity; // No more actions available.
+        accumulated = 0; // Reset segment for the new action.
+      }
 
       // Determine stamina cost based on walk/sprint zone.
       let staminaCost = 0;

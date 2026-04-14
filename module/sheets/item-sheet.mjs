@@ -279,6 +279,7 @@ export class AspectsofPowerItemSheet extends foundry.applications.api.Handlebars
         debuffType:        form.querySelector('[name="system.tagConfig.debuffType"]')?.value ?? 'none',
         debuffDuration:    Number(form.querySelector('[name="system.tagConfig.debuffDuration"]')?.value) || 1,
         debuffStackable:   form.querySelector('[name="system.tagConfig.debuffStackable"]')?.checked ?? false,
+        debuffScaleWithAttack: Number(form.querySelector('[name="system.tagConfig.debuffScaleWithAttack"]')?.value) || 0,
         debuffDealsDamage: form.querySelector('[name="system.tagConfig.debuffDealsDamage"]')?.checked ?? false,
         debuffDamageType:  form.querySelector('[name="system.tagConfig.debuffDamageType"]')?.value ?? 'physical',
         debuffDirectional: form.querySelector('[name="system.tagConfig.debuffDirectional"]')?.checked ?? false,

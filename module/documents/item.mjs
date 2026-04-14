@@ -219,6 +219,17 @@ export class AspectsofPowerItem extends Item {
         defenseLine = `<p>${defLabel} defense: no pool remaining (0 / ${poolMax})</p>`;
       }
 
+      // Post public defense message so players see what happened.
+      if (defenseResult.defend && pool > 0) {
+        const pct = pool >= hitTotal ? 100 : Math.round((pool / hitTotal) * 100);
+        ChatMessage.create({
+          speaker: ChatMessage.getSpeaker({ actor: targetActor }),
+          content: pool >= hitTotal
+            ? `<p><strong>${targetActor.name}</strong> fully dodges the attack!</p>`
+            : `<p><strong>${targetActor.name}</strong> partially blocks the attack (${pct}% reduced).</p>`,
+        });
+      }
+
       // Handle reaction skill usage.
       if (defenseResult.reactionSkillId) {
         const reactionSkill = targetActor.items.get(defenseResult.reactionSkillId);
@@ -231,26 +242,37 @@ export class AspectsofPowerItem extends Item {
             targetActorUuid: targetActor.uuid,
           });
 
+          const reactionSpeaker = ChatMessage.getSpeaker({ actor: targetActor });
+
           if (rType === 'dodge') {
-            // Dodge: completely avoids the attack, no defense pool cost.
             isHit = false;
             reactionLine = `<p><em>${targetActor.name} dodges with <strong>${reactionSkill.name}</strong>!</em></p>`;
+            ChatMessage.create({ speaker: reactionSpeaker,
+              content: `<p><strong>${targetActor.name}</strong> deftly dodges the attack with <strong>${reactionSkill.name}</strong>!</p>`,
+            });
           } else if (rType === 'parry') {
-            // Parry: roll the reaction skill's hit formula and compare to-hits.
             const parryRoll = await reactionSkill.roll({ parryOnly: true });
             const parryTotal = parryRoll ? Math.round(parryRoll.total) : 0;
             if (parryTotal >= hitTotal) {
               isHit = false;
               reactionLine = `<p><em>${targetActor.name} parries with <strong>${reactionSkill.name}</strong>! `
                            + `(${parryTotal} vs ${hitTotal})</em></p>`;
+              ChatMessage.create({ speaker: reactionSpeaker,
+                content: `<p><strong>${targetActor.name}</strong> parries the blow with <strong>${reactionSkill.name}</strong>! (${parryTotal} vs ${hitTotal})</p>`,
+              });
             } else {
               reactionLine = `<p><em>${targetActor.name} fails to parry with <strong>${reactionSkill.name}</strong> `
                            + `(${parryTotal} vs ${hitTotal})</em></p>`;
+              ChatMessage.create({ speaker: reactionSpeaker,
+                content: `<p><strong>${targetActor.name}</strong> attempts to parry with <strong>${reactionSkill.name}</strong> but fails! (${parryTotal} vs ${hitTotal})</p>`,
+              });
             }
           } else if (rType === 'barrier') {
-            // Barrier: execute the skill normally (creates barrier via restoration tag).
             await reactionSkill.roll();
             reactionLine = `<p><em>${targetActor.name} reacts with <strong>${reactionSkill.name}</strong> (Barrier)!</em></p>`;
+            ChatMessage.create({ speaker: reactionSpeaker,
+              content: `<p><strong>${targetActor.name}</strong> raises a barrier with <strong>${reactionSkill.name}</strong>!</p>`,
+            });
           }
         }
       }
@@ -342,7 +364,7 @@ export class AspectsofPowerItem extends Item {
 
     // Barrier fully absorbs → flag so debuff/DoT can be skipped.
     const fullyBlocked = isHit && preToughnessDmg > 0 && barrierValue >= preToughnessDmg;
-    return { isHit, fullyBlocked };
+    return { isHit, fullyBlocked, damageMultiplier };
   }
 
   /**
@@ -354,17 +376,17 @@ export class AspectsofPowerItem extends Item {
     const poolMax = targetActor.system.defense[defKey]?.poolMax ?? 0;
     const defLabel = defKey.charAt(0).toUpperCase() + defKey.slice(1);
 
-    // Gather available reaction skills if actor has reactions remaining.
+    // Gather reaction skills — always show them if the actor has any,
+    // even if reactions are consumed (player sees them greyed context).
     const reactions = targetActor.system.reactions ?? { value: 0, max: 1 };
-    const reactionSkills = reactions.value > 0
-      ? targetActor.items.filter(i => i.type === 'skill' && i.system.skillType === 'Reaction')
-      : [];
+    const reactionSkills = targetActor.items.filter(i => i.type === 'skill' && i.system.skillType === 'Reaction');
     const reactionList = reactionSkills.map(s => ({
       id: s.id, name: s.name, img: s.img,
       reactionType: s.system.reactionType ?? 'dodge',
+      available: reactions.value > 0,
     }));
 
-    // If pool is empty and no reactions, skip prompt entirely.
+    // If pool is empty and no reaction skills exist at all, skip prompt.
     if (pool <= 0 && reactionList.length === 0) return { defend: false, reactionSkillId: null };
 
     const fullDodge = pool > 0 && pool >= hitTotal;
@@ -461,7 +483,11 @@ export class AspectsofPowerItem extends Item {
       buttons.push({ action: 'defend', label: 'Defend', icon: 'fas fa-shield-alt', default: true });
     }
     for (const rs of reactionSkills) {
-      buttons.push({ action: `reaction:${rs.id}`, label: rs.name, icon: 'fas fa-bolt' });
+      if (rs.available) {
+        buttons.push({ action: `reaction:${rs.id}`, label: rs.name, icon: 'fas fa-bolt' });
+      } else {
+        buttons.push({ action: `reaction:${rs.id}`, label: `${rs.name} (no reactions)`, icon: 'fas fa-bolt', disabled: true });
+      }
     }
     buttons.push({ action: 'takeHit', label: 'Take Hit' });
 
@@ -1121,7 +1147,7 @@ export class AspectsofPowerItem extends Item {
    * Stat values are roll-based: rollTotal * entry.value (multiplier, default 1).
    * DoT damage = raw roll total, bypasses mitigation.
    */
-  async _handleDebuffTag(item, rollData, dmgRoll, speaker, rollMode, label, targetTokenOverride = null) {
+  async _handleDebuffTag(item, rollData, dmgRoll, speaker, rollMode, label, targetTokenOverride = null, defenseMultiplier = 1) {
     const whisperGM = !_isPlayerCharacter(this.actor) ? ChatMessage.getWhisperRecipients('GM') : undefined;
     const targetToken = targetTokenOverride ?? game.user.targets.first() ?? null;
     const targetActor = targetToken?.actor ?? null;
@@ -1135,7 +1161,13 @@ export class AspectsofPowerItem extends Item {
     const dealsDmg   = this.system.tagConfig?.debuffDealsDamage ?? false;
     const dmgType    = this.system.tagConfig?.debuffDamageType ?? 'physical';
     const debuffType = this.system.tagConfig?.debuffType ?? 'none';
-    const rollTotal  = Math.round(dmgRoll.total);
+    // Scale debuff by defense multiplier (partial defense = partial debuff).
+    // If debuffScaleWithAttack > 0, debuff strength is a fraction of attack damage.
+    const attackScaling = this.system.tagConfig?.debuffScaleWithAttack ?? 0;
+    const baseTotal = attackScaling > 0
+      ? Math.round(dmgRoll.total * attackScaling)
+      : Math.round(dmgRoll.total);
+    const rollTotal = Math.round(baseTotal * defenseMultiplier);
 
     // Build stat-reduction changes (roll-based).
     const changes = entries.map(e => ({
@@ -1464,7 +1496,7 @@ export class AspectsofPowerItem extends Item {
                 targetingMode: aoe.targetingMode ?? 'all',
                 zoneEffect: aoe.zoneEffect ?? 'none',
                 casterDisposition: this.actor.getActiveTokens()?.[0]?.document?.disposition ?? CONST.TOKEN_DISPOSITIONS.NEUTRAL,
-                affectedTokens: [],
+                affectedTokens: {},
               } : null,
             },
           },
@@ -1538,6 +1570,21 @@ export class AspectsofPowerItem extends Item {
     }
 
     return qualifying;
+  }
+
+  /**
+   * Rotate the caster's token to face a target point.
+   * @param {object} targetPoint  { x, y } in canvas coordinates.
+   */
+  async _orientToward(targetPoint) {
+    const casterToken = this.actor.getActiveTokens()?.[0];
+    if (!casterToken) return;
+    const cc = casterToken.center;
+    const dx = targetPoint.x - cc.x;
+    const dy = targetPoint.y - cc.y;
+    if (dx === 0 && dy === 0) return;
+    const angle = Math.toDegrees(Math.atan2(dy, dx)) + 90; // +90 because Foundry 0° is up
+    await casterToken.document.update({ rotation: angle });
   }
 
   /* ------------------------------------------------------------------ */
@@ -1925,6 +1972,12 @@ export class AspectsofPowerItem extends Item {
       const templateDoc = await this._placeAoeTemplate(casterToken);
       if (!templateDoc) return dmgRoll;
 
+      // Orient caster toward the AOE center.
+      const aoeShape = templateDoc.shapes?.[0];
+      if (aoeShape) {
+        await this._orientToward({ x: aoeShape.x, y: aoeShape.y });
+      }
+
       // Store roll totals on persistent AOE templates for later trigger.
       const persistFlags = templateDoc.flags?.['aspects-of-power'];
       if (persistFlags?.persistent && persistFlags.persistentData) {
@@ -1970,10 +2023,12 @@ export class AspectsofPowerItem extends Item {
               await this._handleBuffTag(item, rollData, dmgRoll, speaker, rollMode, label, targetToken);
               break;
             case 'debuff': {
-              // Barrier fully absorbed the attack → skip debuff/DoT for this target.
+              // Skip debuff if the attack missed or barrier fully absorbed for this target.
               const attackResult = hitResults.get(targetToken);
+              if (attackResult && !attackResult.isHit) break;
               if (attackResult?.fullyBlocked) break;
-              await this._handleDebuffTag(item, rollData, dmgRoll, speaker, rollMode, label, targetToken);
+              const defMult = attackResult?.damageMultiplier ?? 1;
+              await this._handleDebuffTag(item, rollData, dmgRoll, speaker, rollMode, label, targetToken, defMult);
               break;
             }
             case 'repair':
@@ -1989,10 +2044,12 @@ export class AspectsofPowerItem extends Item {
       // Execute chained skills after all parent tags have resolved.
       await this._executeChainedSkills(hitResults, targets, speaker, rollMode);
 
-      // Mark initial targets as affected on persistent AOEs.
+      // Mark initial targets as affected this round on persistent AOEs.
       if (persistFlags?.persistent) {
-        const affectedIds = targets.map(t => t.id);
-        await templateDoc.update({ 'flags.aspects-of-power.persistentData.affectedTokens': affectedIds });
+        const currentRound = game.combat?.round ?? 0;
+        const affectedMap = {};
+        for (const t of targets) affectedMap[t.id] = currentRound;
+        await templateDoc.update({ 'flags.aspects-of-power.persistentData.affectedTokens': affectedMap });
       }
 
       // Deduct resource cost AFTER effects are applied.
@@ -2036,6 +2093,12 @@ export class AspectsofPowerItem extends Item {
     if (hitRoll) await hitRoll.toMessage({ speaker, rollMode, ...(whisperGM ? { whisper: whisperGM } : {}), flavor: `${label} — To Hit` });
     await dmgRoll.toMessage({ speaker, rollMode, ...(whisperGM ? { whisper: whisperGM } : {}), flavor: `${label} — Roll` });
 
+    // ── Orient caster toward target (single-target) ──
+    const singleTarget = game.user.targets.first() ?? null;
+    if (singleTarget) {
+      await this._orientToward(singleTarget.center);
+    }
+
     // ── Dispatch to each tag handler (single-target) ─────────────────────
     const hitResults = new Map();
     for (const tag of tags) {
@@ -2052,10 +2115,12 @@ export class AspectsofPowerItem extends Item {
           await this._handleBuffTag(item, rollData, dmgRoll, speaker, rollMode, label);
           break;
         case 'debuff': {
-          // Barrier fully absorbed the attack → skip debuff/DoT.
+          // Skip debuff if the attack missed or barrier fully absorbed.
           const attackResult = hitResults.get(null);
+          if (attackResult && !attackResult.isHit) break;
           if (attackResult?.fullyBlocked) break;
-          await this._handleDebuffTag(item, rollData, dmgRoll, speaker, rollMode, label);
+          const defMult = attackResult?.damageMultiplier ?? 1;
+          await this._handleDebuffTag(item, rollData, dmgRoll, speaker, rollMode, label, null, defMult);
           break;
         }
         case 'repair':

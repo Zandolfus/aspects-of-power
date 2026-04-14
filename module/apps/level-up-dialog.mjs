@@ -31,7 +31,7 @@ export class LevelUpDialog extends foundry.applications.api.HandlebarsApplicatio
   async _prepareContext(options) {
     const context = await super._prepareContext(options);
     const sys = this.actor.system;
-    const types = ['race', 'class', 'profession'];
+    const types = ['class', 'race', 'profession'];
 
     context.actor = this.actor;
     context.types = await Promise.all(types.map(async type => {
