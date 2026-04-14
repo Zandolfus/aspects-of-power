@@ -1,0 +1,38 @@
+{{!-- Reusable tag editor partial.
+     Expects context: { systemTags, tagRegistry, tagCategories }
+     systemTags = array of {id, value} from the item's system.systemTags
+--}}
+<div class="tag-editor">
+  <h3 class="tag-editor-header">System Tags</h3>
+
+  <div class="tag-add-row">
+    <select class="tag-category-filter">
+      <option value="">All Categories</option>
+      {{#each tagCategories as |cat key|}}
+        <option value="{{key}}">{{localize cat.label}}</option>
+      {{/each}}
+    </select>
+    <select class="tag-select">
+      <option value="">— Select Tag —</option>
+      {{#each tagRegistry as |def tagId|}}
+        <option value="{{tagId}}" data-category="{{def.category}}">{{localize def.label}}</option>
+      {{/each}}
+    </select>
+    <input type="number" class="tag-value-input" value="0" min="0" step="1" title="Value (for resistances)" />
+    <button type="button" class="tag-add-btn"><i class="fas fa-plus"></i></button>
+  </div>
+
+  <div class="tag-chips">
+    {{#each systemTags as |tag|}}
+      {{#with (lookup @root.tagRegistry tag.id) as |def|}}
+        <span class="tag-chip" data-tag-id="{{tag.id}}" style="border-color: {{lookup @root.tagCategoryColors def.category}}">
+          <span class="tag-chip-label">{{localize def.label}}</span>
+          {{#if tag.value}}
+            <span class="tag-chip-value">({{tag.value}})</span>
+          {{/if}}
+          <a class="tag-remove" title="Remove"><i class="fas fa-times"></i></a>
+        </span>
+      {{/with}}
+    {{/each}}
+  </div>
+</div>

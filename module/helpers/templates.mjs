@@ -12,5 +12,7 @@ export const preloadHandlebarsTemplates = async function () {
     'systems/aspects-of-power/templates/actor/parts/actor-effects.hbs',
     // Item partials
     'systems/aspects-of-power/templates/item/parts/item-effects.hbs',
+    // Shared partials
+    'systems/aspects-of-power/templates/parts/tag-editor.hbs',
   ]);
 };

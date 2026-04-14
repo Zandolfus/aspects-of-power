@@ -63,6 +63,18 @@ export class AspectsofPowerItemSheet extends foundry.applications.api.Handlebars
     context.config  = CONFIG.ASPECTSOFPOWER;
     context.effects = prepareActiveEffectCategories(this.item.effects);
 
+    // Tag editor context for items that support systemTags.
+    if (['race', 'class', 'profession', 'item'].includes(this.item.type)) {
+      context.tagRegistry = CONFIG.ASPECTSOFPOWER.tagRegistry ?? {};
+      context.tagCategories = CONFIG.ASPECTSOFPOWER.tagCategories ?? {};
+      context.systemTags = this.item.system.systemTags ?? [];
+      // Build a color lookup by category for chip borders.
+      context.tagCategoryColors = {};
+      for (const [key, cat] of Object.entries(context.tagCategories)) {
+        context.tagCategoryColors[key] = cat.color;
+      }
+    }
+
     // Item bonus field labels for augment sheets.
     if (this.item.type === 'augment') {
       context.itemBonusFields = {
@@ -464,6 +476,9 @@ export class AspectsofPowerItemSheet extends foundry.applications.api.Handlebars
 
     if (!this.isEditable) return;
 
+    // ── Tag Editor ──
+    this._bindTagEditor();
+
     // Profile image — open FilePicker on click (AppV2 doesn't auto-wire data-edit).
     this.element.querySelectorAll('[data-edit="img"]').forEach(el => {
       el.addEventListener('click', () => {
@@ -690,5 +705,60 @@ export class AspectsofPowerItemSheet extends foundry.applications.api.Handlebars
 
     await this.item.update({ 'system.augments': newAugments });
     ui.notifications.info(`Slotted ${ownedAugment.name} into ${this.item.name}.`);
+  }
+
+  /**
+   * Bind event listeners for the tag editor partial.
+   */
+  _bindTagEditor() {
+    const editor = this.element.querySelector('.tag-editor');
+    if (!editor) return;
+
+    const categoryFilter = editor.querySelector('.tag-category-filter');
+    const tagSelect = editor.querySelector('.tag-select');
+    const valueInput = editor.querySelector('.tag-value-input');
+
+    // Filter tag dropdown by category.
+    categoryFilter?.addEventListener('change', () => {
+      const cat = categoryFilter.value;
+      for (const opt of tagSelect.options) {
+        if (!opt.value) continue; // skip placeholder
+        opt.hidden = cat && opt.dataset.category !== cat;
+      }
+      tagSelect.value = '';
+    });
+
+    // Show/hide value input based on selected tag's category.
+    tagSelect?.addEventListener('change', () => {
+      const tagId = tagSelect.value;
+      const def = CONFIG.ASPECTSOFPOWER.tagRegistry?.[tagId];
+      valueInput.style.display = def?.category === 'resistance' ? '' : 'none';
+    });
+    // Initialize visibility.
+    valueInput.style.display = 'none';
+
+    // Add tag.
+    editor.querySelector('.tag-add-btn')?.addEventListener('click', async () => {
+      const tagId = tagSelect.value;
+      if (!tagId) return;
+      const value = Number(valueInput.value) || 0;
+      const existing = this.item.system.systemTags ?? [];
+      // Don't add duplicates.
+      if (existing.some(t => t.id === tagId)) {
+        ui.notifications.warn('Tag already assigned.');
+        return;
+      }
+      await this.item.update({ 'system.systemTags': [...existing, { id: tagId, value }] });
+    });
+
+    // Remove tag.
+    editor.querySelectorAll('.tag-remove').forEach(el => {
+      el.addEventListener('click', async () => {
+        const tagId = el.closest('.tag-chip')?.dataset.tagId;
+        if (!tagId) return;
+        const existing = this.item.system.systemTags ?? [];
+        await this.item.update({ 'system.systemTags': existing.filter(t => t.id !== tagId) });
+      });
+    });
   }
 }
