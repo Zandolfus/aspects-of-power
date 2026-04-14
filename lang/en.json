@@ -202,7 +202,7 @@
       "globalEquipCap": "Global Equip Cap (20%)",
       "equipmentUsed": "Equipment Used"
     },
-    "Tag": {
+    "SystemTag": {
       "Category": {
         "affinity": "Affinity",
         "immunity": "Immunity",
