@@ -493,6 +493,7 @@ export class AspectsofPowerActorSheet extends foundry.applications.api.Handlebar
     const item = await Item.implementation.fromDropData(data);
     if (!item) return;
 
+    console.log('DROP ITEM:', item.name, 'type:', item.type, 'uuid:', item.uuid);
     if (['race', 'class', 'profession'].includes(item.type)) {
       if (!game.user.isGM) {
         ui.notifications.warn('Only the GM can assign templates.');
