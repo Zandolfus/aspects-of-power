@@ -845,7 +845,8 @@ export class AspectsofPowerItem extends Item {
 
         // ── Immunity check ──
         const debuffTypeCheck = payload.effectData?.system?.debuffType ?? 'none';
-        if (target.isImmuneTo?.(debuffTypeCheck)) {
+        const isImmune = target.isImmuneTo?.(debuffTypeCheck) || target.system?.collectedTags?.has?.(`${debuffTypeCheck}-immune`);
+        if (isImmune) {
           ChatMessage.create({
             speaker: payload.speaker, ...msgWhisper,
             content: `<p><strong>${target.name}</strong> is immune to <strong>${game.i18n.localize(CONFIG.ASPECTSOFPOWER.debuffTypes[debuffTypeCheck] ?? debuffTypeCheck)}</strong>!</p>`,
@@ -1619,7 +1620,7 @@ export class AspectsofPowerItem extends Item {
     const dx = targetPoint.x - cc.x;
     const dy = targetPoint.y - cc.y;
     if (dx === 0 && dy === 0) return;
-    const angle = Math.toDegrees(Math.atan2(dy, dx)) + 90; // +90 because Foundry 0° is up
+    const angle = Math.toDegrees(Math.atan2(dy, dx)) - 90;
     await casterToken.document.update({ rotation: angle });
   }
 
