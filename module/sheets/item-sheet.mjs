@@ -743,7 +743,7 @@ export class AspectsofPowerItemSheet extends foundry.applications.api.Handlebars
       if (!tagId) return;
       const value = Number(valueInput.value) || 0;
       console.log('TAG ADD: item=', this.item.name, 'uuid=', this.item.uuid, 'tagId=', tagId);
-      const existing = this.item.system.systemTags ?? [];
+      const existing = foundry.utils.deepClone(this.item._source.system.systemTags ?? []);
       // Don't add duplicates.
       if (existing.some(t => t.id === tagId)) {
         ui.notifications.warn('Tag already assigned.');
@@ -757,7 +757,7 @@ export class AspectsofPowerItemSheet extends foundry.applications.api.Handlebars
       el.addEventListener('click', async () => {
         const tagId = el.closest('.tag-chip')?.dataset.tagId;
         if (!tagId) return;
-        const existing = this.item.system.systemTags ?? [];
+        const existing = foundry.utils.deepClone(this.item._source.system.systemTags ?? []);
         await this.item.update({ 'system.systemTags': existing.filter(t => t.id !== tagId) });
       });
     });
