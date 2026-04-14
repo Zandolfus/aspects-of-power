@@ -493,19 +493,20 @@ export class AspectsofPowerActorSheet extends foundry.applications.api.Handlebar
     const item = await Item.implementation.fromDropData(data);
     if (!item) return;
 
-    console.log('DROP ITEM:', item.name, 'type:', item.type, 'uuid:', item.uuid);
     if (['race', 'class', 'profession'].includes(item.type)) {
       if (!game.user.isGM) {
         ui.notifications.warn('Only the GM can assign templates.');
         return;
       }
       const type = item.type;
-      // Store the UUID so both world items and compendium items work.
-      await this.actor.update({
+      const updateData = {
         [`system.attributes.${type}.templateId`]: item.uuid,
         [`system.attributes.${type}.name`]: item.name,
         [`system.attributes.${type}.cachedTags`]: item.system.systemTags ?? [],
-      });
+      };
+      console.log('TEMPLATE ASSIGN update:', JSON.stringify(updateData));
+      const result = await this.actor.update(updateData);
+      console.log('TEMPLATE ASSIGN result:', result, 'actor id:', this.actor.id, 'isToken:', this.actor.isToken);
       const typeLabel = game.i18n.localize(CONFIG.ASPECTSOFPOWER.levelTypes[type]);
       ui.notifications.info(`${this.actor.name}: ${typeLabel} ${game.i18n.localize('ASPECTSOFPOWER.Level.templateAssigned')} ${item.name}`);
       return;
