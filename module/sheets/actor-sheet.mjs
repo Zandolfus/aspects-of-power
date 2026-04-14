@@ -442,6 +442,7 @@ export class AspectsofPowerActorSheet extends foundry.applications.api.Handlebar
         await this.actor.update({
           [`system.attributes.${type}.templateId`]: '',
           [`system.attributes.${type}.name`]: '',
+          [`system.attributes.${type}.cachedTags`]: [],
         });
       });
     });
@@ -502,6 +503,7 @@ export class AspectsofPowerActorSheet extends foundry.applications.api.Handlebar
       await this.actor.update({
         [`system.attributes.${type}.templateId`]: item.uuid,
         [`system.attributes.${type}.name`]: item.name,
+        [`system.attributes.${type}.cachedTags`]: item.system.systemTags ?? [],
       });
       const typeLabel = game.i18n.localize(CONFIG.ASPECTSOFPOWER.levelTypes[type]);
       ui.notifications.info(`${this.actor.name}: ${typeLabel} ${game.i18n.localize('ASPECTSOFPOWER.Level.templateAssigned')} ${item.name}`);

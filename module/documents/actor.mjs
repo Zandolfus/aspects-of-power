@@ -292,6 +292,10 @@ export class AspectsofPowerActor extends Actor {
       }
     }
 
+    // ── Tag Collection ──
+    // Collect tags from race/class/profession (cached) + equipped items.
+    this._collectTags(systemData);
+
     // Make separate methods for each Actor type (character, npc, etc.) to keep
     // things organized.
     this._prepareCharacterData(actorData);
@@ -323,6 +327,114 @@ export class AspectsofPowerActor extends Actor {
     // Make modifications to data here. For example:
     const systemData = actorData.system;
     systemData.xp = systemData.cr * systemData.cr * 100;
+  }
+
+  /* -------------------------------------------- */
+  /*  Tag System                                  */
+  /* -------------------------------------------- */
+
+  /**
+   * Collect system tags from all sources into a unified map.
+   * Sources: cached tags from race/class/profession templates + equipped items.
+   * Expands composite tags via `implies`.
+   * Result stored as systemData.collectedTags = Map<tagId, { sources: string[], value: number, category: string }>
+   */
+  _collectTags(systemData) {
+    const registry = CONFIG.ASPECTSOFPOWER?.tagRegistry ?? {};
+    const collected = new Map();
+
+    const addTag = (tagId, value, source) => {
+      const def = registry[tagId];
+      if (!def) return;
+
+      if (collected.has(tagId)) {
+        const existing = collected.get(tagId);
+        // Resistances: values are additive.
+        if (def.category === 'resistance') existing.value += value;
+        existing.sources.push(source);
+      } else {
+        collected.set(tagId, {
+          category: def.category,
+          value: value || 0,
+          sources: [source],
+        });
+      }
+
+      // Expand implied tags recursively.
+      for (const implied of (def.implies ?? [])) {
+        addTag(implied, 0, `${source} (${tagId})`);
+      }
+    };
+
+    // Collect from race/class/profession cached tags.
+    if (systemData.attributes) {
+      for (const type of ['race', 'class', 'profession']) {
+        const attr = systemData.attributes[type];
+        if (!attr?.cachedTags) continue;
+        for (const tag of attr.cachedTags) {
+          if (tag.id) addTag(tag.id, tag.value ?? 0, `${type}: ${attr.name}`);
+        }
+      }
+    }
+
+    // Collect from equipped items.
+    for (const item of this.items) {
+      if (item.type !== 'item' || !item.system.equipped) continue;
+      for (const tag of (item.system.systemTags ?? [])) {
+        if (tag.id) addTag(tag.id, tag.value ?? 0, `equip: ${item.name}`);
+      }
+    }
+
+    systemData.collectedTags = collected;
+  }
+
+  /**
+   * Check if this actor has a specific tag.
+   * @param {string} tagId
+   * @returns {boolean}
+   */
+  hasTag(tagId) {
+    return this.system.collectedTags?.has(tagId) ?? false;
+  }
+
+  /**
+   * Get the numeric value for a tag (resistances are additive).
+   * @param {string} tagId
+   * @returns {number}
+   */
+  getTagValue(tagId) {
+    return this.system.collectedTags?.get(tagId)?.value ?? 0;
+  }
+
+  /**
+   * Get all tags of a specific category.
+   * @param {string} category  'affinity' | 'immunity' | 'resistance' | 'gate' | 'passive'
+   * @returns {Map<string, object>}
+   */
+  getTagsByCategory(category) {
+    const result = new Map();
+    for (const [id, data] of (this.system.collectedTags ?? new Map())) {
+      if (data.category === category) result.set(id, data);
+    }
+    return result;
+  }
+
+  /**
+   * Check if the actor is immune to a specific debuff type.
+   * @param {string} debuffType  e.g., 'stun', 'poison', 'charm'
+   * @returns {boolean}
+   */
+  isImmuneTo(debuffType) {
+    return this.hasTag(`${debuffType}-immune`);
+  }
+
+  /**
+   * Get flat resistance value for a type.
+   * @param {string} type  e.g., 'fire', 'stun'
+   * @returns {number}
+   */
+  getResistance(type) {
+    return this.getTagValue(`${type}-resist`);
   }
 
   /**
