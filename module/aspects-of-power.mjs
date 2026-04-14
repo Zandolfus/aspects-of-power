@@ -338,12 +338,13 @@ Hooks.once('init', function () {
     if (!['race', 'class', 'profession'].includes(item.type)) return;
 
     // Find all actors that reference this item as a template and update their cached tags.
+    console.log('TAG SYNC: item updated:', item.name, 'uuid:', item.uuid, 'tags:', changes.system.systemTags);
     for (const actor of game.actors) {
       for (const type of ['race', 'class', 'profession']) {
         const attr = actor.system.attributes?.[type];
         if (!attr?.templateId) continue;
-        // templateId is a UUID — compare against the item's UUID.
         if (attr.templateId === item.uuid) {
+          console.log('  → syncing to', actor.name, type, 'templateId:', attr.templateId);
           actor.update({ [`system.attributes.${type}.cachedTags`]: item.system.systemTags ?? [] });
         }
       }
