@@ -102,6 +102,10 @@ export class SkillData extends foundry.abstract.TypeDataModel {
 
         // Repair: which material types this skill can repair.
         repairMaterials: new fields.ArrayField(new fields.StringField(), { initial: [] }),
+
+        // Sustain: per-round upkeep cost/resource to maintain the active effect.
+        sustainCost:     new fields.NumberField({ initial: 0, min: 0, integer: true }),
+        sustainResource: new fields.StringField({ initial: 'mana' }),
       }),
     };
   }

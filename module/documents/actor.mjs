@@ -554,18 +554,48 @@ export class AspectsofPowerActor extends Actor {
       });
     }
 
+    // ── 0.5. Sustain Upkeep ──
+    // Deduct upkeep cost from each active sustain; end sustain if resource insufficient.
+    const sustainEffects = this.effects.filter(e =>
+      !e.disabled && e.system?.effectType === 'sustain'
+    );
+    for (const sustainFx of sustainEffects) {
+      const costAmt = sustainFx.system?.sustainCost ?? 0;
+      const resKey  = sustainFx.system?.sustainResource ?? 'mana';
+      const current = systemData[resKey]?.value ?? 0;
+      if (current < costAmt) {
+        // Insufficient resource — end the sustain.
+        await sustainFx.delete();
+        ChatMessage.create({
+          speaker, ...gmWhisper,
+          content: `<p><strong>${this.name}</strong>'s <strong>${sustainFx.name}</strong> ends — insufficient ${resKey}.</p>`,
+        });
+      } else if (costAmt > 0) {
+        const newVal = current - costAmt;
+        updateData[`system.${resKey}.value`] = newVal;
+        ChatMessage.create({
+          speaker, ...gmWhisper,
+          content: `<p><em>${this.name} sustains ${sustainFx.name} (−${costAmt} ${resKey}).</em></p>`,
+        });
+      }
+    }
+
     // ── 1. Stamina Regeneration ──
     const stamina = systemData.stamina;
     const regenPct = systemData.staminaRegen ?? 5;
     const regenAmt = Math.floor(stamina.max * (regenPct / 100));
-    if (stamina.value < stamina.max) {
-      const newStamina = Math.min(stamina.max, stamina.value + regenAmt);
-      const gained = newStamina - stamina.value;
+    // Respect any pending stamina change from sustain upkeep above.
+    const staminaBase = updateData['system.stamina.value'] ?? stamina.value;
+    if (staminaBase < stamina.max) {
+      const newStamina = Math.min(stamina.max, staminaBase + regenAmt);
+      const gained = newStamina - staminaBase;
       updateData['system.stamina.value'] = newStamina;
-      ChatMessage.create({
-        speaker, ...gmWhisper,
-        content: `<p><em>${this.name} regenerates ${gained} stamina (${regenPct}% of ${stamina.max}).</em></p>`,
-      });
+      if (gained > 0) {
+        ChatMessage.create({
+          speaker, ...gmWhisper,
+          content: `<p><em>${this.name} regenerates ${gained} stamina (${regenPct}% of ${stamina.max}).</em></p>`,
+        });
+      }
     }
 
     // ── 2. Overhealth Decay ──

@@ -1868,6 +1868,23 @@ export class AspectsofPowerItem extends Item {
       }
     }
 
+    // ── Sustain toggle: if already active, end it and skip execution ──
+    if (tags.includes('sustain') && this.actor) {
+      const existingSustain = this.actor.effects.find(e =>
+        !e.disabled
+        && e.system?.effectType === 'sustain'
+        && e.system?.itemSource === this.id
+      );
+      if (existingSustain) {
+        await existingSustain.delete();
+        ChatMessage.create({
+          speaker,
+          content: `<p><strong>${this.actor.name}</strong> ends <strong>${item.name}</strong>.</p>`,
+        });
+        return;
+      }
+    }
+
     // ── Parry-only mode: evaluate just the hit roll for comparison ─────
     if (options.parryOnly) {
       const { hitFormula } = this._buildRollFormulas(rollData);
@@ -2126,6 +2143,7 @@ export class AspectsofPowerItem extends Item {
         await canvas.scene.deleteEmbeddedDocuments('Region', [templateDoc.id]);
       }
 
+      await this._applySustainEffect(speaker);
       return dmgRoll;
     }
 
@@ -2198,6 +2216,7 @@ export class AspectsofPowerItem extends Item {
     // Execute chained skills after all parent tags have resolved.
     await this._executeChainedSkills(hitResults, null, speaker, rollMode);
 
+    await this._applySustainEffect(speaker);
     return dmgRoll;
   }
 
@@ -2214,6 +2233,36 @@ export class AspectsofPowerItem extends Item {
    * @param {string} rollMode                      Roll mode setting.
    * @private
    */
+  /**
+   * Create a sustain ActiveEffect on the caster if the skill has the 'sustain' tag.
+   * No-op if the skill doesn't have the tag or there's no caster.
+   */
+  async _applySustainEffect(speaker) {
+    const tags = this.system.tags ?? [];
+    if (!tags.includes('sustain') || !this.actor) return;
+
+    const cost     = this.system.tagConfig?.sustainCost ?? 0;
+    const resource = this.system.tagConfig?.sustainResource ?? 'mana';
+
+    await this.actor.createEmbeddedDocuments('ActiveEffect', [{
+      name: `${this.name} (Sustained)`,
+      img: this.img,
+      type: 'base',
+      system: {
+        effectType: 'sustain',
+        effectCategory: 'temporary',
+        itemSource: this.id,
+        sustainCost: cost,
+        sustainResource: resource,
+      },
+    }]);
+
+    ChatMessage.create({
+      speaker,
+      content: `<p><strong>${this.actor.name}</strong> begins sustaining <strong>${this.name}</strong> (${cost} ${resource}/round).</p>`,
+    });
+  }
+
   async _executeChainedSkills(hitResults, aoeTargets, speaker, rollMode) {
     const whisperGM = !_isPlayerCharacter(this.actor) ? ChatMessage.getWhisperRecipients('GM') : undefined;
     const chains = this.system.chainedSkills ?? [];

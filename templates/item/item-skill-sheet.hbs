@@ -370,6 +370,21 @@
       </div>
       {{/if}}
 
+      {{! ── Sustain Tag Config ── }}
+      {{#if (includes system.tags "sustain")}}
+      <div class='tag-config sustain-config'>
+        <label class='resource-label'>Upkeep Resource</label>
+        <select name='system.tagConfig.sustainResource'>
+          <option value="mana" {{#if (eq system.tagConfig.sustainResource "mana")}}selected{{/if}}>Mana</option>
+          <option value="stamina" {{#if (eq system.tagConfig.sustainResource "stamina")}}selected{{/if}}>Stamina</option>
+          <option value="health" {{#if (eq system.tagConfig.sustainResource "health")}}selected{{/if}}>Health</option>
+        </select>
+        <label class='resource-label'>Upkeep Cost (per round)</label>
+        <input type='number' name='system.tagConfig.sustainCost'
+               value='{{system.tagConfig.sustainCost}}' min='0' step='1' />
+      </div>
+      {{/if}}
+
       {{! ── Skill Chain Config ── }}
       {{#if system.tags.length}}
       <div class='tag-config chain-config'>

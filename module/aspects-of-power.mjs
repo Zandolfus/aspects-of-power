@@ -1441,6 +1441,19 @@ Hooks.on('updateActor', async (actor, changes, _options, userId) => {
   const healthChange = changes.system?.health;
   if (healthChange?.value === undefined) return;
 
+  // Actor death — clear all active sustains.
+  if (actor.system.health.value <= 0) {
+    const deathSustains = actor.effects.filter(e =>
+      !e.disabled && e.system?.effectType === 'sustain'
+    );
+    if (deathSustains.length > 0) {
+      await actor.deleteEmbeddedDocuments('ActiveEffect', deathSustains.map(e => e.id));
+      ChatMessage.create({
+        content: `<p><strong>${actor.name}</strong>'s sustained skills end — ${deathSustains.map(e => e.name).join(', ')}.</p>`,
+      });
+    }
+  }
+
   const threshold = game.settings.get('aspects-of-power', 'woundedTokenThreshold');
   if (threshold <= 0) return;
 

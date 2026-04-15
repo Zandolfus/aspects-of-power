@@ -56,6 +56,7 @@ ASPECTSOFPOWER.skillTags = {
   cleanse:     'ASPECTSOFPOWER.Tag.cleanse',
   repair:      'ASPECTSOFPOWER.Tag.repair',
   aoe:         'ASPECTSOFPOWER.Tag.aoe',
+  sustain:     'ASPECTSOFPOWER.Tag.sustain',
   // Descriptor tags (mechanical effects).
   magic:       'ASPECTSOFPOWER.Tag.magic',
   physical:    'ASPECTSOFPOWER.Tag.physical',
@@ -113,6 +114,7 @@ ASPECTSOFPOWER.combatTags = {
   debuff:      'ASPECTSOFPOWER.Tag.debuff',
   cleanse:     'ASPECTSOFPOWER.Tag.cleanse',
   aoe:         'ASPECTSOFPOWER.Tag.aoe',
+  sustain:     'ASPECTSOFPOWER.Tag.sustain',
   // Descriptors.
   magic:       'ASPECTSOFPOWER.Tag.magic',
   physical:    'ASPECTSOFPOWER.Tag.physical',

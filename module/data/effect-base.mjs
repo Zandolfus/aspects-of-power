@@ -39,6 +39,10 @@ export class AopEffectData extends foundry.data.ActiveEffectTypeDataModel {
         source:     new fields.StringField({ initial: '' }),
       }, { nullable: true, initial: null }),
 
+      // ── Sustain ──
+      sustainCost:     new fields.NumberField({ initial: 0, integer: true }),
+      sustainResource: new fields.StringField({ initial: 'mana' }),
+
       // ── Special flags ──
       dismemberedSlot:          new fields.StringField({ initial: '' }),
       sleepActive:              new fields.BooleanField({ initial: false }),
