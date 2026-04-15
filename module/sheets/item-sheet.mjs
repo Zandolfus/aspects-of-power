@@ -266,14 +266,8 @@ export class AspectsofPowerItemSheet extends foundry.applications.api.Handlebars
       return;
     }
 
-    // Tag checkboxes: collect all checked values into an array.
-    if (this.item.type === 'skill' && event.target?.name === 'system.tags') {
-      const form = this.element.querySelector('form');
-      const checked = [...form.querySelectorAll('input[name="system.tags"]:checked')]
-        .map(el => el.value);
-      await this.document.update({ 'system.tags': checked });
-      return;
-    }
+    // Tag autocomplete is handled by _bindSkillTagAutocomplete — skip form submission for it.
+    if (this.item.type === 'skill' && event.target?.classList?.contains('skill-tag-input')) return;
 
     // AOE config: update individual fields via dot-notation so conditional
     // DOM elements (width/angle that only appear for certain shapes) don't
@@ -507,8 +501,11 @@ export class AspectsofPowerItemSheet extends foundry.applications.api.Handlebars
 
     if (!this.isEditable) return;
 
-    // ── Tag Editor ──
+    // ── Tag Editor (system tags on race/class/prof/equipment) ──
     this._bindTagEditor();
+
+    // ── Skill Tag Autocomplete ──
+    if (this.item.type === 'skill') this._bindSkillTagAutocomplete();
 
     // Profile image — open FilePicker on click (AppV2 doesn't auto-wire data-edit).
     this.element.querySelectorAll('[data-edit="img"]').forEach(el => {
@@ -736,6 +733,108 @@ export class AspectsofPowerItemSheet extends foundry.applications.api.Handlebars
 
     await this.item.update({ 'system.augments': newAugments });
     ui.notifications.info(`Slotted ${ownedAugment.name} into ${this.item.name}.`);
+  }
+
+  /**
+   * Bind the skill tag autocomplete input.
+   */
+  _bindSkillTagAutocomplete() {
+    const container = this.element.querySelector('.skill-tag-autocomplete');
+    if (!container) return;
+
+    const input = container.querySelector('.skill-tag-input');
+    const suggestions = container.querySelector('.skill-tag-suggestions');
+    if (!input || !suggestions) return;
+
+    // Build available tags based on skill category.
+    const category = this.item.system.skillCategory;
+    const tagSource = category === 'profession'
+      ? CONFIG.ASPECTSOFPOWER.professionTags
+      : CONFIG.ASPECTSOFPOWER.combatTags;
+    const allTags = Object.entries(tagSource).map(([key, label]) => ({
+      key,
+      label: game.i18n.localize(label),
+    }));
+
+    const currentTags = () => this.item.system.tags ?? [];
+
+    // Filter and render suggestions.
+    const updateSuggestions = () => {
+      const query = input.value.trim().toLowerCase();
+      suggestions.innerHTML = '';
+      if (!query) { suggestions.classList.remove('open'); return; }
+
+      const existing = new Set(currentTags());
+      const matches = allTags.filter(t =>
+        !existing.has(t.key) && t.label.toLowerCase().includes(query)
+      );
+
+      if (!matches.length) { suggestions.classList.remove('open'); return; }
+
+      for (const tag of matches) {
+        const li = document.createElement('li');
+        li.textContent = tag.label;
+        li.dataset.tag = tag.key;
+        li.addEventListener('mousedown', (e) => {
+          e.preventDefault(); // prevent blur
+          this._addSkillTag(tag.key);
+          input.value = '';
+          suggestions.classList.remove('open');
+        });
+        suggestions.appendChild(li);
+      }
+      suggestions.classList.add('open');
+    };
+
+    input.addEventListener('input', updateSuggestions);
+    input.addEventListener('focus', updateSuggestions);
+    input.addEventListener('blur', () => {
+      // Small delay so mousedown on suggestion fires first.
+      setTimeout(() => suggestions.classList.remove('open'), 150);
+    });
+
+    // Keyboard navigation.
+    input.addEventListener('keydown', (e) => {
+      const items = suggestions.querySelectorAll('li');
+      const active = suggestions.querySelector('li.active');
+      if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        const next = active ? active.nextElementSibling : items[0];
+        if (active) active.classList.remove('active');
+        if (next) next.classList.add('active');
+      } else if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        const prev = active?.previousElementSibling;
+        if (active) active.classList.remove('active');
+        if (prev) prev.classList.add('active');
+      } else if (e.key === 'Enter') {
+        e.preventDefault();
+        if (active) {
+          this._addSkillTag(active.dataset.tag);
+          input.value = '';
+          suggestions.classList.remove('open');
+        }
+      } else if (e.key === 'Escape') {
+        suggestions.classList.remove('open');
+      }
+    });
+
+    // Remove tag chips.
+    this.element.querySelectorAll('.skill-tag-remove').forEach(el => {
+      el.addEventListener('click', () => this._removeSkillTag(el.dataset.tag));
+    });
+  }
+
+  async _addSkillTag(tagKey) {
+    const existing = [...(this.item.system.tags ?? [])];
+    if (existing.includes(tagKey)) return;
+    existing.push(tagKey);
+    await this.document.update({ 'system.tags': existing });
+  }
+
+  async _removeSkillTag(tagKey) {
+    const existing = [...(this.item.system.tags ?? [])];
+    await this.document.update({ 'system.tags': existing.filter(t => t !== tagKey) });
   }
 
   /**

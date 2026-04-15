@@ -55,27 +55,20 @@
         </div>
       </div>
 
-      {{! ── Tag Checkboxes (filtered by category) ── }}
+      {{! ── Tag Autocomplete ── }}
       <div class='skill-tags'>
         <label class='resource-label'>{{localize "ASPECTSOFPOWER.Tag.label"}}</label>
-        <div class='tag-checkboxes'>
-          {{#if (eq system.skillCategory "profession")}}
-            {{#each config.professionTags as |label key|}}
-              <label class='tag-checkbox'>
-                <input type='checkbox' name='system.tags' value='{{key}}'
-                  {{#if (includes ../system.tags key)}}checked{{/if}} />
-                {{localize label}}
-              </label>
-            {{/each}}
-          {{else}}
-            {{#each config.combatTags as |label key|}}
-              <label class='tag-checkbox'>
-                <input type='checkbox' name='system.tags' value='{{key}}'
-                  {{#if (includes ../system.tags key)}}checked{{/if}} />
-                {{localize label}}
-              </label>
-            {{/each}}
-          {{/if}}
+        <div class='skill-tag-chips'>
+          {{#each system.tags as |tag|}}
+            <span class='skill-tag-chip'>
+              {{tag}}
+              <a class='skill-tag-remove' data-tag='{{tag}}' title='Remove'>×</a>
+            </span>
+          {{/each}}
+        </div>
+        <div class='skill-tag-autocomplete'>
+          <input type='text' class='skill-tag-input' placeholder='Type to search tags...' autocomplete='off' />
+          <ul class='skill-tag-suggestions'></ul>
         </div>
       </div>
 

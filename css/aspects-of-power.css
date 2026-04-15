@@ -576,21 +576,67 @@
   border-bottom: 1px solid #c9c7b8;
   padding-bottom: 8px;
 }
-.aspects-of-power .skill-tags .tag-checkboxes {
+.aspects-of-power .skill-tag-chips {
   display: flex;
-  gap: 12px;
   flex-wrap: wrap;
+  gap: 4px;
   margin-top: 4px;
+  margin-bottom: 4px;
 }
-.aspects-of-power .skill-tags .tag-checkbox {
-  display: flex;
+.aspects-of-power .skill-tag-chip {
+  display: inline-flex;
   align-items: center;
   gap: 4px;
-  font-weight: normal;
-  cursor: pointer;
+  background: #4a4a3a;
+  border: 1px solid #7a7971;
+  border-radius: 3px;
+  padding: 2px 8px;
+  font-size: 11px;
+  text-transform: capitalize;
 }
-.aspects-of-power .skill-tags .tag-checkbox input[type="checkbox"] {
+.aspects-of-power .skill-tag-chip .skill-tag-remove {
+  cursor: pointer;
+  opacity: 0.7;
+  font-weight: bold;
+  line-height: 1;
+}
+.aspects-of-power .skill-tag-chip .skill-tag-remove:hover { opacity: 1; color: #ef5350; }
+.aspects-of-power .skill-tag-autocomplete {
+  position: relative;
+}
+.aspects-of-power .skill-tag-input {
+  width: 100%;
+  box-sizing: border-box;
+}
+.aspects-of-power .skill-tag-suggestions {
+  display: none;
+  position: absolute;
+  z-index: 100;
+  left: 0;
+  right: 0;
+  top: 100%;
   margin: 0;
+  padding: 0;
+  list-style: none;
+  background: #302e2a;
+  border: 1px solid #7a7971;
+  border-top: none;
+  border-radius: 0 0 3px 3px;
+  max-height: 150px;
+  overflow-y: auto;
+}
+.aspects-of-power .skill-tag-suggestions.open {
+  display: block;
+}
+.aspects-of-power .skill-tag-suggestions li {
+  padding: 4px 8px;
+  cursor: pointer;
+  font-size: 12px;
+  text-transform: capitalize;
+}
+.aspects-of-power .skill-tag-suggestions li:hover,
+.aspects-of-power .skill-tag-suggestions li.active {
+  background: #4a4a3a;
 }
 .aspects-of-power .tag-config {
   margin-top: 8px;
