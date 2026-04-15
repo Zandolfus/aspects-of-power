@@ -104,6 +104,11 @@ export class AspectsofPowerItemSheet extends foundry.applications.api.Handlebars
         if (!blockedResources.has(key)) context.availableResources[key] = label;
       }
       context.hasGateRestrictions = blockedTypes.size > 0 || blockedResources.size > 0;
+
+      // Check if a debuff subtype tag is present (hides manual debuff type dropdown).
+      const debuffSubtypes = CONFIG.ASPECTSOFPOWER.debuffSubtypeTags ?? {};
+      const skillTags = this.item.system.tags ?? [];
+      context.hasDebuffSubtype = skillTags.some(t => debuffSubtypes[t]);
     }
 
     // Item bonus field labels for augment sheets.

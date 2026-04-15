@@ -292,6 +292,7 @@
       {{! ── Debuff Tag Config ── }}
       {{#if (includes system.tags "debuff")}}
       <div class='tag-config debuff-config'>
+        {{#unless hasDebuffSubtype}}
         <label class='resource-label'>{{localize "ASPECTSOFPOWER.Debuff.label"}}</label>
         <select name='system.tagConfig.debuffType'>
           {{#each config.debuffTypes as |label key|}}
@@ -334,6 +335,7 @@
                  {{#if system.tagConfig.debuffDirectional}}checked{{/if}} />
           Omnidirectional DR
         </label>
+        {{/unless}}
         <label class='resource-label dot-toggle'>
           <input type='checkbox' name='system.tagConfig.debuffDealsDamage'
                  {{#if system.tagConfig.debuffDealsDamage}}checked{{/if}} />
