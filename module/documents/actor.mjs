@@ -50,6 +50,9 @@ export class AspectsofPowerActor extends Actor {
       }
     }
 
+    // ── Tag Collection (early — needed for size scaling) ──
+    this._collectTags(systemData);
+
     // Sigmoid modifier formula.
     const sigmoidMod = (value, key) => {
       if (key === "toughness")
@@ -135,6 +138,23 @@ export class AspectsofPowerActor extends Actor {
       totalEquipRaw: abilityKeys.reduce((sum, k) => sum + systemData.abilities[k].breakdown.equipmentBonusRaw, 0),
       totalEquipCapped: totalEquip,
     };
+
+    // ── Size Scaling (str/vit mods) ──
+    // Detect size tag from collectedTags; default to medium (1.0x).
+    const sizeScaling = CONFIG.ASPECTSOFPOWER.sizeScaling ?? {};
+    let actorSizeTag = 'medium';
+    for (const sizeKey of Object.keys(sizeScaling)) {
+      if (systemData.collectedTags?.has(sizeKey)) { actorSizeTag = sizeKey; break; }
+    }
+    const sizeMultipliers = sizeScaling[actorSizeTag] ?? { strVit: 1.0, meleeRangedDef: 1.0 };
+    systemData.sizeTag = actorSizeTag;
+
+    if (sizeMultipliers.strVit !== 1.0) {
+      systemData.abilities.strength.mod = Math.round(systemData.abilities.strength.mod * sizeMultipliers.strVit);
+      systemData.abilities.strength.breakdown.finalMod = systemData.abilities.strength.mod;
+      systemData.abilities.vitality.mod = Math.round(systemData.abilities.vitality.mod * sizeMultipliers.strVit);
+      systemData.abilities.vitality.breakdown.finalMod = systemData.abilities.vitality.mod;
+    }
 
     // --- Resource maxima ---
     systemData.health.max = Math.round(systemData.abilities.vitality.mod * 1.25);
@@ -240,6 +260,12 @@ export class AspectsofPowerActor extends Actor {
     if (zeroRanged) rangedVal = 0;
     if (zeroMind)   mindVal = 0;
 
+    // ── Size Scaling (melee/ranged defense) ──
+    if (sizeMultipliers.meleeRangedDef !== 1.0) {
+      meleeVal  = Math.round(meleeVal * sizeMultipliers.meleeRangedDef);
+      rangedVal = Math.round(rangedVal * sizeMultipliers.meleeRangedDef);
+    }
+
     systemData.defense.melee.value  = meleeVal;
     systemData.defense.ranged.value = rangedVal;
     systemData.defense.mind.value   = mindVal;
@@ -291,10 +317,6 @@ export class AspectsofPowerActor extends Actor {
         systemData.barrier.source = '';
       }
     }
-
-    // ── Tag Collection ──
-    // Collect tags from race/class/profession (cached) + equipped items.
-    this._collectTags(systemData);
 
     // ── Passive Tag Bonuses ──
     // 'armored' tag adds flat armor. 'ethereal' tag adds flat veil.

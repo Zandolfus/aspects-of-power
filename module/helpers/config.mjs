@@ -180,6 +180,20 @@ ASPECTSOFPOWER.affinityTags = new Set([
   'poison', 'blood', 'necromantic', 'holy', 'arcane', 'psychic',
 ]);
 
+/**
+ * Size tag scaling — multipliers applied to ability mods and defense values.
+ * strVit: multiplier on strength.mod and vitality.mod (affects HP and damage).
+ * meleeRangedDef: multiplier on melee and ranged defense values.
+ */
+ASPECTSOFPOWER.sizeScaling = {
+  tiny:       { strVit: 0.6, meleeRangedDef: 1.4 },
+  small:      { strVit: 0.8, meleeRangedDef: 1.2 },
+  medium:     { strVit: 1.0, meleeRangedDef: 1.0 },
+  large:      { strVit: 1.2, meleeRangedDef: 0.8 },
+  huge:       { strVit: 1.4, meleeRangedDef: 0.6 },
+  gargantuan: { strVit: 1.6, meleeRangedDef: 0.4 },
+};
+
 ASPECTSOFPOWER.reactionTypes = {
   dodge:   'ASPECTSOFPOWER.Reaction.dodge',
   parry:   'ASPECTSOFPOWER.Reaction.parry',
