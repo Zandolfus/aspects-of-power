@@ -130,6 +130,11 @@ export class AspectsofPowerItem extends Item {
       hitFormula = `((((d20/100)*(${m}))+(${m})))`;
       dmgFormula = `(((${dic}/50*(${m}))+(${m}))*${db})`;
 
+    } else if (typ === 'magic') {
+      const m = `${A.intelligence.mod}`;
+      hitFormula = `((((d20/100)*(${m}))+(${m})))`;
+      dmgFormula = `(((${dic}/100*${ab})+${ab})*${db})`;
+
     } else if (typ === 'wisdom_dexterity') {
       const m = `${A.wisdom.mod}*(9/10)+${A.dexterity.mod}*(3/10)`;
       hitFormula = `((((d20/100)*(${m}))+(${m})))`;

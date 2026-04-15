@@ -276,6 +276,7 @@
       "strWeapon": "Strength Weapon",
       "dexWeapon": "Dexterity Weapon",
       "physRanged": "Physical Ranged",
+      "magic": "Magic (Intelligence)",
       "magicProjectile": "Magic Projectile",
       "magicMelee": "Magic Melee",
       "wisdomDexterity": "Wisdom/Dexterity"

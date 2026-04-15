@@ -116,6 +116,7 @@ ASPECTSOFPOWER.rollTypes = {
   str_weapon:       'ASPECTSOFPOWER.RollType.strWeapon',
   dex_weapon:       'ASPECTSOFPOWER.RollType.dexWeapon',
   phys_ranged:      'ASPECTSOFPOWER.RollType.physRanged',
+  magic:            'ASPECTSOFPOWER.RollType.magic',
   magic_projectile: 'ASPECTSOFPOWER.RollType.magicProjectile',
   magic_melee:      'ASPECTSOFPOWER.RollType.magicMelee',
   wisdom_dexterity: 'ASPECTSOFPOWER.RollType.wisdomDexterity',
@@ -135,9 +136,9 @@ ASPECTSOFPOWER.skillResources = {
  * Used for skill sheet filtering and runtime blocking.
  */
 ASPECTSOFPOWER.gateRules = {
-  'no-magic':    { blockedTypes: ['magic_projectile', 'magic_melee'], blockedResources: ['mana'] },
-  'no-ranged':   { blockedTypes: ['phys_ranged', 'magic_projectile'], blockedResources: [] },
-  'melee-only':  { blockedTypes: ['phys_ranged', 'magic_projectile'], blockedResources: ['mana'] },
+  'no-magic':    { blockedTypes: ['magic', 'magic_projectile', 'magic_melee'], blockedResources: ['mana'] },
+  'no-ranged':   { blockedTypes: ['phys_ranged', 'magic', 'magic_projectile'], blockedResources: [] },
+  'melee-only':  { blockedTypes: ['phys_ranged', 'magic', 'magic_projectile'], blockedResources: ['mana'] },
   'no-physical': { blockedTypes: ['str_weapon', 'dex_weapon', 'phys_ranged'], blockedResources: ['stamina'] },
   'magic-only':  { blockedTypes: ['str_weapon', 'dex_weapon', 'phys_ranged'], blockedResources: ['stamina'] },
   'no-stamina-skills': { blockedTypes: [], blockedResources: ['stamina'] },
