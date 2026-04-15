@@ -146,18 +146,16 @@ export class AspectsofPowerActor extends Actor {
     for (const sizeKey of Object.keys(sizeScaling)) {
       if (systemData.collectedTags?.has(sizeKey)) { actorSizeTag = sizeKey; break; }
     }
-    const sizeMultipliers = sizeScaling[actorSizeTag] ?? { strVit: 1.0, meleeRangedDef: 1.0 };
+    const sizeMultipliers = sizeScaling[actorSizeTag] ?? { str: 1.0, hp: 1.0, meleeRangedDef: 1.0 };
     systemData.sizeTag = actorSizeTag;
 
-    if (sizeMultipliers.strVit !== 1.0) {
-      systemData.abilities.strength.mod = Math.round(systemData.abilities.strength.mod * sizeMultipliers.strVit);
+    if (sizeMultipliers.str !== 1.0) {
+      systemData.abilities.strength.mod = Math.round(systemData.abilities.strength.mod * sizeMultipliers.str);
       systemData.abilities.strength.breakdown.finalMod = systemData.abilities.strength.mod;
-      systemData.abilities.vitality.mod = Math.round(systemData.abilities.vitality.mod * sizeMultipliers.strVit);
-      systemData.abilities.vitality.breakdown.finalMod = systemData.abilities.vitality.mod;
     }
 
     // --- Resource maxima ---
-    systemData.health.max = Math.round(systemData.abilities.vitality.mod * 1.25);
+    systemData.health.max = Math.round(systemData.abilities.vitality.mod * 1.25 * sizeMultipliers.hp);
     systemData.mana.max = systemData.abilities.willpower.mod;
     systemData.stamina.max = systemData.abilities.endurance.mod;
 

@@ -182,16 +182,17 @@ ASPECTSOFPOWER.affinityTags = new Set([
 
 /**
  * Size tag scaling — multipliers applied to ability mods and defense values.
- * strVit: multiplier on strength.mod and vitality.mod (affects HP and damage).
+ * str: multiplier on strength.mod (affects damage).
+ * hp: multiplier on health.max (derived from vitality).
  * meleeRangedDef: multiplier on melee and ranged defense values.
  */
 ASPECTSOFPOWER.sizeScaling = {
-  tiny:       { strVit: 0.6, meleeRangedDef: 1.4 },
-  small:      { strVit: 0.8, meleeRangedDef: 1.2 },
-  medium:     { strVit: 1.0, meleeRangedDef: 1.0 },
-  large:      { strVit: 1.2, meleeRangedDef: 0.8 },
-  huge:       { strVit: 1.4, meleeRangedDef: 0.6 },
-  gargantuan: { strVit: 1.6, meleeRangedDef: 0.4 },
+  tiny:       { str: 0.6, hp: 0.6, meleeRangedDef: 1.4 },
+  small:      { str: 0.8, hp: 0.8, meleeRangedDef: 1.2 },
+  medium:     { str: 1.0, hp: 1.0, meleeRangedDef: 1.0 },
+  large:      { str: 1.2, hp: 1.2, meleeRangedDef: 0.8 },
+  huge:       { str: 1.4, hp: 1.4, meleeRangedDef: 0.6 },
+  gargantuan: { str: 1.6, hp: 1.6, meleeRangedDef: 0.4 },
 };
 
 ASPECTSOFPOWER.reactionTypes = {
