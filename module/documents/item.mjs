@@ -1842,6 +1842,27 @@ export class AspectsofPowerItem extends Item {
     const whisperGM = gmOnly ? ChatMessage.getWhisperRecipients('GM') : undefined;
     const tags     = this.system.tags ?? [];
 
+    // ── Gate check: block execution if actor has restricting tags ──
+    if (this.actor?.system?.collectedTags) {
+      const gateRules = CONFIG.ASPECTSOFPOWER.gateRules ?? {};
+      const rollType = rollData.roll?.type ?? '';
+      const resource = rollData.roll?.resource ?? '';
+      for (const [tagId] of this.actor.system.collectedTags) {
+        const rule = gateRules[tagId];
+        if (!rule) continue;
+        if (rollType && rule.blockedTypes?.includes(rollType)) {
+          const tagLabel = game.i18n.localize(CONFIG.ASPECTSOFPOWER.tagRegistry?.[tagId]?.label ?? tagId);
+          ui.notifications.warn(`${this.actor.name} ${game.i18n.localize('ASPECTSOFPOWER.Gate.blocked')} (${tagLabel})`);
+          return;
+        }
+        if (resource && rule.blockedResources?.includes(resource)) {
+          const tagLabel = game.i18n.localize(CONFIG.ASPECTSOFPOWER.tagRegistry?.[tagId]?.label ?? tagId);
+          ui.notifications.warn(`${this.actor.name} ${game.i18n.localize('ASPECTSOFPOWER.Gate.blocked')} (${tagLabel})`);
+          return;
+        }
+      }
+    }
+
     // ── Parry-only mode: evaluate just the hit roll for comparison ─────
     if (options.parryOnly) {
       const { hitFormula } = this._buildRollFormulas(rollData);

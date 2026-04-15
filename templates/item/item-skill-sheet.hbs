@@ -184,9 +184,15 @@
           <div class='grid-span-1'>
             <label class='resource-label'>Resource</label>
             <select name='system.roll.resource'>
-              <option value="mana" {{#if (eq system.roll.resource "mana")}}selected{{/if}}>Mana</option>
-              <option value="stamina" {{#if (eq system.roll.resource "stamina")}}selected{{/if}}>Stamina</option>
-              <option value="health" {{#if (eq system.roll.resource "health")}}selected{{/if}}>Health</option>
+              {{#if availableResources}}
+                {{#each availableResources as |label key|}}
+                  <option value="{{key}}" {{#if (eq key ../system.roll.resource)}}selected{{/if}}>{{localize label}}</option>
+                {{/each}}
+              {{else}}
+                <option value="mana" {{#if (eq system.roll.resource "mana")}}selected{{/if}}>Mana</option>
+                <option value="stamina" {{#if (eq system.roll.resource "stamina")}}selected{{/if}}>Stamina</option>
+                <option value="health" {{#if (eq system.roll.resource "health")}}selected{{/if}}>Health</option>
+              {{/if}}
             </select>
           </div>
           <div class='grid-span-1'>
@@ -196,13 +202,18 @@
           <div class='grid-span-1'>
             <label class='resource-label'>Skill Type</label>
             <select name='system.roll.type' data-dtype='String'>
-              <option value="str_weapon" {{#if (eq system.roll.type "str_weapon")}}selected{{/if}}>Strength Weapon</option>
-              <option value="dex_weapon" {{#if (eq system.roll.type "dex_weapon")}}selected{{/if}}>Dexterity Weapon</option>
-              <option value="phys_ranged" {{#if (eq system.roll.type "phys_ranged")}}selected{{/if}}>Physical Ranged Weapon</option>
-              <option value="magic" {{#if (eq system.roll.type "magic")}}selected{{/if}}>Magic</option>
-              <option value="magic_projectile" {{#if (eq system.roll.type "magic_projectile")}}selected{{/if}}>Magic Projectile</option>
-              <option value="magic_melee" {{#if (eq system.roll.type "magic_melee")}}selected{{/if}}>Magic Melee</option>
-              <option value="wisdom_dexterity" {{#if (eq system.roll.type "wisdom_dexterity")}}selected{{/if}}>Wisdom Dexterity</option>
+              {{#if availableRollTypes}}
+                {{#each availableRollTypes as |label key|}}
+                  <option value="{{key}}" {{#if (eq key ../system.roll.type)}}selected{{/if}}>{{localize label}}</option>
+                {{/each}}
+              {{else}}
+                <option value="str_weapon" {{#if (eq system.roll.type "str_weapon")}}selected{{/if}}>Strength Weapon</option>
+                <option value="dex_weapon" {{#if (eq system.roll.type "dex_weapon")}}selected{{/if}}>Dexterity Weapon</option>
+                <option value="phys_ranged" {{#if (eq system.roll.type "phys_ranged")}}selected{{/if}}>Physical Ranged</option>
+                <option value="magic_projectile" {{#if (eq system.roll.type "magic_projectile")}}selected{{/if}}>Magic Projectile</option>
+                <option value="magic_melee" {{#if (eq system.roll.type "magic_melee")}}selected{{/if}}>Magic Melee</option>
+                <option value="wisdom_dexterity" {{#if (eq system.roll.type "wisdom_dexterity")}}selected{{/if}}>Wisdom/Dexterity</option>
+              {{/if}}
             </select>
           </div>
         </div>

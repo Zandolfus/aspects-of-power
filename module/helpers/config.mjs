@@ -108,6 +108,41 @@ ASPECTSOFPOWER.zoneEffects = {
   difficultTerrain: 'ASPECTSOFPOWER.Zone.difficultTerrain',
 };
 
+/**
+ * Roll types for skills — used in skill sheet dropdown.
+ * Keyed by internal value, value is localization key.
+ */
+ASPECTSOFPOWER.rollTypes = {
+  str_weapon:       'ASPECTSOFPOWER.RollType.strWeapon',
+  dex_weapon:       'ASPECTSOFPOWER.RollType.dexWeapon',
+  phys_ranged:      'ASPECTSOFPOWER.RollType.physRanged',
+  magic_projectile: 'ASPECTSOFPOWER.RollType.magicProjectile',
+  magic_melee:      'ASPECTSOFPOWER.RollType.magicMelee',
+  wisdom_dexterity: 'ASPECTSOFPOWER.RollType.wisdomDexterity',
+};
+
+/**
+ * Skill resources.
+ */
+ASPECTSOFPOWER.skillResources = {
+  stamina: 'ASPECTSOFPOWER.Resource.stamina',
+  mana:    'ASPECTSOFPOWER.Resource.mana',
+  health:  'ASPECTSOFPOWER.Resource.health',
+};
+
+/**
+ * Gate tag → blocked roll types / resources.
+ * Used for skill sheet filtering and runtime blocking.
+ */
+ASPECTSOFPOWER.gateRules = {
+  'no-magic':    { blockedTypes: ['magic_projectile', 'magic_melee'], blockedResources: ['mana'] },
+  'no-ranged':   { blockedTypes: ['phys_ranged', 'magic_projectile'], blockedResources: [] },
+  'melee-only':  { blockedTypes: ['phys_ranged', 'magic_projectile'], blockedResources: ['mana'] },
+  'no-physical': { blockedTypes: ['str_weapon', 'dex_weapon', 'phys_ranged'], blockedResources: ['stamina'] },
+  'magic-only':  { blockedTypes: ['str_weapon', 'dex_weapon', 'phys_ranged'], blockedResources: ['stamina'] },
+  'no-stamina-skills': { blockedTypes: [], blockedResources: ['stamina'] },
+};
+
 ASPECTSOFPOWER.professionTags = {
   repair:      'ASPECTSOFPOWER.Tag.repair',
 };

@@ -75,6 +75,37 @@ export class AspectsofPowerItemSheet extends foundry.applications.api.Handlebars
       }
     }
 
+    // Skill sheet: build filtered roll type and resource lists based on actor gate tags.
+    if (this.item.type === 'skill') {
+      const allRollTypes = CONFIG.ASPECTSOFPOWER.rollTypes ?? {};
+      const allResources = CONFIG.ASPECTSOFPOWER.skillResources ?? {};
+      const gateRules = CONFIG.ASPECTSOFPOWER.gateRules ?? {};
+      const actor = this.item.actor;
+
+      // Collect blocked types/resources from actor's gate tags.
+      const blockedTypes = new Set();
+      const blockedResources = new Set();
+      if (actor?.system?.collectedTags) {
+        for (const [tagId] of actor.system.collectedTags) {
+          const rule = gateRules[tagId];
+          if (!rule) continue;
+          for (const t of rule.blockedTypes) blockedTypes.add(t);
+          for (const r of rule.blockedResources) blockedResources.add(r);
+        }
+      }
+
+      // Filter available options.
+      context.availableRollTypes = {};
+      for (const [key, label] of Object.entries(allRollTypes)) {
+        if (!blockedTypes.has(key)) context.availableRollTypes[key] = label;
+      }
+      context.availableResources = {};
+      for (const [key, label] of Object.entries(allResources)) {
+        if (!blockedResources.has(key)) context.availableResources[key] = label;
+      }
+      context.hasGateRestrictions = blockedTypes.size > 0 || blockedResources.size > 0;
+    }
+
     // Item bonus field labels for augment sheets.
     if (this.item.type === 'augment') {
       context.itemBonusFields = {

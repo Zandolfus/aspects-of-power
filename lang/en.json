@@ -272,6 +272,22 @@
       "Passive": "Passive Effects",
       "Inactive": "Inactive Effects"
     },
+    "RollType": {
+      "strWeapon": "Strength Weapon",
+      "dexWeapon": "Dexterity Weapon",
+      "physRanged": "Physical Ranged",
+      "magicProjectile": "Magic Projectile",
+      "magicMelee": "Magic Melee",
+      "wisdomDexterity": "Wisdom/Dexterity"
+    },
+    "Resource": {
+      "stamina": "Stamina",
+      "mana": "Mana",
+      "health": "Health"
+    },
+    "Gate": {
+      "blocked": "cannot use this skill type"
+    },
     "Chain": {
       "label": "Skill Chains",
       "add": "Add Chain",
