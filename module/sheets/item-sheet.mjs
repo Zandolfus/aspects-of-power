@@ -829,12 +829,52 @@ export class AspectsofPowerItemSheet extends foundry.applications.api.Handlebars
     const existing = [...(this.item.system.tags ?? [])];
     if (existing.includes(tagKey)) return;
     existing.push(tagKey);
-    await this.document.update({ 'system.tags': existing });
+
+    const updateData = { 'system.tags': existing };
+
+    // Debuff subtype auto-adds the 'debuff' parent tag and sets debuff type.
+    const debuffSubtypes = CONFIG.ASPECTSOFPOWER.debuffSubtypeTags ?? {};
+    if (debuffSubtypes[tagKey]) {
+      if (!existing.includes('debuff')) existing.push('debuff');
+      updateData['system.tagConfig.debuffType'] = debuffSubtypes[tagKey];
+    }
+
+    // AOE tag auto-enables the AOE section.
+    if (tagKey === 'aoe') {
+      updateData['system.aoe.enabled'] = true;
+    }
+
+    await this.document.update(updateData);
   }
 
   async _removeSkillTag(tagKey) {
-    const existing = [...(this.item.system.tags ?? [])];
-    await this.document.update({ 'system.tags': existing.filter(t => t !== tagKey) });
+    let filtered = (this.item.system.tags ?? []).filter(t => t !== tagKey);
+    const updateData = { 'system.tags': filtered };
+
+    // If removing aoe tag, disable AOE.
+    if (tagKey === 'aoe') {
+      updateData['system.aoe.enabled'] = false;
+    }
+
+    // If removing a debuff subtype, clear debuff type. If no subtypes remain, remove 'debuff' parent.
+    const debuffSubtypes = CONFIG.ASPECTSOFPOWER.debuffSubtypeTags ?? {};
+    if (debuffSubtypes[tagKey]) {
+      updateData['system.tagConfig.debuffType'] = 'none';
+      const hasOtherSubtype = filtered.some(t => debuffSubtypes[t]);
+      if (!hasOtherSubtype) {
+        filtered = filtered.filter(t => t !== 'debuff');
+        updateData['system.tags'] = filtered;
+      }
+    }
+
+    // If removing 'debuff' directly, also remove all subtype tags.
+    if (tagKey === 'debuff') {
+      filtered = filtered.filter(t => !debuffSubtypes[t]);
+      updateData['system.tags'] = filtered;
+      updateData['system.tagConfig.debuffType'] = 'none';
+    }
+
+    await this.document.update(updateData);
   }
 
   /**

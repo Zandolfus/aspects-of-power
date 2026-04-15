@@ -48,23 +48,89 @@ ASPECTSOFPOWER.skillCategories = {
  * A skill can have multiple tags (e.g. [attack, debuff]).
  */
 ASPECTSOFPOWER.skillTags = {
+  // Section-driving tags (show/hide config sections).
   attack:      'ASPECTSOFPOWER.Tag.attack',
   restoration: 'ASPECTSOFPOWER.Tag.restoration',
   buff:        'ASPECTSOFPOWER.Tag.buff',
   debuff:      'ASPECTSOFPOWER.Tag.debuff',
   cleanse:     'ASPECTSOFPOWER.Tag.cleanse',
   repair:      'ASPECTSOFPOWER.Tag.repair',
+  aoe:         'ASPECTSOFPOWER.Tag.aoe',
+  // Descriptor tags (mechanical effects).
+  magic:       'ASPECTSOFPOWER.Tag.magic',
+  physical:    'ASPECTSOFPOWER.Tag.physical',
+  vocal:       'ASPECTSOFPOWER.Tag.vocal',
+  ranged:      'ASPECTSOFPOWER.Tag.ranged',
+  melee:       'ASPECTSOFPOWER.Tag.melee',
+  // Debuff subtype tags (auto-add debuff parent, auto-set debuff type).
+  root:          'ASPECTSOFPOWER.Tag.root',
+  immobilized:   'ASPECTSOFPOWER.Tag.immobilized',
+  slow:          'ASPECTSOFPOWER.Tag.slow',
+  chilled:       'ASPECTSOFPOWER.Tag.chilled',
+  frozen:        'ASPECTSOFPOWER.Tag.frozen',
+  sleep:         'ASPECTSOFPOWER.Tag.sleep',
+  stun:          'ASPECTSOFPOWER.Tag.stun',
+  paralysis:     'ASPECTSOFPOWER.Tag.paralysis',
+  fear:          'ASPECTSOFPOWER.Tag.fear',
+  blind:         'ASPECTSOFPOWER.Tag.blind',
+  silence:       'ASPECTSOFPOWER.Tag.silence',
+  weaken:        'ASPECTSOFPOWER.Tag.weaken',
+  deafened:      'ASPECTSOFPOWER.Tag.deafened',
+  taunt:         'ASPECTSOFPOWER.Tag.taunt',
+  charm:         'ASPECTSOFPOWER.Tag.charm',
+  enraged:       'ASPECTSOFPOWER.Tag.enraged',
+  hallucination: 'ASPECTSOFPOWER.Tag.hallucination',
+  dismembered:   'ASPECTSOFPOWER.Tag.dismembered',
 };
 
 /**
  * Tags available per skill category.
  */
 ASPECTSOFPOWER.combatTags = {
+  // Section-driving.
   attack:      'ASPECTSOFPOWER.Tag.attack',
   restoration: 'ASPECTSOFPOWER.Tag.restoration',
   buff:        'ASPECTSOFPOWER.Tag.buff',
   debuff:      'ASPECTSOFPOWER.Tag.debuff',
   cleanse:     'ASPECTSOFPOWER.Tag.cleanse',
+  aoe:         'ASPECTSOFPOWER.Tag.aoe',
+  // Descriptors.
+  magic:       'ASPECTSOFPOWER.Tag.magic',
+  physical:    'ASPECTSOFPOWER.Tag.physical',
+  vocal:       'ASPECTSOFPOWER.Tag.vocal',
+  ranged:      'ASPECTSOFPOWER.Tag.ranged',
+  melee:       'ASPECTSOFPOWER.Tag.melee',
+  // Debuff subtypes.
+  root:          'ASPECTSOFPOWER.Tag.root',
+  immobilized:   'ASPECTSOFPOWER.Tag.immobilized',
+  slow:          'ASPECTSOFPOWER.Tag.slow',
+  chilled:       'ASPECTSOFPOWER.Tag.chilled',
+  frozen:        'ASPECTSOFPOWER.Tag.frozen',
+  sleep:         'ASPECTSOFPOWER.Tag.sleep',
+  stun:          'ASPECTSOFPOWER.Tag.stun',
+  paralysis:     'ASPECTSOFPOWER.Tag.paralysis',
+  fear:          'ASPECTSOFPOWER.Tag.fear',
+  blind:         'ASPECTSOFPOWER.Tag.blind',
+  silence:       'ASPECTSOFPOWER.Tag.silence',
+  weaken:        'ASPECTSOFPOWER.Tag.weaken',
+  deafened:      'ASPECTSOFPOWER.Tag.deafened',
+  taunt:         'ASPECTSOFPOWER.Tag.taunt',
+  charm:         'ASPECTSOFPOWER.Tag.charm',
+  enraged:       'ASPECTSOFPOWER.Tag.enraged',
+  hallucination: 'ASPECTSOFPOWER.Tag.hallucination',
+  dismembered:   'ASPECTSOFPOWER.Tag.dismembered',
+};
+
+/**
+ * Debuff subtype tags → auto-add 'debuff' parent and set debuff type.
+ */
+ASPECTSOFPOWER.debuffSubtypeTags = {
+  root: 'root', immobilized: 'immobilized', slow: 'slow',
+  chilled: 'chilled', frozen: 'frozen', sleep: 'sleep',
+  stun: 'stun', paralysis: 'paralysis', fear: 'fear',
+  blind: 'blind', silence: 'silence', weaken: 'weaken',
+  deafened: 'deafened', taunt: 'taunt', charm: 'charm',
+  enraged: 'enraged', hallucination: 'hallucination', dismembered: 'dismembered',
 };
 
 ASPECTSOFPOWER.reactionTypes = {
