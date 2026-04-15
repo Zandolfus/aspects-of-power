@@ -337,13 +337,44 @@ Hooks.once('init', function () {
     if (!changes.system?.systemTags) return;
     if (!['race', 'class', 'profession'].includes(item.type)) return;
 
-    // Find all actors that reference this item as a template and update their cached tags.
+    const newTags = item.system.systemTags ?? [];
+    const itemUuid = item.uuid;
+    const itemId = item.id;
+
+    // Match by UUID or by bare item ID (compendium UUIDs may differ from stored templateId).
+    const _matchesTemplate = (templateId) => {
+      if (!templateId) return false;
+      return templateId === itemUuid || templateId.endsWith(itemId);
+    };
+
+    // Sync world actors.
     for (const actor of game.actors) {
       for (const type of ['race', 'class', 'profession']) {
         const attr = actor.system.attributes?.[type];
         if (!attr?.templateId) continue;
-        if (attr.templateId === item.uuid) {
-          actor.update({ [`system.attributes.${type}.cachedTags`]: item.system.systemTags ?? [] });
+        if (_matchesTemplate(attr.templateId)) {
+          actor.update({ [`system.attributes.${type}.cachedTags`]: newTags });
+        }
+      }
+    }
+
+    // Sync unlinked token actors on active scenes.
+    for (const scene of game.scenes) {
+      for (const token of scene.tokens) {
+        if (token.actorLink) continue; // linked tokens use world actor above
+        const synthActor = token.actor;
+        if (!synthActor) continue;
+        for (const type of ['race', 'class', 'profession']) {
+          const attr = synthActor.system.attributes?.[type];
+          if (!attr?.templateId) continue;
+          if (_matchesTemplate(attr.templateId)) {
+            // Update both synthetic and world actor source for unlinked tokens.
+            synthActor.update({ [`system.attributes.${type}.cachedTags`]: newTags });
+            const worldActor = game.actors.get(token.actorId);
+            if (worldActor) {
+              worldActor.update({ [`system.attributes.${type}.cachedTags`]: newTags });
+            }
+          }
         }
       }
     }
