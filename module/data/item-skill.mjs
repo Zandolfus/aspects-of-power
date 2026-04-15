@@ -106,6 +106,9 @@ export class SkillData extends foundry.abstract.TypeDataModel {
         // Sustain: per-round upkeep cost/resource to maintain the active effect.
         sustainCost:     new fields.NumberField({ initial: 0, min: 0, integer: true }),
         sustainResource: new fields.StringField({ initial: 'mana' }),
+
+        // Shrapnel: defense pool consumption multiplier (>1.0 = harder to dodge).
+        shrapnelMultiplier: new fields.NumberField({ initial: 1.5, min: 1.0, max: 5.0 }),
       }),
     };
   }

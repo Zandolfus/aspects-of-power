@@ -370,6 +370,16 @@
       </div>
       {{/if}}
 
+      {{! ── Shrapnel Tag Config ── }}
+      {{#if (includes system.tags "shrapnel")}}
+      <div class='tag-config shrapnel-config'>
+        <label class='resource-label'>Defense Pool Multiplier</label>
+        <input type='number' name='system.tagConfig.shrapnelMultiplier'
+               value='{{system.tagConfig.shrapnelMultiplier}}' min='1.0' max='5.0' step='0.1'
+               title='Multiplies the hit total when consuming defense pool. 1.5 = pool depletes 50% faster.' />
+      </div>
+      {{/if}}
+
       {{! ── Sustain Tag Config ── }}
       {{#if (includes system.tags "sustain")}}
       <div class='tag-config sustain-config'>

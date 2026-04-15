@@ -191,6 +191,13 @@ export class AspectsofPowerItem extends Item {
       const poolMax = targetActor.system.defense[targetDefKey]?.poolMax ?? 0;
       const defLabel = targetDefKey.charAt(0).toUpperCase() + targetDefKey.slice(1);
 
+      // Shrapnel: inflates the effective hit cost to deplete defense pool faster.
+      const skillTags = item.system?.tags ?? [];
+      const shrapnelMult = skillTags.includes('shrapnel')
+        ? (item.system?.tagConfig?.shrapnelMultiplier ?? 1.5)
+        : 1;
+      const effectiveHit = Math.round(hitTotal * shrapnelMult);
+
       // Prompt the defender (shows defense pool and/or available reactions).
       const defenseResult = await this._promptDefensePool(
         targetActor, targetDefKey, hitTotal, item.name
@@ -198,9 +205,9 @@ export class AspectsofPowerItem extends Item {
 
       // Handle defense pool usage.
       if (defenseResult.defend && pool > 0) {
-        if (pool >= hitTotal) {
+        if (pool >= effectiveHit) {
           isHit = false;
-          const newPool = pool - hitTotal;
+          const newPool = pool - effectiveHit;
           await this._gmAction({
             type: 'gmUpdateDefensePool',
             targetActorUuid: targetActor.uuid,
@@ -209,7 +216,7 @@ export class AspectsofPowerItem extends Item {
           });
           defenseLine = `<p>${defLabel} defense: full dodge (pool ${pool} → ${newPool} / ${poolMax})</p>`;
         } else {
-          damageMultiplier = 1 - (pool / hitTotal);
+          damageMultiplier = 1 - (pool / effectiveHit);
           await this._gmAction({
             type: 'gmUpdateDefensePool',
             targetActorUuid: targetActor.uuid,
@@ -226,10 +233,10 @@ export class AspectsofPowerItem extends Item {
 
       // Post public defense message so players see what happened.
       if (defenseResult.defend && pool > 0) {
-        const pct = pool >= hitTotal ? 100 : Math.round((pool / hitTotal) * 100);
+        const pct = pool >= effectiveHit ? 100 : Math.round((pool / effectiveHit) * 100);
         ChatMessage.create({
           speaker: ChatMessage.getSpeaker({ actor: targetActor }),
-          content: pool >= hitTotal
+          content: pool >= effectiveHit
             ? `<p><strong>${targetActor.name}</strong> fully dodges the attack!</p>`
             : `<p><strong>${targetActor.name}</strong> partially blocks the attack (${pct}% reduced).</p>`,
         });

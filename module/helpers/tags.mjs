@@ -31,11 +31,13 @@ export const TAG_REGISTRY = {
 
   // ── Affinities ──
   'fire-affinity':        { label: 'ASPECTSOFPOWER.SystemTag.fire.label',        category: 'affinity', implies: [], description: 'ASPECTSOFPOWER.SystemTag.fire.desc' },
+  'heat-affinity':        { label: 'ASPECTSOFPOWER.SystemTag.heat.label',        category: 'affinity', implies: [], description: 'ASPECTSOFPOWER.SystemTag.heat.desc' },
   'ice-affinity':         { label: 'ASPECTSOFPOWER.SystemTag.ice.label',         category: 'affinity', implies: [], description: 'ASPECTSOFPOWER.SystemTag.ice.desc' },
   'lightning-affinity':   { label: 'ASPECTSOFPOWER.SystemTag.lightning.label',   category: 'affinity', implies: [], description: 'ASPECTSOFPOWER.SystemTag.lightning.desc' },
   'earth-affinity':       { label: 'ASPECTSOFPOWER.SystemTag.earth.label',       category: 'affinity', implies: [], description: 'ASPECTSOFPOWER.SystemTag.earth.desc' },
   'water-affinity':       { label: 'ASPECTSOFPOWER.SystemTag.water.label',       category: 'affinity', implies: [], description: 'ASPECTSOFPOWER.SystemTag.water.desc' },
   'wind-affinity':        { label: 'ASPECTSOFPOWER.SystemTag.wind.label',        category: 'affinity', implies: [], description: 'ASPECTSOFPOWER.SystemTag.wind.desc' },
+  'metal-affinity':       { label: 'ASPECTSOFPOWER.SystemTag.metal.label',       category: 'affinity', implies: [], description: 'ASPECTSOFPOWER.SystemTag.metal.desc' },
   'lunar-affinity':       { label: 'ASPECTSOFPOWER.SystemTag.lunar.label',       category: 'affinity', implies: [], description: 'ASPECTSOFPOWER.SystemTag.lunar.desc' },
   'solar-affinity':       { label: 'ASPECTSOFPOWER.SystemTag.solar.label',       category: 'affinity', implies: [], description: 'ASPECTSOFPOWER.SystemTag.solar.desc' },
   'space-affinity':       { label: 'ASPECTSOFPOWER.SystemTag.space.label',       category: 'affinity', implies: [], description: 'ASPECTSOFPOWER.SystemTag.space.desc' },

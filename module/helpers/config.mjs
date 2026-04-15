@@ -57,6 +57,7 @@ ASPECTSOFPOWER.skillTags = {
   repair:      'ASPECTSOFPOWER.Tag.repair',
   aoe:         'ASPECTSOFPOWER.Tag.aoe',
   sustain:     'ASPECTSOFPOWER.Tag.sustain',
+  shrapnel:    'ASPECTSOFPOWER.Tag.shrapnel',
   // Descriptor tags (mechanical effects).
   magic:       'ASPECTSOFPOWER.Tag.magic',
   physical:    'ASPECTSOFPOWER.Tag.physical',
@@ -65,11 +66,13 @@ ASPECTSOFPOWER.skillTags = {
   melee:       'ASPECTSOFPOWER.Tag.melee',
   // Affinity tags (set skill damage affinity).
   fire:          'ASPECTSOFPOWER.Tag.fire',
+  heat:          'ASPECTSOFPOWER.Tag.heat',
   ice:           'ASPECTSOFPOWER.Tag.ice',
   lightning:     'ASPECTSOFPOWER.Tag.lightning',
   earth:         'ASPECTSOFPOWER.Tag.earth',
   water:         'ASPECTSOFPOWER.Tag.water',
   wind:          'ASPECTSOFPOWER.Tag.wind',
+  metal:         'ASPECTSOFPOWER.Tag.metal',
   lunar:         'ASPECTSOFPOWER.Tag.lunar',
   solar:         'ASPECTSOFPOWER.Tag.solar',
   space:         'ASPECTSOFPOWER.Tag.space',
@@ -115,6 +118,7 @@ ASPECTSOFPOWER.combatTags = {
   cleanse:     'ASPECTSOFPOWER.Tag.cleanse',
   aoe:         'ASPECTSOFPOWER.Tag.aoe',
   sustain:     'ASPECTSOFPOWER.Tag.sustain',
+  shrapnel:    'ASPECTSOFPOWER.Tag.shrapnel',
   // Descriptors.
   magic:       'ASPECTSOFPOWER.Tag.magic',
   physical:    'ASPECTSOFPOWER.Tag.physical',
@@ -123,11 +127,13 @@ ASPECTSOFPOWER.combatTags = {
   melee:       'ASPECTSOFPOWER.Tag.melee',
   // Affinities.
   fire:          'ASPECTSOFPOWER.Tag.fire',
+  heat:          'ASPECTSOFPOWER.Tag.heat',
   ice:           'ASPECTSOFPOWER.Tag.ice',
   lightning:     'ASPECTSOFPOWER.Tag.lightning',
   earth:         'ASPECTSOFPOWER.Tag.earth',
   water:         'ASPECTSOFPOWER.Tag.water',
   wind:          'ASPECTSOFPOWER.Tag.wind',
+  metal:         'ASPECTSOFPOWER.Tag.metal',
   lunar:         'ASPECTSOFPOWER.Tag.lunar',
   solar:         'ASPECTSOFPOWER.Tag.solar',
   space:         'ASPECTSOFPOWER.Tag.space',
@@ -177,7 +183,7 @@ ASPECTSOFPOWER.debuffSubtypeTags = {
  * Affinity skill tags — auto-populate the skill's affinities array.
  */
 ASPECTSOFPOWER.affinityTags = new Set([
-  'fire', 'ice', 'lightning', 'earth', 'water', 'wind',
+  'fire', 'heat', 'ice', 'lightning', 'earth', 'water', 'wind', 'metal',
   'lunar', 'solar', 'space', 'shadow', 'light', 'nature',
   'poison', 'blood', 'necromantic', 'holy', 'arcane', 'psychic',
 ]);
