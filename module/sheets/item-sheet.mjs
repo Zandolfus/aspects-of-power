@@ -920,6 +920,17 @@ export class AspectsofPowerItemSheet extends foundry.applications.api.Handlebars
         ui.notifications.warn('Tag already assigned.');
         return;
       }
+      // Enforce one-per-category for exclusive categories (e.g. size).
+      const tagDef = CONFIG.ASPECTSOFPOWER.tagRegistry?.[tagId];
+      const exclusiveCategories = new Set(['size']);
+      if (tagDef && exclusiveCategories.has(tagDef.category)) {
+        const filtered = existing.filter(t => {
+          const def = CONFIG.ASPECTSOFPOWER.tagRegistry?.[t.id];
+          return !def || def.category !== tagDef.category;
+        });
+        await this.item.update({ 'system.systemTags': [...filtered, { id: tagId, value }] });
+        return;
+      }
       await this.item.update({ 'system.systemTags': [...existing, { id: tagId, value }] });
     });
 

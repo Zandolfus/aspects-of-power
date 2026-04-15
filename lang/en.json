@@ -250,7 +250,8 @@
         "immunity": "Immunity",
         "resistance": "Resistance",
         "gate": "Capability",
-        "passive": "Passive"
+        "passive": "Passive",
+        "size": "Size"
       },
       "fire": { "label": "Fire", "desc": "Fire elemental affinity" },
       "ice": { "label": "Ice", "desc": "Ice elemental affinity" },
@@ -302,8 +303,19 @@
       "flying": { "label": "Flying", "desc": "Can fly" },
       "aquatic": { "label": "Aquatic", "desc": "Can breathe underwater" },
       "darkvision": { "label": "Darkvision", "desc": "Can see in darkness" },
+      "noncorporeal": { "label": "Noncorporeal", "desc": "Lacks a physical form" },
+      "humanoid": { "label": "Humanoid", "desc": "Humanoid creature type" },
+      "beast": { "label": "Beast", "desc": "Beast creature type" },
+      "elemental": { "label": "Elemental", "desc": "Elemental creature — immune to poison and charm" },
+      "demon": { "label": "Demon", "desc": "Demon creature type" },
       "undead": { "label": "Undead", "desc": "Immune to poison and charm" },
-      "construct": { "label": "Construct", "desc": "Immune to stun, poison, and charm" }
+      "construct": { "label": "Construct", "desc": "Immune to stun, poison, and charm" },
+      "tiny": { "label": "Tiny", "desc": "Tiny creature size" },
+      "small": { "label": "Small", "desc": "Small creature size" },
+      "medium": { "label": "Medium", "desc": "Medium creature size" },
+      "large": { "label": "Large", "desc": "Large creature size" },
+      "huge": { "label": "Huge", "desc": "Huge creature size" },
+      "gargantuan": { "label": "Gargantuan", "desc": "Gargantuan creature size" }
     },
     "Effect": {
       "Source": "Source",

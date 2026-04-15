@@ -20,6 +20,7 @@ export const TAG_CATEGORIES = {
   resistance: { label: 'ASPECTSOFPOWER.SystemTag.Category.resistance', color: '#ffca28' },
   gate:       { label: 'ASPECTSOFPOWER.SystemTag.Category.gate',       color: '#ef5350' },
   passive:    { label: 'ASPECTSOFPOWER.SystemTag.Category.passive',    color: '#ab47bc' },
+  size:       { label: 'ASPECTSOFPOWER.SystemTag.Category.size',       color: '#78909c' },
 };
 
 /* ------------------------------------------------------------------ */
@@ -80,13 +81,27 @@ export const TAG_REGISTRY = {
   'magic-only':        { label: 'ASPECTSOFPOWER.SystemTag.magicOnly.label',       category: 'gate', implies: [], description: 'ASPECTSOFPOWER.SystemTag.magicOnly.desc' },
   'no-physical':       { label: 'ASPECTSOFPOWER.SystemTag.noPhysical.label',      category: 'gate', implies: [], description: 'ASPECTSOFPOWER.SystemTag.noPhysical.desc' },
 
+  // ── Size ──
+  'tiny':       { label: 'ASPECTSOFPOWER.SystemTag.tiny.label',       category: 'size', implies: [], description: 'ASPECTSOFPOWER.SystemTag.tiny.desc' },
+  'small':      { label: 'ASPECTSOFPOWER.SystemTag.small.label',      category: 'size', implies: [], description: 'ASPECTSOFPOWER.SystemTag.small.desc' },
+  'medium':     { label: 'ASPECTSOFPOWER.SystemTag.medium.label',     category: 'size', implies: [], description: 'ASPECTSOFPOWER.SystemTag.medium.desc' },
+  'large':      { label: 'ASPECTSOFPOWER.SystemTag.large.label',      category: 'size', implies: [], description: 'ASPECTSOFPOWER.SystemTag.large.desc' },
+  'huge':       { label: 'ASPECTSOFPOWER.SystemTag.huge.label',       category: 'size', implies: [], description: 'ASPECTSOFPOWER.SystemTag.huge.desc' },
+  'gargantuan': { label: 'ASPECTSOFPOWER.SystemTag.gargantuan.label', category: 'size', implies: [], description: 'ASPECTSOFPOWER.SystemTag.gargantuan.desc' },
+
   // ── Passive Modifiers ──
-  'armored':    { label: 'ASPECTSOFPOWER.SystemTag.armored.label',    category: 'passive', implies: [],                                    description: 'ASPECTSOFPOWER.SystemTag.armored.desc' },
-  'ethereal':   { label: 'ASPECTSOFPOWER.SystemTag.ethereal.label',   category: 'passive', implies: [],                                    description: 'ASPECTSOFPOWER.SystemTag.ethereal.desc' },
-  'heavy':      { label: 'ASPECTSOFPOWER.SystemTag.heavy.label',      category: 'passive', implies: [],                                    description: 'ASPECTSOFPOWER.SystemTag.heavy.desc' },
-  'flying':     { label: 'ASPECTSOFPOWER.SystemTag.flying.label',     category: 'passive', implies: [],                                    description: 'ASPECTSOFPOWER.SystemTag.flying.desc' },
-  'aquatic':    { label: 'ASPECTSOFPOWER.SystemTag.aquatic.label',    category: 'passive', implies: [],                                    description: 'ASPECTSOFPOWER.SystemTag.aquatic.desc' },
-  'darkvision': { label: 'ASPECTSOFPOWER.SystemTag.darkvision.label', category: 'passive', implies: [],                                    description: 'ASPECTSOFPOWER.SystemTag.darkvision.desc' },
-  'undead':     { label: 'ASPECTSOFPOWER.SystemTag.undead.label',     category: 'passive', implies: ['poison-immune', 'charm-immune'],     description: 'ASPECTSOFPOWER.SystemTag.undead.desc' },
-  'construct':  { label: 'ASPECTSOFPOWER.SystemTag.construct.label',  category: 'passive', implies: ['stun-immune', 'poison-immune', 'charm-immune'], description: 'ASPECTSOFPOWER.SystemTag.construct.desc' },
+  'armored':       { label: 'ASPECTSOFPOWER.SystemTag.armored.label',       category: 'passive', implies: [],                                    description: 'ASPECTSOFPOWER.SystemTag.armored.desc' },
+  'ethereal':      { label: 'ASPECTSOFPOWER.SystemTag.ethereal.label',      category: 'passive', implies: [],                                    description: 'ASPECTSOFPOWER.SystemTag.ethereal.desc' },
+  'heavy':         { label: 'ASPECTSOFPOWER.SystemTag.heavy.label',         category: 'passive', implies: [],                                    description: 'ASPECTSOFPOWER.SystemTag.heavy.desc' },
+  'flying':        { label: 'ASPECTSOFPOWER.SystemTag.flying.label',        category: 'passive', implies: [],                                    description: 'ASPECTSOFPOWER.SystemTag.flying.desc' },
+  'aquatic':       { label: 'ASPECTSOFPOWER.SystemTag.aquatic.label',       category: 'passive', implies: [],                                    description: 'ASPECTSOFPOWER.SystemTag.aquatic.desc' },
+  'darkvision':    { label: 'ASPECTSOFPOWER.SystemTag.darkvision.label',    category: 'passive', implies: [],                                    description: 'ASPECTSOFPOWER.SystemTag.darkvision.desc' },
+  'noncorporeal':  { label: 'ASPECTSOFPOWER.SystemTag.noncorporeal.label',  category: 'passive', implies: [],                                    description: 'ASPECTSOFPOWER.SystemTag.noncorporeal.desc' },
+  // Creature types.
+  'humanoid':    { label: 'ASPECTSOFPOWER.SystemTag.humanoid.label',    category: 'passive', implies: [],                                                      description: 'ASPECTSOFPOWER.SystemTag.humanoid.desc' },
+  'beast':       { label: 'ASPECTSOFPOWER.SystemTag.beast.label',       category: 'passive', implies: [],                                                      description: 'ASPECTSOFPOWER.SystemTag.beast.desc' },
+  'elemental':   { label: 'ASPECTSOFPOWER.SystemTag.elemental.label',   category: 'passive', implies: ['poison-immune', 'charm-immune'],                       description: 'ASPECTSOFPOWER.SystemTag.elemental.desc' },
+  'demon':       { label: 'ASPECTSOFPOWER.SystemTag.demon.label',       category: 'passive', implies: [],                                                      description: 'ASPECTSOFPOWER.SystemTag.demon.desc' },
+  'undead':      { label: 'ASPECTSOFPOWER.SystemTag.undead.label',      category: 'passive', implies: ['poison-immune', 'charm-immune'],                       description: 'ASPECTSOFPOWER.SystemTag.undead.desc' },
+  'construct':   { label: 'ASPECTSOFPOWER.SystemTag.construct.label',   category: 'passive', implies: ['stun-immune', 'poison-immune', 'charm-immune'],        description: 'ASPECTSOFPOWER.SystemTag.construct.desc' },
 };
