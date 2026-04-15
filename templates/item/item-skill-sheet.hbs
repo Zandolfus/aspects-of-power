@@ -38,23 +38,6 @@
         </select>
       </div>
 
-      {{! ── Affinities ── }}
-      <div class='skill-affinities'>
-        <label class='resource-label'>Affinities</label>
-        <div class='affinity-chips'>
-          {{#each system.affinities as |affinity|}}
-            <span class='affinity-chip'>
-              {{affinity}}
-              <a class='affinity-remove' data-affinity='{{affinity}}' title='Remove'>×</a>
-            </span>
-          {{/each}}
-        </div>
-        <div class='affinity-add-row'>
-          <input type='text' class='affinity-input' placeholder='e.g. fire, lunar...' />
-          <a class='affinity-add' title='Add affinity'><i class='fas fa-plus'></i></a>
-        </div>
-      </div>
-
       {{! ── Tag Autocomplete ── }}
       <div class='skill-tags'>
         <label class='resource-label'>{{localize "ASPECTSOFPOWER.Tag.label"}}</label>

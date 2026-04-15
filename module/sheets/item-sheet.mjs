@@ -579,26 +579,6 @@ export class AspectsofPowerItemSheet extends foundry.applications.api.Handlebars
       });
     }
 
-    // --- Skill: Affinity add / remove ---
-    if (this.item.type === 'skill') {
-      this.element.querySelector('.affinity-add')?.addEventListener('click', async () => {
-        const input = this.element.querySelector('.affinity-input');
-        const val = input?.value?.trim().toLowerCase();
-        if (!val) return;
-        const affinities = [...(this.item.system.affinities ?? [])];
-        if (!affinities.includes(val)) affinities.push(val);
-        await this.document.update({ 'system.affinities': affinities });
-      });
-
-      this.element.querySelectorAll('.affinity-remove').forEach(el => {
-        el.addEventListener('click', async () => {
-          const val = el.dataset.affinity;
-          const affinities = (this.item.system.affinities ?? []).filter(a => a !== val);
-          await this.document.update({ 'system.affinities': affinities });
-        });
-      });
-    }
-
     // --- Consumable: Add / Delete buff entries ---
     this.element.querySelector('.consumable-buff-add')?.addEventListener('click', async () => {
       const entries = [...(this.item.system.buff?.entries ?? []), { attribute: 'abilities.strength', value: 0 }];
@@ -844,6 +824,16 @@ export class AspectsofPowerItemSheet extends foundry.applications.api.Handlebars
       updateData['system.aoe.enabled'] = true;
     }
 
+    // Affinity tag auto-adds to the affinities array.
+    const affinityTags = CONFIG.ASPECTSOFPOWER.affinityTags ?? new Set();
+    if (affinityTags.has(tagKey)) {
+      const affinities = [...(this.item.system.affinities ?? [])];
+      if (!affinities.includes(tagKey)) {
+        affinities.push(tagKey);
+        updateData['system.affinities'] = affinities;
+      }
+    }
+
     await this.document.update(updateData);
   }
 
@@ -872,6 +862,13 @@ export class AspectsofPowerItemSheet extends foundry.applications.api.Handlebars
       filtered = filtered.filter(t => !debuffSubtypes[t]);
       updateData['system.tags'] = filtered;
       updateData['system.tagConfig.debuffType'] = 'none';
+    }
+
+    // Affinity tag removal — remove from affinities array.
+    const affinityTags = CONFIG.ASPECTSOFPOWER.affinityTags ?? new Set();
+    if (affinityTags.has(tagKey)) {
+      const affinities = (this.item.system.affinities ?? []).filter(a => a !== tagKey);
+      updateData['system.affinities'] = affinities;
     }
 
     await this.document.update(updateData);

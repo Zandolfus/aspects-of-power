@@ -62,6 +62,25 @@ ASPECTSOFPOWER.skillTags = {
   vocal:       'ASPECTSOFPOWER.Tag.vocal',
   ranged:      'ASPECTSOFPOWER.Tag.ranged',
   melee:       'ASPECTSOFPOWER.Tag.melee',
+  // Affinity tags (set skill damage affinity).
+  fire:          'ASPECTSOFPOWER.Tag.fire',
+  ice:           'ASPECTSOFPOWER.Tag.ice',
+  lightning:     'ASPECTSOFPOWER.Tag.lightning',
+  earth:         'ASPECTSOFPOWER.Tag.earth',
+  water:         'ASPECTSOFPOWER.Tag.water',
+  wind:          'ASPECTSOFPOWER.Tag.wind',
+  lunar:         'ASPECTSOFPOWER.Tag.lunar',
+  solar:         'ASPECTSOFPOWER.Tag.solar',
+  space:         'ASPECTSOFPOWER.Tag.space',
+  shadow:        'ASPECTSOFPOWER.Tag.shadow',
+  light:         'ASPECTSOFPOWER.Tag.light',
+  nature:        'ASPECTSOFPOWER.Tag.nature',
+  poison:        'ASPECTSOFPOWER.Tag.poison',
+  blood:         'ASPECTSOFPOWER.Tag.blood',
+  necromantic:   'ASPECTSOFPOWER.Tag.necromantic',
+  holy:          'ASPECTSOFPOWER.Tag.holy',
+  arcane:        'ASPECTSOFPOWER.Tag.arcane',
+  psychic:       'ASPECTSOFPOWER.Tag.psychic',
   // Debuff subtype tags (auto-add debuff parent, auto-set debuff type).
   root:          'ASPECTSOFPOWER.Tag.root',
   immobilized:   'ASPECTSOFPOWER.Tag.immobilized',
@@ -100,6 +119,25 @@ ASPECTSOFPOWER.combatTags = {
   vocal:       'ASPECTSOFPOWER.Tag.vocal',
   ranged:      'ASPECTSOFPOWER.Tag.ranged',
   melee:       'ASPECTSOFPOWER.Tag.melee',
+  // Affinities.
+  fire:          'ASPECTSOFPOWER.Tag.fire',
+  ice:           'ASPECTSOFPOWER.Tag.ice',
+  lightning:     'ASPECTSOFPOWER.Tag.lightning',
+  earth:         'ASPECTSOFPOWER.Tag.earth',
+  water:         'ASPECTSOFPOWER.Tag.water',
+  wind:          'ASPECTSOFPOWER.Tag.wind',
+  lunar:         'ASPECTSOFPOWER.Tag.lunar',
+  solar:         'ASPECTSOFPOWER.Tag.solar',
+  space:         'ASPECTSOFPOWER.Tag.space',
+  shadow:        'ASPECTSOFPOWER.Tag.shadow',
+  light:         'ASPECTSOFPOWER.Tag.light',
+  nature:        'ASPECTSOFPOWER.Tag.nature',
+  poison:        'ASPECTSOFPOWER.Tag.poison',
+  blood:         'ASPECTSOFPOWER.Tag.blood',
+  necromantic:   'ASPECTSOFPOWER.Tag.necromantic',
+  holy:          'ASPECTSOFPOWER.Tag.holy',
+  arcane:        'ASPECTSOFPOWER.Tag.arcane',
+  psychic:       'ASPECTSOFPOWER.Tag.psychic',
   // Debuff subtypes.
   root:          'ASPECTSOFPOWER.Tag.root',
   immobilized:   'ASPECTSOFPOWER.Tag.immobilized',
@@ -132,6 +170,15 @@ ASPECTSOFPOWER.debuffSubtypeTags = {
   deafened: 'deafened', taunt: 'taunt', charm: 'charm',
   enraged: 'enraged', hallucination: 'hallucination', dismembered: 'dismembered',
 };
+
+/**
+ * Affinity skill tags — auto-populate the skill's affinities array.
+ */
+ASPECTSOFPOWER.affinityTags = new Set([
+  'fire', 'ice', 'lightning', 'earth', 'water', 'wind',
+  'lunar', 'solar', 'space', 'shadow', 'light', 'nature',
+  'poison', 'blood', 'necromantic', 'holy', 'arcane', 'psychic',
+]);
 
 ASPECTSOFPOWER.reactionTypes = {
   dodge:   'ASPECTSOFPOWER.Reaction.dodge',
