@@ -54,11 +54,8 @@ export class AspectsofPowerActor extends Actor {
     this._collectTags(systemData);
 
     // Sigmoid modifier formula.
-    const sigmoidMod = (value, key) => {
-      if (key === "toughness")
-        return Math.round(((6000 / (1 + Math.exp(-0.001 * (value - 500)))) - 2265) * 0.5);
-      else
-        return Math.round((6000 / (1 + Math.exp(-0.001 * (value - 500)))) - 2265);
+    const sigmoidMod = (value) => {
+      return Math.round((6000 / (1 + Math.exp(-0.001 * (value - 500)))) - 2265);
     };
 
     // --- Stat breakdown: classify effect contributions by source ---
@@ -127,7 +124,7 @@ export class AspectsofPowerActor extends Actor {
       const b = ability.breakdown;
       b.final = Math.round(b.calculated + b.equipmentCapped + b.effectBonus);
       ability.value = b.final;
-      ability.mod = sigmoidMod(b.final, key);
+      ability.mod = sigmoidMod(b.final);
       b.finalMod = ability.mod;
     }
 
@@ -236,6 +233,10 @@ export class AspectsofPowerActor extends Actor {
 
     const effectiveDex = Math.max(0, dexMod - dexReduction);
     const effectivePer = Math.max(0, perMod - perceptionReduction);
+
+    // DR: base 50% of toughness mod + effect bonuses.
+    const toughMod = systemData.abilities.toughness.mod;
+    systemData.defense.dr.value = Math.round(toughMod * 0.5) + effectBonus('system.defense.dr.value');
 
     // Armor and veil: entirely from equipment/effects (no base stat contribution).
     systemData.defense.armor.value = effectBonus('system.defense.armor.value');

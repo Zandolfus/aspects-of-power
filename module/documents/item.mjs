@@ -175,9 +175,9 @@ export class AspectsofPowerItem extends Item {
       ? (targetActor.system.defense.armor?.value ?? 0)
       : (targetActor.system.defense.veil?.value  ?? 0);
     const attackerToken      = this.actor.getActiveTokens()[0] ?? null;
-    const toughnessMod       = targetActor.system.abilities?.toughness?.mod ?? 0;
+    const baseDR             = targetActor.system.defense?.dr?.value ?? 0;
     const affinityDR         = this._getAffinityDRReduction(targetActor, attackerToken, targetToken);
-    const effectiveToughness = Math.max(0, toughnessMod - affinityDR);
+    const effectiveToughness = Math.max(0, baseDR - affinityDR);
     const mitigLabel         = isPhysical ? 'Armor' : 'Veil';
 
     // ── Defense pool + reaction resolution ─────────────────────────────
@@ -319,7 +319,7 @@ export class AspectsofPowerItem extends Item {
       : '';
 
     const toughnessLine = preToughnessDmg > 0
-      ? `<p>Toughness: −${Math.min(effectiveToughness, preToughnessDmg)}${affinityDR > 0 ? ` <em>(−${affinityDR} affinity)</em>` : ''}</p>`
+      ? `<p>DR: −${Math.min(effectiveToughness, preToughnessDmg)}${affinityDR > 0 ? ` <em>(−${affinityDR} affinity)</em>` : ''}</p>`
       : '';
 
     // Forced movement info for the button data attributes.
@@ -351,7 +351,7 @@ export class AspectsofPowerItem extends Item {
            <button class="apply-damage"
              data-actor-uuid="${targetActor.uuid}"
              data-damage="${afterDefense}"
-             data-toughness="${toughnessMod}"
+             data-toughness="${baseDR}"
              data-affinity-dr="${affinityDR}"
              data-damage-type="${isPhysical ? 'physical' : 'magical'}"${fmAttrs}
              style="margin-top:6px;width:100%;">
@@ -983,11 +983,11 @@ export class AspectsofPowerItem extends Item {
           }
         }
 
-        // Immediate DoT damage (bypasses armor/veil AND barrier, but not toughness).
+        // Immediate DoT damage (bypasses armor/veil AND barrier, but not DR).
         // Pre-existing wounds bypass barriers — routes through: Overhealth → HP.
         if (payload.dotDamage > 0) {
-          const toughnessMod = target.system.abilities?.toughness?.mod ?? 0;
-          let remaining = Math.max(0, payload.dotDamage - toughnessMod);
+          const dotDR = target.system.defense?.dr?.value ?? 0;
+          let remaining = Math.max(0, payload.dotDamage - dotDR);
           const updateData = {};
           const parts = [];
 
@@ -1008,12 +1008,12 @@ export class AspectsofPowerItem extends Item {
 
           await target.update(updateData);
 
-          const mitigated = Math.max(0, payload.dotDamage - toughnessMod);
+          const mitigated = Math.max(0, payload.dotDamage - dotDR);
           const breakdown = parts.length ? ` (${parts.join(', ')})` : '';
           ChatMessage.create({
             whisper: ChatMessage.getWhisperRecipients('GM'),
             content: `<p><strong>${target.name}</strong> takes <strong>${mitigated}</strong> `
-                   + `${payload.dotDamageType} damage from ${payload.effectName} (Toughness: −${toughnessMod})${breakdown}. `
+                   + `${payload.dotDamageType} damage from ${payload.effectName} (DR: −${dotDR})${breakdown}. `
                    + `Health: ${newHealth} / ${health.max}`
                    + `${newHealth === 0 ? ' &mdash; <em>Incapacitated!</em>' : ''}</p>`,
           });

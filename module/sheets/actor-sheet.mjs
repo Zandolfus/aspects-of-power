@@ -72,6 +72,9 @@ export class AspectsofPowerActorSheet extends foundry.applications.api.Handlebar
     // Prepare debuff data for dedicated display.
     context.debuffs = this._prepareDebuffs();
 
+    // Build tooltip strings for defense stats.
+    context.tooltips = this._prepareTooltips(context.system);
+
     return context;
   }
 
@@ -716,6 +719,89 @@ export class AspectsofPowerActorSheet extends foundry.applications.api.Handlebar
    * Extracts combat-relevant info from ActiveEffects with debuff flags.
    * @returns {object[]}
    */
+  _prepareTooltips(system) {
+    const tips = {};
+    const ab = system.abilities;
+    const def = system.defense;
+
+    // DR tooltip.
+    const toughMod = ab.toughness?.mod ?? 0;
+    const drBase = Math.round(toughMod * 0.5);
+    const drTotal = def.dr?.value ?? 0;
+    const drBonus = drTotal - drBase;
+    tips.dr = `<strong>DR ${drTotal}</strong><hr>`
+            + `Base: 50% of Toughness mod (${toughMod}) = ${drBase}`
+            + (drBonus !== 0 ? `<br>Effect bonus: ${drBonus > 0 ? '+' : ''}${drBonus}` : '');
+
+    // Armor tooltip.
+    const armorVal = def.armor?.value ?? 0;
+    tips.armor = `<strong>Armor ${armorVal}</strong><hr>From equipment and effects`;
+
+    // Veil tooltip.
+    const veilVal = def.veil?.value ?? 0;
+    tips.veil = `<strong>Veil ${veilVal}</strong><hr>From equipment and effects`;
+
+    // Defense pool tooltips.
+    const dexMod = ab.dexterity?.mod ?? 0;
+    const strMod = ab.strength?.mod ?? 0;
+    const perMod = ab.perception?.mod ?? 0;
+    const intMod = ab.intelligence?.mod ?? 0;
+    const wisMod = ab.wisdom?.mod ?? 0;
+    const wilMod = ab.willpower?.mod ?? 0;
+
+    const meleeBase = Math.round((dexMod + strMod * 0.3) * 1.1);
+    tips.melee = `<strong>Melee Defense ${def.melee?.value ?? 0}</strong><hr>`
+               + `Base: (Dex ${dexMod} + Str ${strMod} × 0.3) × 1.1 = ${meleeBase}`
+               + `<br>Pool: ${def.melee?.pool ?? 0} / ${def.melee?.poolMax ?? 0}`;
+
+    const rangedBase = Math.round((dexMod * 0.3 + perMod) * 1.1);
+    tips.ranged = `<strong>Ranged Defense ${def.ranged?.value ?? 0}</strong><hr>`
+                + `Base: (Dex ${dexMod} × 0.3 + Per ${perMod}) × 1.1 = ${rangedBase}`
+                + `<br>Pool: ${def.ranged?.pool ?? 0} / ${def.ranged?.poolMax ?? 0}`;
+
+    const mindBase = Math.round((intMod + wisMod * 0.3) * 1.1);
+    tips.mind = `<strong>Mind Defense ${def.mind?.value ?? 0}</strong><hr>`
+              + `Base: (Int ${intMod} + Wis ${wisMod} × 0.3) × 1.1 = ${mindBase}`
+              + `<br>Pool: ${def.mind?.pool ?? 0} / ${def.mind?.poolMax ?? 0}`;
+
+    const soulBase = Math.round((wisMod + wilMod * 0.3) * 1.1);
+    tips.soul = `<strong>Soul Defense ${def.soul?.value ?? 0}</strong><hr>`
+              + `Base: (Wis ${wisMod} + Wil ${wilMod} × 0.3) × 1.1 = ${soulBase}`
+              + `<br>Pool: ${def.soul?.pool ?? 0} / ${def.soul?.poolMax ?? 0}`;
+
+    // Ability mod tooltips.
+    tips.abilities = {};
+    for (const [key, ability] of Object.entries(ab)) {
+      const b = ability.breakdown;
+      if (!b) continue;
+      let tip = `<strong>${key.charAt(0).toUpperCase() + key.slice(1)} ${b.final}</strong> (mod ${ability.mod})<hr>`;
+      tip += `Base: ${b.base}`;
+      if (b.titleBonus) tip += `<br>Titles: +${b.titleBonus}`;
+      if (b.blessingMultiplier !== 1) tip += `<br>Blessings: ×${b.blessingMultiplier}`;
+      if (b.blessingAdd) tip += `<br>Blessings: +${b.blessingAdd}`;
+      tip += `<br>Calculated: ${b.calculated}`;
+      if (b.equipmentBonusRaw) tip += `<br>Equipment: +${b.equipmentCapped} (raw ${b.equipmentBonusRaw}, cap ${b.perStatCap})`;
+      if (b.effectBonus) tip += `<br>Effects: +${b.effectBonus}`;
+      tips.abilities[key] = tip;
+    }
+
+    // HP tooltip.
+    const vitMod = ab.vitality?.mod ?? 0;
+    tips.hp = `<strong>HP ${system.health?.max ?? 0}</strong><hr>`
+            + `Vitality mod (${vitMod}) × 1.25 = ${Math.round(vitMod * 1.25)}`;
+
+    // Stamina tooltip.
+    const endMod = ab.endurance?.mod ?? 0;
+    tips.stamina = `<strong>Stamina ${system.stamina?.max ?? 0}</strong><hr>`
+                 + `Endurance mod: ${endMod}`;
+
+    // Mana tooltip.
+    tips.mana = `<strong>Mana ${system.mana?.max ?? 0}</strong><hr>`
+              + `Willpower mod: ${ab.willpower?.mod ?? 0}`;
+
+    return tips;
+  }
+
   _prepareDebuffs() {
     const breakStats = {
       root: 'strength', paralysis: 'vitality', fear: 'willpower',

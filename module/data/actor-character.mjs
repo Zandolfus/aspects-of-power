@@ -88,6 +88,9 @@ export class CharacterData extends foundry.abstract.TypeDataModel {
       }),
 
       defense: new fields.SchemaField({
+        dr:     new fields.SchemaField({
+          value: new fields.NumberField({ initial: 0, integer: true }),
+        }),
         armor:  defenseSchema(),
         veil:   defenseSchema(),
         melee:  defenseSchema(),

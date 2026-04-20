@@ -726,8 +726,8 @@ Hooks.on('combatTurnChange', async (combat, _prior, current) => {
       const rawDamage = sys.dotDamage ?? 0;
       if (rawDamage <= 0) continue;
 
-      const toughnessMod = c.actor.system.abilities?.toughness?.mod ?? 0;
-      const damage  = Math.max(0, rawDamage - toughnessMod);
+      const drValue = c.actor.system.defense?.dr?.value ?? 0;
+      const damage  = Math.max(0, rawDamage - drValue);
       const health  = c.actor.system.health;
       const newHealth = Math.max(0, health.value - damage);
       await c.actor.update({ 'system.health.value': newHealth });
@@ -735,7 +735,7 @@ Hooks.on('combatTurnChange', async (combat, _prior, current) => {
       ChatMessage.create({
         whisper: ChatMessage.getWhisperRecipients('GM'),
         content: `<p><strong>${c.actor.name}</strong> takes <strong>${damage}</strong> `
-               + `${flags.dotDamageType ?? 'physical'} damage from ${effect.name} (Toughness: −${toughnessMod}). `
+               + `${flags.dotDamageType ?? 'physical'} damage from ${effect.name} (DR: −${drValue}). `
                + `Health: ${newHealth} / ${health.max}`
                + `${newHealth === 0 ? ' &mdash; <em>Incapacitated!</em>' : ''}</p>`,
       });
@@ -1065,7 +1065,7 @@ async function _triggerPersistentAoe(tokenDoc, force = false) {
           content: `<p><strong>${targetActor.name}</strong> in AOE zone — `
                  + `<strong>${rollTotal}</strong> ${pd.damageType} damage incoming.</p>`
                  + `<button class="apply-damage" data-actor-uuid="${targetActor.uuid}" `
-                 + `data-damage="${rollTotal}" data-toughness="${targetActor.system.abilities?.toughness?.mod ?? 0}" `
+                 + `data-damage="${rollTotal}" data-toughness="${targetActor.system.defense?.dr?.value ?? 0}" `
                  + `data-damage-type="${pd.damageType}" data-affinity-dr="0">Apply Damage</button>`,
         });
       }
@@ -1221,7 +1221,7 @@ Hooks.on('renderChatMessageHTML', (message, html) => {
 
       const actorUuid  = btn.dataset.actorUuid;
       const incomingDmg = parseInt(btn.dataset.damage, 10);
-      const toughnessMod = parseInt(btn.dataset.toughness, 10) || 0;
+      const drValue = parseInt(btn.dataset.toughness, 10) || 0;
       const affinityDR   = parseInt(btn.dataset.affinityDr, 10) || 0;
       const damageType = btn.dataset.damageType || 'physical';
       const target     = await fromUuid(actorUuid);
@@ -1268,12 +1268,12 @@ Hooks.on('renderChatMessageHTML', (message, html) => {
         parts.push(`${isPhysical ? 'Armor' : 'Veil'}: −${mitigated}`);
       }
 
-      // 3. Toughness (with affinity DR) reduces whatever got through armor.
+      // 3. DR (with affinity reduction) reduces whatever got through armor.
       if (remaining > 0) {
-        const effectiveToughness = Math.max(0, toughnessMod - affinityDR);
-        const toughnessReduced = Math.min(effectiveToughness, remaining);
-        remaining = Math.max(0, remaining - effectiveToughness);
-        if (toughnessReduced > 0) parts.push(`Toughness: −${toughnessReduced}`);
+        const effectiveDR = Math.max(0, drValue - affinityDR);
+        const drReduced = Math.min(effectiveDR, remaining);
+        remaining = Math.max(0, remaining - effectiveDR);
+        if (drReduced > 0) parts.push(`DR: −${drReduced}`);
       }
 
       // 3. Overhealth absorbs next.
@@ -1307,9 +1307,9 @@ Hooks.on('renderChatMessageHTML', (message, html) => {
 
       // Degrade durability only on damage that passed through barriers.
       if (!barrierAbsorbed || remaining > 0) {
-        const effectiveTough = Math.max(0, toughnessMod - affinityDR);
+        const effectiveDR = Math.max(0, drValue - affinityDR);
         const postBarrierDmg = barrierAbsorbed ? Math.max(0, incomingDmg - (barrier?.value ?? 0)) : incomingDmg;
-        const totalDurabilityDmg = Math.max(0, postBarrierDmg - mitigation - effectiveTough);
+        const totalDurabilityDmg = Math.max(0, postBarrierDmg - mitigation - effectiveDR);
         if (totalDurabilityDmg > 0) await EquipmentSystem.degradeDurability(target, totalDurabilityDmg, damageType);
       }
 

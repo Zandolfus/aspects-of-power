@@ -207,8 +207,8 @@ export class CombatSystem {
       return;
     }
     
-    const toughness = target.system.abilities.toughness;
-    const reduction = options.ignoreToughness ? 0 : toughness.mod;
+    const drValue = target.system.defense?.dr?.value ?? 0;
+    const reduction = options.ignoreToughness ? 0 : drValue;
     const finalDamage = Math.max(0, damage - reduction);
     
     const currentHealth = target.system.derived.health.value;

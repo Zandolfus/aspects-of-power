@@ -18,7 +18,7 @@
 
       {{!-- ── Resource Bars ── --}}
       <div class="resource-bars">
-        <div class="resource-bar-row resource-health">
+        <div class="resource-bar-row resource-health" data-tooltip="{{{tooltips.hp}}}">
           <label class="bar-label">HP</label>
           <div class="bar-track">
             <div class="bar-fill bar-fill-health" style="width: {{#if (gt system.health.max 0)}}{{math system.health.value '/' system.health.max '*' 100}}{{else}}0{{/if}}%"></div>
@@ -30,7 +30,7 @@
           </div>
         </div>
 
-        <div class="resource-bar-row resource-mana">
+        <div class="resource-bar-row resource-mana" data-tooltip="{{{tooltips.mana}}}">
           <label class="bar-label">MP</label>
           <div class="bar-track">
             <div class="bar-fill bar-fill-mana" style="width: {{#if (gt system.mana.max 0)}}{{math system.mana.value '/' system.mana.max '*' 100}}{{else}}0{{/if}}%"></div>
@@ -42,7 +42,7 @@
           </div>
         </div>
 
-        <div class="resource-bar-row resource-stamina">
+        <div class="resource-bar-row resource-stamina" data-tooltip="{{{tooltips.stamina}}}">
           <label class="bar-label">SP</label>
           <div class="bar-track">
             <div class="bar-fill bar-fill-stamina" style="width: {{#if (gt system.stamina.max 0)}}{{math system.stamina.value '/' system.stamina.max '*' 100}}{{else}}0{{/if}}%"></div>
@@ -96,29 +96,33 @@
       <div class="header-bottom">
         <div class="defense-block">
           <div class="defense-row defense-mitigation">
-            <div class="defense-item">
+            <div class="defense-item" data-tooltip="{{{tooltips.dr}}}">
+              <label>DR</label>
+              <span>{{system.defense.dr.value}}</span>
+            </div>
+            <div class="defense-item" data-tooltip="{{{tooltips.armor}}}">
               <label>Armor</label>
               <span>{{system.defense.armor.value}}</span>
             </div>
-            <div class="defense-item">
+            <div class="defense-item" data-tooltip="{{{tooltips.veil}}}">
               <label>Veil</label>
               <span>{{system.defense.veil.value}}</span>
             </div>
           </div>
           <div class="defense-row defense-pools">
-            <div class="defense-item">
+            <div class="defense-item" data-tooltip="{{{tooltips.melee}}}">
               <label>Melee</label>
               <span>{{system.defense.melee.pool}}/{{system.defense.melee.poolMax}}</span>
             </div>
-            <div class="defense-item">
+            <div class="defense-item" data-tooltip="{{{tooltips.ranged}}}">
               <label>Ranged</label>
               <span>{{system.defense.ranged.pool}}/{{system.defense.ranged.poolMax}}</span>
             </div>
-            <div class="defense-item">
+            <div class="defense-item" data-tooltip="{{{tooltips.mind}}}">
               <label>Mind</label>
               <span>{{system.defense.mind.pool}}/{{system.defense.mind.poolMax}}</span>
             </div>
-            <div class="defense-item">
+            <div class="defense-item" data-tooltip="{{{tooltips.soul}}}">
               <label>Soul</label>
               <span>{{system.defense.soul.pool}}/{{system.defense.soul.poolMax}}</span>
             </div>
@@ -199,7 +203,7 @@
 
           <div class="abilities flexcol">
             {{#each system.abilities as |ability key|}}
-            <div class="ability flexrow flex-group-center">
+            <div class="ability flexrow flex-group-center" data-tooltip="{{{lookup @root.tooltips.abilities key}}}">
               <label for="system.abilities.{{key}}.value" class="resource-label rollable flexlarge align-left" data-roll="(d20/100)*@abilities.{{key}}.mod+@abilities.{{key}}.mod" data-label="{{localize (lookup @root.config.abilities key)}}">{{localize (lookup @root.config.abilities key)}}</label>
               <input type="number" name="system.abilities.{{key}}.value" value="{{ability.value}}" min="0"/>
               <span class="stat-mod rollable" data-roll="(d20/100)*@abilities.{{key}}.mod+@abilities.{{key}}.mod" data-label="{{localize (lookup @root.config.abilities key)}}">{{numberFormat ability.mod decimals=0 sign=true}}</span>
