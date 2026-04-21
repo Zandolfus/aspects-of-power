@@ -167,15 +167,19 @@ export class AspectsofPowerActorSheet extends foundry.applications.api.Handlebar
     context.skills         = skills;
     context.skillGroups    = skillGroups;
 
-    // Equipment slot summary for the Equipment tab.
-    context.equipmentSlots = {};
+    // Equipment slot summary for the Equipment tab — split combat vs profession.
+    context.combatSlots = {};
+    context.professionSlots = {};
     for (const [slotKey, slotDef] of Object.entries(CONFIG.ASPECTSOFPOWER.equipmentSlots)) {
-      context.equipmentSlots[slotKey] = {
+      const target = slotDef.set === 'profession' ? context.professionSlots : context.combatSlots;
+      target[slotKey] = {
         label: game.i18n.localize(slotDef.label),
         max: slotDef.max,
         items: [],
       };
     }
+    // Keep combined for backward compat.
+    context.equipmentSlots = { ...context.combatSlots, ...context.professionSlots };
     context.unequippedGear = [];
 
     for (const i of gear) {
@@ -400,6 +404,17 @@ export class AspectsofPowerActorSheet extends foundry.applications.api.Handlebar
         const item = this.actor.items.get(itemId);
         if (!item || item.type !== 'consumable') return;
         await item.useConsumable();
+      });
+    });
+
+    // Gear set toggle (combat / profession).
+    this.element.querySelectorAll('.gear-toggle-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const set = btn.dataset.set;
+        this.element.querySelectorAll('.gear-toggle-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        this.element.querySelector('.gear-set-combat').style.display = set === 'combat' ? '' : 'none';
+        this.element.querySelector('.gear-set-profession').style.display = set === 'profession' ? '' : 'none';
       });
     });
 

@@ -502,18 +502,26 @@ ASPECTSOFPOWER.materialTypes = {
  * can occupy that slot simultaneously.
  */
 ASPECTSOFPOWER.equipmentSlots = {
-  chest:    { label: 'ASPECTSOFPOWER.Equip.Slot.chest',    max: 1 },
-  legs:     { label: 'ASPECTSOFPOWER.Equip.Slot.legs',     max: 1 },
-  head:     { label: 'ASPECTSOFPOWER.Equip.Slot.head',     max: 1 },
-  bracers:  { label: 'ASPECTSOFPOWER.Equip.Slot.bracers',  max: 1 },
-  boots:    { label: 'ASPECTSOFPOWER.Equip.Slot.boots',    max: 1 },
-  gloves:   { label: 'ASPECTSOFPOWER.Equip.Slot.gloves',   max: 1 },
-  back:     { label: 'ASPECTSOFPOWER.Equip.Slot.back',     max: 1 },
-  necklace: { label: 'ASPECTSOFPOWER.Equip.Slot.necklace', max: 1 },
-  bracelet: { label: 'ASPECTSOFPOWER.Equip.Slot.bracelet', max: 2 },
-  ring:     { label: 'ASPECTSOFPOWER.Equip.Slot.ring',     max: 10 },
-  earring:  { label: 'ASPECTSOFPOWER.Equip.Slot.earring',  max: 1 },
-  weaponry: { label: 'ASPECTSOFPOWER.Equip.Slot.weaponry',  max: 2 },
+  chest:    { label: 'ASPECTSOFPOWER.Equip.Slot.chest',    max: 1, set: 'combat' },
+  legs:     { label: 'ASPECTSOFPOWER.Equip.Slot.legs',     max: 1, set: 'combat' },
+  head:     { label: 'ASPECTSOFPOWER.Equip.Slot.head',     max: 1, set: 'combat' },
+  bracers:  { label: 'ASPECTSOFPOWER.Equip.Slot.bracers',  max: 1, set: 'combat' },
+  boots:    { label: 'ASPECTSOFPOWER.Equip.Slot.boots',    max: 1, set: 'combat' },
+  gloves:   { label: 'ASPECTSOFPOWER.Equip.Slot.gloves',   max: 1, set: 'combat' },
+  back:     { label: 'ASPECTSOFPOWER.Equip.Slot.back',     max: 1, set: 'combat' },
+  necklace: { label: 'ASPECTSOFPOWER.Equip.Slot.necklace', max: 1, set: 'combat' },
+  bracelet: { label: 'ASPECTSOFPOWER.Equip.Slot.bracelet', max: 2, set: 'combat' },
+  ring:     { label: 'ASPECTSOFPOWER.Equip.Slot.ring',     max: 10, set: 'combat' },
+  earring:  { label: 'ASPECTSOFPOWER.Equip.Slot.earring',  max: 1, set: 'combat' },
+  weaponry: { label: 'ASPECTSOFPOWER.Equip.Slot.weaponry', max: 2, set: 'combat' },
+  // Profession gear slots.
+  profWeapon:  { label: 'ASPECTSOFPOWER.Equip.Slot.profWeapon',  max: 1, set: 'profession' },
+  profUtility: { label: 'ASPECTSOFPOWER.Equip.Slot.profUtility', max: 1, set: 'profession' },
+  profHead:    { label: 'ASPECTSOFPOWER.Equip.Slot.profHead',    max: 1, set: 'profession' },
+  profChest:   { label: 'ASPECTSOFPOWER.Equip.Slot.profChest',   max: 1, set: 'profession' },
+  profLegs:    { label: 'ASPECTSOFPOWER.Equip.Slot.profLegs',    max: 1, set: 'profession' },
+  profBoots:   { label: 'ASPECTSOFPOWER.Equip.Slot.profBoots',   max: 1, set: 'profession' },
+  profGloves:  { label: 'ASPECTSOFPOWER.Equip.Slot.profGloves',  max: 1, set: 'profession' },
 };
 
 /**

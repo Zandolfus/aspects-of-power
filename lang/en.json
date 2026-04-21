@@ -469,7 +469,14 @@
         "bracelet": "Bracelet",
         "ring": "Ring",
         "earring": "Earring",
-        "weaponry": "Weaponry"
+        "weaponry": "Weaponry",
+        "profWeapon": "Primary Tool",
+        "profUtility": "Off-Hand Tool",
+        "profHead": "Work Head",
+        "profChest": "Work Body",
+        "profLegs": "Work Legs",
+        "profBoots": "Work Boots",
+        "profGloves": "Work Gloves"
       },
       "Rarity": {
         "inferior": "Inferior",
