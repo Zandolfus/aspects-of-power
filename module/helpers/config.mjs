@@ -291,6 +291,7 @@ ASPECTSOFPOWER.professionTags = {
   armor:       'ASPECTSOFPOWER.Tag.armor',
   weapon:      'ASPECTSOFPOWER.Tag.weapon',
   clothing:    'ASPECTSOFPOWER.Tag.clothing',
+  alchemy:     'ASPECTSOFPOWER.Tag.alchemy',
   metal:       'ASPECTSOFPOWER.Tag.metalMat',
   leather:     'ASPECTSOFPOWER.Tag.leatherMat',
   cloth:       'ASPECTSOFPOWER.Tag.clothMat',

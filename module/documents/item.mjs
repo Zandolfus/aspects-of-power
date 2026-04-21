@@ -1588,29 +1588,30 @@ export class AspectsofPowerItem extends Item {
         : Object.keys(CONFIG.ASPECTSOFPOWER.equipmentSlots ?? {});
     }
 
-    // ── Step 1: Select output slot ──
-    const slotOptions = allowedSlots.map(s =>
-      `<option value="${s}">${s.charAt(0).toUpperCase() + s.slice(1)}</option>`
-    ).join('');
+    // ── Step 1: Select output slot (skip for alchemy) ──
+    const isAlchemySkill = tags.includes('alchemy');
+    let outputSlot = '';
 
-    const step1Buttons = allowedSlots.map(s => ({
-      action: s,
-      label: s.charAt(0).toUpperCase() + s.slice(1),
-    }));
-    step1Buttons.push({ action: 'cancel', label: 'Cancel' });
+    if (!isAlchemySkill) {
+      const step1Buttons = allowedSlots.map(s => ({
+        action: s,
+        label: s.charAt(0).toUpperCase() + s.slice(1),
+      }));
+      step1Buttons.push({ action: 'cancel', label: 'Cancel' });
 
-    const outputSlot = await foundry.applications.api.DialogV2.wait({
-      window: { title: `${item.name} — What are you crafting?` },
-      content: '<p>Select the item type to craft:</p>',
-      buttons: step1Buttons,
-      close: () => 'cancel',
-    });
-    if (outputSlot === 'cancel') return;
+      outputSlot = await foundry.applications.api.DialogV2.wait({
+        window: { title: `${item.name} — What are you crafting?` },
+        content: '<p>Select the item type to craft:</p>',
+        buttons: step1Buttons,
+        close: () => 'cancel',
+      });
+      if (outputSlot === 'cancel') return;
+    }
 
     // ── Step 2: Select material ──
     const materials = actor.items.filter(i => {
       if (i.type !== 'item' || !i.system.isMaterial) return false;
-      if (allowedMaterials && i.system.material && !allowedMaterials.includes(i.system.material)) return false;
+      if (!isAlchemySkill && allowedMaterials && i.system.material && !allowedMaterials.includes(i.system.material)) return false;
       return true;
     });
 
@@ -1758,101 +1759,193 @@ export class AspectsofPowerItem extends Item {
       }
     }
 
-    // Compute output stats from element + slot + material.
     const element = materialItem.system.materialElement || '';
-    const elementDef = CONFIG.ASPECTSOFPOWER.craftElements?.[element];
-    const outputMaterial = craftConfig?.craftOutputMaterial || materialItem.system.material || 'metal';
-    const slotValue = CONFIG.ASPECTSOFPOWER.craftSlotValues?.[outputSlot] ?? 0.25;
-    const matValue = CONFIG.ASPECTSOFPOWER.craftMaterialValues?.[outputMaterial] ?? 0.5;
-
-    const totalStatBudget = Math.round(totalProgress * slotValue * matValue * 0.5);
-    const statBonuses = [];
-
-    if (elementDef?.stats?.length >= 3 && totalStatBudget > 0) {
-      const base = Math.round(totalStatBudget / 3);
-      const remainder = Math.round(totalStatBudget % 3);
-      let s1, s2, s3;
-      if (remainder === 0)      { s1 = base + 1; s2 = base;     s3 = base - 1; }
-      else if (remainder === 1) { s1 = base + 2; s2 = base;     s3 = base - 1; }
-      else                      { s1 = base + 1; s2 = base;     s3 = base - 2; }
-      statBonuses.push(
-        { ability: elementDef.stats[0], value: Math.max(0, s1) },
-        { ability: elementDef.stats[1], value: Math.max(0, s2) },
-        { ability: elementDef.stats[2], value: Math.max(0, s3) },
-      );
-    } else if (element === 'neutral' && totalStatBudget > 0) {
-      const perStat = Math.round(totalStatBudget / 9);
-      for (const ab of ['vitality','endurance','strength','dexterity','toughness','intelligence','willpower','wisdom','perception']) {
-        if (perStat > 0) statBonuses.push({ ability: ab, value: perStat });
-      }
-    }
-
-    const isJewelry = tags.includes('jewelry') || outputMaterial === 'jewelry'
-                   || outputMaterial === 'gem' || outputMaterial === 'crystal';
-    const isArmor = !isJewelry && ['metal', 'leather', 'cloth'].includes(outputMaterial);
-    const defenseValue = Math.round(totalProgress * slotValue * matValue);
-    const armorBonus = isArmor ? defenseValue : 0;
-    const veilBonus = isJewelry ? defenseValue : 0;
-
-    const rarityDef = CONFIG.ASPECTSOFPOWER.rarities?.[qualityData.rarity];
-    const augmentSlots = rarityDef?.augments ?? 0;
-
-    const elPrefix = element ? `${element.charAt(0).toUpperCase() + element.slice(1)} ` : '';
-    const slotName = outputSlot.charAt(0).toUpperCase() + outputSlot.slice(1);
-    const itemName = `${elPrefix}${slotName}`;
-
-    const [createdItem] = await actor.createEmbeddedDocuments('Item', [{
-      name: itemName,
-      type: 'item',
-      img: materialItem.img,
-      system: {
-        description: `<p>Crafted by ${actor.name} using ${materialItem.name}.</p>`,
-        slot: outputSlot,
-        material: outputMaterial,
-        rarity: qualityData.rarity,
-        progress: totalProgress,
-        durability: { value: totalProgress * 2, max: totalProgress * 2 },
-        statBonuses,
-        armorBonus,
-        veilBonus,
-        augmentSlots,
-      },
-    }]);
-
-    if ((materialItem.system.quantity ?? 1) <= 1) {
-      await materialItem.delete();
-    } else {
-      await materialItem.update({ 'system.quantity': materialItem.system.quantity - 1 });
-    }
-
-    const statLine = statBonuses.length
-      ? statBonuses.map(s => `${s.ability}: +${s.value}`).join(', ')
-      : 'none';
-
     const craftNatLine = d100Roll.total === 100
       ? '<p style="color:#ffca28;font-size:1.2em;">&#9733; Masterwork! Natural 100! &#9733;</p>'
       : '';
 
-    ChatMessage.create({
-      speaker,
-      content: `<div class="craft-result">
-        <h3>${item.name} — Crafting Result</h3>
-        <hr>
-        ${craftNatLine}
-        <p><strong>Material:</strong> ${materialItem.name} (${matRarity}, progress ${materialProgress})</p>
-        <p><strong>Material (50%):</strong> ${materialProgress} × 0.5 = ${materialContribution}</p>
-        <p><strong>Crafter (50%):</strong> ${skillRoll} × ${d100Pct.toFixed(2)} = ${crafterRoll} × 0.5 = ${crafterContribution}</p>
-        <p><strong>d100:</strong> ${d100Roll.total} + ${rarityRange.floor} = ${effectiveD100} (cap ${rarityRange.ceiling})</p>
-        ${prepBonus ? `<p><strong>Preparation:</strong> +${prepBonus}</p>` : ''}
-        <p><strong>Total Progress:</strong> ${materialContribution} + ${crafterContribution}${prepBonus ? ` + ${prepBonus}` : ''} = ${totalProgress}</p>
-        <p><strong>Quality:</strong> ${qualityKey.charAt(0).toUpperCase() + qualityKey.slice(1)} (${qualityData.rarity})</p>
-        ${armorBonus ? `<p><strong>Armor:</strong> ${armorBonus}</p>` : ''}
-        ${veilBonus ? `<p><strong>Veil:</strong> ${veilBonus}</p>` : ''}
-        <p><strong>Stats:</strong> ${statLine}</p>
-        <p><strong>Augment Slots:</strong> ${augmentSlots}</p>
-        <p><em>Created: ${createdItem.name}</em></p>
-      </div>`,
-    });
+    // ── Branch: Alchemy (consumable) vs Equipment ──
+    const isAlchemy = tags.includes('alchemy');
+    let createdItem;
+
+    if (isAlchemy) {
+      // Determine consumable type from skill tags.
+      let consumableType = 'potion';
+      let effectType = 'restoration';
+      if (tags.includes('attack') || tags.includes('aoe')) { consumableType = 'bomb'; effectType = 'bomb'; }
+      else if (tags.includes('debuff'))    effectType = 'poison';
+      else if (tags.includes('buff'))      effectType = 'buff';
+      else if (tags.includes('cleanse'))   effectType = 'restoration';
+
+      // Build consumable data from skill's tagConfig.
+      const tc = item.system.tagConfig ?? {};
+      const consumableData = {
+        description: `<p>Brewed by ${actor.name} using ${materialItem.name}.</p>`,
+        quantity: 1,
+        rarity: qualityData.rarity,
+        consumableType,
+        effectType,
+        charges: { value: 1, max: 1 },
+      };
+
+      // Map skill effects to consumable fields based on progress.
+      if (effectType === 'restoration') {
+        consumableData.restoration = {
+          resource: tc.restorationResource || 'health',
+          amount: totalProgress,
+          overhealth: tc.restorationOverhealth || false,
+        };
+      } else if (effectType === 'buff') {
+        consumableData.buff = {
+          entries: (tc.buffEntries || []).map(e => ({
+            attribute: e.attribute,
+            value: Math.round((e.value || 1) * totalProgress * 0.1),
+          })),
+          duration: tc.buffDuration || 1,
+        };
+      } else if (effectType === 'poison') {
+        consumableData.poison = {
+          damage: totalProgress,
+          damageType: tc.debuffDamageType || 'physical',
+          duration: tc.debuffDuration || 3,
+        };
+      } else if (effectType === 'bomb') {
+        consumableData.bomb = {
+          damage: totalProgress,
+          damageType: tc.debuffDamageType || 'physical',
+          shape: tc.craftOutputSlot || 'circle',
+          diameter: 10,
+        };
+      }
+
+      const elPrefix = element ? `${element.charAt(0).toUpperCase() + element.slice(1)} ` : '';
+      const typeLabel = consumableType.charAt(0).toUpperCase() + consumableType.slice(1);
+      const itemName = `${elPrefix}${typeLabel}`;
+
+      [createdItem] = await actor.createEmbeddedDocuments('Item', [{
+        name: itemName,
+        type: 'consumable',
+        img: materialItem.img,
+        system: consumableData,
+      }]);
+
+      // Consume material.
+      if ((materialItem.system.quantity ?? 1) <= 1) {
+        await materialItem.delete();
+      } else {
+        await materialItem.update({ 'system.quantity': materialItem.system.quantity - 1 });
+      }
+
+      ChatMessage.create({
+        speaker,
+        content: `<div class="craft-result">
+          <h3>${item.name} — Alchemy Result</h3>
+          <hr>
+          ${craftNatLine}
+          <p><strong>Material:</strong> ${materialItem.name} (${matRarity}, progress ${materialProgress})</p>
+          <p><strong>Material (50%):</strong> ${materialProgress} × 0.5 = ${materialContribution}</p>
+          <p><strong>Crafter (50%):</strong> ${skillRoll} × ${d100Pct.toFixed(2)} = ${crafterRoll} × 0.5 = ${crafterContribution}</p>
+          <p><strong>d100:</strong> ${d100Roll.total} + ${rarityRange.floor} = ${effectiveD100} (cap ${rarityRange.ceiling})</p>
+          ${prepBonus ? `<p><strong>Preparation:</strong> +${prepBonus}</p>` : ''}
+          <p><strong>Total Progress:</strong> ${totalProgress}</p>
+          <p><strong>Quality:</strong> ${qualityKey.charAt(0).toUpperCase() + qualityKey.slice(1)} (${qualityData.rarity})</p>
+          <p><strong>Type:</strong> ${typeLabel} (${effectType})</p>
+          <p><em>Created: ${createdItem.name}</em></p>
+        </div>`,
+      });
+
+    } else {
+      // ── Equipment crafting (existing logic) ──
+      const elementDef = CONFIG.ASPECTSOFPOWER.craftElements?.[element];
+      const outputMaterial = craftConfig?.craftOutputMaterial || materialItem.system.material || 'metal';
+      const slotValue = CONFIG.ASPECTSOFPOWER.craftSlotValues?.[outputSlot] ?? 0.25;
+      const matValue = CONFIG.ASPECTSOFPOWER.craftMaterialValues?.[outputMaterial] ?? 0.5;
+
+      const totalStatBudget = Math.round(totalProgress * slotValue * matValue * 0.5);
+      const statBonuses = [];
+
+      if (elementDef?.stats?.length >= 3 && totalStatBudget > 0) {
+        const base = Math.round(totalStatBudget / 3);
+        const remainder = Math.round(totalStatBudget % 3);
+        let s1, s2, s3;
+        if (remainder === 0)      { s1 = base + 1; s2 = base;     s3 = base - 1; }
+        else if (remainder === 1) { s1 = base + 2; s2 = base;     s3 = base - 1; }
+        else                      { s1 = base + 1; s2 = base;     s3 = base - 2; }
+        statBonuses.push(
+          { ability: elementDef.stats[0], value: Math.max(0, s1) },
+          { ability: elementDef.stats[1], value: Math.max(0, s2) },
+          { ability: elementDef.stats[2], value: Math.max(0, s3) },
+        );
+      } else if (element === 'neutral' && totalStatBudget > 0) {
+        const perStat = Math.round(totalStatBudget / 9);
+        for (const ab of ['vitality','endurance','strength','dexterity','toughness','intelligence','willpower','wisdom','perception']) {
+          if (perStat > 0) statBonuses.push({ ability: ab, value: perStat });
+        }
+      }
+
+      const isJewelry = tags.includes('jewelry') || outputMaterial === 'jewelry'
+                     || outputMaterial === 'gem' || outputMaterial === 'crystal';
+      const isArmor = !isJewelry && ['metal', 'leather', 'cloth'].includes(outputMaterial);
+      const defenseValue = Math.round(totalProgress * slotValue * matValue);
+      const armorBonus = isArmor ? defenseValue : 0;
+      const veilBonus = isJewelry ? defenseValue : 0;
+
+      const rarityDef = CONFIG.ASPECTSOFPOWER.rarities?.[qualityData.rarity];
+      const augmentSlots = rarityDef?.augments ?? 0;
+
+      const elPrefix = element ? `${element.charAt(0).toUpperCase() + element.slice(1)} ` : '';
+      const slotName = outputSlot.charAt(0).toUpperCase() + outputSlot.slice(1);
+      const itemName = `${elPrefix}${slotName}`;
+
+      [createdItem] = await actor.createEmbeddedDocuments('Item', [{
+        name: itemName,
+        type: 'item',
+        img: materialItem.img,
+        system: {
+          description: `<p>Crafted by ${actor.name} using ${materialItem.name}.</p>`,
+          slot: outputSlot,
+          material: outputMaterial,
+          rarity: qualityData.rarity,
+          progress: totalProgress,
+          durability: { value: totalProgress * 2, max: totalProgress * 2 },
+          statBonuses,
+          armorBonus,
+          veilBonus,
+          augmentSlots,
+        },
+      }]);
+
+      if ((materialItem.system.quantity ?? 1) <= 1) {
+        await materialItem.delete();
+      } else {
+        await materialItem.update({ 'system.quantity': materialItem.system.quantity - 1 });
+      }
+
+      const statLine = statBonuses.length
+        ? statBonuses.map(s => `${s.ability}: +${s.value}`).join(', ')
+        : 'none';
+
+      ChatMessage.create({
+        speaker,
+        content: `<div class="craft-result">
+          <h3>${item.name} — Crafting Result</h3>
+          <hr>
+          ${craftNatLine}
+          <p><strong>Material:</strong> ${materialItem.name} (${matRarity}, progress ${materialProgress})</p>
+          <p><strong>Material (50%):</strong> ${materialProgress} × 0.5 = ${materialContribution}</p>
+          <p><strong>Crafter (50%):</strong> ${skillRoll} × ${d100Pct.toFixed(2)} = ${crafterRoll} × 0.5 = ${crafterContribution}</p>
+          <p><strong>d100:</strong> ${d100Roll.total} + ${rarityRange.floor} = ${effectiveD100} (cap ${rarityRange.ceiling})</p>
+          ${prepBonus ? `<p><strong>Preparation:</strong> +${prepBonus}</p>` : ''}
+          <p><strong>Total Progress:</strong> ${materialContribution} + ${crafterContribution}${prepBonus ? ` + ${prepBonus}` : ''} = ${totalProgress}</p>
+          <p><strong>Quality:</strong> ${qualityKey.charAt(0).toUpperCase() + qualityKey.slice(1)} (${qualityData.rarity})</p>
+          ${armorBonus ? `<p><strong>Armor:</strong> ${armorBonus}</p>` : ''}
+          ${veilBonus ? `<p><strong>Veil:</strong> ${veilBonus}</p>` : ''}
+          <p><strong>Stats:</strong> ${statLine}</p>
+          <p><strong>Augment Slots:</strong> ${augmentSlots}</p>
+          <p><em>Created: ${createdItem.name}</em></p>
+        </div>`,
+      });
+    }
 
     createdItem.sheet.render(true);
   }
