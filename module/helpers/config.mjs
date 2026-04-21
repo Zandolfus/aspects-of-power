@@ -361,7 +361,7 @@ ASPECTSOFPOWER.craftRarityRanges = {
  * Craft sub-type → allowed slots and default materials.
  */
 ASPECTSOFPOWER.craftTypes = {
-  jewelry:  { slots: ['necklace', 'bracelet', 'ring', 'earring'], materials: ['jewelry'] },
+  jewelry:  { slots: ['necklace', 'bracelet', 'ring', 'earring'], materials: ['jewelry', 'gem', 'crystal'] },
   armor:    { slots: ['chest', 'legs', 'head', 'bracers', 'boots', 'gloves', 'back'], materials: ['metal', 'leather'] },
   weapon:   { slots: ['weaponry'], materials: ['metal'] },
   clothing: { slots: ['chest', 'legs', 'head', 'gloves', 'back'], materials: ['cloth', 'leather'] },
