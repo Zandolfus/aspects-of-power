@@ -1628,12 +1628,12 @@ export class AspectsofPowerItem extends Item {
     const d100Roll = new Roll('1d100');
     await d100Roll.evaluate();
 
-    // Clamp d100 to material rarity range.
+    // Additive d100: floor boosts the roll, ceiling caps it.
     const matRarity = materialItem.system.rarity || 'common';
     const rarityRange = CONFIG.ASPECTSOFPOWER.craftRarityRanges?.[matRarity]
                      ?? { floor: 1, ceiling: 100 };
-    const clampedD100 = Math.min(Math.max(d100Roll.total, rarityRange.floor), rarityRange.ceiling);
-    const d100Pct = clampedD100 / 100;
+    const effectiveD100 = Math.min(d100Roll.total + rarityRange.floor, rarityRange.ceiling);
+    const d100Pct = effectiveD100 / 100;
 
     // 50/50 split: material quality + crafter skill.
     const materialProgress = materialItem.system.progress ?? 0;
@@ -1735,7 +1735,7 @@ export class AspectsofPowerItem extends Item {
         <p><strong>Material:</strong> ${materialItem.name} (${matRarity}, progress ${materialProgress})</p>
         <p><strong>Material (50%):</strong> ${materialProgress} × 0.5 = ${materialContribution}</p>
         <p><strong>Crafter (50%):</strong> ${skillRoll} × ${d100Pct.toFixed(2)} = ${crafterRoll} × 0.5 = ${crafterContribution}</p>
-        <p><strong>d100:</strong> ${d100Roll.total} → ${clampedD100} (${matRarity}: ${rarityRange.floor}-${rarityRange.ceiling})</p>
+        <p><strong>d100:</strong> ${d100Roll.total} + ${rarityRange.floor} = ${effectiveD100} (cap ${rarityRange.ceiling})</p>
         ${prepBonus ? `<p><strong>Preparation:</strong> +${prepBonus}</p>` : ''}
         <p><strong>Total Progress:</strong> ${materialContribution} + ${crafterContribution}${prepBonus ? ` + ${prepBonus}` : ''} = ${totalProgress}</p>
         <p><strong>Quality:</strong> ${qualityKey.charAt(0).toUpperCase() + qualityKey.slice(1)} (${qualityData.rarity})</p>
