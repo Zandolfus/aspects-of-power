@@ -336,6 +336,20 @@ ASPECTSOFPOWER.craftMaterialValues = {
 };
 
 /**
+ * Material rarity → d100 roll floor/ceiling for crafting.
+ */
+ASPECTSOFPOWER.craftRarityRanges = {
+  inferior:  { floor: 1,  ceiling: 25 },
+  common:    { floor: 1,  ceiling: 50 },
+  uncommon:  { floor: 10, ceiling: 60 },
+  rare:      { floor: 20, ceiling: 100 },
+  epic:      { floor: 30, ceiling: 120 },
+  legendary: { floor: 50, ceiling: 150 },
+  mythic:    { floor: 70, ceiling: 175 },
+  divine:    { floor: 100, ceiling: 200 },
+};
+
+/**
  * Craft sub-type → allowed slots and default materials.
  */
 ASPECTSOFPOWER.craftTypes = {
