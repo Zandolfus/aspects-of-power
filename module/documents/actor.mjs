@@ -236,6 +236,7 @@ export class AspectsofPowerActor extends Actor {
 
     // DR: base 50% of toughness mod + effect bonuses.
     const toughMod = systemData.abilities.toughness.mod;
+    if (!systemData.defense.dr) systemData.defense.dr = { value: 0 };
     systemData.defense.dr.value = Math.round(toughMod * 0.5) + effectBonus('system.defense.dr.value');
 
     // Armor and veil: entirely from equipment/effects (no base stat contribution).
