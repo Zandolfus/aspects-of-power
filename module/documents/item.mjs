@@ -1377,7 +1377,6 @@ export class AspectsofPowerItem extends Item {
 
     const gatherConfig = item.system.tagConfig;
     const materialType = gatherConfig?.gatherMaterial || '';
-    const element = gatherConfig?.gatherElement || '';
 
     // ── Step 1: Select material rarity ──
     const rarityRanges = CONFIG.ASPECTSOFPOWER.craftRarityRanges ?? {};
@@ -1394,6 +1393,24 @@ export class AspectsofPowerItem extends Item {
       close: () => 'cancel',
     });
     if (selectedRarity === 'cancel') return;
+
+    // ── Step 2: Select element/affinity ──
+    const craftElements = CONFIG.ASPECTSOFPOWER.craftElements ?? {};
+    const elementButtons = Object.entries(craftElements).map(([key, def]) => ({
+      action: key,
+      label: game.i18n.localize(def.label),
+    }));
+    elementButtons.push({ action: 'none', label: 'None' });
+    elementButtons.push({ action: 'cancel', label: 'Cancel' });
+
+    const selectedElement = await foundry.applications.api.DialogV2.wait({
+      window: { title: `${item.name} — Element` },
+      content: '<p>What element is this material?</p>',
+      buttons: elementButtons,
+      close: () => 'cancel',
+    });
+    if (selectedElement === 'cancel') return;
+    const element = selectedElement === 'none' ? '' : selectedElement;
 
     // Roll d100 for gathering conditions.
     const d100Roll = new Roll('1d100');
