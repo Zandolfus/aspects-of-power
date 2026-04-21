@@ -1406,24 +1406,19 @@ export class AspectsofPowerItem extends Item {
       `<option value="${s}">${s.charAt(0).toUpperCase() + s.slice(1)}</option>`
     ).join('');
 
-    const step1 = await foundry.applications.api.DialogV2.prompt({
-      window: { title: `${item.name} — Select Item Type` },
-      content: `<form class="craft-dialog">
-        <div class="form-group">
-          <label>What are you crafting?</label>
-          <select name="outputSlot">${slotOptions}</select>
-        </div>
-      </form>`,
-      ok: {
-        label: 'Next',
-        callback: (event, button) => {
-          const form = button.closest('.dialog-v2')?.querySelector('form');
-          return form?.querySelector('[name="outputSlot"]')?.value;
-        },
-      },
+    const step1Buttons = allowedSlots.map(s => ({
+      action: s,
+      label: s.charAt(0).toUpperCase() + s.slice(1),
+    }));
+    step1Buttons.push({ action: 'cancel', label: 'Cancel' });
+
+    const outputSlot = await foundry.applications.api.DialogV2.wait({
+      window: { title: `${item.name} — What are you crafting?` },
+      content: '<p>Select the item type to craft:</p>',
+      buttons: step1Buttons,
+      close: () => 'cancel',
     });
-    if (!step1) return;
-    const outputSlot = step1;
+    if (outputSlot === 'cancel') return;
 
     // ── Step 2: Select material ──
     const materials = actor.items.filter(i => {
@@ -1437,31 +1432,22 @@ export class AspectsofPowerItem extends Item {
       return;
     }
 
-    const matOptions = materials.map(m => {
+    const step2Buttons = materials.map(m => {
       const elLabel = m.system.materialElement ? ` [${m.system.materialElement}]` : '';
       const refined = m.system.progress > 0 ? ` — Value ${m.system.progress}` : ' — Unrefined';
-      return `<option value="${m.id}">${m.name}${elLabel}${refined}</option>`;
-    }).join('');
-
-    const step2 = await foundry.applications.api.DialogV2.prompt({
-      window: { title: `${item.name} — Select Material` },
-      content: `<form class="craft-dialog">
-        <div class="form-group">
-          <label>Material</label>
-          <select name="materialId">${matOptions}</select>
-        </div>
-      </form>`,
-      ok: {
-        label: 'Next',
-        callback: (event, button) => {
-          const form = button.closest('.dialog-v2')?.querySelector('form');
-          return form?.querySelector('[name="materialId"]')?.value;
-        },
-      },
+      return { action: m.id, label: `${m.name}${elLabel}${refined}` };
     });
-    if (!step2) return;
+    step2Buttons.push({ action: 'cancel', label: 'Cancel' });
 
-    let materialItem = actor.items.get(step2);
+    const step2Result = await foundry.applications.api.DialogV2.wait({
+      window: { title: `${item.name} — Select Material` },
+      content: `<p>Select a material for your ${outputSlot}:</p>`,
+      buttons: step2Buttons,
+      close: () => 'cancel',
+    });
+    if (step2Result === 'cancel') return;
+
+    let materialItem = actor.items.get(step2Result);
     if (!materialItem) return;
 
     // ── Step 3: Refine if unrefined ──
@@ -1475,25 +1461,19 @@ export class AspectsofPowerItem extends Item {
           `<option value="${s.id}">${s.name}</option>`
         ).join('');
 
-        const refineChoice = await foundry.applications.api.DialogV2.prompt({
+        const refineButtons = refineSkills.map(s => ({
+          action: s.id, label: s.name,
+        }));
+        refineButtons.push({ action: 'skip', label: 'Skip' });
+
+        const refineChoice = await foundry.applications.api.DialogV2.wait({
           window: { title: 'Material is Unrefined' },
-          content: `<form class="craft-dialog">
-            <p>This material has no progress value. Refine it first?</p>
-            <div class="form-group">
-              <label>Refine Skill</label>
-              <select name="refineSkillId">${refineOptions}</select>
-            </div>
-          </form>`,
-          ok: {
-            label: 'Refine',
-            callback: (event, button) => {
-              const form = button.closest('.dialog-v2')?.querySelector('form');
-              return form?.querySelector('[name="refineSkillId"]')?.value;
-            },
-          },
+          content: '<p>This material has no progress value. Refine it first?</p>',
+          buttons: refineButtons,
+          close: () => 'skip',
         });
 
-        if (refineChoice) {
+        if (refineChoice && refineChoice !== 'skip') {
           const refineSkill = actor.items.get(refineChoice);
           if (refineSkill) {
             const refineRollData = refineSkill.getRollData();
@@ -1505,7 +1485,7 @@ export class AspectsofPowerItem extends Item {
             const refineProgress = Math.round(Math.round(refRoll.total) * (refineD100.total / 100));
 
             await materialItem.update({ 'system.progress': refineProgress });
-            materialItem = actor.items.get(step2);
+            materialItem = actor.items.get(step2Result);
 
             ChatMessage.create({
               speaker,
@@ -1524,32 +1504,19 @@ export class AspectsofPowerItem extends Item {
     );
 
     if (prepSkills.length > 0) {
-      const prepOptions = prepSkills.map(s =>
-        `<option value="${s.id}">${s.name}</option>`
-      ).join('');
+      const prepButtons = prepSkills.map(s => ({
+        action: s.id, label: s.name,
+      }));
+      prepButtons.push({ action: 'skip', label: 'Skip' });
 
-      const prepChoice = await foundry.applications.api.DialogV2.prompt({
+      const prepChoice = await foundry.applications.api.DialogV2.wait({
         window: { title: 'Pre-Craft Preparation' },
-        content: `<form class="craft-dialog">
-          <p>Apply a preparation skill before crafting?</p>
-          <div class="form-group">
-            <label>Preparation Skill</label>
-            <select name="prepSkillId">
-              <option value="">(skip)</option>
-              ${prepOptions}
-            </select>
-          </div>
-        </form>`,
-        ok: {
-          label: 'Continue',
-          callback: (event, button) => {
-            const form = button.closest('.dialog-v2')?.querySelector('form');
-            return form?.querySelector('[name="prepSkillId"]')?.value;
-          },
-        },
+        content: '<p>Apply a preparation skill before crafting?</p>',
+        buttons: prepButtons,
+        close: () => 'skip',
       });
 
-      if (prepChoice) {
+      if (prepChoice && prepChoice !== 'skip') {
         const prepSkill = actor.items.get(prepChoice);
         if (prepSkill) {
           const prepRollData = prepSkill.getRollData();
