@@ -86,6 +86,26 @@
           </select>
         </div>
 
+        {{!-- Crafting Material --}}
+        <label class="equip-field material-toggle">
+          <input type="checkbox" name="system.isMaterial" {{checked system.isMaterial}} />
+          Crafting Material
+        </label>
+
+        {{#if system.isMaterial}}
+        <div class="equip-field">
+          <label>Element</label>
+          <select name="system.materialElement">
+            <option value="">(none)</option>
+            {{#each @root.config.craftElements as |elDef elKey|}}
+              <option value="{{elKey}}" {{#if (eq elKey @root.system.materialElement)}}selected{{/if}}>
+                {{localize elDef.label}}
+              </option>
+            {{/each}}
+          </select>
+        </div>
+        {{/if}}
+
         {{!-- Two-Handed (only for weaponry slot) --}}
         {{#if (eq system.slot "weaponry")}}
           <label class="equip-field two-handed-toggle">
