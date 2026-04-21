@@ -1465,11 +1465,16 @@ export class AspectsofPowerItem extends Item {
       },
     }]);
 
+    const natLine = d100Roll.total === 100
+      ? '<p style="color:#ffca28;font-size:1.2em;">&#9733; Perfect Harvest! Natural 100! &#9733;</p>'
+      : '';
+
     ChatMessage.create({
       speaker,
       content: `<div class="craft-result">
         <h3>${item.name} — Gathering Result</h3>
         <hr>
+        ${natLine}
         <p><strong>Rarity:</strong> ${rarityLabel}</p>
         <p><strong>Skill Roll:</strong> ${skillRoll}</p>
         <p><strong>d100:</strong> ${d100Roll.total} (${d100Pct.toFixed(2)})</p>
@@ -1753,11 +1758,16 @@ export class AspectsofPowerItem extends Item {
       ? statBonuses.map(s => `${s.ability}: +${s.value}`).join(', ')
       : 'none';
 
+    const craftNatLine = d100Roll.total === 100
+      ? '<p style="color:#ffca28;font-size:1.2em;">&#9733; Masterwork! Natural 100! &#9733;</p>'
+      : '';
+
     ChatMessage.create({
       speaker,
       content: `<div class="craft-result">
         <h3>${item.name} — Crafting Result</h3>
         <hr>
+        ${craftNatLine}
         <p><strong>Material:</strong> ${materialItem.name} (${matRarity}, progress ${materialProgress})</p>
         <p><strong>Material (50%):</strong> ${materialProgress} × 0.5 = ${materialContribution}</p>
         <p><strong>Crafter (50%):</strong> ${skillRoll} × ${d100Pct.toFixed(2)} = ${crafterRoll} × 0.5 = ${crafterContribution}</p>

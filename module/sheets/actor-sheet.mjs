@@ -585,6 +585,8 @@ export class AspectsofPowerActorSheet extends foundry.applications.api.Handlebar
             cssClass = '';
           }
 
+          foundry.audio.AudioHelper.play({ src: 'sounds/dice.wav', volume: 0.8, autoplay: true, loop: false }, true);
+
           const speaker = ChatMessage.getSpeaker({ actor });
           ChatMessage.create({
             speaker,
