@@ -1689,7 +1689,7 @@ export class AspectsofPowerItem extends Item {
     const slotValue = CONFIG.ASPECTSOFPOWER.craftSlotValues?.[outputSlot] ?? 0.25;
     const matValue = CONFIG.ASPECTSOFPOWER.craftMaterialValues?.[outputMaterial] ?? 0.5;
 
-    const totalStatBudget = Math.round(totalProgress * slotValue * matValue);
+    const totalStatBudget = Math.round(totalProgress * slotValue * matValue * 0.5);
     const statBonuses = [];
 
     if (elementDef?.stats?.length >= 3 && totalStatBudget > 0) {
@@ -1711,7 +1711,8 @@ export class AspectsofPowerItem extends Item {
       }
     }
 
-    const isJewelry = tags.includes('jewelry') || outputMaterial === 'jewelry';
+    const isJewelry = tags.includes('jewelry') || outputMaterial === 'jewelry'
+                   || outputMaterial === 'gem' || outputMaterial === 'crystal';
     const isArmor = !isJewelry && ['metal', 'leather', 'cloth'].includes(outputMaterial);
     const defenseValue = Math.round(totalProgress * slotValue * matValue);
     const armorBonus = isArmor ? defenseValue : 0;
