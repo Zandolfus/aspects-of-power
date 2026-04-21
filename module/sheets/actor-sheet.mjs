@@ -114,6 +114,11 @@ export class AspectsofPowerActorSheet extends foundry.applications.api.Handlebar
     const consumables    = [];
     const features       = [];
     const skills         = { Active: [], Reaction: [], Passive: [] };
+    const skillGroups    = {
+      combat:     { label: 'Combat',     skills: [] },
+      profession: { label: 'Profession', skills: [] },
+      passive:    { label: 'Passive',    skills: [] },
+    };
 
     for (const i of context.items) {
       i.img = i.img || Item.DEFAULT_ICON;
@@ -145,6 +150,13 @@ export class AspectsofPowerActorSheet extends foundry.applications.api.Handlebar
         if (i.system.skillType !== undefined) {
           skills[i.system.skillType].push(i);
         }
+        if (i.system.skillType === 'Passive') {
+          skillGroups.passive.skills.push(i);
+        } else if (i.system.skillCategory === 'profession') {
+          skillGroups.profession.skills.push(i);
+        } else {
+          skillGroups.combat.skills.push(i);
+        }
       }
     }
 
@@ -152,6 +164,7 @@ export class AspectsofPowerActorSheet extends foundry.applications.api.Handlebar
     context.consumables    = consumables;
     context.features       = features;
     context.skills         = skills;
+    context.skillGroups    = skillGroups;
 
     // Equipment slot summary for the Equipment tab.
     context.equipmentSlots = {};

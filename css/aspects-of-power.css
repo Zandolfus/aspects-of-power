@@ -698,6 +698,43 @@
   font-weight: bold;
 }
 
+/* Skill group collapsible sections */
+.aspects-of-power .skill-group {
+  margin-bottom: 4px;
+  border: 1px solid #7a7971;
+  border-radius: 3px;
+}
+.aspects-of-power .skill-group-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 8px;
+  background: rgba(0, 0, 0, 0.15);
+  cursor: pointer;
+  font-weight: bold;
+  font-size: 13px;
+  color: #eeede0;
+  user-select: none;
+}
+.aspects-of-power .skill-group-header:hover {
+  background: rgba(0, 0, 0, 0.25);
+}
+.aspects-of-power .skill-group-count {
+  font-weight: normal;
+  font-size: 11px;
+  opacity: 0.7;
+}
+.aspects-of-power .skill-group-header .item-control {
+  margin-left: auto;
+  opacity: 0.7;
+}
+.aspects-of-power .skill-group-header .item-control:hover {
+  opacity: 1;
+}
+.aspects-of-power .skill-group[open] > .items-list {
+  padding: 2px 0;
+}
+
 /* Legacy overhealth/barrier styles removed — now using resource-bar-row layout */
 .aspects-of-power .items-header {
   height: 22px;
