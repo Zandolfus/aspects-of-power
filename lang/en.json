@@ -38,6 +38,7 @@
       "aoe": "AOE",
       "sustain": "Sustain",
       "shrapnel": "Shrapnel",
+      "craft": "Craft",
       "magic": "Magic",
       "physical": "Physical",
       "vocal": "Vocal",
@@ -348,6 +349,25 @@
     },
     "Gate": {
       "blocked": "cannot use this skill type"
+    },
+    "CraftElement": {
+      "solar": "Solar",
+      "lunar": "Lunar",
+      "water": "Water",
+      "fire": "Fire",
+      "earth": "Earth",
+      "air": "Air",
+      "lightning": "Lightning",
+      "ice": "Ice",
+      "space": "Space",
+      "neutral": "Neutral"
+    },
+    "CraftQuality": {
+      "cracked": "Cracked",
+      "inferior": "Inferior",
+      "common": "Common",
+      "uncommon": "Uncommon",
+      "rare": "Rare"
     },
     "Chain": {
       "label": "Skill Chains",

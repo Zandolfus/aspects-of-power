@@ -55,7 +55,14 @@
       "Bash(curl -s \"https://raw.githubusercontent.com/foundryvtt/crucible/v14/module/canvas/token-ruler.mjs\")",
       "Bash(curl -s \"https://raw.githubusercontent.com/foundryvtt/crucible/v14/templates/hud/token-ruler-waypoint-label.hbs\")",
       "Bash(curl -s \"https://raw.githubusercontent.com/foundryvtt/foundryvtt/main/templates/hud/waypoint-label.hbs\")",
-      "Bash(curl -s \"https://api.github.com/search/code?q=waypoint-label.hbs+foundry&per_page=5\")"
+      "Bash(curl -s \"https://api.github.com/search/code?q=waypoint-label.hbs+foundry&per_page=5\")",
+      "WebFetch(domain:docs.google.com)",
+      "WebFetch(domain:doc-0g-a4-sheets.googleusercontent.com)",
+      "Bash(curl -L -o /tmp/aop-crafters.ods \"https://docs.google.com/spreadsheets/d/e/2PACX-1vTE_EDaij-T7EEZC6MKlEQe6RtBm9IE5XaDnMYAM2yci1jbx3FD_oeciuTEsA-ZtyIaELkNU82jwa2r/pub?output=ods\")",
+      "Read(//tmp/**)",
+      "Bash(curl -L -o \"C:/Users/Vind Gnyr/Downloads/aop-crafters.ods\" \"https://docs.google.com/spreadsheets/d/e/2PACX-1vTE_EDaij-T7EEZC6MKlEQe6RtBm9IE5XaDnMYAM2yci1jbx3FD_oeciuTEsA-ZtyIaELkNU82jwa2r/pub?output=ods\")",
+      "Read(//c/Users/Vind Gnyr/Downloads/**)",
+      "Bash(grep -E \"\\\\.mjs$\")"
     ]
   }
 }

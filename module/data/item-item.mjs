@@ -57,6 +57,10 @@ export class ItemItemData extends foundry.abstract.TypeDataModel {
       // Repair kit fields.
       isRepairKit:  new fields.BooleanField({ initial: false }),
       repairAmount: new fields.NumberField({ initial: 25, min: 0, integer: true }),
+
+      // Crafting material fields.
+      isMaterial:      new fields.BooleanField({ initial: false }),
+      materialElement: new fields.StringField({ initial: '' }),
     };
   }
 }

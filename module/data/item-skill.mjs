@@ -109,6 +109,10 @@ export class SkillData extends foundry.abstract.TypeDataModel {
 
         // Shrapnel: defense pool consumption multiplier (>1.0 = harder to dodge).
         shrapnelMultiplier: new fields.NumberField({ initial: 1.5, min: 1.0, max: 5.0 }),
+
+        // Craft: output configuration.
+        craftOutputSlot:     new fields.StringField({ initial: '' }),
+        craftOutputMaterial: new fields.StringField({ initial: '' }),
       }),
     };
   }

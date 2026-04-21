@@ -58,6 +58,7 @@ ASPECTSOFPOWER.skillTags = {
   aoe:         'ASPECTSOFPOWER.Tag.aoe',
   sustain:     'ASPECTSOFPOWER.Tag.sustain',
   shrapnel:    'ASPECTSOFPOWER.Tag.shrapnel',
+  craft:       'ASPECTSOFPOWER.Tag.craft',
   // Descriptor tags (mechanical effects).
   magic:       'ASPECTSOFPOWER.Tag.magic',
   physical:    'ASPECTSOFPOWER.Tag.physical',
@@ -282,6 +283,50 @@ ASPECTSOFPOWER.gateRules = {
 
 ASPECTSOFPOWER.professionTags = {
   repair:      'ASPECTSOFPOWER.Tag.repair',
+  craft:       'ASPECTSOFPOWER.Tag.craft',
+};
+
+/**
+ * Element-to-stat mappings for crafting.
+ */
+ASPECTSOFPOWER.craftElements = {
+  solar:     { stats: ['vitality', 'perception', 'endurance'],     label: 'ASPECTSOFPOWER.CraftElement.solar' },
+  lunar:     { stats: ['intelligence', 'willpower', 'wisdom'],     label: 'ASPECTSOFPOWER.CraftElement.lunar' },
+  water:     { stats: ['wisdom', 'willpower', 'endurance'],        label: 'ASPECTSOFPOWER.CraftElement.water' },
+  fire:      { stats: ['strength', 'vitality', 'dexterity'],       label: 'ASPECTSOFPOWER.CraftElement.fire' },
+  earth:     { stats: ['strength', 'endurance', 'vitality'],       label: 'ASPECTSOFPOWER.CraftElement.earth' },
+  air:       { stats: ['dexterity', 'endurance', 'perception'],    label: 'ASPECTSOFPOWER.CraftElement.air' },
+  lightning: { stats: ['dexterity', 'perception', 'vitality'],     label: 'ASPECTSOFPOWER.CraftElement.lightning' },
+  ice:       { stats: ['intelligence', 'perception', 'toughness'], label: 'ASPECTSOFPOWER.CraftElement.ice' },
+  space:     { stats: ['perception', 'willpower', 'endurance'],    label: 'ASPECTSOFPOWER.CraftElement.space' },
+  neutral:   { stats: [],                                          label: 'ASPECTSOFPOWER.CraftElement.neutral' },
+};
+
+/**
+ * Quality thresholds for crafted items (progress → quality).
+ */
+ASPECTSOFPOWER.craftQuality = {
+  cracked:  { minProgress: 0,   rarity: 'inferior',  label: 'ASPECTSOFPOWER.CraftQuality.cracked' },
+  inferior: { minProgress: 50,  rarity: 'inferior',  label: 'ASPECTSOFPOWER.CraftQuality.inferior' },
+  common:   { minProgress: 200, rarity: 'common',    label: 'ASPECTSOFPOWER.CraftQuality.common' },
+  uncommon: { minProgress: 500, rarity: 'uncommon',  label: 'ASPECTSOFPOWER.CraftQuality.uncommon' },
+  rare:     { minProgress: 1000, rarity: 'rare',     label: 'ASPECTSOFPOWER.CraftQuality.rare' },
+};
+
+/**
+ * Slot value multipliers for crafting stat/armor calculations.
+ */
+ASPECTSOFPOWER.craftSlotValues = {
+  chest: 0.5, legs: 0.4, head: 0.2, bracers: 0.2, boots: 0.2,
+  gloves: 0.1, back: 0.1, necklace: 0.4, bracelet: 0.3, ring: 0.5,
+  earring: 0.3, weaponry: 0.25,
+};
+
+/**
+ * Material value multipliers for crafting.
+ */
+ASPECTSOFPOWER.craftMaterialValues = {
+  metal: 0.5, leather: 0.333, cloth: 0.25, jewelry: 0.5,
 };
 
 /**
