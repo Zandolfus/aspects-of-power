@@ -737,15 +737,15 @@
 .aspects-of-power .skill-reactions-header {
   margin-top: 4px;
   padding: 2px 8px;
-  background: rgba(255, 193, 7, 0.1);
+  background: rgba(255, 193, 7, 0.15);
   border-top: 1px solid rgba(255, 193, 7, 0.3);
-  font-size: 11px;
+  font-size: 12px;
   font-weight: bold;
-  color: #ffc107;
+  color: #ffe082;
   pointer-events: none;
 }
 .aspects-of-power .skill-reactions-header .item-name {
-  color: #ffc107;
+  color: #ffe082;
 }
 .aspects-of-power .skill-reaction {
   border-left: 2px solid rgba(255, 193, 7, 0.3);
