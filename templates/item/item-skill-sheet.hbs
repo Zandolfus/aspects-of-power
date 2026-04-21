@@ -383,24 +383,7 @@
       {{! ── Craft Tag Config ── }}
       {{#if (includes system.tags "craft")}}
       <div class='tag-config craft-config'>
-        <label class='resource-label'>Output Slot</label>
-        <select name='system.tagConfig.craftOutputSlot'>
-          <option value="">(any)</option>
-          {{#each @root.config.equipmentSlots as |slotDef key|}}
-            <option value="{{key}}" {{#if (eq key ../system.tagConfig.craftOutputSlot)}}selected{{/if}}>
-              {{key}}
-            </option>
-          {{/each}}
-        </select>
-        <label class='resource-label'>Output Material</label>
-        <select name='system.tagConfig.craftOutputMaterial'>
-          <option value="">(any)</option>
-          {{#each @root.config.materialTypes as |label key|}}
-            <option value="{{key}}" {{#if (eq key ../system.tagConfig.craftOutputMaterial)}}selected{{/if}}>
-              {{localize label}}
-            </option>
-          {{/each}}
-        </select>
+        <p class='hint'>Add a sub-type tag (jewelry, armor, weapon, clothing) to filter crafting options.</p>
       </div>
       {{/if}}
 

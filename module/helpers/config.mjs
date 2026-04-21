@@ -284,6 +284,12 @@ ASPECTSOFPOWER.gateRules = {
 ASPECTSOFPOWER.professionTags = {
   repair:      'ASPECTSOFPOWER.Tag.repair',
   craft:       'ASPECTSOFPOWER.Tag.craft',
+  refine:      'ASPECTSOFPOWER.Tag.refine',
+  preparation: 'ASPECTSOFPOWER.Tag.preparation',
+  jewelry:     'ASPECTSOFPOWER.Tag.jewelry',
+  armor:       'ASPECTSOFPOWER.Tag.armor',
+  weapon:      'ASPECTSOFPOWER.Tag.weapon',
+  clothing:    'ASPECTSOFPOWER.Tag.clothing',
 };
 
 /**
@@ -327,6 +333,16 @@ ASPECTSOFPOWER.craftSlotValues = {
  */
 ASPECTSOFPOWER.craftMaterialValues = {
   metal: 0.5, leather: 0.333, cloth: 0.25, jewelry: 0.5,
+};
+
+/**
+ * Craft sub-type → allowed slots and default materials.
+ */
+ASPECTSOFPOWER.craftTypes = {
+  jewelry:  { slots: ['necklace', 'bracelet', 'ring', 'earring'], materials: ['jewelry'] },
+  armor:    { slots: ['chest', 'legs', 'head', 'bracers', 'boots', 'gloves', 'back'], materials: ['metal', 'leather'] },
+  weapon:   { slots: ['weaponry'], materials: ['metal'] },
+  clothing: { slots: ['chest', 'legs', 'head', 'gloves', 'back'], materials: ['cloth', 'leather'] },
 };
 
 /**

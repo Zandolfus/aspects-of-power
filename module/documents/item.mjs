@@ -1368,85 +1368,214 @@ export class AspectsofPowerItem extends Item {
   }
 
   /**
-   * Craft tag: open a crafting dialog, select a material from inventory,
-   * roll skill × d100, compute progress, and create the crafted item.
+   * Craft tag: multi-step crafting dialog.
+   * Step 1: Select output slot (filtered by craft sub-type tags)
+   * Step 2: Select material from inventory
+   * Step 3: Offer refinement if material is unrefined
+   * Step 4: Offer preparation buffs if actor has preparation skills
+   * Step 5: Roll and create the item
    */
   async _handleCraftTag(item, rollData, dmgRoll, speaker, rollMode, label) {
     const actor = this.actor;
     if (!actor) return;
 
-    // Find material items in the actor's inventory.
-    const materials = actor.items.filter(i => i.type === 'item' && i.system.isMaterial);
-    if (materials.length === 0) {
-      ui.notifications.warn('No crafting materials in inventory.');
-      return;
+    const tags = item.system.tags ?? [];
+    const craftConfig = item.system.tagConfig;
+
+    // Determine craft sub-type from tags → filter available slots.
+    const craftTypes = CONFIG.ASPECTSOFPOWER.craftTypes ?? {};
+    let allowedSlots = null;
+    let allowedMaterials = null;
+    for (const [typeKey, typeDef] of Object.entries(craftTypes)) {
+      if (tags.includes(typeKey)) {
+        allowedSlots = typeDef.slots;
+        allowedMaterials = typeDef.materials;
+        break;
+      }
     }
 
-    const craftConfig = item.system.tagConfig;
-    const outputSlot = craftConfig?.craftOutputSlot || '';
-    const outputMaterial = craftConfig?.craftOutputMaterial || '';
+    // Fallback: use skill config or all slots.
+    if (!allowedSlots) {
+      allowedSlots = craftConfig?.craftOutputSlot
+        ? [craftConfig.craftOutputSlot]
+        : Object.keys(CONFIG.ASPECTSOFPOWER.equipmentSlots ?? {});
+    }
 
-    // Build material options HTML.
-    const materialOptions = materials.map(m => {
-      const elLabel = m.system.materialElement
-        ? ` (${m.system.materialElement})`
-        : '';
-      return `<option value="${m.id}">${m.name}${elLabel} — Progress ${m.system.progress}</option>`;
-    }).join('');
+    // ── Step 1: Select output slot ──
+    const slotOptions = allowedSlots.map(s =>
+      `<option value="${s}">${s.charAt(0).toUpperCase() + s.slice(1)}</option>`
+    ).join('');
 
-    // Build slot options if not locked by skill.
-    const slotConfig = CONFIG.ASPECTSOFPOWER.equipmentSlots ?? {};
-    const slotOptions = outputSlot
-      ? `<option value="${outputSlot}" selected>${outputSlot}</option>`
-      : Object.keys(slotConfig).map(k =>
-          `<option value="${k}">${k}</option>`
-        ).join('');
-
-    // Show crafting dialog.
-    const dialogContent = `
-      <form class="craft-dialog">
+    const step1 = await foundry.applications.api.DialogV2.prompt({
+      window: { title: `${item.name} — Select Item Type` },
+      content: `<form class="craft-dialog">
         <div class="form-group">
-          <label>Material</label>
-          <select name="materialId">${materialOptions}</select>
+          <label>What are you crafting?</label>
+          <select name="outputSlot">${slotOptions}</select>
         </div>
-        <div class="form-group">
-          <label>Output Slot</label>
-          <select name="outputSlot" ${outputSlot ? 'disabled' : ''}>${slotOptions}</select>
-        </div>
-      </form>`;
-
-    const result = await foundry.applications.api.DialogV2.prompt({
-      window: { title: `${item.name} — Craft` },
-      content: dialogContent,
+      </form>`,
       ok: {
-        label: 'Craft',
+        label: 'Next',
         callback: (event, button) => {
           const form = button.closest('.dialog-v2')?.querySelector('form');
-          return {
-            materialId: form?.querySelector('[name="materialId"]')?.value,
-            outputSlot: form?.querySelector('[name="outputSlot"]')?.value || outputSlot,
-          };
+          return form?.querySelector('[name="outputSlot"]')?.value;
         },
       },
     });
+    if (!step1) return;
+    const outputSlot = step1;
 
-    if (!result) return;
+    // ── Step 2: Select material ──
+    const materials = actor.items.filter(i => {
+      if (i.type !== 'item' || !i.system.isMaterial) return false;
+      if (allowedMaterials && i.system.material && !allowedMaterials.includes(i.system.material)) return false;
+      return true;
+    });
 
-    const materialItem = actor.items.get(result.materialId);
+    if (materials.length === 0) {
+      ui.notifications.warn('No suitable crafting materials in inventory.');
+      return;
+    }
+
+    const matOptions = materials.map(m => {
+      const elLabel = m.system.materialElement ? ` [${m.system.materialElement}]` : '';
+      const refined = m.system.progress > 0 ? ` — Value ${m.system.progress}` : ' — Unrefined';
+      return `<option value="${m.id}">${m.name}${elLabel}${refined}</option>`;
+    }).join('');
+
+    const step2 = await foundry.applications.api.DialogV2.prompt({
+      window: { title: `${item.name} — Select Material` },
+      content: `<form class="craft-dialog">
+        <div class="form-group">
+          <label>Material</label>
+          <select name="materialId">${matOptions}</select>
+        </div>
+      </form>`,
+      ok: {
+        label: 'Next',
+        callback: (event, button) => {
+          const form = button.closest('.dialog-v2')?.querySelector('form');
+          return form?.querySelector('[name="materialId"]')?.value;
+        },
+      },
+    });
+    if (!step2) return;
+
+    let materialItem = actor.items.get(step2);
     if (!materialItem) return;
 
-    // Roll d100 for environmental/luck factor.
+    // ── Step 3: Refine if unrefined ──
+    if (materialItem.system.progress === 0) {
+      const refineSkills = actor.items.filter(i =>
+        i.type === 'skill' && (i.system.tags ?? []).includes('refine')
+      );
+
+      if (refineSkills.length > 0) {
+        const refineOptions = refineSkills.map(s =>
+          `<option value="${s.id}">${s.name}</option>`
+        ).join('');
+
+        const refineChoice = await foundry.applications.api.DialogV2.prompt({
+          window: { title: 'Material is Unrefined' },
+          content: `<form class="craft-dialog">
+            <p>This material has no progress value. Refine it first?</p>
+            <div class="form-group">
+              <label>Refine Skill</label>
+              <select name="refineSkillId">${refineOptions}</select>
+            </div>
+          </form>`,
+          ok: {
+            label: 'Refine',
+            callback: (event, button) => {
+              const form = button.closest('.dialog-v2')?.querySelector('form');
+              return form?.querySelector('[name="refineSkillId"]')?.value;
+            },
+          },
+        });
+
+        if (refineChoice) {
+          const refineSkill = actor.items.get(refineChoice);
+          if (refineSkill) {
+            const refineRollData = refineSkill.getRollData();
+            const { dmgFormula: refDmgF } = refineSkill._buildRollFormulas(refineRollData);
+            const refRoll = new Roll(refDmgF, refineRollData);
+            await refRoll.evaluate();
+            const refineD100 = new Roll('1d100');
+            await refineD100.evaluate();
+            const refineProgress = Math.round(Math.round(refRoll.total) * (refineD100.total / 100));
+
+            await materialItem.update({ 'system.progress': refineProgress });
+            materialItem = actor.items.get(step2);
+
+            ChatMessage.create({
+              speaker,
+              content: `<p><strong>${actor.name}</strong> refines ${materialItem.name}: `
+                     + `Skill ${Math.round(refRoll.total)} × d100 (${refineD100.total}) = <strong>${refineProgress} progress</strong>.</p>`,
+            });
+          }
+        }
+      }
+    }
+
+    // ── Step 4: Pre-craft preparation buffs ──
+    let prepBonus = 0;
+    const prepSkills = actor.items.filter(i =>
+      i.type === 'skill' && (i.system.tags ?? []).includes('preparation')
+    );
+
+    if (prepSkills.length > 0) {
+      const prepOptions = prepSkills.map(s =>
+        `<option value="${s.id}">${s.name}</option>`
+      ).join('');
+
+      const prepChoice = await foundry.applications.api.DialogV2.prompt({
+        window: { title: 'Pre-Craft Preparation' },
+        content: `<form class="craft-dialog">
+          <p>Apply a preparation skill before crafting?</p>
+          <div class="form-group">
+            <label>Preparation Skill</label>
+            <select name="prepSkillId">
+              <option value="">(skip)</option>
+              ${prepOptions}
+            </select>
+          </div>
+        </form>`,
+        ok: {
+          label: 'Continue',
+          callback: (event, button) => {
+            const form = button.closest('.dialog-v2')?.querySelector('form');
+            return form?.querySelector('[name="prepSkillId"]')?.value;
+          },
+        },
+      });
+
+      if (prepChoice) {
+        const prepSkill = actor.items.get(prepChoice);
+        if (prepSkill) {
+          const prepRollData = prepSkill.getRollData();
+          const { dmgFormula: prepDmgF } = prepSkill._buildRollFormulas(prepRollData);
+          const prepRoll = new Roll(prepDmgF, prepRollData);
+          await prepRoll.evaluate();
+          prepBonus = Math.round(Math.round(prepRoll.total) / 10);
+
+          ChatMessage.create({
+            speaker,
+            content: `<p><strong>${actor.name}</strong> uses ${prepSkill.name}: `
+                   + `Roll ${Math.round(prepRoll.total)} ÷ 10 = <strong>+${prepBonus} preparation bonus</strong>.</p>`,
+          });
+        }
+      }
+    }
+
+    // ── Step 5: Craft roll ──
     const d100Roll = new Roll('1d100');
     await d100Roll.evaluate();
     const d100Pct = d100Roll.total / 100;
 
-    // Skill roll total is the crafter's ability.
     const skillRoll = Math.round(dmgRoll.total);
-
-    // Craft progress = skillRoll × d100% + material base.
     const materialBase = materialItem.system.progress ?? 0;
     const craftProgress = Math.round(skillRoll * d100Pct);
-    const totalProgress = materialBase + craftProgress;
+    const totalProgress = materialBase + craftProgress + prepBonus;
 
     // Determine quality from thresholds.
     const qualityTiers = Object.entries(CONFIG.ASPECTSOFPOWER.craftQuality)
@@ -1464,21 +1593,20 @@ export class AspectsofPowerItem extends Item {
     // Compute output stats from element + slot + material.
     const element = materialItem.system.materialElement || '';
     const elementDef = CONFIG.ASPECTSOFPOWER.craftElements?.[element];
-    const slotValue = CONFIG.ASPECTSOFPOWER.craftSlotValues?.[result.outputSlot] ?? 0.25;
-    const matValue = CONFIG.ASPECTSOFPOWER.craftMaterialValues?.[outputMaterial || materialItem.system.material || 'metal'] ?? 0.5;
+    const outputMaterial = craftConfig?.craftOutputMaterial || materialItem.system.material || 'metal';
+    const slotValue = CONFIG.ASPECTSOFPOWER.craftSlotValues?.[outputSlot] ?? 0.25;
+    const matValue = CONFIG.ASPECTSOFPOWER.craftMaterialValues?.[outputMaterial] ?? 0.5;
 
     const totalStatBudget = Math.round(totalProgress * slotValue * matValue);
     const statBonuses = [];
 
     if (elementDef?.stats?.length >= 3 && totalStatBudget > 0) {
-      // Split stats using the 3-way breakdown formula.
       const base = Math.round(totalStatBudget / 3);
       const remainder = Math.round(totalStatBudget % 3);
       let s1, s2, s3;
       if (remainder === 0)      { s1 = base + 1; s2 = base;     s3 = base - 1; }
       else if (remainder === 1) { s1 = base + 2; s2 = base;     s3 = base - 1; }
       else                      { s1 = base + 1; s2 = base;     s3 = base - 2; }
-
       statBonuses.push(
         { ability: elementDef.stats[0], value: Math.max(0, s1) },
         { ability: elementDef.stats[1], value: Math.max(0, s2) },
@@ -1491,30 +1619,26 @@ export class AspectsofPowerItem extends Item {
       }
     }
 
-    // Compute armor/veil based on material type.
-    const isArmor = ['metal', 'leather', 'cloth'].includes(outputMaterial || materialItem.system.material);
-    const isJewelry = (outputMaterial || materialItem.system.material) === 'jewelry';
+    const isArmor = ['metal', 'leather', 'cloth'].includes(outputMaterial);
+    const isJewelry = outputMaterial === 'jewelry';
     const armorBonus = isArmor ? Math.round(totalProgress * slotValue * matValue) : 0;
     const veilBonus = isJewelry ? Math.round(totalProgress * slotValue * matValue) : 0;
 
-    // Determine augment slots from rarity.
     const rarityDef = CONFIG.ASPECTSOFPOWER.rarities?.[qualityData.rarity];
     const augmentSlots = rarityDef?.augments ?? 0;
 
-    // Build the item name.
     const elPrefix = element ? `${element.charAt(0).toUpperCase() + element.slice(1)} ` : '';
-    const slotName = result.outputSlot.charAt(0).toUpperCase() + result.outputSlot.slice(1);
+    const slotName = outputSlot.charAt(0).toUpperCase() + outputSlot.slice(1);
     const itemName = `${elPrefix}${slotName}`;
 
-    // Create the crafted item on the actor.
     const [createdItem] = await actor.createEmbeddedDocuments('Item', [{
       name: itemName,
       type: 'item',
       img: materialItem.img,
       system: {
         description: `<p>Crafted by ${actor.name} using ${materialItem.name}.</p>`,
-        slot: result.outputSlot,
-        material: outputMaterial || materialItem.system.material || '',
+        slot: outputSlot,
+        material: outputMaterial,
         rarity: qualityData.rarity,
         progress: totalProgress,
         durability: { value: totalProgress * 2, max: totalProgress * 2 },
@@ -1525,14 +1649,12 @@ export class AspectsofPowerItem extends Item {
       },
     }]);
 
-    // Consume the material (reduce quantity or delete).
     if ((materialItem.system.quantity ?? 1) <= 1) {
       await materialItem.delete();
     } else {
       await materialItem.update({ 'system.quantity': materialItem.system.quantity - 1 });
     }
 
-    // Post results to chat.
     const statLine = statBonuses.length
       ? statBonuses.map(s => `${s.ability}: +${s.value}`).join(', ')
       : 'none';
@@ -1544,7 +1666,8 @@ export class AspectsofPowerItem extends Item {
         <hr>
         <p><strong>Material:</strong> ${materialItem.name} (base ${materialBase})</p>
         <p><strong>Skill Roll:</strong> ${skillRoll} × d100 (${d100Roll.total}) = ${craftProgress}</p>
-        <p><strong>Total Progress:</strong> ${materialBase} + ${craftProgress} = ${totalProgress}</p>
+        ${prepBonus ? `<p><strong>Preparation:</strong> +${prepBonus}</p>` : ''}
+        <p><strong>Total Progress:</strong> ${materialBase} + ${craftProgress}${prepBonus ? ` + ${prepBonus}` : ''} = ${totalProgress}</p>
         <p><strong>Quality:</strong> ${qualityKey.charAt(0).toUpperCase() + qualityKey.slice(1)} (${qualityData.rarity})</p>
         ${armorBonus ? `<p><strong>Armor:</strong> ${armorBonus}</p>` : ''}
         ${veilBonus ? `<p><strong>Veil:</strong> ${veilBonus}</p>` : ''}
