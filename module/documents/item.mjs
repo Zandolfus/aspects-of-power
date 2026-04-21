@@ -1368,6 +1368,74 @@ export class AspectsofPowerItem extends Item {
   }
 
   /**
+   * Refine tag: select a material from inventory and improve its progress.
+   * Can be used standalone or as part of the craft pipeline.
+   */
+  async _handleRefineTag(item, rollData, dmgRoll, speaker, rollMode, label) {
+    const actor = this.actor;
+    if (!actor) return;
+
+    // Find unrefined materials in inventory.
+    const materials = actor.items.filter(i =>
+      i.type === 'item' && i.system.isMaterial && !i.system.isRefined
+    );
+    if (materials.length === 0) {
+      ui.notifications.warn('No unrefined materials available.');
+      return;
+    }
+
+    const matButtons = materials.map(m => {
+      const elLabel = m.system.materialElement ? ` [${m.system.materialElement}]` : '';
+      return { action: m.id, label: `${m.name}${elLabel} — Progress ${m.system.progress}` };
+    });
+    matButtons.push({ action: 'cancel', label: 'Cancel' });
+
+    const selectedMat = await foundry.applications.api.DialogV2.wait({
+      window: { title: `${item.name} — Select Material to Refine` },
+      content: '<p>Which material do you want to refine?</p>',
+      buttons: matButtons,
+      close: () => 'cancel',
+    });
+    if (selectedMat === 'cancel') return;
+
+    const materialItem = actor.items.get(selectedMat);
+    if (!materialItem) return;
+
+    // Roll refine: skill × d100%, capped at 20% of current progress.
+    const skillRoll = Math.round(dmgRoll.total);
+    const d100Roll = new Roll('1d100');
+    await d100Roll.evaluate();
+    const d100Pct = d100Roll.total / 100;
+    const rawGain = Math.round(skillRoll * d100Pct);
+    const oldProgress = materialItem.system.progress ?? 0;
+    const maxGain = Math.round(oldProgress * 0.2);
+    const refineGain = Math.min(rawGain, maxGain);
+
+    const newProgress = oldProgress + refineGain;
+    await materialItem.update({ 'system.progress': newProgress, 'system.isRefined': true });
+
+    const natLine = d100Roll.total === 100
+      ? '<p style="color:#ffca28;font-size:1.2em;">&#9733; Perfect Refinement! Natural 100! &#9733;</p>'
+      : '';
+    const capLine = rawGain > maxGain
+      ? `<p><em>Capped at 20% of base progress (max +${maxGain})</em></p>`
+      : '';
+
+    ChatMessage.create({
+      speaker,
+      content: `<div class="craft-result">
+        <h3>${item.name} — Refinement Result</h3>
+        <hr>
+        ${natLine}
+        <p><strong>Material:</strong> ${materialItem.name}</p>
+        <p><strong>Skill Roll:</strong> ${skillRoll} × d100 (${d100Roll.total}) = ${rawGain}</p>
+        ${capLine}
+        <p><strong>Progress:</strong> ${oldProgress} → <strong>${newProgress}</strong> (+${refineGain})</p>
+      </div>`,
+    });
+  }
+
+  /**
    * Gather tag: roll to create a material item in the actor's inventory.
    * Progress = skillRoll × d100%. Determines material quality.
    */
@@ -1569,16 +1637,14 @@ export class AspectsofPowerItem extends Item {
     let materialItem = actor.items.get(step2Result);
     if (!materialItem) return;
 
-    // ── Step 3: Refine if unrefined ──
-    if (materialItem.system.progress === 0) {
+    // ── Step 3: Offer refinement (one-time, +20% cap) ──
+    if (!materialItem.system.isRefined) {
       const refineSkills = actor.items.filter(i =>
         i.type === 'skill' && (i.system.tags ?? []).includes('refine')
       );
 
       if (refineSkills.length > 0) {
-        const refineOptions = refineSkills.map(s =>
-          `<option value="${s.id}">${s.name}</option>`
-        ).join('');
+        const currentProgress = materialItem.system.progress ?? 0;
 
         const refineButtons = refineSkills.map(s => ({
           action: s.id, label: s.name,
@@ -1586,8 +1652,8 @@ export class AspectsofPowerItem extends Item {
         refineButtons.push({ action: 'skip', label: 'Skip' });
 
         const refineChoice = await foundry.applications.api.DialogV2.wait({
-          window: { title: 'Material is Unrefined' },
-          content: '<p>This material has no progress value. Refine it first?</p>',
+          window: { title: `${item.name} — Refine Material` },
+          content: `<p>Refine ${materialItem.name}? (Progress: ${currentProgress}, max +${Math.round(currentProgress * 0.2)})</p>`,
           buttons: refineButtons,
           close: () => 'skip',
         });
@@ -1601,15 +1667,20 @@ export class AspectsofPowerItem extends Item {
             await refRoll.evaluate();
             const refineD100 = new Roll('1d100');
             await refineD100.evaluate();
-            const refineProgress = Math.round(Math.round(refRoll.total) * (refineD100.total / 100));
+            const rawGain = Math.round(Math.round(refRoll.total) * (refineD100.total / 100));
+            const maxGain = Math.round(currentProgress * 0.2);
+            const refineGain = Math.min(rawGain, maxGain);
 
-            await materialItem.update({ 'system.progress': refineProgress });
+            const newProgress = currentProgress + refineGain;
+            await materialItem.update({ 'system.progress': newProgress, 'system.isRefined': true });
             materialItem = actor.items.get(step2Result);
 
             ChatMessage.create({
               speaker,
               content: `<p><strong>${actor.name}</strong> refines ${materialItem.name}: `
-                     + `Skill ${Math.round(refRoll.total)} × d100 (${refineD100.total}) = <strong>${refineProgress} progress</strong>.</p>`,
+                     + `Skill ${Math.round(refRoll.total)} × d100 (${refineD100.total}) = ${rawGain}`
+                     + `${rawGain > maxGain ? ` (capped at +${maxGain})` : ''}. `
+                     + `Progress: ${currentProgress} → <strong>${newProgress}</strong>.</p>`,
             });
           }
         }
@@ -2549,6 +2620,9 @@ export class AspectsofPowerItem extends Item {
             case 'gather':
               await this._handleGatherTag(item, rollData, dmgRoll, speaker, rollMode, label);
               break;
+            case 'refine':
+              await this._handleRefineTag(item, rollData, dmgRoll, speaker, rollMode, label);
+              break;
           }
         }
       }
@@ -2647,6 +2721,9 @@ export class AspectsofPowerItem extends Item {
           break;
         case 'gather':
           await this._handleGatherTag(item, rollData, dmgRoll, speaker, rollMode, label);
+          break;
+        case 'refine':
+          await this._handleRefineTag(item, rollData, dmgRoll, speaker, rollMode, label);
           break;
       }
     }

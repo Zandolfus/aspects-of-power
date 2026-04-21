@@ -60,6 +60,7 @@ export class ItemItemData extends foundry.abstract.TypeDataModel {
 
       // Crafting material fields.
       isMaterial:      new fields.BooleanField({ initial: false }),
+      isRefined:       new fields.BooleanField({ initial: false }),
       materialElement: new fields.StringField({ initial: '' }),
     };
   }
