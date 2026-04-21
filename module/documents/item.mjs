@@ -1376,7 +1376,12 @@ export class AspectsofPowerItem extends Item {
     if (!actor) return;
 
     const gatherConfig = item.system.tagConfig;
-    const materialType = gatherConfig?.gatherMaterial || '';
+    const tags = item.system.tags ?? [];
+
+    // Detect material type from tags (metal, leather, cloth, jewelry, gem, wood, bone, crystal).
+    const materialTypes = Object.keys(CONFIG.ASPECTSOFPOWER.materialTypes ?? {});
+    const materialType = tags.find(t => materialTypes.includes(t))
+                      || gatherConfig?.gatherMaterial || '';
 
     // ── Step 1: Select material rarity ──
     const rarityRanges = CONFIG.ASPECTSOFPOWER.craftRarityRanges ?? {};
@@ -1706,10 +1711,11 @@ export class AspectsofPowerItem extends Item {
       }
     }
 
-    const isArmor = ['metal', 'leather', 'cloth'].includes(outputMaterial);
-    const isJewelry = outputMaterial === 'jewelry';
-    const armorBonus = isArmor ? Math.round(totalProgress * slotValue * matValue) : 0;
-    const veilBonus = isJewelry ? Math.round(totalProgress * slotValue * matValue) : 0;
+    const isJewelry = tags.includes('jewelry') || outputMaterial === 'jewelry';
+    const isArmor = !isJewelry && ['metal', 'leather', 'cloth'].includes(outputMaterial);
+    const defenseValue = Math.round(totalProgress * slotValue * matValue);
+    const armorBonus = isArmor ? defenseValue : 0;
+    const veilBonus = isJewelry ? defenseValue : 0;
 
     const rarityDef = CONFIG.ASPECTSOFPOWER.rarities?.[qualityData.rarity];
     const augmentSlots = rarityDef?.augments ?? 0;

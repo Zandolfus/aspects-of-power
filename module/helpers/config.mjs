@@ -291,6 +291,13 @@ ASPECTSOFPOWER.professionTags = {
   armor:       'ASPECTSOFPOWER.Tag.armor',
   weapon:      'ASPECTSOFPOWER.Tag.weapon',
   clothing:    'ASPECTSOFPOWER.Tag.clothing',
+  metal:       'ASPECTSOFPOWER.Tag.metalMat',
+  leather:     'ASPECTSOFPOWER.Tag.leatherMat',
+  cloth:       'ASPECTSOFPOWER.Tag.clothMat',
+  gem:         'ASPECTSOFPOWER.Tag.gem',
+  wood:        'ASPECTSOFPOWER.Tag.wood',
+  bone:        'ASPECTSOFPOWER.Tag.bone',
+  crystal:     'ASPECTSOFPOWER.Tag.crystal',
 };
 
 /**
@@ -484,6 +491,10 @@ ASPECTSOFPOWER.materialTypes = {
   leather: 'ASPECTSOFPOWER.Material.leather',
   cloth:   'ASPECTSOFPOWER.Material.cloth',
   jewelry: 'ASPECTSOFPOWER.Material.jewelry',
+  gem:     'ASPECTSOFPOWER.Material.gem',
+  wood:    'ASPECTSOFPOWER.Material.wood',
+  bone:    'ASPECTSOFPOWER.Material.bone',
+  crystal: 'ASPECTSOFPOWER.Material.crystal',
 };
 
 /**

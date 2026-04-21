@@ -46,6 +46,13 @@
       "armor": "Armor",
       "weapon": "Weapon",
       "clothing": "Clothing",
+      "metalMat": "Metal",
+      "leatherMat": "Leather",
+      "clothMat": "Cloth",
+      "gem": "Gem",
+      "wood": "Wood",
+      "bone": "Bone",
+      "crystal": "Crystal",
       "magic": "Magic",
       "physical": "Physical",
       "vocal": "Vocal",
@@ -105,7 +112,11 @@
       "metal": "Metal",
       "leather": "Leather",
       "cloth": "Cloth",
-      "jewelry": "Jewelry"
+      "jewelry": "Jewelry",
+      "gem": "Gem",
+      "wood": "Wood",
+      "bone": "Bone",
+      "crystal": "Crystal"
     },
     "AttributeGroup": {
       "abilities": "Abilities",
