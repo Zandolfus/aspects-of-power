@@ -741,11 +741,11 @@
   border-top: 1px solid rgba(255, 193, 7, 0.3);
   font-size: 12px;
   font-weight: bold;
-  color: #ffe082;
+  color: #eeede0;
   pointer-events: none;
 }
 .aspects-of-power .skill-reactions-header .item-name {
-  color: #ffe082;
+  color: #eeede0;
 }
 .aspects-of-power .skill-reaction {
   border-left: 2px solid rgba(255, 193, 7, 0.3);
