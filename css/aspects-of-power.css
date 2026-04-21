@@ -744,8 +744,17 @@
   color: #ffc107;
   pointer-events: none;
 }
+.aspects-of-power .skill-reactions-header .item-name {
+  color: #ffc107;
+}
 .aspects-of-power .skill-reaction {
   border-left: 2px solid rgba(255, 193, 7, 0.3);
+}
+.aspects-of-power .skill-reaction .item-name h4 {
+  color: #eeede0;
+}
+.aspects-of-power .skill-group .items-list .item .item-name h4 {
+  color: #eeede0;
 }
 
 /* Legacy overhealth/barrier styles removed — now using resource-bar-row layout */
