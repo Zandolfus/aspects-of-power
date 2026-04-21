@@ -1427,8 +1427,8 @@ export class AspectsofPowerItem extends Item {
     const rarityLabel = selectedRarity.charAt(0).toUpperCase() + selectedRarity.slice(1);
     const itemName = `${elPrefix}${matLabel} (${rarityLabel})`;
 
-    // Create the material item.
-    await actor.createEmbeddedDocuments('Item', [{
+    // Create the material item and open its sheet for renaming.
+    const [gatheredItem] = await actor.createEmbeddedDocuments('Item', [{
       name: itemName,
       type: 'item',
       img: item.img,
@@ -1455,6 +1455,8 @@ export class AspectsofPowerItem extends Item {
         <p><em>Created: ${itemName}</em></p>
       </div>`,
     });
+
+    gatheredItem.sheet.render(true);
   }
 
   /**
@@ -1746,6 +1748,8 @@ export class AspectsofPowerItem extends Item {
         <p><em>Created: ${createdItem.name}</em></p>
       </div>`,
     });
+
+    createdItem.sheet.render(true);
   }
 
   /* ------------------------------------------------------------------ */
