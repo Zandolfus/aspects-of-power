@@ -115,9 +115,9 @@ export class AspectsofPowerActorSheet extends foundry.applications.api.Handlebar
     const features       = [];
     const skills         = { Active: [], Reaction: [], Passive: [] };
     const skillGroups    = {
-      combat:     { label: 'Combat',     skills: [] },
-      profession: { label: 'Profession', skills: [] },
-      passive:    { label: 'Passive',    skills: [] },
+      combat:     { label: 'Combat',     active: [], reactions: [] },
+      profession: { label: 'Profession', active: [], reactions: [] },
+      passive:    { label: 'Passive',    active: [], reactions: [] },
     };
 
     for (const i of context.items) {
@@ -150,12 +150,13 @@ export class AspectsofPowerActorSheet extends foundry.applications.api.Handlebar
         if (i.system.skillType !== undefined) {
           skills[i.system.skillType].push(i);
         }
+        const isReaction = i.system.skillType === 'Reaction';
         if (i.system.skillType === 'Passive') {
-          skillGroups.passive.skills.push(i);
+          skillGroups.passive.active.push(i);
         } else if (i.system.skillCategory === 'profession') {
-          skillGroups.profession.skills.push(i);
+          (isReaction ? skillGroups.profession.reactions : skillGroups.profession.active).push(i);
         } else {
-          skillGroups.combat.skills.push(i);
+          (isReaction ? skillGroups.combat.reactions : skillGroups.combat.active).push(i);
         }
       }
     }
