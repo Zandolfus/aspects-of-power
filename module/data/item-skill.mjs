@@ -113,6 +113,10 @@ export class SkillData extends foundry.abstract.TypeDataModel {
         // Craft: output configuration.
         craftOutputSlot:     new fields.StringField({ initial: '' }),
         craftOutputMaterial: new fields.StringField({ initial: '' }),
+
+        // Gather: output material configuration.
+        gatherMaterial: new fields.StringField({ initial: '' }),
+        gatherElement:  new fields.StringField({ initial: '' }),
       }),
     };
   }

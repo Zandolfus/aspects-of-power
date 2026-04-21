@@ -380,6 +380,30 @@
       </div>
       {{/if}}
 
+      {{! ── Gather Tag Config ── }}
+      {{#if (includes system.tags "gather")}}
+      <div class='tag-config gather-config'>
+        <label class='resource-label'>Material Type</label>
+        <select name='system.tagConfig.gatherMaterial'>
+          <option value="">(any)</option>
+          {{#each @root.config.materialTypes as |label key|}}
+            <option value="{{key}}" {{#if (eq key ../system.tagConfig.gatherMaterial)}}selected{{/if}}>
+              {{localize label}}
+            </option>
+          {{/each}}
+        </select>
+        <label class='resource-label'>Element</label>
+        <select name='system.tagConfig.gatherElement'>
+          <option value="">(none)</option>
+          {{#each @root.config.craftElements as |elDef elKey|}}
+            <option value="{{elKey}}" {{#if (eq elKey ../system.tagConfig.gatherElement)}}selected{{/if}}>
+              {{localize elDef.label}}
+            </option>
+          {{/each}}
+        </select>
+      </div>
+      {{/if}}
+
       {{! ── Craft Tag Config ── }}
       {{#if (includes system.tags "craft")}}
       <div class='tag-config craft-config'>

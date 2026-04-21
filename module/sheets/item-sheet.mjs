@@ -337,6 +337,21 @@ export class AspectsofPowerItemSheet extends foundry.applications.api.Handlebars
         // Repair: collect checked material types.
         repairMaterials: [...form.querySelectorAll('input[name="system.tagConfig.repairMaterials"]:checked')]
           .map(el => el.value),
+
+        // Sustain.
+        sustainCost:     Number(form.querySelector('[name="system.tagConfig.sustainCost"]')?.value) || 0,
+        sustainResource: form.querySelector('[name="system.tagConfig.sustainResource"]')?.value ?? 'mana',
+
+        // Shrapnel.
+        shrapnelMultiplier: Number(form.querySelector('[name="system.tagConfig.shrapnelMultiplier"]')?.value) || 1.5,
+
+        // Craft.
+        craftOutputSlot:     form.querySelector('[name="system.tagConfig.craftOutputSlot"]')?.value ?? '',
+        craftOutputMaterial: form.querySelector('[name="system.tagConfig.craftOutputMaterial"]')?.value ?? '',
+
+        // Gather.
+        gatherMaterial: form.querySelector('[name="system.tagConfig.gatherMaterial"]')?.value ?? '',
+        gatherElement:  form.querySelector('[name="system.tagConfig.gatherElement"]')?.value ?? '',
       };
       await this.document.update({ 'system.tagConfig': tagConfigData });
       return;

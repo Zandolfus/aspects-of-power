@@ -1368,6 +1368,96 @@ export class AspectsofPowerItem extends Item {
   }
 
   /**
+   * Gather tag: roll to create a material item in the actor's inventory.
+   * Progress = skillRoll × d100%. Determines material quality.
+   */
+  async _handleGatherTag(item, rollData, dmgRoll, speaker, rollMode, label) {
+    const actor = this.actor;
+    if (!actor) return;
+
+    const gatherConfig = item.system.tagConfig;
+    const materialType = gatherConfig?.gatherMaterial || '';
+    const element = gatherConfig?.gatherElement || '';
+
+    // ── Step 1: Select material rarity ──
+    const rarityRanges = CONFIG.ASPECTSOFPOWER.craftRarityRanges ?? {};
+    const rarityButtons = Object.keys(rarityRanges).map(r => ({
+      action: r,
+      label: r.charAt(0).toUpperCase() + r.slice(1),
+    }));
+    rarityButtons.push({ action: 'cancel', label: 'Cancel' });
+
+    const selectedRarity = await foundry.applications.api.DialogV2.wait({
+      window: { title: `${item.name} — Material Rarity` },
+      content: '<p>What rarity of material are you harvesting?</p>',
+      buttons: rarityButtons,
+      close: () => 'cancel',
+    });
+    if (selectedRarity === 'cancel') return;
+
+    // Roll d100 for gathering conditions.
+    const d100Roll = new Roll('1d100');
+    await d100Roll.evaluate();
+    const d100Pct = d100Roll.total / 100;
+
+    const skillRoll = Math.round(dmgRoll.total);
+    const gatherProgress = Math.round(skillRoll * d100Pct);
+
+    // Failure check: d100 of 1 ruins the attempt.
+    if (d100Roll.total <= 1) {
+      ChatMessage.create({
+        speaker,
+        content: `<div class="craft-result">
+          <h3>${item.name} — Gathering Failed</h3>
+          <hr>
+          <p><strong>Skill Roll:</strong> ${skillRoll}</p>
+          <p><strong>d100:</strong> ${d100Roll.total} — <em>Critical failure! Materials ruined.</em></p>
+        </div>`,
+      });
+      return;
+    }
+
+    // Build material name.
+    const elPrefix = element
+      ? `${element.charAt(0).toUpperCase() + element.slice(1)} `
+      : '';
+    const matLabel = materialType
+      ? materialType.charAt(0).toUpperCase() + materialType.slice(1)
+      : 'Material';
+    const rarityLabel = selectedRarity.charAt(0).toUpperCase() + selectedRarity.slice(1);
+    const itemName = `${elPrefix}${matLabel} (${rarityLabel})`;
+
+    // Create the material item.
+    await actor.createEmbeddedDocuments('Item', [{
+      name: itemName,
+      type: 'item',
+      img: item.img,
+      system: {
+        description: `<p>Gathered by ${actor.name} using ${item.name}.</p>`,
+        quantity: 1,
+        isMaterial: true,
+        material: materialType,
+        materialElement: element,
+        rarity: selectedRarity,
+        progress: gatherProgress,
+      },
+    }]);
+
+    ChatMessage.create({
+      speaker,
+      content: `<div class="craft-result">
+        <h3>${item.name} — Gathering Result</h3>
+        <hr>
+        <p><strong>Rarity:</strong> ${rarityLabel}</p>
+        <p><strong>Skill Roll:</strong> ${skillRoll}</p>
+        <p><strong>d100:</strong> ${d100Roll.total} (${d100Pct.toFixed(2)})</p>
+        <p><strong>Progress:</strong> ${skillRoll} × ${d100Pct.toFixed(2)} = ${gatherProgress}</p>
+        <p><em>Created: ${itemName}</em></p>
+      </div>`,
+    });
+  }
+
+  /**
    * Craft tag: multi-step crafting dialog.
    * Step 1: Select output slot (filtered by craft sub-type tags)
    * Step 2: Select material from inventory
@@ -2418,6 +2508,9 @@ export class AspectsofPowerItem extends Item {
             case 'craft':
               await this._handleCraftTag(item, rollData, dmgRoll, speaker, rollMode, label);
               break;
+            case 'gather':
+              await this._handleGatherTag(item, rollData, dmgRoll, speaker, rollMode, label);
+              break;
           }
         }
       }
@@ -2513,6 +2606,9 @@ export class AspectsofPowerItem extends Item {
           break;
         case 'craft':
           await this._handleCraftTag(item, rollData, dmgRoll, speaker, rollMode, label);
+          break;
+        case 'gather':
+          await this._handleGatherTag(item, rollData, dmgRoll, speaker, rollMode, label);
           break;
       }
     }

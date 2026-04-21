@@ -284,6 +284,7 @@ ASPECTSOFPOWER.gateRules = {
 ASPECTSOFPOWER.professionTags = {
   repair:      'ASPECTSOFPOWER.Tag.repair',
   craft:       'ASPECTSOFPOWER.Tag.craft',
+  gather:      'ASPECTSOFPOWER.Tag.gather',
   refine:      'ASPECTSOFPOWER.Tag.refine',
   preparation: 'ASPECTSOFPOWER.Tag.preparation',
   jewelry:     'ASPECTSOFPOWER.Tag.jewelry',
