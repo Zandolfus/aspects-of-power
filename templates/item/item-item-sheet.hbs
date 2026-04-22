@@ -191,6 +191,32 @@
           </div>
         </div>
 
+        {{!-- Profession Augments (only on profession gear) --}}
+        {{#if (gt system.profAugmentSlots 0)}}
+        <div class="equip-section augment-section profession-augment-section">
+          <h4>Profession Augments ({{system.profAugmentSlots}})</h4>
+          <div class="augment-list">
+            {{#each profAugmentSlots as |slot idx|}}
+              <div class="augment-slot prof-augment-slot flexrow {{#if slot.filled}}filled{{else}}empty{{/if}}"
+                   data-prof-index="{{idx}}" data-augment-id="{{slot.augmentId}}">
+                {{#if slot.filled}}
+                  <img class="augment-icon" src="{{slot.img}}" width="24" height="24"/>
+                  <span class="augment-name">{{slot.name}}</span>
+                  <span class="augment-bonuses">{{slot.bonusSummary}}</span>
+                  <a class="prof-augment-remove" data-prof-index="{{idx}}" title="Remove">
+                    <i class="fas fa-times"></i>
+                  </a>
+                {{else}}
+                  <span class="augment-empty-slot">
+                    <i class="fas fa-hammer"></i> Drop a profession augment
+                  </span>
+                {{/if}}
+              </div>
+            {{/each}}
+          </div>
+        </div>
+        {{/if}}
+
     </div>
 
     {{! Attributes Tab }}

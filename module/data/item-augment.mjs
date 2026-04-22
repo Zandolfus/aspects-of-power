@@ -22,6 +22,17 @@ export class AugmentData extends foundry.abstract.TypeDataModel {
         value: new fields.NumberField({ initial: 0 }),
         mode:  new fields.StringField({ initial: 'percentage' }),
       }), { initial: [] }),
+
+      // Profession augment flag — only fits in profession augment slots.
+      isProfessionAugment: new fields.BooleanField({ initial: false }),
+
+      // Craft bonuses applied when the augment is equipped on profession gear.
+      // affinity (optional): only applies when material/output element matches.
+      craftBonuses: new fields.ArrayField(new fields.SchemaField({
+        type:     new fields.StringField({ initial: 'craftProgress' }),
+        value:    new fields.NumberField({ initial: 0 }),
+        affinity: new fields.StringField({ initial: '' }),
+      }), { initial: [] }),
     };
   }
 }

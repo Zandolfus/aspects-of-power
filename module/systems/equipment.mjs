@@ -522,9 +522,19 @@ export class EquipmentSystem {
       updates['system.durability.max'] = durMax;
       updates['system.durability.value'] = durMax;
     }
-    const augSlots = CONFIG.ASPECTSOFPOWER.rarities[item.system.rarity]?.augments ?? 0;
+    const rarityAugments = CONFIG.ASPECTSOFPOWER.rarities[item.system.rarity]?.augments ?? 0;
+    const isProfGear = (item.system.slot ?? '').startsWith('prof');
+
+    // Profession gear: 0 regular slots, profession slots = rarity + 1 extra.
+    // Combat gear: rarity slots, 0 profession slots.
+    const augSlots = isProfGear ? 0 : rarityAugments;
+    const profAugSlots = isProfGear ? rarityAugments + 1 : 0;
+
     if (item.system.augmentSlots !== augSlots) {
       updates['system.augmentSlots'] = augSlots;
+    }
+    if (item.system.profAugmentSlots !== profAugSlots) {
+      updates['system.profAugmentSlots'] = profAugSlots;
     }
     if (Object.keys(updates).length > 0) item.update(updates);
   }

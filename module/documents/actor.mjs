@@ -458,6 +458,32 @@ export class AspectsofPowerActor extends Actor {
   }
 
   /**
+   * Sum craft bonuses from augments slotted in equipped profession gear.
+   * @param {string} [element]  Material/output element. Bonuses with a matching
+   *                            affinity (or no affinity) are included.
+   * @returns {Object} Map of bonus type → total value (e.g., { craftProgress: 50, d100Bonus: 10 })
+   */
+  getProfessionAugmentBonuses(element = '') {
+    const totals = {};
+    for (const item of this.items) {
+      if (item.type !== 'item') continue;
+      if (!item.system.equipped) continue;
+      if (!(item.system.slot ?? '').startsWith('prof')) continue;
+      const profAugIds = (item.system.profAugments ?? []).map(a => a.augmentId).filter(Boolean);
+      for (const augId of profAugIds) {
+        const augment = this.items.get(augId);
+        if (!augment || augment.type !== 'augment') continue;
+        for (const bonus of augment.system.craftBonuses ?? []) {
+          // Affinity filter: bonus only applies if no affinity set OR matches element.
+          if (bonus.affinity && bonus.affinity !== element) continue;
+          totals[bonus.type] = (totals[bonus.type] || 0) + (bonus.value || 0);
+        }
+      }
+    }
+    return totals;
+  }
+
+  /**
    * Get flat resistance value for a type.
    * @param {string} type  e.g., 'fire', 'stun'
    * @returns {number}

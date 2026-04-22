@@ -154,6 +154,33 @@ export class AspectsofPowerItemSheet extends foundry.applications.api.Handlebars
         }
         context.augmentSlots.push(slotData);
       }
+
+      // Profession augment slots — same structure but reads profAugments + craftBonuses.
+      const profSlots = this.item.system.profAugmentSlots ?? 0;
+      const profExisting = this.item.system.profAugments ?? [];
+      context.profAugmentSlots = [];
+      for (let i = 0; i < profSlots; i++) {
+        const entry = profExisting[i];
+        const augmentId = entry?.augmentId ?? '';
+        let slotData = { filled: false, augmentId: '', name: '', img: '', bonusSummary: '' };
+        if (augmentId && this.item.actor) {
+          const augItem = this.item.actor.items.get(augmentId);
+          if (augItem && augItem.type === 'augment') {
+            const craftParts = (augItem.system.craftBonuses ?? [])
+              .filter(b => b.type && b.value)
+              .map(b => `${b.type} ${b.value > 0 ? '+' : ''}${b.value}`);
+            const bonuses = craftParts.join(', ');
+            slotData = {
+              filled: true,
+              augmentId: augItem.id,
+              name: augItem.name,
+              img: augItem.img,
+              bonusSummary: bonuses || '—',
+            };
+          }
+        }
+        context.profAugmentSlots.push(slotData);
+      }
     }
 
     // Build grouped attribute data for buff/debuff multi-select UI.
@@ -373,16 +400,33 @@ export class AspectsofPowerItemSheet extends foundry.applications.api.Handlebars
         if (event.target.type === 'checkbox') value = event.target.checked;
         else if (event.target.type === 'number') value = Number(event.target.value);
         else value = event.target.value;
-        await this.document.update({ [name]: value });
+        const updateData = { [name]: value };
+
+        // Slot change: re-derive augment slots if switching profession/combat type.
+        if (name === 'system.slot') {
+          const rarityAugments = CONFIG.ASPECTSOFPOWER.rarities[this.document.system.rarity]?.augments ?? 0;
+          const isProfGear = (value ?? '').startsWith('prof');
+          updateData['system.augmentSlots'] = isProfGear ? 0 : rarityAugments;
+          updateData['system.profAugmentSlots'] = isProfGear ? rarityAugments + 1 : 0;
+        }
+
+        await this.document.update(updateData);
         return;
       }
 
-      // Rarity change: for equipment, also auto-set augmentSlots.
+      // Rarity change: for equipment, also auto-set augment slots.
       if (name === 'system.rarity') {
         const rarity = event.target.value;
         if (this.document.type === 'item') {
-          const augSlots = CONFIG.ASPECTSOFPOWER.rarities[rarity]?.augments ?? 0;
-          await this.document.update({ 'system.rarity': rarity, 'system.augmentSlots': augSlots });
+          const rarityAugments = CONFIG.ASPECTSOFPOWER.rarities[rarity]?.augments ?? 0;
+          const isProfGear = (this.document.system.slot ?? '').startsWith('prof');
+          const augSlots = isProfGear ? 0 : rarityAugments;
+          const profAugSlots = isProfGear ? rarityAugments + 1 : 0;
+          await this.document.update({
+            'system.rarity': rarity,
+            'system.augmentSlots': augSlots,
+            'system.profAugmentSlots': profAugSlots,
+          });
         } else {
           await this.document.update({ 'system.rarity': rarity });
         }
@@ -408,6 +452,16 @@ export class AspectsofPowerItemSheet extends foundry.applications.api.Handlebars
           || event.target?.classList?.contains('item-bonus-value')
           || event.target?.classList?.contains('item-bonus-mode')) {
         this._saveItemBonuses();
+        return;
+      }
+      if (event.target?.classList?.contains('craft-bonus-type')
+          || event.target?.classList?.contains('craft-bonus-value')
+          || event.target?.classList?.contains('craft-bonus-affinity')) {
+        this._saveCraftBonuses();
+        return;
+      }
+      if (event.target?.name === 'system.isProfessionAugment') {
+        await this.document.update({ 'system.isProfessionAugment': event.target.checked });
         return;
       }
     }
@@ -490,6 +544,18 @@ export class AspectsofPowerItemSheet extends foundry.applications.api.Handlebars
       itemBonuses.push({ field, value, mode });
     });
     await this.document.update({ 'system.itemBonuses': itemBonuses });
+  }
+
+  async _saveCraftBonuses() {
+    const form = this.element.querySelector('form');
+    const craftBonuses = [];
+    form.querySelectorAll('.craft-bonus-row').forEach(row => {
+      const type = row.querySelector('.craft-bonus-type')?.value ?? 'craftProgress';
+      const value = Number(row.querySelector('.craft-bonus-value')?.value) || 0;
+      const affinity = row.querySelector('.craft-bonus-affinity')?.value ?? '';
+      craftBonuses.push({ type, value, affinity });
+    });
+    await this.document.update({ 'system.craftBonuses': craftBonuses });
   }
 
   /** @override – save scroll position before DOM replacement. */
@@ -578,6 +644,21 @@ export class AspectsofPowerItemSheet extends foundry.applications.api.Handlebars
       });
     });
 
+    // --- Craft bonus add/delete (profession augments) ---
+    this.element.querySelector('.craft-bonus-add')?.addEventListener('click', async () => {
+      const bonuses = [...(this.item.system.craftBonuses ?? []), { type: 'craftProgress', value: 0 }];
+      await this.document.update({ 'system.craftBonuses': bonuses });
+    });
+
+    this.element.querySelectorAll('.craft-bonus-delete').forEach(el => {
+      el.addEventListener('click', async () => {
+        const idx = Number(el.dataset.index);
+        const bonuses = [...(this.item.system.craftBonuses ?? [])];
+        bonuses.splice(idx, 1);
+        await this.document.update({ 'system.craftBonuses': bonuses });
+      });
+    });
+
     // --- Augment drop zone + remove buttons (equipment items) ---
     if (this.item.type === 'item') {
       const augSection = this.element.querySelector('.augment-section');
@@ -595,6 +676,16 @@ export class AspectsofPowerItemSheet extends foundry.applications.api.Handlebars
           if (idx >= 0 && idx < augments.length) {
             augments[idx] = { augmentId: '' };
             await this.item.update({ 'system.augments': augments });
+          }
+        });
+      });
+      this.element.querySelectorAll('.prof-augment-remove').forEach(el => {
+        el.addEventListener('click', async (ev) => {
+          const idx = Number(ev.currentTarget.dataset.profIndex);
+          const augments = [...(this.item.system.profAugments ?? [])];
+          if (idx >= 0 && idx < augments.length) {
+            augments[idx] = { augmentId: '' };
+            await this.item.update({ 'system.profAugments': augments });
           }
         });
       });
@@ -680,12 +771,32 @@ export class AspectsofPowerItemSheet extends foundry.applications.api.Handlebars
       return;
     }
 
-    const slots = this.item.system.augmentSlots ?? 0;
-    const existing = this.item.system.augments ?? [];
+    // Determine which slot type was targeted (profession or regular).
+    const profSlotEl = event.target.closest('.prof-augment-slot');
+    const isProfTarget = !!profSlotEl;
+    const isProfAugment = augmentItem.system.isProfessionAugment === true;
+
+    // Validate: profession augments only fit in profession slots, regular only in regular.
+    if (isProfTarget && !isProfAugment) {
+      ui.notifications.warn('This slot only accepts profession augments.');
+      return;
+    }
+    if (!isProfTarget && isProfAugment) {
+      ui.notifications.warn('Profession augments can only be slotted in profession augment slots.');
+      return;
+    }
+
+    const slotsField = isProfTarget ? 'profAugmentSlots' : 'augmentSlots';
+    const augField   = isProfTarget ? 'profAugments' : 'augments';
+    const slotClass  = isProfTarget ? '.prof-augment-slot' : '.augment-slot';
+    const indexAttr  = isProfTarget ? 'profIndex' : 'index';
+
+    const slots = this.item.system[slotsField] ?? 0;
+    const existing = this.item.system[augField] ?? [];
 
     // Determine target slot index from drop target element.
-    const slotEl = event.target.closest('.augment-slot');
-    let targetIdx = slotEl ? Number(slotEl.dataset.index) : -1;
+    const slotEl = event.target.closest(slotClass);
+    let targetIdx = slotEl ? Number(slotEl.dataset[indexAttr]) : -1;
 
     // If no specific slot targeted, find the first empty slot.
     if (targetIdx < 0 || targetIdx >= slots) {
@@ -715,7 +826,7 @@ export class AspectsofPowerItemSheet extends foundry.applications.api.Handlebars
     // Check if this augment is already slotted in any equipment on this actor.
     for (const otherItem of actor.items) {
       if (otherItem.type !== 'item') continue;
-      const otherAugs = otherItem.system.augments ?? [];
+      const otherAugs = [...(otherItem.system.augments ?? []), ...(otherItem.system.profAugments ?? [])];
       if (otherAugs.some(a => a.augmentId === ownedAugment.id)) {
         ui.notifications.warn(`${ownedAugment.name} is already slotted in ${otherItem.name}.`);
         return;
@@ -732,7 +843,7 @@ export class AspectsofPowerItemSheet extends foundry.applications.api.Handlebars
       }
     }
 
-    await this.item.update({ 'system.augments': newAugments });
+    await this.item.update({ [`system.${augField}`]: newAugments });
     ui.notifications.info(`Slotted ${ownedAugment.name} into ${this.item.name}.`);
   }
 

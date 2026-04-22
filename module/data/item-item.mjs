@@ -45,6 +45,13 @@ export class ItemItemData extends foundry.abstract.TypeDataModel {
         augmentId: new fields.StringField({ initial: '' }),
       }), { initial: [] }),
 
+      // Profession augment slots — additional slots on profession gear that
+      // ONLY accept augments tagged as profession augments.
+      profAugmentSlots: new fields.NumberField({ initial: 0, min: 0, integer: true }),
+      profAugments: new fields.ArrayField(new fields.SchemaField({
+        augmentId: new fields.StringField({ initial: '' }),
+      }), { initial: [] }),
+
       // Skill IDs this item grants access to when equipped.
       grantedSkills: new fields.ArrayField(new fields.StringField(), { initial: [] }),
 

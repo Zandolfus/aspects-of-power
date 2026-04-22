@@ -1485,13 +1485,27 @@ export class AspectsofPowerItem extends Item {
     if (selectedElement === 'cancel') return;
     const element = selectedElement === 'none' ? '' : selectedElement;
 
+    // Profession augment bonuses from equipped profession gear (element-filtered).
+    const gatherAugBonuses = actor.getProfessionAugmentBonuses(element);
+    const gatherD100Bonus = gatherAugBonuses.d100Bonus || 0;
+    const gatherSkillBonus = gatherAugBonuses.craftSkillMod || 0;
+    const gatherProgressBonus = gatherAugBonuses.gatherProgress || 0;
+    const gatherAugParts = [];
+    if (gatherSkillBonus)    gatherAugParts.push(`Skill +${gatherSkillBonus}`);
+    if (gatherD100Bonus)     gatherAugParts.push(`d100 +${gatherD100Bonus}`);
+    if (gatherProgressBonus) gatherAugParts.push(`Progress +${gatherProgressBonus}`);
+    const gatherAugLine = gatherAugParts.length
+      ? `<p><strong>Profession Augments:</strong> ${gatherAugParts.join(', ')}</p>`
+      : '';
+
     // Roll d100 for gathering conditions.
     const d100Roll = new Roll('1d100');
     await d100Roll.evaluate();
-    const d100Pct = d100Roll.total / 100;
+    const effectiveD100 = Math.min(d100Roll.total + gatherD100Bonus, 100 + gatherD100Bonus);
+    const d100Pct = effectiveD100 / 100;
 
-    const skillRoll = Math.round(dmgRoll.total);
-    const gatherProgress = Math.round(skillRoll * d100Pct);
+    const skillRoll = Math.round(dmgRoll.total) + gatherSkillBonus;
+    const gatherProgress = Math.round(skillRoll * d100Pct) + gatherProgressBonus;
 
     // Failure check: d100 of 1 ruins the attempt.
     if (d100Roll.total <= 1) {
@@ -1547,6 +1561,7 @@ export class AspectsofPowerItem extends Item {
         <p><strong>Skill Roll:</strong> ${skillRoll}</p>
         <p><strong>d100:</strong> ${d100Roll.total} (${d100Pct.toFixed(2)})</p>
         <p><strong>Progress:</strong> ${skillRoll} × ${d100Pct.toFixed(2)} = ${gatherProgress}</p>
+        ${gatherAugLine}
         <p><em>Created: ${itemName}</em></p>
       </div>`,
     });
@@ -1729,22 +1744,38 @@ export class AspectsofPowerItem extends Item {
     const d100Roll = new Roll('1d100');
     await d100Roll.evaluate();
 
+    // Profession augment bonuses from equipped profession gear (element-filtered).
+    const matElement = materialItem.system.materialElement || '';
+    const profAugBonuses = actor.getProfessionAugmentBonuses(matElement);
+    const d100Bonus = profAugBonuses.d100Bonus || 0;
+    const skillModBonus = profAugBonuses.craftSkillMod || 0;
+    const progressBonus = profAugBonuses.craftProgress || 0;
+    const rarityFloorBonus = profAugBonuses.rarityFloor || 0;
+    const augBonusParts = [];
+    if (skillModBonus)    augBonusParts.push(`Skill +${skillModBonus}`);
+    if (d100Bonus)        augBonusParts.push(`d100 +${d100Bonus}`);
+    if (rarityFloorBonus) augBonusParts.push(`Floor +${rarityFloorBonus}`);
+    if (progressBonus)    augBonusParts.push(`Progress +${progressBonus}`);
+    const profAugLine = augBonusParts.length
+      ? `<p><strong>Profession Augments:</strong> ${augBonusParts.join(', ')}</p>`
+      : '';
+
     // Additive d100: floor boosts the roll, ceiling caps it.
     const matRarity = materialItem.system.rarity || 'common';
     const rarityRange = CONFIG.ASPECTSOFPOWER.craftRarityRanges?.[matRarity]
                      ?? { floor: 1, ceiling: 100 };
-    const effectiveD100 = Math.min(d100Roll.total + rarityRange.floor, rarityRange.ceiling);
+    const effectiveD100 = Math.min(d100Roll.total + rarityRange.floor + rarityFloorBonus + d100Bonus, rarityRange.ceiling);
     const d100Pct = effectiveD100 / 100;
 
     // 50/50 split: material quality + crafter skill.
     const materialProgress = materialItem.system.progress ?? 0;
     const materialContribution = Math.round(materialProgress * 0.5);
 
-    const skillRoll = Math.round(dmgRoll.total);
+    const skillRoll = Math.round(dmgRoll.total) + skillModBonus;
     const crafterRoll = Math.round(skillRoll * d100Pct);
     const crafterContribution = Math.round(crafterRoll * 0.5);
 
-    const totalProgress = materialContribution + crafterContribution + prepBonus;
+    const totalProgress = materialContribution + crafterContribution + prepBonus + progressBonus;
 
     // Determine quality from thresholds.
     const qualityTiers = Object.entries(CONFIG.ASPECTSOFPOWER.craftQuality)
@@ -1847,6 +1878,7 @@ export class AspectsofPowerItem extends Item {
           <p><strong>Crafter (50%):</strong> ${skillRoll} × ${d100Pct.toFixed(2)} = ${crafterRoll} × 0.5 = ${crafterContribution}</p>
           <p><strong>d100:</strong> ${d100Roll.total} + ${rarityRange.floor} = ${effectiveD100} (cap ${rarityRange.ceiling})</p>
           ${prepBonus ? `<p><strong>Preparation:</strong> +${prepBonus}</p>` : ''}
+          ${profAugLine}
           <p><strong>Total Progress:</strong> ${totalProgress}</p>
           <p><strong>Quality:</strong> ${qualityKey.charAt(0).toUpperCase() + qualityKey.slice(1)} (${qualityData.rarity})</p>
           <p><strong>Type:</strong> ${typeLabel} (${effectType})</p>
@@ -1936,6 +1968,7 @@ export class AspectsofPowerItem extends Item {
           <p><strong>Crafter (50%):</strong> ${skillRoll} × ${d100Pct.toFixed(2)} = ${crafterRoll} × 0.5 = ${crafterContribution}</p>
           <p><strong>d100:</strong> ${d100Roll.total} + ${rarityRange.floor} = ${effectiveD100} (cap ${rarityRange.ceiling})</p>
           ${prepBonus ? `<p><strong>Preparation:</strong> +${prepBonus}</p>` : ''}
+          ${profAugLine}
           <p><strong>Total Progress:</strong> ${materialContribution} + ${crafterContribution}${prepBonus ? ` + ${prepBonus}` : ''} = ${totalProgress}</p>
           <p><strong>Quality:</strong> ${qualityKey.charAt(0).toUpperCase() + qualityKey.slice(1)} (${qualityData.rarity})</p>
           ${armorBonus ? `<p><strong>Armor:</strong> ${armorBonus}</p>` : ''}
