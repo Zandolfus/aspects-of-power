@@ -1734,9 +1734,12 @@ export class AspectsofPowerItem extends Item {
         const reworkButtons = [{ action: 'new', label: 'Create New Item' }];
         for (const e of existing) {
           const cnt = e.system.reworkCount ?? 0;
+          const cur = e.system.progress ?? 0;
+          const max = e.system.maxProgress ?? 0;
+          const atMax = max > 0 && cur >= max;
           reworkButtons.push({
             action: e.id,
-            label: `Rework: ${e.name} (×${cnt + 1}, progress ${e.system.progress})`,
+            label: `Rework: ${e.name} (×${cnt + 1}, ${cur}${max ? `/${max}` : ''})${atMax ? ' — AT MAX' : ''}`,
           });
         }
         reworkButtons.push({ action: 'cancel', label: 'Cancel' });
@@ -1853,16 +1856,42 @@ export class AspectsofPowerItem extends Item {
     const crafterRoll = Math.round(skillRoll * d100Pct);
     const crafterContribution = Math.round(crafterRoll * 0.5);
 
+    // Theoretical max for THIS craft: d100 hits the rarity ceiling.
+    const maxD100Pct = rarityRange.ceiling / 100;
+    const maxCrafterRoll = Math.round(skillRoll * maxD100Pct);
+    const theoreticalMaxProgress = Math.round(materialProgress * 0.5) + Math.round(maxCrafterRoll * 0.5) + prepBonus + progressBonus;
+
     let totalProgress = materialContribution + crafterContribution + prepBonus + progressBonus;
 
-    // Iterative rework: apply 1/(reworkCount+1) diminishing returns to ADDED progress.
-    // First rework (count 0→1): added progress × 1/2. Second (1→2): × 1/3. Etc.
+    // Iterative rework: apply 1/(reworkCount+1) diminishing returns, capped at item's maxProgress.
     let reworkAddedProgress = 0;
+    let reworkBlocked = false;
     if (reworkTarget) {
-      const existingCount = reworkTarget.system.reworkCount ?? 0;
-      const divisor = existingCount + 2; // first rework divides by 2
-      reworkAddedProgress = Math.round(totalProgress / divisor);
-      totalProgress = (reworkTarget.system.progress ?? 0) + reworkAddedProgress;
+      const existingMax = reworkTarget.system.maxProgress ?? 0;
+      const existingProgress = reworkTarget.system.progress ?? 0;
+      const headroom = Math.max(0, existingMax - existingProgress);
+
+      if (headroom <= 0) {
+        reworkBlocked = true;
+      } else {
+        const existingCount = reworkTarget.system.reworkCount ?? 0;
+        const divisor = existingCount + 2;
+        const rawAdd = Math.round(totalProgress / divisor);
+        reworkAddedProgress = Math.min(rawAdd, headroom);
+        totalProgress = existingProgress + reworkAddedProgress;
+      }
+    }
+
+    if (reworkBlocked) {
+      ChatMessage.create({
+        speaker,
+        content: `<div class="craft-result">
+          <h3>${item.name} — Rework Blocked</h3>
+          <hr>
+          <p><strong>${reworkTarget.name}</strong> is already at maximum potential (${reworkTarget.system.maxProgress}). No further improvement is possible.</p>
+        </div>`,
+      });
+      return;
     }
 
     // Determine quality from thresholds.
@@ -2019,6 +2048,7 @@ export class AspectsofPowerItem extends Item {
 
       if (reworkTarget) {
         // Update the existing item with new totals; bump rework count.
+        // maxProgress is locked at first craft and not updated.
         await reworkTarget.update({
           'system.progress': totalProgress,
           'system.durability.value': totalProgress * 2,
@@ -2042,6 +2072,7 @@ export class AspectsofPowerItem extends Item {
             material: outputMaterial,
             rarity: qualityData.rarity,
             progress: totalProgress,
+            maxProgress: theoreticalMaxProgress,
             durability: { value: totalProgress * 2, max: totalProgress * 2 },
             statBonuses,
             armorBonus,
