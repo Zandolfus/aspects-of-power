@@ -75,6 +75,8 @@ export class CharacterData extends foundry.abstract.TypeDataModel {
 
       freePoints: new fields.NumberField({ initial: 0, min: 0, integer: true }),
 
+      credits: new fields.NumberField({ initial: 0, min: 0, integer: true }),
+
       abilities: new fields.SchemaField({
         vitality:     abilitySchema(),
         endurance:    abilitySchema(),

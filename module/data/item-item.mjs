@@ -69,6 +69,10 @@ export class ItemItemData extends foundry.abstract.TypeDataModel {
       isMaterial:      new fields.BooleanField({ initial: false }),
       isRefined:       new fields.BooleanField({ initial: false }),
       materialElement: new fields.StringField({ initial: '' }),
+      maxProgress:     new fields.NumberField({ initial: 0, min: 0, integer: true }),
+
+      // Crafting iteration tracking — 0 = freshly crafted, increments per rework.
+      reworkCount:     new fields.NumberField({ initial: 0, min: 0, integer: true }),
     };
   }
 }

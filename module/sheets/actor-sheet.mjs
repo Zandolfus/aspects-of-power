@@ -305,6 +305,17 @@ export class AspectsofPowerActorSheet extends foundry.applications.api.Handlebar
       });
     });
 
+    // Trade / Give item button.
+    this.element.querySelectorAll('.item-trade').forEach(el => {
+      el.addEventListener('click', async ev => {
+        const li = ev.currentTarget.closest('.item');
+        const item = this.actor.items.get(li.dataset.itemId);
+        if (!item) return;
+        const { TradingSystem } = await import('../systems/trading.mjs');
+        await TradingSystem.openGiveDialog(this.actor, item);
+      });
+    });
+
     // Everything below requires the sheet to be editable.
     if (!this.isEditable) return;
 

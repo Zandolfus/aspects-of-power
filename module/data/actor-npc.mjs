@@ -40,6 +40,8 @@ export class NpcData extends foundry.abstract.TypeDataModel {
         }),
       }),
 
+      credits: new fields.NumberField({ initial: 0, min: 0, integer: true }),
+
       // Full ability scores — derived data (mods, resource maxes) flows from these.
       abilities: new fields.SchemaField({
         vitality:     abilitySchema(),

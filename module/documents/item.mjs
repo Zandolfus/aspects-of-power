@@ -1098,6 +1098,12 @@ export class AspectsofPowerItem extends Item {
         }
         break;
       }
+
+      case 'gmExecuteTrade': {
+        const { TradingSystem } = await import('../systems/trading.mjs');
+        await TradingSystem._performTransfer(payload);
+        break;
+      }
     }
   }
 
@@ -1375,18 +1381,23 @@ export class AspectsofPowerItem extends Item {
     const actor = this.actor;
     if (!actor) return;
 
-    // Find unrefined materials in inventory.
-    const materials = actor.items.filter(i =>
-      i.type === 'item' && i.system.isMaterial && !i.system.isRefined
-    );
+    // Find materials with room to grow (current progress < max potential).
+    const materials = actor.items.filter(i => {
+      if (i.type !== 'item' || !i.system.isMaterial) return false;
+      const cur = i.system.progress ?? 0;
+      const max = i.system.maxProgress ?? (cur * 2);
+      return cur < max;
+    });
     if (materials.length === 0) {
-      ui.notifications.warn('No unrefined materials available.');
+      ui.notifications.warn('No materials available for refinement (all at max potential).');
       return;
     }
 
     const matButtons = materials.map(m => {
       const elLabel = m.system.materialElement ? ` [${m.system.materialElement}]` : '';
-      return { action: m.id, label: `${m.name}${elLabel} — Progress ${m.system.progress}` };
+      const cur = m.system.progress ?? 0;
+      const max = m.system.maxProgress ?? (cur * 2);
+      return { action: m.id, label: `${m.name}${elLabel} — ${cur}/${max}` };
     });
     matButtons.push({ action: 'cancel', label: 'Cancel' });
 
@@ -1401,15 +1412,16 @@ export class AspectsofPowerItem extends Item {
     const materialItem = actor.items.get(selectedMat);
     if (!materialItem) return;
 
-    // Roll refine: skill × d100%, capped at 20% of current progress.
+    // Roll refine: skill × d100%, capped at remaining headroom toward maxProgress.
     const skillRoll = Math.round(dmgRoll.total);
     const d100Roll = new Roll('1d100');
     await d100Roll.evaluate();
     const d100Pct = d100Roll.total / 100;
     const rawGain = Math.round(skillRoll * d100Pct);
     const oldProgress = materialItem.system.progress ?? 0;
-    const maxGain = Math.round(oldProgress * 0.2);
-    const refineGain = Math.min(rawGain, maxGain);
+    const maxProgress = materialItem.system.maxProgress ?? (oldProgress * 2);
+    const headroom = Math.max(0, maxProgress - oldProgress);
+    const refineGain = Math.min(rawGain, headroom);
 
     const newProgress = oldProgress + refineGain;
     await materialItem.update({ 'system.progress': newProgress, 'system.isRefined': true });
@@ -1417,8 +1429,11 @@ export class AspectsofPowerItem extends Item {
     const natLine = d100Roll.total === 100
       ? '<p style="color:#ffca28;font-size:1.2em;">&#9733; Perfect Refinement! Natural 100! &#9733;</p>'
       : '';
-    const capLine = rawGain > maxGain
-      ? `<p><em>Capped at 20% of base progress (max +${maxGain})</em></p>`
+    const capLine = rawGain > headroom
+      ? `<p><em>Capped at max potential (${maxProgress}, +${headroom} available)</em></p>`
+      : '';
+    const maxLine = newProgress >= maxProgress
+      ? '<p><em>Material is now at maximum potential.</em></p>'
       : '';
 
     ChatMessage.create({
@@ -1430,7 +1445,8 @@ export class AspectsofPowerItem extends Item {
         <p><strong>Material:</strong> ${materialItem.name}</p>
         <p><strong>Skill Roll:</strong> ${skillRoll} × d100 (${d100Roll.total}) = ${rawGain}</p>
         ${capLine}
-        <p><strong>Progress:</strong> ${oldProgress} → <strong>${newProgress}</strong> (+${refineGain})</p>
+        <p><strong>Progress:</strong> ${oldProgress} → <strong>${newProgress}</strong> / ${maxProgress} (+${refineGain})</p>
+        ${maxLine}
       </div>`,
     });
   }
@@ -1532,6 +1548,7 @@ export class AspectsofPowerItem extends Item {
     const itemName = `${elPrefix}${matLabel} (${rarityLabel})`;
 
     // Create the material item and open its sheet for renaming.
+    // Max potential is 2x the gathered progress — refinement can grow toward this.
     const [gatheredItem] = await actor.createEmbeddedDocuments('Item', [{
       name: itemName,
       type: 'item',
@@ -1544,6 +1561,7 @@ export class AspectsofPowerItem extends Item {
         materialElement: element,
         rarity: selectedRarity,
         progress: gatherProgress,
+        maxProgress: gatherProgress * 2,
       },
     }]);
 
@@ -1653,15 +1671,16 @@ export class AspectsofPowerItem extends Item {
     let materialItem = actor.items.get(step2Result);
     if (!materialItem) return;
 
-    // ── Step 3: Offer refinement (one-time, +20% cap) ──
-    if (!materialItem.system.isRefined) {
+    // ── Step 3: Offer refinement (multiple times, capped at maxProgress) ──
+    {
       const refineSkills = actor.items.filter(i =>
         i.type === 'skill' && (i.system.tags ?? []).includes('refine')
       );
+      const currentProgress = materialItem.system.progress ?? 0;
+      const maxProgress = materialItem.system.maxProgress ?? (currentProgress * 2);
+      const headroom = Math.max(0, maxProgress - currentProgress);
 
-      if (refineSkills.length > 0) {
-        const currentProgress = materialItem.system.progress ?? 0;
-
+      if (refineSkills.length > 0 && headroom > 0) {
         const refineButtons = refineSkills.map(s => ({
           action: s.id, label: s.name,
         }));
@@ -1669,7 +1688,7 @@ export class AspectsofPowerItem extends Item {
 
         const refineChoice = await foundry.applications.api.DialogV2.wait({
           window: { title: `${item.name} — Refine Material` },
-          content: `<p>Refine ${materialItem.name}? (Progress: ${currentProgress}, max +${Math.round(currentProgress * 0.2)})</p>`,
+          content: `<p>Refine ${materialItem.name}? (Progress: ${currentProgress}/${maxProgress}, ${headroom} headroom)</p>`,
           buttons: refineButtons,
           close: () => 'skip',
         });
@@ -1684,8 +1703,7 @@ export class AspectsofPowerItem extends Item {
             const refineD100 = new Roll('1d100');
             await refineD100.evaluate();
             const rawGain = Math.round(Math.round(refRoll.total) * (refineD100.total / 100));
-            const maxGain = Math.round(currentProgress * 0.2);
-            const refineGain = Math.min(rawGain, maxGain);
+            const refineGain = Math.min(rawGain, headroom);
 
             const newProgress = currentProgress + refineGain;
             await materialItem.update({ 'system.progress': newProgress, 'system.isRefined': true });
@@ -1695,11 +1713,42 @@ export class AspectsofPowerItem extends Item {
               speaker,
               content: `<p><strong>${actor.name}</strong> refines ${materialItem.name}: `
                      + `Skill ${Math.round(refRoll.total)} × d100 (${refineD100.total}) = ${rawGain}`
-                     + `${rawGain > maxGain ? ` (capped at +${maxGain})` : ''}. `
-                     + `Progress: ${currentProgress} → <strong>${newProgress}</strong>.</p>`,
+                     + `${rawGain > headroom ? ` (capped at +${headroom})` : ''}. `
+                     + `Progress: ${currentProgress} → <strong>${newProgress}</strong> / ${maxProgress}.</p>`,
             });
           }
         }
+      }
+    }
+
+    // ── Step 3.5: Iterative rework — target an existing item or create new ──
+    // Only relevant for equipment crafting (not alchemy).
+    let reworkTarget = null;
+    if (!isAlchemySkill && outputSlot) {
+      const existing = actor.items.filter(i =>
+        i.type === 'item'
+        && !i.system.isMaterial
+        && i.system.slot === outputSlot
+      );
+      if (existing.length > 0) {
+        const reworkButtons = [{ action: 'new', label: 'Create New Item' }];
+        for (const e of existing) {
+          const cnt = e.system.reworkCount ?? 0;
+          reworkButtons.push({
+            action: e.id,
+            label: `Rework: ${e.name} (×${cnt + 1}, progress ${e.system.progress})`,
+          });
+        }
+        reworkButtons.push({ action: 'cancel', label: 'Cancel' });
+
+        const reworkChoice = await foundry.applications.api.DialogV2.wait({
+          window: { title: `${item.name} — New or Rework?` },
+          content: '<p>Create a new item, or improve an existing one?</p>',
+          buttons: reworkButtons,
+          close: () => 'cancel',
+        });
+        if (reworkChoice === 'cancel') return;
+        if (reworkChoice !== 'new') reworkTarget = actor.items.get(reworkChoice);
       }
     }
 
@@ -1767,6 +1816,35 @@ export class AspectsofPowerItem extends Item {
     const effectiveD100 = Math.min(d100Roll.total + rarityRange.floor + rarityFloorBonus + d100Bonus, rarityRange.ceiling);
     const d100Pct = effectiveD100 / 100;
 
+    // ── Critical failure: d100 of 1 ──
+    if (d100Roll.total === 1) {
+      const isAlchemyFailure = (item.system.tags ?? []).includes('alchemy');
+      const failureMsg = isAlchemyFailure
+        ? `<p><strong>Materials destroyed!</strong> ${materialItem.name} is consumed in the failed brew.</p>`
+        : `<p><strong>Craft failed.</strong> Materials are preserved — try again.</p>`;
+
+      // Alchemy: consume the material. Equipment: leave it alone.
+      if (isAlchemyFailure) {
+        if ((materialItem.system.quantity ?? 1) <= 1) {
+          await materialItem.delete();
+        } else {
+          await materialItem.update({ 'system.quantity': materialItem.system.quantity - 1 });
+        }
+      }
+
+      ChatMessage.create({
+        speaker,
+        content: `<div class="craft-result">
+          <h3>${item.name} — Critical Failure</h3>
+          <hr>
+          <p style="color:#ef5350;font-size:1.2em;">&#10008; Natural 1 on d100! &#10008;</p>
+          <p><strong>Material:</strong> ${materialItem.name}</p>
+          ${failureMsg}
+        </div>`,
+      });
+      return;
+    }
+
     // 50/50 split: material quality + crafter skill.
     const materialProgress = materialItem.system.progress ?? 0;
     const materialContribution = Math.round(materialProgress * 0.5);
@@ -1775,7 +1853,17 @@ export class AspectsofPowerItem extends Item {
     const crafterRoll = Math.round(skillRoll * d100Pct);
     const crafterContribution = Math.round(crafterRoll * 0.5);
 
-    const totalProgress = materialContribution + crafterContribution + prepBonus + progressBonus;
+    let totalProgress = materialContribution + crafterContribution + prepBonus + progressBonus;
+
+    // Iterative rework: apply 1/(reworkCount+1) diminishing returns to ADDED progress.
+    // First rework (count 0→1): added progress × 1/2. Second (1→2): × 1/3. Etc.
+    let reworkAddedProgress = 0;
+    if (reworkTarget) {
+      const existingCount = reworkTarget.system.reworkCount ?? 0;
+      const divisor = existingCount + 2; // first rework divides by 2
+      reworkAddedProgress = Math.round(totalProgress / divisor);
+      totalProgress = (reworkTarget.system.progress ?? 0) + reworkAddedProgress;
+    }
 
     // Determine quality from thresholds.
     const qualityTiers = Object.entries(CONFIG.ASPECTSOFPOWER.craftQuality)
@@ -1929,23 +2017,39 @@ export class AspectsofPowerItem extends Item {
       const slotName = outputSlot.charAt(0).toUpperCase() + outputSlot.slice(1);
       const itemName = `${elPrefix}${slotName}`;
 
-      [createdItem] = await actor.createEmbeddedDocuments('Item', [{
-        name: itemName,
-        type: 'item',
-        img: materialItem.img,
-        system: {
-          description: `<p>Crafted by ${actor.name} using ${materialItem.name}.</p>`,
-          slot: outputSlot,
-          material: outputMaterial,
-          rarity: qualityData.rarity,
-          progress: totalProgress,
-          durability: { value: totalProgress * 2, max: totalProgress * 2 },
-          statBonuses,
-          armorBonus,
-          veilBonus,
-          augmentSlots,
-        },
-      }]);
+      if (reworkTarget) {
+        // Update the existing item with new totals; bump rework count.
+        await reworkTarget.update({
+          'system.progress': totalProgress,
+          'system.durability.value': totalProgress * 2,
+          'system.durability.max': totalProgress * 2,
+          'system.rarity': qualityData.rarity,
+          'system.statBonuses': statBonuses,
+          'system.armorBonus': armorBonus,
+          'system.veilBonus': veilBonus,
+          'system.augmentSlots': augmentSlots,
+          'system.reworkCount': (reworkTarget.system.reworkCount ?? 0) + 1,
+        });
+        createdItem = reworkTarget;
+      } else {
+        [createdItem] = await actor.createEmbeddedDocuments('Item', [{
+          name: itemName,
+          type: 'item',
+          img: materialItem.img,
+          system: {
+            description: `<p>Crafted by ${actor.name} using ${materialItem.name}.</p>`,
+            slot: outputSlot,
+            material: outputMaterial,
+            rarity: qualityData.rarity,
+            progress: totalProgress,
+            durability: { value: totalProgress * 2, max: totalProgress * 2 },
+            statBonuses,
+            armorBonus,
+            veilBonus,
+            augmentSlots,
+          },
+        }]);
+      }
 
       if ((materialItem.system.quantity ?? 1) <= 1) {
         await materialItem.delete();
@@ -1957,25 +2061,34 @@ export class AspectsofPowerItem extends Item {
         ? statBonuses.map(s => `${s.ability}: +${s.value}`).join(', ')
         : 'none';
 
+      const reworkLine = reworkTarget
+        ? `<p><strong>Rework:</strong> ×${reworkTarget.system.reworkCount} → ×${(reworkTarget.system.reworkCount ?? 0) + 1} (added +${reworkAddedProgress} with diminishing returns)</p>`
+        : '';
+      const headerTitle = reworkTarget ? 'Rework Result' : 'Crafting Result';
+      const createdLine = reworkTarget
+        ? `<p><em>Improved: ${createdItem.name}</em></p>`
+        : `<p><em>Created: ${createdItem.name}</em></p>`;
+
       ChatMessage.create({
         speaker,
         content: `<div class="craft-result">
-          <h3>${item.name} — Crafting Result</h3>
+          <h3>${item.name} — ${headerTitle}</h3>
           <hr>
           ${craftNatLine}
+          ${reworkLine}
           <p><strong>Material:</strong> ${materialItem.name} (${matRarity}, progress ${materialProgress})</p>
           <p><strong>Material (50%):</strong> ${materialProgress} × 0.5 = ${materialContribution}</p>
           <p><strong>Crafter (50%):</strong> ${skillRoll} × ${d100Pct.toFixed(2)} = ${crafterRoll} × 0.5 = ${crafterContribution}</p>
           <p><strong>d100:</strong> ${d100Roll.total} + ${rarityRange.floor} = ${effectiveD100} (cap ${rarityRange.ceiling})</p>
           ${prepBonus ? `<p><strong>Preparation:</strong> +${prepBonus}</p>` : ''}
           ${profAugLine}
-          <p><strong>Total Progress:</strong> ${materialContribution} + ${crafterContribution}${prepBonus ? ` + ${prepBonus}` : ''} = ${totalProgress}</p>
+          <p><strong>Total Progress:</strong> ${totalProgress}</p>
           <p><strong>Quality:</strong> ${qualityKey.charAt(0).toUpperCase() + qualityKey.slice(1)} (${qualityData.rarity})</p>
           ${armorBonus ? `<p><strong>Armor:</strong> ${armorBonus}</p>` : ''}
           ${veilBonus ? `<p><strong>Veil:</strong> ${veilBonus}</p>` : ''}
           <p><strong>Stats:</strong> ${statLine}</p>
           <p><strong>Augment Slots:</strong> ${augmentSlots}</p>
-          <p><em>Created: ${createdItem.name}</em></p>
+          ${createdLine}
         </div>`,
       });
     }
