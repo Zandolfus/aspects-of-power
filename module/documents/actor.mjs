@@ -65,8 +65,33 @@ export class AspectsofPowerActor extends Actor {
     for (const key of abilityKeys) {
       contributions[key] = { equipment: 0, blessingAdd: 0, blessingMultiplier: 1, title: 0, other: 0 };
     }
+    // Active loadout determines which equipment effects apply.
+    // 'combat' loadout: only items in combat slots contribute.
+    // 'profession' loadout: only items in profession slots contribute.
+    const activeLoadout = systemData.activeLoadout || 'combat';
+    const slotConfig = CONFIG.ASPECTSOFPOWER.equipmentSlots ?? {};
+
+    // Helper: does an item belong to the active loadout?
+    // Checks primary slot AND any additional slots — if any matches the loadout, it applies.
+    const _itemMatchesLoadout = (item) => {
+      if (!item) return true; // no source item: always apply (legacy effects)
+      const allSlots = [item.system.slot, ...(item.system.additionalSlots ?? [])].filter(Boolean);
+      return allSlots.some(slotKey => {
+        const slotDef = slotConfig[slotKey];
+        const itemLoadout = slotDef?.set === 'profession' ? 'profession' : 'combat';
+        return itemLoadout === activeLoadout;
+      });
+    };
+
     for (const e of this.allApplicableEffects()) {
       if (e.disabled) continue;
+
+      // Filter equipment effects by loadout match.
+      if (e.system?.effectType === 'equipment') {
+        const sourceItem = this.items.get(e.system?.itemSource);
+        if (!_itemMatchesLoadout(sourceItem)) continue;
+      }
+
       for (const c of e.changes) {
         const match = c.key.match(/^system\.abilities\.(\w+)\.value$/);
         if (!match || !contributions[match[1]]) continue;
@@ -170,6 +195,13 @@ export class AspectsofPowerActor extends Actor {
       let sum = 0;
       for (const e of this.allApplicableEffects()) {
         if (e.disabled) continue;
+
+        // Equipment effects: filter by active loadout.
+        if (e.system?.effectType === 'equipment') {
+          const sourceItem = this.items.get(e.system?.itemSource);
+          if (!_itemMatchesLoadout(sourceItem)) continue;
+        }
+
         for (const c of e.changes) {
           if (c.key === key) sum += Number(c.value) || 0;
         }
@@ -465,10 +497,14 @@ export class AspectsofPowerActor extends Actor {
    */
   getProfessionAugmentBonuses(element = '') {
     const totals = {};
+    // Profession augments only apply when actor is in profession loadout.
+    if ((this.system.activeLoadout || 'combat') !== 'profession') return totals;
     for (const item of this.items) {
       if (item.type !== 'item') continue;
       if (!item.system.equipped) continue;
-      if (!(item.system.slot ?? '').startsWith('prof')) continue;
+      // Item must be slottable in a profession slot (primary or additional).
+      const allSlots = [item.system.slot, ...(item.system.additionalSlots ?? [])].filter(Boolean);
+      if (!allSlots.some(s => s.startsWith('prof'))) continue;
       const profAugIds = (item.system.profAugments ?? []).map(a => a.augmentId).filter(Boolean);
       for (const augId of profAugIds) {
         const augment = this.items.get(augId);

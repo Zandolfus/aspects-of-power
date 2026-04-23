@@ -388,6 +388,15 @@ export class AspectsofPowerItemSheet extends foundry.applications.api.Handlebars
     if (this.item.type === 'item') {
       const name = event.target?.name;
 
+      // Additional slots checkboxes: collect all checked values.
+      if (name === 'system.additionalSlots') {
+        const form = this.element.querySelector('form');
+        const checked = [...form.querySelectorAll('input[name="system.additionalSlots"]:checked')]
+          .map(el => el.value);
+        await this.document.update({ 'system.additionalSlots': checked });
+        return;
+      }
+
       // Simple equipment fields: direct update.
       if (name === 'system.slot' || name === 'system.twoHanded' || name === 'system.isRepairKit'
           || name === 'system.repairAmount' || name === 'system.material'

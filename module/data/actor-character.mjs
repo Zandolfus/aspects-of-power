@@ -77,6 +77,9 @@ export class CharacterData extends foundry.abstract.TypeDataModel {
 
       credits: new fields.NumberField({ initial: 0, min: 0, integer: true }),
 
+      // Active gear loadout — combat or profession. Equipment effects filter by this.
+      activeLoadout: new fields.StringField({ initial: 'combat' }),
+
       abilities: new fields.SchemaField({
         vitality:     abilitySchema(),
         endurance:    abilitySchema(),

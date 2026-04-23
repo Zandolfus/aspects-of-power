@@ -14,6 +14,10 @@ export class ItemItemData extends foundry.abstract.TypeDataModel {
       // --- Equipment fields ---
       equipped:    new fields.BooleanField({ initial: false }),
       slot:        new fields.StringField({ initial: '' }),
+
+      // Additional slots — item can be cross-listed in multiple slot types.
+      // E.g. a hammer in 'weaponry' (combat) can also be in 'profWeapon' (profession).
+      additionalSlots: new fields.ArrayField(new fields.StringField(), { initial: [] }),
       rarity:      new fields.StringField({ initial: 'common' }),
       twoHanded:   new fields.BooleanField({ initial: false }),
 

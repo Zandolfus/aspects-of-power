@@ -60,6 +60,22 @@
           </select>
         </div>
 
+        {{!-- Additional Slots (item appears in these slots too) --}}
+        <div class="equip-field">
+          <label>Additional Slots</label>
+          <div class="additional-slots-checks">
+            {{#each @root.config.equipmentSlots as |slotDef slotKey|}}
+              {{#unless (eq slotKey @root.system.slot)}}
+                <label class="additional-slot-check">
+                  <input type="checkbox" name="system.additionalSlots" value="{{slotKey}}"
+                         {{#if (includes @root.system.additionalSlots slotKey)}}checked{{/if}} />
+                  {{localize slotDef.label}}
+                </label>
+              {{/unless}}
+            {{/each}}
+          </div>
+        </div>
+
         {{!-- Rarity --}}
         <div class="equip-field">
           <label>{{localize "ASPECTSOFPOWER.Equip.rarity"}}</label>

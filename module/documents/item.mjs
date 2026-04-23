@@ -2010,7 +2010,7 @@ export class AspectsofPowerItem extends Item {
       const slotValue = CONFIG.ASPECTSOFPOWER.craftSlotValues?.[outputSlot] ?? 0.25;
       const matValue = CONFIG.ASPECTSOFPOWER.craftMaterialValues?.[outputMaterial] ?? 0.5;
 
-      const totalStatBudget = Math.round(totalProgress * slotValue * matValue * 0.5);
+      const totalStatBudget = Math.round(totalProgress * slotValue * 0.25);
       const statBonuses = [];
 
       if (elementDef?.stats?.length >= 3 && totalStatBudget > 0) {

@@ -187,6 +187,7 @@
     <a class="item" data-tab="features">Features</a>
     <a class="item" data-tab="skills">Skills</a>
     <a class="item" data-tab="stats">Stats</a>
+    <a class="item" data-tab="defense">Defense</a>
     <a class="item" data-tab="equipment">{{localize "ASPECTSOFPOWER.Equip.tabLabel"}}</a>
     <a class="item" data-tab="items">Items</a>
     <a class="item" data-tab="effects">Effects</a>
@@ -267,6 +268,19 @@
     <div class="tab stats" data-group="primary" data-tab="stats">
       <div class="stats-breakdown">
 
+        {{!-- Gear set toggle --}}
+        <div class="stats-view-toggle flexrow">
+          <a class="stats-view-btn {{#if (eq statsViewMode 'all')}}active{{/if}}" data-view="all">
+            <i class="fas fa-asterisk"></i> All Gear
+          </a>
+          <a class="stats-view-btn {{#if (eq statsViewMode 'combat')}}active{{/if}}" data-view="combat">
+            <i class="fas fa-shield-alt"></i> Combat Only
+          </a>
+          <a class="stats-view-btn {{#if (eq statsViewMode 'profession')}}active{{/if}}" data-view="profession">
+            <i class="fas fa-hammer"></i> Profession Only
+          </a>
+        </div>
+
         {{!-- Summary --}}
         <div class="stats-summary flexrow">
           <span>{{localize "ASPECTSOFPOWER.Stats.totalCalculated"}}: {{statsSummary.totalCalculated}}</span>
@@ -288,7 +302,7 @@
 
         {{!-- One row per ability --}}
         <div class="stat-list">
-          {{#each system.abilities as |ability key|}}
+          {{#each displayAbilities as |ability key|}}
           <div class="stat-row flexrow">
             <label class="stat-col-name rollable"
                    data-roll="(d20/100)*@abilities.{{key}}.mod+@abilities.{{key}}.mod"
@@ -336,6 +350,101 @@
       </div>
     </div>
 
+    {{!-- Defense Tab --}}
+    <div class="tab defense" data-group="primary" data-tab="defense">
+      <div class="defense-tab">
+
+        {{!-- Mitigation --}}
+        <div class="defense-section">
+          <h3>Mitigation</h3>
+          <div class="defense-grid">
+            <div class="defense-cell" data-tooltip="{{{tooltips.dr}}}">
+              <label>DR</label>
+              <span class="defense-value">{{system.defense.dr.value}}</span>
+            </div>
+            <div class="defense-cell" data-tooltip="{{{tooltips.armor}}}">
+              <label>Armor</label>
+              <span class="defense-value">{{system.defense.armor.value}}</span>
+            </div>
+            <div class="defense-cell" data-tooltip="{{{tooltips.veil}}}">
+              <label>Veil</label>
+              <span class="defense-value">{{system.defense.veil.value}}</span>
+            </div>
+          </div>
+        </div>
+
+        {{!-- Defense Pools --}}
+        <div class="defense-section">
+          <h3>Defense Pools</h3>
+          <div class="defense-grid">
+            <div class="defense-cell" data-tooltip="{{{tooltips.melee}}}">
+              <label>Melee</label>
+              <span class="defense-value">{{system.defense.melee.pool}}/{{system.defense.melee.poolMax}}</span>
+            </div>
+            <div class="defense-cell" data-tooltip="{{{tooltips.ranged}}}">
+              <label>Ranged</label>
+              <span class="defense-value">{{system.defense.ranged.pool}}/{{system.defense.ranged.poolMax}}</span>
+            </div>
+            <div class="defense-cell" data-tooltip="{{{tooltips.mind}}}">
+              <label>Mind</label>
+              <span class="defense-value">{{system.defense.mind.pool}}/{{system.defense.mind.poolMax}}</span>
+            </div>
+            <div class="defense-cell" data-tooltip="{{{tooltips.soul}}}">
+              <label>Soul</label>
+              <span class="defense-value">{{system.defense.soul.pool}}/{{system.defense.soul.poolMax}}</span>
+            </div>
+          </div>
+        </div>
+
+        {{!-- Reactions --}}
+        <div class="defense-section">
+          <h3>Reactions</h3>
+          <div class="defense-grid">
+            <div class="defense-cell">
+              <label>Available</label>
+              <span class="defense-value">
+                <input type="number" name="system.reactions.value" value="{{system.reactions.value}}" min="0" style="width:50px;" />
+                /
+                <input type="number" name="system.reactions.max" value="{{system.reactions.max}}" min="0" style="width:50px;" />
+              </span>
+            </div>
+          </div>
+        </div>
+
+        {{!-- Resistances --}}
+        <div class="defense-section">
+          <h3>Resistances</h3>
+          {{#if resistances.length}}
+            <div class="defense-grid">
+              {{#each resistances}}
+                <div class="defense-cell">
+                  <label>{{this.label}}</label>
+                  <span class="defense-value">{{this.value}}</span>
+                </div>
+              {{/each}}
+            </div>
+          {{else}}
+            <p class="hint">No resistances.</p>
+          {{/if}}
+        </div>
+
+        {{!-- Immunities --}}
+        <div class="defense-section">
+          <h3>Immunities</h3>
+          {{#if immunities.length}}
+            <div class="immunity-chips">
+              {{#each immunities}}
+                <span class="immunity-chip">{{this.label}}</span>
+              {{/each}}
+            </div>
+          {{else}}
+            <p class="hint">No immunities.</p>
+          {{/if}}
+        </div>
+
+      </div>
+    </div>
+
     {{!-- Equipment Tab --}}
     <div class="tab equipment" data-group="primary" data-tab="equipment">
       <div class="equipment-tab">
@@ -360,10 +469,19 @@
           </span>
         </div>
 
-        {{!-- Gear Set Toggle --}}
+        {{!-- Gear Set Toggle (view) + Active Loadout (mechanical) --}}
         <div class="gear-set-toggle flexrow">
-          <a class="gear-toggle-btn active" data-set="combat"><i class="fas fa-shield-alt"></i> Combat</a>
-          <a class="gear-toggle-btn" data-set="profession"><i class="fas fa-hammer"></i> Profession</a>
+          <a class="gear-toggle-btn active" data-set="combat"><i class="fas fa-shield-alt"></i> View Combat</a>
+          <a class="gear-toggle-btn" data-set="profession"><i class="fas fa-hammer"></i> View Profession</a>
+        </div>
+        <div class="loadout-toggle flexrow">
+          <strong>Active Loadout:</strong>
+          <a class="loadout-btn {{#if (eq system.activeLoadout 'combat')}}active{{/if}}" data-loadout="combat">
+            <i class="fas fa-shield-alt"></i> Combat
+          </a>
+          <a class="loadout-btn {{#if (eq system.activeLoadout 'profession')}}active{{/if}}" data-loadout="profession">
+            <i class="fas fa-hammer"></i> Profession
+          </a>
         </div>
 
         {{!-- Combat Equipment Slots --}}

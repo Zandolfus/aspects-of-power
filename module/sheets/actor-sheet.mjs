@@ -33,6 +33,84 @@ export class AspectsofPowerActorSheet extends foundry.applications.api.Handlebar
     options.parts = [this.actor.type];
   }
 
+  /**
+   * Sheet-local state for stat view filtering.
+   * 'all' (default) | 'combat' | 'profession'
+   */
+  _statsViewMode = 'all';
+
+  /**
+   * Recompute ability breakdowns with equipment effects filtered by gear set.
+   * Mirrors the logic in actor.mjs prepareDerivedData but only for the equipment cap step.
+   * @param {string} mode  'combat' or 'profession' — which gear set to include.
+   * @returns {Object} Map of ability key → breakdown with filtered equipment.
+   */
+  _computeFilteredAbilities(mode) {
+    const actor = this.actor;
+    const slotConfig = CONFIG.ASPECTSOFPOWER.equipmentSlots ?? {};
+
+    // Determine which equipped items belong to the chosen set.
+    const includedItemIds = new Set();
+    for (const item of actor.items) {
+      if (item.type !== 'item') continue;
+      if (!item.system.equipped) continue;
+      const slotDef = slotConfig[item.system.slot];
+      if (!slotDef) continue;
+      if (slotDef.set === mode) includedItemIds.add(item.id);
+    }
+
+    // Sum equipment stat bonuses from included items only.
+    const abilityKeys = Object.keys(actor.system.abilities);
+    const equipBonusByStat = {};
+    for (const key of abilityKeys) equipBonusByStat[key] = 0;
+
+    for (const item of actor.items) {
+      if (!includedItemIds.has(item.id)) continue;
+      for (const sb of item.system.statBonuses ?? []) {
+        if (equipBonusByStat[sb.ability] !== undefined) {
+          equipBonusByStat[sb.ability] += sb.value || 0;
+        }
+      }
+    }
+
+    // Build new breakdowns by replacing equipmentBonusRaw with the filtered total,
+    // then re-applying the per-stat and global caps.
+    const sigmoidMod = (value) =>
+      Math.round((6000 / (1 + Math.exp(-0.001 * (value - 500)))) - 2265);
+
+    const filtered = {};
+    for (const key of abilityKeys) {
+      const orig = actor.system.abilities[key].breakdown;
+      filtered[key] = {
+        ...orig,
+        equipmentBonusRaw: equipBonusByStat[key],
+        equipmentCapped: Math.min(equipBonusByStat[key], orig.perStatCap),
+      };
+    }
+
+    // Apply global cap (20% of total calculated).
+    const totalCalculated = abilityKeys.reduce(
+      (s, k) => s + filtered[k].calculated, 0
+    );
+    const globalCap = Math.floor(totalCalculated * 0.20);
+    let totalEquip = abilityKeys.reduce((s, k) => s + filtered[k].equipmentCapped, 0);
+    if (totalEquip > globalCap && totalEquip > 0) {
+      const ratio = globalCap / totalEquip;
+      for (const key of abilityKeys) {
+        filtered[key].equipmentCapped = Math.floor(filtered[key].equipmentCapped * ratio);
+      }
+    }
+
+    // Final + finalMod recompute.
+    for (const key of abilityKeys) {
+      const b = filtered[key];
+      b.final = Math.round(b.calculated + b.equipmentCapped + b.effectBonus);
+      b.finalMod = sigmoidMod(b.final);
+    }
+
+    return filtered;
+  }
+
   /* -------------------------------------------- */
 
   /** @override */
@@ -103,6 +181,54 @@ export class AspectsofPowerActorSheet extends foundry.applications.api.Handlebar
     }
     context.freePoints = context.system.freePoints ?? 0;
     context.isGM = game.user.isGM;
+
+    // Stats view mode for the gear-set toggle on the Stats tab.
+    context.statsViewMode = this._statsViewMode;
+    if (this._statsViewMode === 'all') {
+      context.displayAbilities = context.system.abilities;
+    } else {
+      const filtered = this._computeFilteredAbilities(this._statsViewMode);
+      // Build a shape matching system.abilities: { value, mod, breakdown }
+      const display = {};
+      for (const [key, ability] of Object.entries(context.system.abilities)) {
+        const fb = filtered[key];
+        display[key] = {
+          value: fb.final,
+          mod: fb.finalMod,
+          breakdown: fb,
+        };
+      }
+      context.displayAbilities = display;
+    }
+
+    // Defense tab: collect resistances from system tags.
+    context.resistances = [];
+    const collected = context.system.collectedTags;
+    if (collected) {
+      for (const [tagId, data] of collected) {
+        if (data?.category === 'resistance') {
+          const def = CONFIG.ASPECTSOFPOWER.tagRegistry?.[tagId];
+          context.resistances.push({
+            id: tagId,
+            label: def ? game.i18n.localize(def.label) : tagId,
+            value: data.value || 0,
+          });
+        }
+      }
+    }
+    // Defense tab: immunities from tags.
+    context.immunities = [];
+    if (collected) {
+      for (const [tagId, data] of collected) {
+        if (data?.category === 'immunity') {
+          const def = CONFIG.ASPECTSOFPOWER.tagRegistry?.[tagId];
+          context.immunities.push({
+            id: tagId,
+            label: def ? game.i18n.localize(def.label) : tagId,
+          });
+        }
+      }
+    }
   }
 
   /**
@@ -183,8 +309,16 @@ export class AspectsofPowerActorSheet extends foundry.applications.api.Handlebar
     context.unequippedGear = [];
 
     for (const i of gear) {
-      if (i.system.equipped && i.system.slot && context.equipmentSlots[i.system.slot]) {
-        context.equipmentSlots[i.system.slot].items.push(i);
+      if (i.system.equipped) {
+        const allSlots = [i.system.slot, ...(i.system.additionalSlots ?? [])].filter(Boolean);
+        const placed = [];
+        for (const slotKey of allSlots) {
+          if (context.equipmentSlots[slotKey]) {
+            context.equipmentSlots[slotKey].items.push(i);
+            placed.push(slotKey);
+          }
+        }
+        if (placed.length === 0) context.unequippedGear.push(i);
       } else {
         context.unequippedGear.push(i);
       }
@@ -426,6 +560,23 @@ export class AspectsofPowerActorSheet extends foundry.applications.api.Handlebar
         btn.classList.add('active');
         this.element.querySelector('.gear-set-combat').style.display = set === 'combat' ? '' : 'none';
         this.element.querySelector('.gear-set-profession').style.display = set === 'profession' ? '' : 'none';
+      });
+    });
+
+    // Stats view toggle (all / combat / profession gear breakdown).
+    this.element.querySelectorAll('.stats-view-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        this._statsViewMode = btn.dataset.view || 'all';
+        this.render();
+      });
+    });
+
+    // Active loadout toggle (mechanical — switches which gear set's stats apply).
+    this.element.querySelectorAll('.loadout-btn').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        const loadout = btn.dataset.loadout || 'combat';
+        if (this.actor.system.activeLoadout === loadout) return;
+        await this.actor.update({ 'system.activeLoadout': loadout });
       });
     });
 

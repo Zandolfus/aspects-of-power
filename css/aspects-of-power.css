@@ -735,6 +735,136 @@
   padding: 2px 0;
 }
 
+/* Defense Tab */
+.aspects-of-power .defense-tab {
+  padding: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.aspects-of-power .defense-section {
+  border: 1px solid #7a7971;
+  border-radius: 4px;
+  padding: 8px 12px;
+  background: rgba(0, 0, 0, 0.1);
+}
+.aspects-of-power .defense-section h3 {
+  margin: 0 0 8px 0;
+  font-size: 14px;
+  color: #eeede0;
+  border-bottom: 1px solid #7a7971;
+  padding-bottom: 4px;
+}
+.aspects-of-power .defense-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: 8px;
+}
+.aspects-of-power .defense-cell {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 6px 8px;
+  background: rgba(0, 0, 0, 0.2);
+  border-radius: 3px;
+}
+.aspects-of-power .defense-cell label {
+  font-size: 11px;
+  color: #c9c7b8;
+  margin-bottom: 2px;
+}
+.aspects-of-power .defense-cell .defense-value {
+  font-size: 16px;
+  font-weight: bold;
+  color: #eeede0;
+}
+.aspects-of-power .immunity-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+.aspects-of-power .immunity-chip {
+  display: inline-block;
+  padding: 2px 8px;
+  background: rgba(102, 187, 106, 0.2);
+  border: 1px solid #66bb6a;
+  border-radius: 3px;
+  font-size: 11px;
+  color: #c5e1a5;
+  text-transform: capitalize;
+}
+
+/* Stats view toggle */
+.aspects-of-power .stats-view-toggle {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 8px;
+}
+.aspects-of-power .stats-view-btn {
+  flex: 1;
+  padding: 4px 8px;
+  border: 1px solid #7a7971;
+  border-radius: 3px;
+  background: rgba(0, 0, 0, 0.15);
+  color: #eeede0;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: bold;
+  text-align: center;
+}
+.aspects-of-power .stats-view-btn:hover {
+  background: rgba(0, 0, 0, 0.25);
+}
+.aspects-of-power .stats-view-btn.active {
+  background: rgba(0, 0, 0, 0.4);
+  border-color: #c9c7b8;
+}
+
+/* Additional slots checkboxes */
+.aspects-of-power .additional-slots-checks {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 12px;
+  font-size: 11px;
+}
+.aspects-of-power .additional-slot-check {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  cursor: pointer;
+}
+
+/* Active loadout toggle */
+.aspects-of-power .loadout-toggle {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  margin-bottom: 8px;
+  padding: 4px 8px;
+  background: rgba(0, 0, 0, 0.2);
+  border: 1px dashed #c9c7b8;
+  border-radius: 3px;
+  color: #eeede0;
+}
+.aspects-of-power .loadout-btn {
+  padding: 3px 10px;
+  border: 1px solid #7a7971;
+  border-radius: 3px;
+  background: rgba(0, 0, 0, 0.15);
+  color: #eeede0;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: bold;
+}
+.aspects-of-power .loadout-btn:hover {
+  background: rgba(0, 0, 0, 0.3);
+}
+.aspects-of-power .loadout-btn.active {
+  background: #c9c7b8;
+  color: #1a1a1a;
+  border-color: #c9c7b8;
+}
+
 /* Gear set toggle */
 .aspects-of-power .gear-set-toggle {
   display: flex;
