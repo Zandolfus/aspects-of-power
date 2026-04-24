@@ -291,12 +291,16 @@ Hooks.once('init', function () {
       label: 'Set Disposition',
       icon: '<i class="fas fa-handshake"></i>',
       visible: (target) => {
-        const folderId = target.dataset.folderId ?? target.closest('[data-folder-id]')?.dataset.folderId;
+        const el = target instanceof HTMLElement ? target : target?.[0];
+        if (!el) return false;
+        const folderId = el.dataset.folderId ?? el.closest('[data-folder-id]')?.dataset.folderId;
         const folder = game.folders.get(folderId);
         return game.user.isGM && folder?.type === 'Actor';
       },
       onClick: async (target) => {
-        const folderId = target.dataset.folderId ?? target.closest('[data-folder-id]')?.dataset.folderId;
+        const el = target instanceof HTMLElement ? target : target?.[0];
+        if (!el) return;
+        const folderId = el.dataset.folderId ?? el.closest('[data-folder-id]')?.dataset.folderId;
         const folder = game.folders.get(folderId);
         if (!folder) return;
 
