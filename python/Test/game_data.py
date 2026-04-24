@@ -553,6 +553,13 @@ profession_gains = {
             "strength": 2,
             "free_points": 4,
         },
+        "blood alchemist": {
+            "wisdom": 5,
+            "vitality": 4,
+            "willpower": 3,
+            "perception": 2,
+            "free_points": 4,
+        },
     },
 }
 
