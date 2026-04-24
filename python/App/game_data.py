@@ -373,6 +373,13 @@ profession_gains = {
             "wisdom": 1,
             "free_points": 2,
         },
+        "drums of war, largo": {
+            "strength": 2,
+            "dexterity": 2,
+            "willpower": 1,
+            "wisdom": 1,
+            "free_points": 2,
+        },
         "novice witch-wright of iron and ice": {
             "intelligence": 2,
             "wisdom": 2,
@@ -393,7 +400,7 @@ profession_gains = {
             "willpower": 1,
             "perception": 1,
             "free_points": 2,
-        },
+        },        
         "demonic butler": {
             "free_points": 8,
         },
@@ -495,6 +502,12 @@ profession_gains = {
         "high justiciar": {
             "free_points": 18
         },
+        "high magistrate": {
+            "free_points": 18
+        },
+        "high advocate": {
+            "free_points": 18
+        },
         "mana-jeweler of the elements": {
             "willpower": 5,
             "wisdom": 4,
@@ -529,7 +542,7 @@ profession_gains = {
             "vitality": 3,
             "intelligence": 2,
             "free_points": 4,
-        },
+        },        
         "head demonic butler": {
             "free_points": 8,
         },
@@ -538,6 +551,13 @@ profession_gains = {
             "willpower": 4,
             "perception": 3,
             "strength": 2,
+            "free_points": 4,
+        },
+        "blood alchemist": {
+            "wisdom": 5,
+            "vitality": 4,
+            "willpower": 3,
+            "perception": 2,
             "free_points": 4,
         },
     },
@@ -700,7 +720,7 @@ races = {
                 "rank": "E",
             },
         ]
-    },
+    },    
     "juvenile astral elf": {
         "rank_ranges": [
             {
