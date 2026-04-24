@@ -264,7 +264,9 @@ Hooks.once('init', function () {
       window: { title: 'Set Token Disposition' },
       content,
       render: (event, dialog) => {
-        const form = dialog.querySelector('form');
+        const root = dialog?.element ?? dialog;
+        const form = root.querySelector('form');
+        if (!form) return;
         const scopeSelect = form.querySelector('[name="scope"]');
         const folderGroup = form.querySelector('.folder-select');
         scopeSelect.addEventListener('change', () => {
@@ -273,8 +275,9 @@ Hooks.once('init', function () {
       },
       buttons: [{
         action: 'apply', label: 'Apply', icon: 'fas fa-check', default: true,
-        callback: async (event, button) => {
-          const form = button.closest('.dialog-v2')?.querySelector('form') ?? button.form;
+        callback: async (event, button, dialog) => {
+          const form = dialog?.element?.querySelector('form') ?? button.form ?? button.closest('.application')?.querySelector('form');
+          if (!form) { ui.notifications.error('Disposition dialog form not found.'); return; }
           const scope = form.querySelector('[name="scope"]').value;
           const disposition = Number(form.querySelector('[name="disposition"]').value);
           const folderId = form.querySelector('[name="folderId"]')?.value;
@@ -320,8 +323,9 @@ Hooks.once('init', function () {
             <select name="disposition">${dispOptions}</select></div></form>`,
           buttons: [{
             action: 'apply', label: 'Apply', icon: 'fas fa-check', default: true,
-            callback: async (event, button) => {
-              const form = button.closest('.dialog-v2')?.querySelector('form') ?? button.form;
+            callback: async (event, button, dialog) => {
+              const form = dialog?.element?.querySelector('form') ?? button.form ?? button.closest('.application')?.querySelector('form');
+              if (!form) { ui.notifications.error('Disposition dialog form not found.'); return; }
               const disposition = Number(form.querySelector('[name="disposition"]').value);
               await game.aspectsofpower.setDisposition({ scope: 'folder', folderId, disposition });
             },
