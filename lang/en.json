@@ -275,7 +275,8 @@
         "resistance": "Resistance",
         "gate": "Capability",
         "passive": "Passive",
-        "size": "Size"
+        "size": "Size",
+        "path": "Path Structure"
       },
       "fire": { "label": "Fire", "desc": "Fire elemental affinity" },
       "heat": { "label": "Heat", "desc": "Heat/thermal affinity" },
@@ -341,7 +342,10 @@
       "medium": { "label": "Medium", "desc": "Medium creature size" },
       "large": { "label": "Large", "desc": "Large creature size" },
       "huge": { "label": "Huge", "desc": "Huge creature size" },
-      "gargantuan": { "label": "Gargantuan", "desc": "Gargantuan creature size" }
+      "gargantuan": { "label": "Gargantuan", "desc": "Gargantuan creature size" },
+      "threefoldPath": { "label": "Threefold-Path", "desc": "Race + Class + Profession; race derives at half the rate of combined class/profession gains" },
+      "twofoldPath": { "label": "Twofold-Path", "desc": "Race + one secondary path (class, profession, or player choice — configured on the race item); race derives 1:1 from the chosen path" },
+      "onefoldPath": { "label": "Onefold-Path", "desc": "Race only (e.g., dragons, monsters); race level driven directly, not derived" }
     },
     "Effect": {
       "Source": "Source",

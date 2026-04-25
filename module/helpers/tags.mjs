@@ -21,6 +21,7 @@ export const TAG_CATEGORIES = {
   gate:       { label: 'ASPECTSOFPOWER.SystemTag.Category.gate',       color: '#ef5350' },
   passive:    { label: 'ASPECTSOFPOWER.SystemTag.Category.passive',    color: '#ab47bc' },
   size:       { label: 'ASPECTSOFPOWER.SystemTag.Category.size',       color: '#78909c' },
+  path:       { label: 'ASPECTSOFPOWER.SystemTag.Category.path',       color: '#26a69a' },
 };
 
 /* ------------------------------------------------------------------ */
@@ -106,4 +107,10 @@ export const TAG_REGISTRY = {
   'demon':       { label: 'ASPECTSOFPOWER.SystemTag.demon.label',       category: 'passive', implies: [],                                                      description: 'ASPECTSOFPOWER.SystemTag.demon.desc' },
   'undead':      { label: 'ASPECTSOFPOWER.SystemTag.undead.label',      category: 'passive', implies: ['poison-immune', 'charm-immune'],                       description: 'ASPECTSOFPOWER.SystemTag.undead.desc' },
   'construct':   { label: 'ASPECTSOFPOWER.SystemTag.construct.label',   category: 'passive', implies: ['stun-immune', 'poison-immune', 'charm-immune'],        description: 'ASPECTSOFPOWER.SystemTag.construct.desc' },
+
+  // ── Race Path Structure (mutually exclusive — drives mass-leveler race derivation) ──
+  // Twofold sub-type (class-locked / profession-locked / choice) is configured on the race item itself.
+  'threefold-path': { label: 'ASPECTSOFPOWER.SystemTag.threefoldPath.label', category: 'path', implies: [], description: 'ASPECTSOFPOWER.SystemTag.threefoldPath.desc' },
+  'twofold-path':   { label: 'ASPECTSOFPOWER.SystemTag.twofoldPath.label',   category: 'path', implies: [], description: 'ASPECTSOFPOWER.SystemTag.twofoldPath.desc' },
+  'onefold-path':   { label: 'ASPECTSOFPOWER.SystemTag.onefoldPath.label',   category: 'path', implies: [], description: 'ASPECTSOFPOWER.SystemTag.onefoldPath.desc' },
 };

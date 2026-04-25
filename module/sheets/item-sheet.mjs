@@ -234,6 +234,16 @@ export class AspectsofPowerItemSheet extends foundry.applications.api.Handlebars
           fieldName: `system.rankGains.${tierKey}.${aKey}`,
         })),
       }));
+
+      // Twofold path config — only meaningful when twofold-path tag is present.
+      const tagIds = (this.item.system.systemTags ?? []).map(t => t.id);
+      context.isTwofold = tagIds.includes('twofold-path');
+      context.twofoldType = this.item.system.twofoldType ?? 'choice';
+      context.twofoldOptions = [
+        { value: 'class',      label: 'Class (locked)' },
+        { value: 'profession', label: 'Profession (locked)' },
+        { value: 'choice',     label: 'Player Choice' },
+      ];
     }
 
     // Class template items: single rank with one set of gains.

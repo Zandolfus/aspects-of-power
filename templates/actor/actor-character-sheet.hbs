@@ -268,16 +268,13 @@
     <div class="tab stats" data-group="primary" data-tab="stats">
       <div class="stats-breakdown">
 
-        {{!-- Gear set toggle --}}
+        {{!-- Gear set preview toggle --}}
         <div class="stats-view-toggle flexrow">
-          <a class="stats-view-btn {{#if (eq statsViewMode 'all')}}active{{/if}}" data-view="all">
-            <i class="fas fa-asterisk"></i> All Gear
-          </a>
           <a class="stats-view-btn {{#if (eq statsViewMode 'combat')}}active{{/if}}" data-view="combat">
-            <i class="fas fa-shield-alt"></i> Combat Only
+            <i class="fas fa-shield-alt"></i> Combat
           </a>
           <a class="stats-view-btn {{#if (eq statsViewMode 'profession')}}active{{/if}}" data-view="profession">
-            <i class="fas fa-hammer"></i> Profession Only
+            <i class="fas fa-hammer"></i> Profession
           </a>
         </div>
 

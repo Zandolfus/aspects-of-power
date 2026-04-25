@@ -22,6 +22,17 @@
         {{{enrichedDescription}}}
       </prose-mirror>
       {{> "systems/aspects-of-power/templates/parts/tag-editor.hbs"}}
+
+      {{#if isTwofold}}
+        <div class="form-group twofold-config">
+          <label>Twofold Path Type</label>
+          <select name="system.twofoldType">
+            {{#each twofoldOptions as |opt|}}
+              <option value="{{opt.value}}" {{#if (eq opt.value ../twofoldType)}}selected{{/if}}>{{opt.label}}</option>
+            {{/each}}
+          </select>
+        </div>
+      {{/if}}
     </div>
 
     {{!-- Rank Gains --}}

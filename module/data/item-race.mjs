@@ -23,6 +23,14 @@ export class RaceData extends foundry.abstract.TypeDataModel {
     return {
       description: new fields.HTMLField({ initial: '' }),
 
+      // For path-twofold races: which secondary path is allowed.
+      // 'class' / 'profession' = locked to that path; 'choice' = player picks at character creation.
+      // Ignored for path-threefold and path-onefold races.
+      twofoldType: new fields.StringField({
+        initial: 'choice',
+        choices: ['class', 'profession', 'choice'],
+      }),
+
       rankGains: new fields.SchemaField({
         G: abilityGainsSchema(),
         F: abilityGainsSchema(),
@@ -46,10 +54,11 @@ export class RaceData extends foundry.abstract.TypeDataModel {
       }),
 
       // System tags (affinities, immunities, resistances, gates, passives).
+      // New races default to threefold-path; GM can swap to twofold-path / onefold-path on the race sheet.
       systemTags: new fields.ArrayField(new fields.SchemaField({
         id:    new fields.StringField({ initial: '' }),
         value: new fields.NumberField({ initial: 0 }),
-      }), { initial: [] }),
+      }), { initial: [{ id: 'threefold-path', value: 0 }] }),
     };
   }
 }

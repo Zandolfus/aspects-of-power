@@ -289,21 +289,24 @@ Hooks.once('init', function () {
   };
 
   // ── Folder context menu: Set Disposition ──
+  const _resolveFolderId = (target) => {
+    const el = target instanceof HTMLElement ? target : target?.[0];
+    if (!el) return null;
+    return el.dataset?.folderId ?? el.closest('[data-folder-id]')?.dataset.folderId ?? null;
+  };
+
   Hooks.on('getFolderContextOptions', (application, menuItems) => {
     menuItems.push({
+      name: 'Set Disposition',
       label: 'Set Disposition',
       icon: '<i class="fas fa-handshake"></i>',
-      visible: (target) => {
-        const el = target instanceof HTMLElement ? target : target?.[0];
-        if (!el) return false;
-        const folderId = el.dataset.folderId ?? el.closest('[data-folder-id]')?.dataset.folderId;
+      condition: (target) => {
+        const folderId = _resolveFolderId(target);
         const folder = game.folders.get(folderId);
         return game.user.isGM && folder?.type === 'Actor';
       },
-      onClick: async (target) => {
-        const el = target instanceof HTMLElement ? target : target?.[0];
-        if (!el) return;
-        const folderId = el.dataset.folderId ?? el.closest('[data-folder-id]')?.dataset.folderId;
+      callback: async (target) => {
+        const folderId = _resolveFolderId(target);
         const folder = game.folders.get(folderId);
         if (!folder) return;
 
@@ -540,6 +543,29 @@ Hooks.once('ready', async function () {
 
       if (migrated > 0) ui.notifications.info(`Migration: moved ${migrated} ActiveEffect flag(s) to system fields.`);
       await game.settings.set('aspects-of-power', 'migrationVersion', '2.2.0');
+    }
+
+    // Migration 2.3.0: Backfill `threefold-path` tag on race items missing any path-structure tag.
+    if (foundry.utils.isNewerVersion('2.3.0', migrationVersion)) {
+      const PATH_TAGS = new Set(['threefold-path', 'twofold-path', 'onefold-path']);
+      let backfilled = 0;
+      const backfillRace = async (item) => {
+        const tags = item.system.systemTags ?? [];
+        if (tags.some(t => PATH_TAGS.has(t.id))) return;
+        await item.update({ 'system.systemTags': [...tags, { id: 'threefold-path', value: 0 }] });
+        backfilled++;
+      };
+      for (const item of game.items) {
+        if (item.type === 'race') await backfillRace(item);
+      }
+      // Defensive: handle race items embedded on actors (shouldn't exist per current architecture, but safe).
+      for (const actor of game.actors) {
+        for (const item of actor.items) {
+          if (item.type === 'race') await backfillRace(item);
+        }
+      }
+      if (backfilled > 0) ui.notifications.info(`Migration: tagged ${backfilled} race(s) with threefold-path.`);
+      await game.settings.set('aspects-of-power', 'migrationVersion', '2.3.0');
     }
   }
 

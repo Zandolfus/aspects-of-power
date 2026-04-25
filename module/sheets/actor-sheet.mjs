@@ -34,10 +34,10 @@ export class AspectsofPowerActorSheet extends foundry.applications.api.Handlebar
   }
 
   /**
-   * Sheet-local state for stat view filtering.
-   * 'all' (default) | 'combat' | 'profession'
+   * Sheet-local state for stat view preview.
+   * 'combat' | 'profession' — defaults to the actor's active loadout (resolved in _prepareContext).
    */
-  _statsViewMode = 'all';
+  _statsViewMode = null;
 
   /**
    * Recompute ability breakdowns with equipment effects filtered by gear set.
@@ -182,24 +182,22 @@ export class AspectsofPowerActorSheet extends foundry.applications.api.Handlebar
     context.freePoints = context.system.freePoints ?? 0;
     context.isGM = game.user.isGM;
 
-    // Stats view mode for the gear-set toggle on the Stats tab.
-    context.statsViewMode = this._statsViewMode;
-    if (this._statsViewMode === 'all') {
-      context.displayAbilities = context.system.abilities;
-    } else {
-      const filtered = this._computeFilteredAbilities(this._statsViewMode);
-      // Build a shape matching system.abilities: { value, mod, breakdown }
-      const display = {};
-      for (const [key, ability] of Object.entries(context.system.abilities)) {
-        const fb = filtered[key];
-        display[key] = {
-          value: fb.final,
-          mod: fb.finalMod,
-          breakdown: fb,
-        };
-      }
-      context.displayAbilities = display;
+    // Stats view preview — defaults to the actor's active loadout the first time the sheet renders.
+    if (this._statsViewMode !== 'combat' && this._statsViewMode !== 'profession') {
+      this._statsViewMode = this.actor.system.activeLoadout === 'profession' ? 'profession' : 'combat';
     }
+    context.statsViewMode = this._statsViewMode;
+    const filtered = this._computeFilteredAbilities(this._statsViewMode);
+    const display = {};
+    for (const [key, ability] of Object.entries(context.system.abilities)) {
+      const fb = filtered[key];
+      display[key] = {
+        value: fb.final,
+        mod: fb.finalMod,
+        breakdown: fb,
+      };
+    }
+    context.displayAbilities = display;
 
     // Defense tab: collect resistances from system tags.
     context.resistances = [];
@@ -563,10 +561,12 @@ export class AspectsofPowerActorSheet extends foundry.applications.api.Handlebar
       });
     });
 
-    // Stats view toggle (all / combat / profession gear breakdown).
+    // Stats view preview toggle (combat / profession gear breakdown).
     this.element.querySelectorAll('.stats-view-btn').forEach(btn => {
       btn.addEventListener('click', () => {
-        this._statsViewMode = btn.dataset.view || 'all';
+        const view = btn.dataset.view;
+        if (view !== 'combat' && view !== 'profession') return;
+        this._statsViewMode = view;
         this.render();
       });
     });
