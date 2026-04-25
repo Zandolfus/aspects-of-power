@@ -576,6 +576,9 @@ export class AspectsofPowerActorSheet extends foundry.applications.api.Handlebar
       btn.addEventListener('click', async () => {
         const loadout = btn.dataset.loadout || 'combat';
         if (this.actor.system.activeLoadout === loadout) return;
+        // Reset the stats-tab preview so it follows the new active loadout instead of
+        // sticking on whatever the user previously previewed.
+        this._statsViewMode = null;
         await this.actor.update({ 'system.activeLoadout': loadout });
       });
     });
