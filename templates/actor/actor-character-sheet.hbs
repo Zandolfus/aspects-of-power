@@ -468,8 +468,8 @@
 
         {{!-- Gear Set Toggle (view) + Active Loadout (mechanical) --}}
         <div class="gear-set-toggle flexrow">
-          <a class="gear-toggle-btn active" data-set="combat"><i class="fas fa-shield-alt"></i> View Combat</a>
-          <a class="gear-toggle-btn" data-set="profession"><i class="fas fa-hammer"></i> View Profession</a>
+          <a class="gear-toggle-btn {{#if (eq system.activeLoadout 'combat')}}active{{/if}}" data-set="combat"><i class="fas fa-shield-alt"></i> View Combat</a>
+          <a class="gear-toggle-btn {{#if (eq system.activeLoadout 'profession')}}active{{/if}}" data-set="profession"><i class="fas fa-hammer"></i> View Profession</a>
         </div>
         <div class="loadout-toggle flexrow">
           <strong>Active Loadout:</strong>
@@ -482,7 +482,7 @@
         </div>
 
         {{!-- Combat Equipment Slots --}}
-        <div class="equip-slots gear-set gear-set-combat">
+        <div class="equip-slots gear-set gear-set-combat" {{#unless (eq system.activeLoadout 'combat')}}style="display:none;"{{/unless}}>
           {{#each combatSlots as |slotData slotKey|}}
             <div class="slot-group">
               <div class="slot-header flexrow">
@@ -521,7 +521,7 @@
         </div>
 
         {{!-- Profession Equipment Slots --}}
-        <div class="equip-slots gear-set gear-set-profession" style="display:none;">
+        <div class="equip-slots gear-set gear-set-profession" {{#unless (eq system.activeLoadout 'profession')}}style="display:none;"{{/unless}}>
           {{#each professionSlots as |slotData slotKey|}}
             <div class="slot-group">
               <div class="slot-header flexrow">
