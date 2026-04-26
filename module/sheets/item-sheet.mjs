@@ -117,6 +117,9 @@ export class AspectsofPowerItemSheet extends foundry.applications.api.Handlebars
         armorBonus: game.i18n.localize('ASPECTSOFPOWER.Augment.fieldArmor'),
         veilBonus:  game.i18n.localize('ASPECTSOFPOWER.Augment.fieldVeil'),
       };
+      // Single craft bonus — collapse the legacy array to its first entry (or default).
+      const existing = this.item.system.craftBonuses ?? [];
+      context.craftBonus = existing[0] ?? { type: 'craftProgress', value: 0, affinity: '' };
     }
 
     // Prepare augment slot display data for item-type items.
@@ -567,14 +570,13 @@ export class AspectsofPowerItemSheet extends foundry.applications.api.Handlebars
 
   async _saveCraftBonuses() {
     const form = this.element.querySelector('form');
-    const craftBonuses = [];
-    form.querySelectorAll('.craft-bonus-row').forEach(row => {
-      const type = row.querySelector('.craft-bonus-type')?.value ?? 'craftProgress';
-      const value = Number(row.querySelector('.craft-bonus-value')?.value) || 0;
-      const affinity = row.querySelector('.craft-bonus-affinity')?.value ?? '';
-      craftBonuses.push({ type, value, affinity });
-    });
-    await this.document.update({ 'system.craftBonuses': craftBonuses });
+    const row = form.querySelector('.craft-bonus-row');
+    if (!row) return;
+    const type = row.querySelector('.craft-bonus-type')?.value ?? 'craftProgress';
+    const value = Number(row.querySelector('.craft-bonus-value')?.value) || 0;
+    const affinity = row.querySelector('.craft-bonus-affinity')?.value ?? '';
+    // Always write a 1-element array so getProfessionAugmentBonuses keeps working unchanged.
+    await this.document.update({ 'system.craftBonuses': [{ type, value, affinity }] });
   }
 
   /** @override – save scroll position before DOM replacement. */
@@ -663,20 +665,7 @@ export class AspectsofPowerItemSheet extends foundry.applications.api.Handlebars
       });
     });
 
-    // --- Craft bonus add/delete (profession augments) ---
-    this.element.querySelector('.craft-bonus-add')?.addEventListener('click', async () => {
-      const bonuses = [...(this.item.system.craftBonuses ?? []), { type: 'craftProgress', value: 0 }];
-      await this.document.update({ 'system.craftBonuses': bonuses });
-    });
-
-    this.element.querySelectorAll('.craft-bonus-delete').forEach(el => {
-      el.addEventListener('click', async () => {
-        const idx = Number(el.dataset.index);
-        const bonuses = [...(this.item.system.craftBonuses ?? [])];
-        bonuses.splice(idx, 1);
-        await this.document.update({ 'system.craftBonuses': bonuses });
-      });
-    });
+    // Craft bonus is now single-row (no add/delete) — saved via _saveCraftBonuses on form change.
 
     // --- Augment drop zone + remove buttons (equipment items) ---
     if (this.item.type === 'item') {

@@ -541,6 +541,26 @@ ASPECTSOFPOWER.rarities = {
   divine:    { label: 'ASPECTSOFPOWER.Equip.Rarity.divine',    augments: 8, color: '#ff4444' },
 };
 
+/**
+ * Profession augment craft-bonus types — single source of truth for the
+ * augment sheet's type dropdown and the craft-side bonus dispatcher.
+ * Order here is the display order in the dropdown.
+ *
+ * `d100Reroll` is intentionally excluded — gated until resource costs are figured out.
+ * See memory/design-profession-augments.md for the full design + sim references.
+ */
+ASPECTSOFPOWER.craftBonusTypes = {
+  d100Bonus:            { label: 'ASPECTSOFPOWER.CraftBonus.d100Bonus',            scaling: 'flat-per-grade-d100' },
+  craftProgress:        { label: 'ASPECTSOFPOWER.CraftBonus.craftProgress',        scaling: 'magnifier' },
+  prepBonus:            { label: 'ASPECTSOFPOWER.CraftBonus.prepBonus',            scaling: 'magnifier' },
+  materialPotency:      { label: 'ASPECTSOFPOWER.CraftBonus.materialPotency',      scaling: 'flat' },
+  critFailReduce:       { label: 'ASPECTSOFPOWER.CraftBonus.critFailReduce',       scaling: 'magnifier-pct' },
+  critSuccessThreshold: { label: 'ASPECTSOFPOWER.CraftBonus.critSuccessThreshold', scaling: 'magnifier-capped' },
+  materialPreservation: { label: 'ASPECTSOFPOWER.CraftBonus.materialPreservation', scaling: 'magnifier-pct-capped' },
+  maxProgressBoost:     { label: 'ASPECTSOFPOWER.CraftBonus.maxProgressBoost',     scaling: 'magnifier-pct' },
+  reworkDecayReduce:    { label: 'ASPECTSOFPOWER.CraftBonus.reworkDecayReduce',    scaling: 'flat-per-grade-decay' },
+};
+
 /* -------------------------------------------- */
 /*  Rank Tiers & Levelling                       */
 /* -------------------------------------------- */

@@ -35,30 +35,23 @@
       {{#if system.isProfessionAugment}}
       <div class="equip-section">
         <div class="equip-section-header flexrow">
-          <h4>Craft Bonuses</h4>
-          <a class="craft-bonus-add" title="Add Craft Bonus"><i class="fas fa-plus"></i></a>
+          <h4>Craft Bonus</h4>
         </div>
         <div class="craft-bonus-list">
-          {{#each system.craftBonuses as |bonus idx|}}
-            <div class="craft-bonus-row flexrow" data-index="{{idx}}">
-              <select class="craft-bonus-type" data-index="{{idx}}">
-                <option value="craftProgress" {{#if (eq bonus.type "craftProgress")}}selected{{/if}}>Craft Progress (flat)</option>
-                <option value="craftSkillMod" {{#if (eq bonus.type "craftSkillMod")}}selected{{/if}}>Craft Skill Mod (flat)</option>
-                <option value="d100Bonus" {{#if (eq bonus.type "d100Bonus")}}selected{{/if}}>d100 Bonus</option>
-                <option value="gatherProgress" {{#if (eq bonus.type "gatherProgress")}}selected{{/if}}>Gather Progress (flat)</option>
-                <option value="prepBonus" {{#if (eq bonus.type "prepBonus")}}selected{{/if}}>Preparation Bonus</option>
-                <option value="rarityFloor" {{#if (eq bonus.type "rarityFloor")}}selected{{/if}}>Material Rarity Floor</option>
-              </select>
-              <input type="number" class="craft-bonus-value" data-index="{{idx}}" value="{{bonus.value}}" step="1" />
-              <select class="craft-bonus-affinity" data-index="{{idx}}" title="Optional affinity filter">
-                <option value="" {{#if (eq bonus.affinity "")}}selected{{/if}}>(any)</option>
-                {{#each @root.config.craftElements as |elDef elKey|}}
-                  <option value="{{elKey}}" {{#if (eq elKey ../bonus.affinity)}}selected{{/if}}>{{localize elDef.label}}</option>
-                {{/each}}
-              </select>
-              <a class="craft-bonus-delete" data-index="{{idx}}" title="Remove"><i class="fas fa-trash"></i></a>
-            </div>
-          {{/each}}
+          <div class="craft-bonus-row flexrow" data-index="0">
+            <select class="craft-bonus-type">
+              {{#each @root.config.craftBonusTypes as |def key|}}
+                <option value="{{key}}" {{#if (eq key @root.craftBonus.type)}}selected{{/if}}>{{localize def.label}}</option>
+              {{/each}}
+            </select>
+            <input type="number" class="craft-bonus-value" value="{{craftBonus.value}}" step="any" />
+            <select class="craft-bonus-affinity" title="Optional affinity filter — bonus only fires when material element matches">
+              <option value="" {{#if (eq craftBonus.affinity "")}}selected{{/if}}>(any affinity)</option>
+              {{#each @root.config.craftElements as |elDef elKey|}}
+                <option value="{{elKey}}" {{#if (eq elKey ../craftBonus.affinity)}}selected{{/if}}>{{localize elDef.label}}</option>
+              {{/each}}
+            </select>
+          </div>
         </div>
       </div>
       {{/if}}

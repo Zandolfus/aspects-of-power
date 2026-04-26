@@ -500,6 +500,17 @@
       "fieldArmor": "Armor",
       "fieldVeil": "Veil"
     },
+    "CraftBonus": {
+      "d100Bonus":            "d100 Bonus (per-grade flat)",
+      "craftProgress":        "Craft Progress (flat)",
+      "prepBonus":            "Prep Bonus (flat)",
+      "materialPotency":      "Material Potency (flat to material)",
+      "critFailReduce":       "Crit Fail Reduce (% proc on d100<=1, sets to 2 + saves mat)",
+      "critSuccessThreshold": "Crit Success Threshold (lowers crit success target, floor 90)",
+      "materialPreservation": "Material Preservation (% mat saved on crit fail; smith/jewel/tailor/leather only)",
+      "maxProgressBoost":     "Max Progress Boost (% lift to craft cap)",
+      "reworkDecayReduce":    "Rework Decay Reduce (per-grade, smoother iterative rework curve)"
+    },
     "Consumable": {
       "sectionTitle": "Consumables",
       "type": "Consumable Type",
