@@ -1385,7 +1385,7 @@ export class AspectsofPowerItem extends Item {
     const materials = actor.items.filter(i => {
       if (i.type !== 'item' || !i.system.isMaterial) return false;
       const cur = i.system.progress ?? 0;
-      const max = i.system.maxProgress ?? (cur * 2);
+      const max = i.system.maxProgress ?? Math.round(cur * 1.2);
       return cur < max;
     });
     if (materials.length === 0) {
@@ -1396,7 +1396,7 @@ export class AspectsofPowerItem extends Item {
     const matButtons = materials.map(m => {
       const elLabel = m.system.materialElement ? ` [${m.system.materialElement}]` : '';
       const cur = m.system.progress ?? 0;
-      const max = m.system.maxProgress ?? (cur * 2);
+      const max = m.system.maxProgress ?? Math.round(cur * 1.2);
       return { action: m.id, label: `${m.name}${elLabel} — ${cur}/${max}` };
     });
     matButtons.push({ action: 'cancel', label: 'Cancel' });
@@ -1419,7 +1419,7 @@ export class AspectsofPowerItem extends Item {
     const d100Pct = d100Roll.total / 100;
     const rawGain = Math.round(skillRoll * d100Pct);
     const oldProgress = materialItem.system.progress ?? 0;
-    const maxProgress = materialItem.system.maxProgress ?? (oldProgress * 2);
+    const maxProgress = materialItem.system.maxProgress ?? Math.round(oldProgress * 1.2);
     const headroom = Math.max(0, maxProgress - oldProgress);
     const refineGain = Math.min(rawGain, headroom);
 
@@ -1548,7 +1548,7 @@ export class AspectsofPowerItem extends Item {
     const itemName = `${elPrefix}${matLabel} (${rarityLabel})`;
 
     // Create the material item and open its sheet for renaming.
-    // Max potential is 2x the gathered progress — refinement can grow toward this.
+    // Max potential is +20% above the gathered progress — refinement can grow toward this.
     const [gatheredItem] = await actor.createEmbeddedDocuments('Item', [{
       name: itemName,
       type: 'item',
@@ -1561,7 +1561,7 @@ export class AspectsofPowerItem extends Item {
         materialElement: element,
         rarity: selectedRarity,
         progress: gatherProgress,
-        maxProgress: gatherProgress * 2,
+        maxProgress: Math.round(gatherProgress * 1.2),
       },
     }]);
 
@@ -1677,7 +1677,7 @@ export class AspectsofPowerItem extends Item {
         i.type === 'skill' && (i.system.tags ?? []).includes('refine')
       );
       const currentProgress = materialItem.system.progress ?? 0;
-      const maxProgress = materialItem.system.maxProgress ?? (currentProgress * 2);
+      const maxProgress = materialItem.system.maxProgress ?? Math.round(currentProgress * 1.2);
       const headroom = Math.max(0, maxProgress - currentProgress);
 
       if (refineSkills.length > 0 && headroom > 0) {
