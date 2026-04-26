@@ -510,10 +510,11 @@ ASPECTSOFPOWER.equipmentSlots = {
   boots:    { label: 'ASPECTSOFPOWER.Equip.Slot.boots',    max: 1, set: 'combat' },
   gloves:   { label: 'ASPECTSOFPOWER.Equip.Slot.gloves',   max: 1, set: 'combat' },
   back:     { label: 'ASPECTSOFPOWER.Equip.Slot.back',     max: 1, set: 'combat' },
-  necklace: { label: 'ASPECTSOFPOWER.Equip.Slot.necklace', max: 1, set: 'combat' },
-  bracelet: { label: 'ASPECTSOFPOWER.Equip.Slot.bracelet', max: 2, set: 'combat' },
-  ring:     { label: 'ASPECTSOFPOWER.Equip.Slot.ring',     max: 10, set: 'combat' },
-  earring:  { label: 'ASPECTSOFPOWER.Equip.Slot.earring',  max: 1, set: 'combat' },
+  // Jewelry — applies to both combat and profession loadouts (worn at all times).
+  necklace: { label: 'ASPECTSOFPOWER.Equip.Slot.necklace', max: 1, set: 'both' },
+  bracelet: { label: 'ASPECTSOFPOWER.Equip.Slot.bracelet', max: 2, set: 'both' },
+  ring:     { label: 'ASPECTSOFPOWER.Equip.Slot.ring',     max: 10, set: 'both' },
+  earring:  { label: 'ASPECTSOFPOWER.Equip.Slot.earring',  max: 1, set: 'both' },
   weaponry: { label: 'ASPECTSOFPOWER.Equip.Slot.weaponry', max: 2, set: 'combat' },
   // Profession gear slots.
   profWeapon:  { label: 'ASPECTSOFPOWER.Equip.Slot.profWeapon',  max: 1, set: 'profession' },

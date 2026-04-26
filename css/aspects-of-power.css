@@ -889,6 +889,19 @@
   background: rgba(0, 0, 0, 0.4);
   border-color: #c9c7b8;
 }
+.aspects-of-power .gear-set-shared {
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px dashed rgba(38, 166, 154, 0.5);
+}
+.aspects-of-power .shared-slots-header {
+  font-size: 11px;
+  font-weight: bold;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: #26a69a;
+  margin-bottom: 4px;
+}
 .aspects-of-power .skill-reactions-header {
   margin-top: 4px;
   padding: 2px 8px;

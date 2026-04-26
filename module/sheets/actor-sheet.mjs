@@ -50,13 +50,17 @@ export class AspectsofPowerActorSheet extends foundry.applications.api.Handlebar
     const slotConfig = CONFIG.ASPECTSOFPOWER.equipmentSlots ?? {};
 
     // Determine which equipped items belong to the chosen set.
+    // 'both'-set slots (jewelry) always count regardless of mode.
     const includedItemIds = new Set();
     for (const item of actor.items) {
       if (item.type !== 'item') continue;
       if (!item.system.equipped) continue;
-      const slotDef = slotConfig[item.system.slot];
-      if (!slotDef) continue;
-      if (slotDef.set === mode) includedItemIds.add(item.id);
+      const allSlots = [item.system.slot, ...(item.system.additionalSlots ?? [])].filter(Boolean);
+      const matches = allSlots.some(slotKey => {
+        const slotSet = slotConfig[slotKey]?.set;
+        return slotSet === 'both' || slotSet === mode;
+      });
+      if (matches) includedItemIds.add(item.id);
     }
 
     // Sum equipment stat bonuses from included items only.
@@ -291,11 +295,15 @@ export class AspectsofPowerActorSheet extends foundry.applications.api.Handlebar
     context.skills         = skills;
     context.skillGroups    = skillGroups;
 
-    // Equipment slot summary for the Equipment tab — split combat vs profession.
+    // Equipment slot summary for the Equipment tab — split combat vs profession vs shared (always-on).
     context.combatSlots = {};
     context.professionSlots = {};
+    context.sharedSlots = {};
     for (const [slotKey, slotDef] of Object.entries(CONFIG.ASPECTSOFPOWER.equipmentSlots)) {
-      const target = slotDef.set === 'profession' ? context.professionSlots : context.combatSlots;
+      let target;
+      if (slotDef.set === 'profession') target = context.professionSlots;
+      else if (slotDef.set === 'both')  target = context.sharedSlots;
+      else                              target = context.combatSlots;
       target[slotKey] = {
         label: game.i18n.localize(slotDef.label),
         max: slotDef.max,
@@ -303,7 +311,7 @@ export class AspectsofPowerActorSheet extends foundry.applications.api.Handlebar
       };
     }
     // Keep combined for backward compat.
-    context.equipmentSlots = { ...context.combatSlots, ...context.professionSlots };
+    context.equipmentSlots = { ...context.combatSlots, ...context.professionSlots, ...context.sharedSlots };
     context.unequippedGear = [];
 
     for (const i of gear) {

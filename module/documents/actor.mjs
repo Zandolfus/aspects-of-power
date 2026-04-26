@@ -77,9 +77,9 @@ export class AspectsofPowerActor extends Actor {
       if (!item) return true; // no source item: always apply (legacy effects)
       const allSlots = [item.system.slot, ...(item.system.additionalSlots ?? [])].filter(Boolean);
       return allSlots.some(slotKey => {
-        const slotDef = slotConfig[slotKey];
-        const itemLoadout = slotDef?.set === 'profession' ? 'profession' : 'combat';
-        return itemLoadout === activeLoadout;
+        const slotSet = slotConfig[slotKey]?.set ?? 'combat';
+        // 'both' (e.g. jewelry) is always active regardless of loadout.
+        return slotSet === 'both' || slotSet === activeLoadout;
       });
     };
 
