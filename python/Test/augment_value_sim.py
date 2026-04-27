@@ -320,6 +320,97 @@ def run_sim_for_crafter(crafter: Crafter):
         delta_pct = (chain - base_chain) / base_chain * 100
         print(f'  {rarity:<10} {reduction:>10.2f} {chain:>9.1f} {delta_pct:>+9.2f}%')
 
+    # ── Option A (revised): cap = "what the craft would output if crafter rolled d100=100" ─
+    # cap = material × 0.5 + skill_roll × 0.5 + bonuses  (i.e., 100% d100 instead of actual roll)
+    # Each rework adds round(crafterRoll / (reworkCount + 2)), capped at headroom.
+    # Headroom is always skill_roll × 0.5 × (1 − d100_pct), independent of material strength.
+    print(f'\nOption A (revised): crafts-to-max-out-item (cap = perfect-d100 craft outcome):')
+    print(f'  {"Material":>10} {"Mean Cap":>10} {"Mean Crafts":>13} {"Median":>8} {"P90":>6} {"Avg Final %":>13}')
+    print(f'  {"-"*70}')
+
+    def simulate_to_max_v2(crafter, material_progress=500, max_attempts=50, divisor_offset=2):
+        """Cap is set per-craft based on the initial skill_roll. Run reworks toward the cap.
+        divisor for nth rework = (n - 1) + divisor_offset."""
+        skill_roll = crafter.main_craft.roll()
+        d100 = random.randint(1, 100)
+        crafter_roll = round(skill_roll * d100 / 100)
+        material_ctrb = round(material_progress * 0.5)
+        crafter_ctrb = round(crafter_roll * 0.5)
+        progress = material_ctrb + crafter_ctrb
+        cap = round(material_progress * 0.5) + round(skill_roll * 1.0 * 0.5)
+        crafts = 1
+
+        if progress >= cap:
+            return crafts, progress, cap
+
+        for rework_count in range(max_attempts):
+            divisor = rework_count + divisor_offset
+            re_skill = crafter.main_craft.roll()
+            re_d100 = random.randint(1, 100)
+            re_crafter = round(re_skill * re_d100 / 100)
+            headroom = cap - progress
+            if headroom <= 0:
+                break
+            add = min(round(re_crafter / divisor), headroom)
+            progress += add
+            crafts += 1
+            if progress >= cap:
+                break
+        return crafts, progress, cap
+
+    print(f'  {"Offset":>8} {"Material":>10} {"Mean Crafts":>13} {"Median":>8} {"P90":>6}')
+    print(f'  {"-"*55}')
+    for offset in [3, 4, 5, 6]:
+        for mat in [500]:  # one material strength to compare offsets cleanly
+            results = [simulate_to_max_v2(crafter, material_progress=mat, divisor_offset=offset) for _ in range(2000)]
+            crafts_list = [r[0] for r in results]
+            crafts_sorted = sorted(crafts_list)
+            median = crafts_sorted[len(crafts_sorted) // 2]
+            p90 = crafts_sorted[int(len(crafts_sorted) * 0.9)]
+            print(f'  {offset:>8} {mat:>10} {statistics.mean(crafts_list):>13.2f} {median:>8} {p90:>6}')
+
+    # ── Option B unbounded saturation analysis ─────────────────────────────
+    # New rework rules: crafter-only contribution (no material, no 50/50), divisor = reworkCount + 2.
+    # Initial craft P0 = material × 0.5 + crafter × 0.5 + bonuses.
+    # Each rework adds (crafter + bonuses) / divisor.
+    # No cap = harmonic series, diverges slowly.
+    print(f'\nOption B saturation analysis (no maxProgress cap, crafter-only reworks):')
+    initial_inputs = CraftInputs(crafter=crafter)
+    initial_p0 = avg_craft(initial_inputs, n=5000)['mean']
+    print(f'  P0 (initial craft avg): {initial_p0:.1f}')
+
+    # Simulate unbounded reworks. Each rework: contribution = crafterRoll only (no material, no halving).
+    def simulate_rework_only(crafter, prior_count):
+        skill_total = crafter.main_craft.roll()
+        skill_roll = round(skill_total)
+        d100 = random.randint(1, 100)
+        d100_pct = d100 / 100
+        crafter_roll = round(skill_roll * d100_pct)
+        divisor = prior_count + 2
+        return round(crafter_roll / divisor)
+
+    print(f'  {"Reworks":>8} {"Total Prog":>11} {"% of P0":>9} {"Last Add":>9}')
+    print(f'  {"-"*42}')
+    breakpoints = [1, 3, 5, 10, 20, 50, 100, 500]
+    n_runs = 2000
+    for target_n in breakpoints:
+        progs = []
+        last_adds = []
+        for _ in range(n_runs):
+            prog = simulate_craft(initial_inputs).progress
+            last = 0
+            for i in range(target_n):
+                add = simulate_rework_only(crafter, prior_count=i)
+                prog += add
+                if i == target_n - 1:
+                    last = add
+            progs.append(prog)
+            last_adds.append(last)
+        avg_total = statistics.mean(progs)
+        avg_last = statistics.mean(last_adds)
+        pct_of_p0 = (avg_total / initial_p0) * 100
+        print(f'  {target_n:>8} {avg_total:>11.1f} {pct_of_p0:>8.0f}% {avg_last:>9.1f}')
+
 def _run_one(aug, baseline_inputs, baseline, value, label_suffix=''):
     aug_inputs = with_augment(baseline_inputs, aug, value)
     aug_result = avg_craft(aug_inputs)

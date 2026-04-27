@@ -345,6 +345,65 @@ ASPECTSOFPOWER.craftMaterialValues = {
 };
 
 /**
+ * Item types a craft skill can produce. Each entry defines:
+ *   category: one of 'armaments' | 'armor' | 'jewelry' | 'profession'
+ *   tags:     static system tags applied at craft time (material + affinity tags inherit dynamically)
+ *   slot:     equipment slot the crafted item lives in
+ * Drives the new craft flow's category + type selection dialogs.
+ */
+ASPECTSOFPOWER.craftItemTypes = {
+  // ── Armaments (slot: weaponry) ──
+  sword:        { category: 'armaments', tags: ['weapon', '1H', 'sword'],                       slot: 'weaponry' },
+  axe:          { category: 'armaments', tags: ['weapon', '1H', 'axe'],                         slot: 'weaponry' },
+  spear:        { category: 'armaments', tags: ['weapon', '1H', 'spear'],                       slot: 'weaponry' },
+  dagger:       { category: 'armaments', tags: ['weapon', '1H', 'dagger'],                      slot: 'weaponry' },
+  hammer:       { category: 'armaments', tags: ['weapon', '1H', 'hammer'],                      slot: 'weaponry' },
+  rapier:       { category: 'armaments', tags: ['weapon', '1H', 'rapier'],                      slot: 'weaponry' },
+  greatsword:   { category: 'armaments', tags: ['weapon', '2H', 'greatsword'],                  slot: 'weaponry' },
+  greataxe:     { category: 'armaments', tags: ['weapon', '2H', 'greataxe'],                    slot: 'weaponry' },
+  polearm:      { category: 'armaments', tags: ['weapon', '2H', 'polearm'],                     slot: 'weaponry' },
+  staff:        { category: 'armaments', tags: ['weapon', '2H', 'staff'],                       slot: 'weaponry' },
+  bow:          { category: 'armaments', tags: ['weapon', '2H', 'bow'],                         slot: 'weaponry' },
+  buckler:      { category: 'armaments', tags: ['weapon', '1H', 'shield', 'buckler'],           slot: 'weaponry' },
+  shield:       { category: 'armaments', tags: ['weapon', '1H', 'shield'],                      slot: 'weaponry' },
+  greatshield:  { category: 'armaments', tags: ['weapon', '1H', 'shield', 'greatshield'],       slot: 'weaponry' },
+
+  // ── Armor (slot = key) ──
+  chest:    { category: 'armor', tags: ['armor', 'chest'],     slot: 'chest' },
+  legs:     { category: 'armor', tags: ['armor', 'legs'],      slot: 'legs' },
+  head:     { category: 'armor', tags: ['armor', 'head'],      slot: 'head' },
+  bracers:  { category: 'armor', tags: ['armor', 'bracers'],   slot: 'bracers' },
+  boots:    { category: 'armor', tags: ['armor', 'boots'],     slot: 'boots' },
+  gloves:   { category: 'armor', tags: ['armor', 'gloves'],    slot: 'gloves' },
+  back:     { category: 'armor', tags: ['armor', 'back'],      slot: 'back' },
+
+  // ── Jewelry (slot = key) ──
+  necklace: { category: 'jewelry', tags: ['jewelry', 'necklace'], slot: 'necklace' },
+  bracelet: { category: 'jewelry', tags: ['jewelry', 'bracelet'], slot: 'bracelet' },
+  ring:     { category: 'jewelry', tags: ['jewelry', 'ring'],     slot: 'ring' },
+  earring:  { category: 'jewelry', tags: ['jewelry', 'earring'],  slot: 'earring' },
+
+  // ── Profession (slot = key) ──
+  profWeapon:  { category: 'profession', tags: ['profession', 'profWeapon'],  slot: 'profWeapon' },
+  profUtility: { category: 'profession', tags: ['profession', 'profUtility'], slot: 'profUtility' },
+  profHead:    { category: 'profession', tags: ['profession', 'profHead'],    slot: 'profHead' },
+  profChest:   { category: 'profession', tags: ['profession', 'profChest'],   slot: 'profChest' },
+  profLegs:    { category: 'profession', tags: ['profession', 'profLegs'],    slot: 'profLegs' },
+  profBoots:   { category: 'profession', tags: ['profession', 'profBoots'],   slot: 'profBoots' },
+  profGloves:  { category: 'profession', tags: ['profession', 'profGloves'],  slot: 'profGloves' },
+};
+
+/**
+ * Display labels for the four craft categories.
+ */
+ASPECTSOFPOWER.craftCategories = {
+  armaments:  { label: 'Armaments' },
+  armor:      { label: 'Armor' },
+  jewelry:    { label: 'Jewelry' },
+  profession: { label: 'Profession' },
+};
+
+/**
  * Material rarity → d100 roll floor/ceiling for crafting.
  */
 ASPECTSOFPOWER.craftRarityRanges = {

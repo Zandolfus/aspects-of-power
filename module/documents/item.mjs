@@ -95,7 +95,16 @@ export class AspectsofPowerItem extends Item {
 
   _buildRollFormulas(rollData) {
     const A   = this.actor.system.abilities;
-    const ab  = A[rollData.roll.abilities]?.mod ?? 0;
+    // Pure (default): use primary ability mod at full weight.
+    // Hybrid: blend primary + secondary at configured weights (e.g., 0.7 + 0.3).
+    const primaryMod = A[rollData.roll.abilities]?.mod ?? 0;
+    let ab = primaryMod;
+    if (rollData.roll.statType === 'hybrid') {
+      const secondaryMod = A[rollData.roll.secondaryAbility]?.mod ?? 0;
+      const pw = rollData.roll.primaryWeight ?? 1.0;
+      const sw = rollData.roll.secondaryWeight ?? 0;
+      ab = Math.round(primaryMod * pw + secondaryMod * sw);
+    }
     const db  = rollData.roll.diceBonus;
     const dic = rollData.roll.dice || '0';
     const typ = rollData.roll.type;
@@ -1856,14 +1865,16 @@ export class AspectsofPowerItem extends Item {
     const crafterRoll = Math.round(skillRoll * d100Pct);
     const crafterContribution = Math.round(crafterRoll * 0.5);
 
-    // Theoretical max for THIS craft: d100 hits the rarity ceiling.
-    const maxD100Pct = rarityRange.ceiling / 100;
-    const maxCrafterRoll = Math.round(skillRoll * maxD100Pct);
+    // Theoretical max for THIS craft: what would result if the crafter rolled a perfect d100 (=100).
+    // Uses 1.0 instead of rarity ceiling so the cap doesn't swing wildly with material rarity.
+    const maxCrafterRoll = skillRoll;
     const theoreticalMaxProgress = Math.round(materialProgress * 0.5) + Math.round(maxCrafterRoll * 0.5) + prepBonus + progressBonus;
 
     let totalProgress = materialContribution + crafterContribution + prepBonus + progressBonus;
 
-    // Iterative rework: apply 1/(reworkCount+1) diminishing returns, capped at item's maxProgress.
+    // Iterative rework: crafter-only contribution (no material, no 50/50 split since
+    // material isn't being consumed). Apply 1/(reworkCount+2) diminishing returns,
+    // capped at the item's maxProgress.
     let reworkAddedProgress = 0;
     let reworkBlocked = false;
     if (reworkTarget) {
@@ -1875,8 +1886,12 @@ export class AspectsofPowerItem extends Item {
         reworkBlocked = true;
       } else {
         const existingCount = reworkTarget.system.reworkCount ?? 0;
-        const divisor = existingCount + 2;
-        const rawAdd = Math.round(totalProgress / divisor);
+        // Divisor offset of 5 calibrated so an item maxes out in ~5 total crafts
+        // (1 initial + ~4 reworks on average); see python/Test/augment_value_sim.py.
+        const divisor = existingCount + 5;
+        // Crafter-only — material is not consumed and doesn't contribute on rework.
+        const reworkContribution = crafterRoll + prepBonus + progressBonus;
+        const rawAdd = Math.round(reworkContribution / divisor);
         reworkAddedProgress = Math.min(rawAdd, headroom);
         totalProgress = existingProgress + reworkAddedProgress;
       }
@@ -1977,11 +1992,13 @@ export class AspectsofPowerItem extends Item {
         system: consumableData,
       }]);
 
-      // Consume material.
-      if ((materialItem.system.quantity ?? 1) <= 1) {
-        await materialItem.delete();
-      } else {
-        await materialItem.update({ 'system.quantity': materialItem.system.quantity - 1 });
+      // Consume material — but only on initial craft. Reworks reuse existing item, no mat cost.
+      if (!reworkTarget) {
+        if ((materialItem.system.quantity ?? 1) <= 1) {
+          await materialItem.delete();
+        } else {
+          await materialItem.update({ 'system.quantity': materialItem.system.quantity - 1 });
+        }
       }
 
       ChatMessage.create({
@@ -2082,10 +2099,13 @@ export class AspectsofPowerItem extends Item {
         }]);
       }
 
-      if ((materialItem.system.quantity ?? 1) <= 1) {
-        await materialItem.delete();
-      } else {
-        await materialItem.update({ 'system.quantity': materialItem.system.quantity - 1 });
+      // Consume material — but only on initial craft. Reworks reuse existing item, no mat cost.
+      if (!reworkTarget) {
+        if ((materialItem.system.quantity ?? 1) <= 1) {
+          await materialItem.delete();
+        } else {
+          await materialItem.update({ 'system.quantity': materialItem.system.quantity - 1 });
+        }
       }
 
       const statLine = statBonuses.length

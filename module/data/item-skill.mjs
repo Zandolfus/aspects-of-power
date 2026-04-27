@@ -15,7 +15,7 @@ export class SkillData extends foundry.abstract.TypeDataModel {
       formula:     new fields.StringField({ initial: '' }),
       roll: new fields.SchemaField({
         dice:         new fields.StringField({ initial: '' }),
-        abilities:    new fields.StringField({ initial: '' }),
+        abilities:    new fields.StringField({ initial: '' }),  // primary ability (back-compat name)
         resource:     new fields.StringField({ initial: '' }),
         cost:         new fields.NumberField({ initial: 0, integer: true }),
         type:         new fields.StringField({ initial: '' }),
@@ -24,7 +24,16 @@ export class SkillData extends foundry.abstract.TypeDataModel {
         targetDefense: new fields.StringField({ initial: '' }),
         // Whether this skill deals physical damage (armor) or non-physical (veil).
         damageType:   new fields.StringField({ initial: 'physical' }),
+        // Pure vs Hybrid stat usage. Pure = primary at 100%; Hybrid blends two abilities at weights.
+        statType:         new fields.StringField({ initial: 'pure', choices: ['pure', 'hybrid'] }),
+        secondaryAbility: new fields.StringField({ initial: '' }),
+        primaryWeight:    new fields.NumberField({ initial: 1.0, min: 0, max: 1 }),
+        secondaryWeight:  new fields.NumberField({ initial: 0, min: 0, max: 1 }),
       }),
+
+      // Craft skills: which item types this skill can produce (keys from CONFIG.ASPECTSOFPOWER.craftItemTypes).
+      // Empty for non-craft skills.
+      craftAllowedTypes: new fields.ArrayField(new fields.StringField(), { initial: [] }),
 
       // Tags that define what this skill does when activated (e.g. ["attack","debuff"]).
       tags: new fields.ArrayField(new fields.StringField(), { initial: [] }),
