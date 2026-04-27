@@ -2308,7 +2308,11 @@ export class AspectsofPowerItem extends Item {
       if (inheritedTypeTags.length > 0) {
         staticTypeTags = inheritedTypeTags;
       } else if (reworkTarget) {
-        staticTypeTags = (reworkTarget.system.systemTags ?? []).map(t => t.id);
+        // Read both arrays — type tags now live in system.tags (free-form), but legacy items
+        // and registry-backed tags (affinities) still come from system.systemTags.
+        const freeTags  = reworkTarget.system.tags ?? [];
+        const sysTagIds = (reworkTarget.system.systemTags ?? []).map(t => t.id);
+        staticTypeTags = [...freeTags, ...sysTagIds];
       } else {
         staticTypeTags = itemTypeDef?.tags ?? [];
       }
