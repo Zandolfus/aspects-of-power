@@ -330,11 +330,37 @@ ASPECTSOFPOWER.craftQuality = {
 
 /**
  * Slot value multipliers for crafting stat/armor calculations.
+ * Keyed by typeKey for weapons (since 1H and 2H differ) and by slot for everything else.
+ * Lookup at craft time: typeKey first, then outputSlot.
+ *
+ * Slot value = armor/veil value for armor & jewelry. For shields, slot value (stat) = 0.25
+ * but armor value differs (see craftShieldArmorValues).
  */
 ASPECTSOFPOWER.craftSlotValues = {
-  chest: 0.5, legs: 0.4, head: 0.2, bracers: 0.2, boots: 0.2,
-  gloves: 0.1, back: 0.1, necklace: 0.4, bracelet: 0.3, ring: 0.5,
-  earring: 0.3, weaponry: 0.25,
+  // ── Armor (slot = type) ──
+  chest: 0.50, legs: 0.40, head: 0.20, bracers: 0.20, boots: 0.20,
+  gloves: 0.10, back: 0.10,
+  // ── Jewelry (slot = type) ──
+  necklace: 0.40, bracelet: 0.30, ring: 0.50, earring: 0.30,
+  // ── Profession (slot = type) ──
+  profWeapon: 0.25, profUtility: 0.25, profHead: 0.20, profChest: 0.50,
+  profLegs: 0.40, profBoots: 0.20, profGloves: 0.10,
+  // ── Weapons (per type — 1H/shields = 25%, 2H = 50%) ──
+  sword: 0.25, axe: 0.25, spear: 0.25, dagger: 0.25, hammer: 0.25, rapier: 0.25,
+  greatsword: 0.50, greataxe: 0.50, polearm: 0.50, staff: 0.50, bow: 0.50,
+  buckler: 0.25, shield: 0.25, greatshield: 0.25,
+  // Slot fallback (used by legacy non-flow callers; only relevant for weaponry slot now)
+  weaponry: 0.25,
+};
+
+/**
+ * Shield armor value multipliers — only used for armorBonus on shield items.
+ * Shields have separate stat value (25%, see craftSlotValues) and armor value.
+ */
+ASPECTSOFPOWER.craftShieldArmorValues = {
+  buckler:     0.30,  // small
+  shield:      0.40,  // medium
+  greatshield: 0.50,  // large
 };
 
 /**

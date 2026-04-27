@@ -1980,7 +1980,12 @@ export class AspectsofPowerItem extends Item {
       }
     }
 
-    const element = materialItem.system.materialElement || '';
+    // For iterative reworks (no material), extract element from reworkTarget's stored affinity tag.
+    let element = materialItem ? (materialItem.system.materialElement || '') : '';
+    if (!element && reworkTarget) {
+      const affTag = (reworkTarget.system.systemTags ?? []).find(t => t.id?.endsWith('-affinity'));
+      if (affTag) element = affTag.id.replace(/-affinity$/, '');
+    }
     const craftNatLine = d100Roll.total === 100
       ? '<p style="color:#ffca28;font-size:1.2em;">&#9733; Masterwork! Natural 100! &#9733;</p>'
       : '';
@@ -2085,10 +2090,7 @@ export class AspectsofPowerItem extends Item {
         || (materialItem ? materialItem.system.material : null)
         || (reworkTarget ? reworkTarget.system.material : null)
         || 'metal';
-      const slotValue = CONFIG.ASPECTSOFPOWER.craftSlotValues?.[outputSlot] ?? 0.25;
-      const matValue = CONFIG.ASPECTSOFPOWER.craftMaterialValues?.[outputMaterial] ?? 0.5;
-
-      // Resolve type tags up-front so 1H/2H weapons get the right stat-budget percentage.
+      // Resolve type tags up-front (drives slotValue lookup, defense routing, naming).
       // Priority: new-flow typeKey → reworkTarget's stored tags → outputSlot fallback.
       const itemTypeDef = typeKey
         ? (CONFIG.ASPECTSOFPOWER.craftItemTypes?.[typeKey])
@@ -2097,19 +2099,27 @@ export class AspectsofPowerItem extends Item {
       if (inheritedTypeTags.length > 0) {
         staticTypeTags = inheritedTypeTags;
       } else if (reworkTarget) {
-        // Iterative: use the existing item's stored systemTags so 1H/2H/shield are correctly detected.
         staticTypeTags = (reworkTarget.system.systemTags ?? []).map(t => t.id);
       } else {
         staticTypeTags = itemTypeDef?.tags ?? [];
       }
       const slotCategory = itemTypeDef?.category;
-      const isShield  = staticTypeTags.includes('shield');
-      const isWeapon  = staticTypeTags.includes('weapon');
-      const isTwoHand = staticTypeTags.includes('2H');
-      // Stat-budget percentage: 1H weapons get 25%, 2H weapons get 50%, armor/jewelry/profession use 25%.
-      const statBudgetPct = (isWeapon && !isShield && isTwoHand) ? 0.50 : 0.25;
+      const isShield = staticTypeTags.includes('shield');
 
-      const totalStatBudget = Math.round(totalProgress * slotValue * statBudgetPct);
+      // Slot value lookup: typeKey first (so 1H/2H weapons get distinct values), then outputSlot.
+      // For iterative reworks, derive an effective typeKey by scanning stored tags for a known type.
+      let effectiveTypeKey = typeKey;
+      if (!effectiveTypeKey && reworkTarget) {
+        const knownTypes = Object.keys(CONFIG.ASPECTSOFPOWER.craftItemTypes ?? {});
+        effectiveTypeKey = knownTypes.find(k => staticTypeTags.includes(k));
+      }
+      const slotValue = CONFIG.ASPECTSOFPOWER.craftSlotValues?.[effectiveTypeKey]
+        ?? CONFIG.ASPECTSOFPOWER.craftSlotValues?.[outputSlot]
+        ?? 0.25;
+      const matValue = CONFIG.ASPECTSOFPOWER.craftMaterialValues?.[outputMaterial] ?? 0.5;
+
+      // Stat budget = Progress × Slot value × 0.25 (universal — slotValue encodes 1H/2H).
+      const totalStatBudget = Math.round(totalProgress * slotValue * 0.25);
       const statBonuses = [];
 
       if (elementDef?.stats?.length >= 3 && totalStatBudget > 0) {
@@ -2131,12 +2141,17 @@ export class AspectsofPowerItem extends Item {
         }
       }
 
-      // Defense routing: armor slots → armor bonus, jewelry → veil, shields → armor, other weapons → neither.
+      // Defense routing: armor slots → armor bonus, jewelry → veil, shields → armor (separate value), other weapons → neither.
       const isArmorSlot   = slotCategory === 'armor';
       const isJewelrySlot = slotCategory === 'jewelry';
       const defenseValue = Math.round(totalProgress * slotValue * matValue);
-      const armorBonus = (isArmorSlot || isShield) ? defenseValue : 0;
+      let armorBonus = isArmorSlot ? defenseValue : 0;
       const veilBonus  = isJewelrySlot ? defenseValue : 0;
+      // Shields use a separate armor value table (small/medium/large = 30/40/50%).
+      if (isShield) {
+        const shieldArmorValue = CONFIG.ASPECTSOFPOWER.craftShieldArmorValues?.[effectiveTypeKey] ?? 0.30;
+        armorBonus = Math.round(totalProgress * shieldArmorValue * matValue);
+      }
 
       const rarityDef = CONFIG.ASPECTSOFPOWER.rarities?.[qualityData.rarity];
       const augmentSlots = rarityDef?.augments ?? 0;
