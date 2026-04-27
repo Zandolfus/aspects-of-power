@@ -627,8 +627,8 @@ export class AspectsofPowerItemSheet extends foundry.applications.api.Handlebars
     // ── Tag Editor (system tags on race/class/prof/equipment) ──
     this._bindTagEditor();
 
-    // ── Skill Tag Autocomplete ──
-    if (this.item.type === 'skill') this._bindSkillTagAutocomplete();
+    // ── Skill / Item Tag Autocomplete ──
+    if (this.item.type === 'skill' || this.item.type === 'item') this._bindSkillTagAutocomplete();
 
     // Profile image — open FilePicker on click (AppV2 doesn't auto-wire data-edit).
     this.element.querySelectorAll('[data-edit="img"]').forEach(el => {
@@ -881,15 +881,35 @@ export class AspectsofPowerItemSheet extends foundry.applications.api.Handlebars
     const suggestions = container.querySelector('.skill-tag-suggestions');
     if (!input || !suggestions) return;
 
-    // Build available tags based on skill category.
-    const category = this.item.system.skillCategory;
-    const tagSource = category === 'profession'
-      ? CONFIG.ASPECTSOFPOWER.professionTags
-      : CONFIG.ASPECTSOFPOWER.combatTags;
-    const allTags = Object.entries(tagSource).map(([key, label]) => ({
-      key,
-      label: game.i18n.localize(label),
-    }));
+    // Build available tags based on item type / skill category.
+    let allTags;
+    if (this.item.type === 'item') {
+      // Item suggestions: union of static type tags from craftItemTypes + materials + affinity registry tags.
+      const seen = new Map();
+      for (const def of Object.values(CONFIG.ASPECTSOFPOWER.craftItemTypes ?? {})) {
+        for (const t of def.tags ?? []) {
+          if (!seen.has(t)) seen.set(t, t.charAt(0).toUpperCase() + t.slice(1));
+        }
+      }
+      for (const m of ['metal', 'wood', 'leather', 'cloth', 'gem', 'crystal', 'herb', 'bone']) {
+        if (!seen.has(m)) seen.set(m, m.charAt(0).toUpperCase() + m.slice(1));
+      }
+      for (const [key, def] of Object.entries(CONFIG.ASPECTSOFPOWER.tagRegistry ?? {})) {
+        if (def.category === 'affinity' && !seen.has(key)) {
+          seen.set(key, game.i18n.localize(def.label));
+        }
+      }
+      allTags = [...seen.entries()].map(([key, label]) => ({ key, label }));
+    } else {
+      const category = this.item.system.skillCategory;
+      const tagSource = category === 'profession'
+        ? CONFIG.ASPECTSOFPOWER.professionTags
+        : CONFIG.ASPECTSOFPOWER.combatTags;
+      allTags = Object.entries(tagSource).map(([key, label]) => ({
+        key,
+        label: game.i18n.localize(label),
+      }));
+    }
 
     const currentTags = () => this.item.system.tags ?? [];
 
@@ -967,25 +987,23 @@ export class AspectsofPowerItemSheet extends foundry.applications.api.Handlebars
 
     const updateData = { 'system.tags': existing };
 
-    // Debuff subtype auto-adds the 'debuff' parent tag and sets debuff type.
-    const debuffSubtypes = CONFIG.ASPECTSOFPOWER.debuffSubtypeTags ?? {};
-    if (debuffSubtypes[tagKey]) {
-      if (!existing.includes('debuff')) existing.push('debuff');
-      updateData['system.tagConfig.debuffType'] = debuffSubtypes[tagKey];
-    }
-
-    // AOE tag auto-enables the AOE section.
-    if (tagKey === 'aoe') {
-      updateData['system.aoe.enabled'] = true;
-    }
-
-    // Affinity tag auto-adds to the affinities array.
-    const affinityTags = CONFIG.ASPECTSOFPOWER.affinityTags ?? new Set();
-    if (affinityTags.has(tagKey)) {
-      const affinities = [...(this.item.system.affinities ?? [])];
-      if (!affinities.includes(tagKey)) {
-        affinities.push(tagKey);
-        updateData['system.affinities'] = affinities;
+    // Skill-only side effects (debuff/aoe/affinity auto-wiring).
+    if (this.item.type === 'skill') {
+      const debuffSubtypes = CONFIG.ASPECTSOFPOWER.debuffSubtypeTags ?? {};
+      if (debuffSubtypes[tagKey]) {
+        if (!existing.includes('debuff')) existing.push('debuff');
+        updateData['system.tagConfig.debuffType'] = debuffSubtypes[tagKey];
+      }
+      if (tagKey === 'aoe') {
+        updateData['system.aoe.enabled'] = true;
+      }
+      const affinityTags = CONFIG.ASPECTSOFPOWER.affinityTags ?? new Set();
+      if (affinityTags.has(tagKey)) {
+        const affinities = [...(this.item.system.affinities ?? [])];
+        if (!affinities.includes(tagKey)) {
+          affinities.push(tagKey);
+          updateData['system.affinities'] = affinities;
+        }
       }
     }
 
@@ -996,34 +1014,30 @@ export class AspectsofPowerItemSheet extends foundry.applications.api.Handlebars
     let filtered = (this.item.system.tags ?? []).filter(t => t !== tagKey);
     const updateData = { 'system.tags': filtered };
 
-    // If removing aoe tag, disable AOE.
-    if (tagKey === 'aoe') {
-      updateData['system.aoe.enabled'] = false;
-    }
-
-    // If removing a debuff subtype, clear debuff type. If no subtypes remain, remove 'debuff' parent.
-    const debuffSubtypes = CONFIG.ASPECTSOFPOWER.debuffSubtypeTags ?? {};
-    if (debuffSubtypes[tagKey]) {
-      updateData['system.tagConfig.debuffType'] = 'none';
-      const hasOtherSubtype = filtered.some(t => debuffSubtypes[t]);
-      if (!hasOtherSubtype) {
-        filtered = filtered.filter(t => t !== 'debuff');
-        updateData['system.tags'] = filtered;
+    // Skill-only side effects (debuff/aoe/affinity unwiring).
+    if (this.item.type === 'skill') {
+      if (tagKey === 'aoe') {
+        updateData['system.aoe.enabled'] = false;
       }
-    }
-
-    // If removing 'debuff' directly, also remove all subtype tags.
-    if (tagKey === 'debuff') {
-      filtered = filtered.filter(t => !debuffSubtypes[t]);
-      updateData['system.tags'] = filtered;
-      updateData['system.tagConfig.debuffType'] = 'none';
-    }
-
-    // Affinity tag removal — remove from affinities array.
-    const affinityTags = CONFIG.ASPECTSOFPOWER.affinityTags ?? new Set();
-    if (affinityTags.has(tagKey)) {
-      const affinities = (this.item.system.affinities ?? []).filter(a => a !== tagKey);
-      updateData['system.affinities'] = affinities;
+      const debuffSubtypes = CONFIG.ASPECTSOFPOWER.debuffSubtypeTags ?? {};
+      if (debuffSubtypes[tagKey]) {
+        updateData['system.tagConfig.debuffType'] = 'none';
+        const hasOtherSubtype = filtered.some(t => debuffSubtypes[t]);
+        if (!hasOtherSubtype) {
+          filtered = filtered.filter(t => t !== 'debuff');
+          updateData['system.tags'] = filtered;
+        }
+      }
+      if (tagKey === 'debuff') {
+        filtered = filtered.filter(t => !debuffSubtypes[t]);
+        updateData['system.tags'] = filtered;
+        updateData['system.tagConfig.debuffType'] = 'none';
+      }
+      const affinityTags = CONFIG.ASPECTSOFPOWER.affinityTags ?? new Set();
+      if (affinityTags.has(tagKey)) {
+        const affinities = (this.item.system.affinities ?? []).filter(a => a !== tagKey);
+        updateData['system.affinities'] = affinities;
+      }
     }
 
     await this.document.update(updateData);

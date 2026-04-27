@@ -1786,6 +1786,12 @@ export class AspectsofPowerItem extends Item {
     const rarityLabel = selectedRarity.charAt(0).toUpperCase() + selectedRarity.slice(1);
     const itemName = `${elPrefix}${matLabel} (${rarityLabel}) - ${gatherProgress}`;
 
+    // Tag inheritance for gathered materials: free-form (material type) + registry (affinity).
+    const matFreeTags = [];
+    if (materialType) matFreeTags.push(materialType);
+    const matSystemTags = [];
+    if (element && element !== 'neutral') matSystemTags.push({ id: `${element}-affinity`, value: 0 });
+
     // Create the material item and open its sheet for renaming.
     // Max potential is +20% above the gathered progress — refinement can grow toward this.
     const [gatheredItem] = await actor.createEmbeddedDocuments('Item', [{
@@ -1801,6 +1807,8 @@ export class AspectsofPowerItem extends Item {
         rarity: selectedRarity,
         progress: gatherProgress,
         maxProgress: Math.round(gatherProgress * 1.2),
+        tags: matFreeTags,
+        systemTags: matSystemTags,
       },
     }]);
 
@@ -2357,11 +2365,13 @@ export class AspectsofPowerItem extends Item {
       const rarityDef = CONFIG.ASPECTSOFPOWER.rarities?.[qualityData.rarity];
       const augmentSlots = rarityDef?.augments ?? 0;
 
-      // Tag inheritance: static type tags + material tag + affinity tag.
-      const craftedTags = [];
-      for (const t of staticTypeTags) craftedTags.push({ id: t, value: 0 });
-      if (outputMaterial) craftedTags.push({ id: outputMaterial, value: 0 });
-      if (element && element !== 'neutral') craftedTags.push({ id: `${element}-affinity`, value: 0 });
+      // Tag inheritance:
+      //   - free-form tags (sword/1H/weapon/metal etc.) → system.tags (chip UI)
+      //   - registry-backed affinity tag → system.systemTags (mechanical effects)
+      const craftedFreeTags = [...staticTypeTags];
+      if (outputMaterial) craftedFreeTags.push(outputMaterial);
+      const craftedSystemTags = [];
+      if (element && element !== 'neutral') craftedSystemTags.push({ id: `${element}-affinity`, value: 0 });
 
       // Name format: "{Element-Prefixed Type} - {progress}". Use typeKey for weapons (sword/axe/etc.),
       // outputSlot for armor/jewelry/profession (slot == type).
@@ -2405,7 +2415,8 @@ export class AspectsofPowerItem extends Item {
             armorBonus,
             veilBonus,
             augmentSlots,
-            systemTags: craftedTags,
+            tags: craftedFreeTags,
+            systemTags: craftedSystemTags,
           },
         }]);
       }
