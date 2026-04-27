@@ -2320,11 +2320,19 @@ export class AspectsofPowerItem extends Item {
       const isShield = staticTypeTags.includes('shield');
 
       // Slot value lookup: typeKey first (so 1H/2H weapons get distinct values), then outputSlot.
-      // For iterative reworks, derive an effective typeKey by scanning stored tags for a known type.
+      // For iterative reworks, derive an effective typeKey by picking the most specific match
+      // (highest tag-overlap with the existing item's stored tags). This avoids 'greatshield'
+      // resolving to 'shield' just because 'shield' comes earlier in config order.
       let effectiveTypeKey = typeKey;
       if (!effectiveTypeKey && reworkTarget) {
-        const knownTypes = Object.keys(CONFIG.ASPECTSOFPOWER.craftItemTypes ?? {});
-        effectiveTypeKey = knownTypes.find(k => staticTypeTags.includes(k));
+        const knownTypes = Object.entries(CONFIG.ASPECTSOFPOWER.craftItemTypes ?? {});
+        let bestKey = null;
+        let bestScore = 0;
+        for (const [k, def] of knownTypes) {
+          const overlap = (def.tags ?? []).filter(t => staticTypeTags.includes(t)).length;
+          if (overlap > bestScore) { bestScore = overlap; bestKey = k; }
+        }
+        effectiveTypeKey = bestKey;
       }
       const slotValue = CONFIG.ASPECTSOFPOWER.craftSlotValues?.[effectiveTypeKey]
         ?? CONFIG.ASPECTSOFPOWER.craftSlotValues?.[outputSlot]
