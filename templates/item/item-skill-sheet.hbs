@@ -3,6 +3,23 @@
     <img class='profile-img' src='{{item.img}}' data-edit='img' title='{{item.name}}' />
     <div class='header-fields'>
       <h1 class='charname'><input name='name' type='text' value='{{item.name}}' placeholder='Name' /></h1>
+
+      {{! Tag chips + autocomplete (always visible) }}
+      <div class='skill-tags'>
+        <label class='resource-label'>{{localize "ASPECTSOFPOWER.Tag.label"}}</label>
+        <div class='skill-tag-chips'>
+          {{#each system.tags as |tag|}}
+            <span class='skill-tag-chip'>
+              {{tag}}
+              <a class='skill-tag-remove' data-tag='{{tag}}' title='Remove'>×</a>
+            </span>
+          {{/each}}
+        </div>
+        <div class='skill-tag-autocomplete'>
+          <input type='text' class='skill-tag-input' placeholder='Type to search tags...' autocomplete='off' />
+          <ul class='skill-tag-suggestions'></ul>
+        </div>
+      </div>
     </div>
   </header>
 
@@ -36,23 +53,6 @@
             </option>
           {{/each}}
         </select>
-      </div>
-
-      {{! ── Tag Autocomplete ── }}
-      <div class='skill-tags'>
-        <label class='resource-label'>{{localize "ASPECTSOFPOWER.Tag.label"}}</label>
-        <div class='skill-tag-chips'>
-          {{#each system.tags as |tag|}}
-            <span class='skill-tag-chip'>
-              {{tag}}
-              <a class='skill-tag-remove' data-tag='{{tag}}' title='Remove'>×</a>
-            </span>
-          {{/each}}
-        </div>
-        <div class='skill-tag-autocomplete'>
-          <input type='text' class='skill-tag-input' placeholder='Type to search tags...' autocomplete='off' />
-          <ul class='skill-tag-suggestions'></ul>
-        </div>
       </div>
 
       {{! ── AOE Config (driven by aoe tag) ── }}
