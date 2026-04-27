@@ -512,16 +512,31 @@ export class AspectsofPowerItemSheet extends foundry.applications.api.Handlebars
     if (this.item.type === 'skill' && event.target?.name?.startsWith('system.roll.')) {
       const form = this.element.querySelector('form');
       const rollData = {
-        dice:          form.querySelector('[name="system.roll.dice"]')?.value ?? '',
-        abilities:     form.querySelector('[name="system.roll.abilities"]')?.value ?? '',
-        resource:      form.querySelector('[name="system.roll.resource"]')?.value ?? '',
-        cost:          Number(form.querySelector('[name="system.roll.cost"]')?.value) || 0,
-        type:          form.querySelector('[name="system.roll.type"]')?.value ?? '',
-        diceBonus:     Number(form.querySelector('[name="system.roll.diceBonus"]')?.value) || 1,
-        targetDefense: form.querySelector('[name="system.roll.targetDefense"]')?.value ?? '',
-        damageType:    form.querySelector('[name="system.roll.damageType"]')?.value ?? 'physical',
+        dice:             form.querySelector('[name="system.roll.dice"]')?.value ?? '',
+        abilities:        form.querySelector('[name="system.roll.abilities"]')?.value ?? '',
+        resource:         form.querySelector('[name="system.roll.resource"]')?.value ?? '',
+        cost:             Number(form.querySelector('[name="system.roll.cost"]')?.value) || 0,
+        type:             form.querySelector('[name="system.roll.type"]')?.value ?? '',
+        diceBonus:        Number(form.querySelector('[name="system.roll.diceBonus"]')?.value) || 1,
+        targetDefense:    form.querySelector('[name="system.roll.targetDefense"]')?.value ?? '',
+        damageType:       form.querySelector('[name="system.roll.damageType"]')?.value ?? 'physical',
+        statType:         form.querySelector('[name="system.roll.statType"]')?.value ?? 'pure',
+        secondaryAbility: form.querySelector('[name="system.roll.secondaryAbility"]')?.value ?? '',
+        primaryWeight:    Number(form.querySelector('[name="system.roll.primaryWeight"]')?.value) || 1.0,
+        secondaryWeight:  Number(form.querySelector('[name="system.roll.secondaryWeight"]')?.value) || 0,
       };
       await this.document.update({ 'system.roll': rollData });
+      return;
+    }
+
+    // Craft skill: allowed item types checkboxes — collect into array on any change.
+    if (this.item.type === 'skill' && event.target?.classList?.contains('craft-allowed-type')) {
+      const form = this.element.querySelector('form');
+      const types = [];
+      form.querySelectorAll('.craft-allowed-type:checked').forEach(cb => {
+        types.push(cb.dataset.typeKey);
+      });
+      await this.document.update({ 'system.craftAllowedTypes': types });
       return;
     }
     // --- Consumable fields: direct update for simple fields ---

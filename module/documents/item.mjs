@@ -1433,7 +1433,13 @@ export class AspectsofPowerItem extends Item {
     const refineGain = Math.min(rawGain, headroom);
 
     const newProgress = oldProgress + refineGain;
-    await materialItem.update({ 'system.progress': newProgress, 'system.isRefined': true });
+    // Update name suffix to reflect new progress.
+    const refinedName = `${materialItem.name.replace(/ - \d+$/, '')} - ${newProgress}`;
+    await materialItem.update({
+      name: refinedName,
+      'system.progress': newProgress,
+      'system.isRefined': true,
+    });
 
     const natLine = d100Roll.total === 100
       ? '<p style="color:#ffca28;font-size:1.2em;">&#9733; Perfect Refinement! Natural 100! &#9733;</p>'
@@ -1554,7 +1560,7 @@ export class AspectsofPowerItem extends Item {
       ? materialType.charAt(0).toUpperCase() + materialType.slice(1)
       : 'Material';
     const rarityLabel = selectedRarity.charAt(0).toUpperCase() + selectedRarity.slice(1);
-    const itemName = `${elPrefix}${matLabel} (${rarityLabel})`;
+    const itemName = `${elPrefix}${matLabel} (${rarityLabel}) - ${gatherProgress}`;
 
     // Create the material item and open its sheet for renaming.
     // Max potential is +20% above the gathered progress — refinement can grow toward this.
@@ -1715,7 +1721,12 @@ export class AspectsofPowerItem extends Item {
             const refineGain = Math.min(rawGain, headroom);
 
             const newProgress = currentProgress + refineGain;
-            await materialItem.update({ 'system.progress': newProgress, 'system.isRefined': true });
+            const refinedName = `${materialItem.name.replace(/ - \d+$/, '')} - ${newProgress}`;
+            await materialItem.update({
+              name: refinedName,
+              'system.progress': newProgress,
+              'system.isRefined': true,
+            });
             materialItem = actor.items.get(step2Result);
 
             ChatMessage.create({
@@ -2049,24 +2060,37 @@ export class AspectsofPowerItem extends Item {
         }
       }
 
-      const isJewelry = tags.includes('jewelry') || outputMaterial === 'jewelry'
-                     || outputMaterial === 'gem' || outputMaterial === 'crystal';
-      const isArmor = !isJewelry && ['metal', 'leather', 'cloth'].includes(outputMaterial);
+      // Slot category: armor slots → armor bonus, jewelry → veil, weaponry → neither
+      // (defense value goes into stat budget for weapons; shields will need explicit tagging via dialog rewrite).
+      const itemTypeDef = CONFIG.ASPECTSOFPOWER.craftItemTypes?.[outputSlot];
+      const slotCategory = itemTypeDef?.category;  // 'armor' | 'jewelry' | 'profession' | undefined
+      const isArmorSlot   = slotCategory === 'armor';
+      const isJewelrySlot = slotCategory === 'jewelry';
       const defenseValue = Math.round(totalProgress * slotValue * matValue);
-      const armorBonus = isArmor ? defenseValue : 0;
-      const veilBonus = isJewelry ? defenseValue : 0;
+      const armorBonus = isArmorSlot   ? defenseValue : 0;
+      const veilBonus  = isJewelrySlot ? defenseValue : 0;
 
       const rarityDef = CONFIG.ASPECTSOFPOWER.rarities?.[qualityData.rarity];
       const augmentSlots = rarityDef?.augments ?? 0;
 
+      // Tag inheritance: static type tags + material tag + affinity tag.
+      const craftedTags = [];
+      for (const t of (itemTypeDef?.tags ?? [])) craftedTags.push({ id: t, value: 0 });
+      if (outputMaterial) craftedTags.push({ id: outputMaterial, value: 0 });
+      if (element && element !== 'neutral') craftedTags.push({ id: `${element}-affinity`, value: 0 });
+
+      // Name format: "{Element-Prefixed Type} - {progress}"
       const elPrefix = element ? `${element.charAt(0).toUpperCase() + element.slice(1)} ` : '';
       const slotName = outputSlot.charAt(0).toUpperCase() + outputSlot.slice(1);
-      const itemName = `${elPrefix}${slotName}`;
+      const itemName = `${elPrefix}${slotName} - ${totalProgress}`;
 
       if (reworkTarget) {
         // Update the existing item with new totals; bump rework count.
         // maxProgress is locked at first craft and not updated.
+        // Name updates with new progress; tags are preserved (set on initial craft).
+        const reworkName = `${reworkTarget.name.replace(/ - \d+$/, '')} - ${totalProgress}`;
         await reworkTarget.update({
+          name: reworkName,
           'system.progress': totalProgress,
           'system.durability.value': totalProgress * 2,
           'system.durability.max': totalProgress * 2,
@@ -2095,6 +2119,7 @@ export class AspectsofPowerItem extends Item {
             armorBonus,
             veilBonus,
             augmentSlots,
+            systemTags: craftedTags,
           },
         }]);
       }

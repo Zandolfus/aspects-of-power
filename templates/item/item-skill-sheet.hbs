@@ -128,7 +128,7 @@
       <div class='resource'>
         <div class='grid grid-5col'>
           <div class='grid-span-1'>
-            <label class='resource-label'>Ability</label>
+            <label class='resource-label'>{{#if (eq system.roll.statType "hybrid")}}Primary Ability{{else}}Ability{{/if}}</label>
             <select name='system.roll.abilities' data-dtype='String'>
               <option value="vitality" {{#if (eq system.roll.abilities "vitality")}}selected{{/if}}>Vitality</option>
               <option value="endurance" {{#if (eq system.roll.abilities "endurance")}}selected{{/if}}>Endurance</option>
@@ -184,6 +184,41 @@
               {{/if}}
             </select>
           </div>
+        </div>
+
+        {{! ── Pure / Hybrid stat config ── }}
+        <div class='grid grid-4col'>
+          <div class='grid-span-1'>
+            <label class='resource-label'>Stat Mode</label>
+            <select name='system.roll.statType' data-dtype='String'>
+              <option value="pure" {{#if (eq system.roll.statType "pure")}}selected{{/if}}>Pure</option>
+              <option value="hybrid" {{#if (eq system.roll.statType "hybrid")}}selected{{/if}}>Hybrid</option>
+            </select>
+          </div>
+          {{#if (eq system.roll.statType "hybrid")}}
+            <div class='grid-span-1'>
+              <label class='resource-label'>Secondary Ability</label>
+              <select name='system.roll.secondaryAbility' data-dtype='String'>
+                <option value="vitality" {{#if (eq system.roll.secondaryAbility "vitality")}}selected{{/if}}>Vitality</option>
+                <option value="endurance" {{#if (eq system.roll.secondaryAbility "endurance")}}selected{{/if}}>Endurance</option>
+                <option value="strength" {{#if (eq system.roll.secondaryAbility "strength")}}selected{{/if}}>Strength</option>
+                <option value="dexterity" {{#if (eq system.roll.secondaryAbility "dexterity")}}selected{{/if}}>Dexterity</option>
+                <option value="toughness" {{#if (eq system.roll.secondaryAbility "toughness")}}selected{{/if}}>Toughness</option>
+                <option value="intelligence" {{#if (eq system.roll.secondaryAbility "intelligence")}}selected{{/if}}>Intelligence</option>
+                <option value="willpower" {{#if (eq system.roll.secondaryAbility "willpower")}}selected{{/if}}>Willpower</option>
+                <option value="wisdom" {{#if (eq system.roll.secondaryAbility "wisdom")}}selected{{/if}}>Wisdom</option>
+                <option value="perception" {{#if (eq system.roll.secondaryAbility "perception")}}selected{{/if}}>Perception</option>
+              </select>
+            </div>
+            <div class='grid-span-1'>
+              <label class='resource-label'>Primary Weight</label>
+              <input type='number' name='system.roll.primaryWeight' value='{{system.roll.primaryWeight}}' min='0' max='1' step='0.05' />
+            </div>
+            <div class='grid-span-1'>
+              <label class='resource-label'>Secondary Weight</label>
+              <input type='number' name='system.roll.secondaryWeight' value='{{system.roll.secondaryWeight}}' min='0' max='1' step='0.05' />
+            </div>
+          {{/if}}
         </div>
       </div>
 
@@ -407,7 +442,17 @@
       {{! ── Craft Tag Config ── }}
       {{#if (includes system.tags "craft")}}
       <div class='tag-config craft-config'>
-        <p class='hint'>Add a sub-type tag (jewelry, armor, weapon, clothing) to filter crafting options.</p>
+        <label class='resource-label'><strong>Allowed Item Types</strong></label>
+        <p class='hint'>Check the item types this craft skill can produce. Empty = all types allowed.</p>
+        <div class='craft-allowed-grid' style='display:grid;grid-template-columns:repeat(4,1fr);gap:4px;'>
+          {{#each @root.config.craftItemTypes as |def key|}}
+            <label style='display:flex;gap:4px;align-items:center;font-size:11px;'>
+              <input type='checkbox' class='craft-allowed-type' data-type-key='{{key}}'
+                     {{#if (includes ../system.craftAllowedTypes key)}}checked{{/if}} />
+              <span title='{{def.category}}'>{{key}}</span>
+            </label>
+          {{/each}}
+        </div>
       </div>
       {{/if}}
 
