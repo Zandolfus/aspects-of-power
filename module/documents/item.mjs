@@ -61,7 +61,7 @@ export class AspectsofPowerItem extends Item {
    * @returns {Promise<number|null>}  Chosen mana amount, or null if cancelled.
    */
   /**
-   * Combined "Craft Setup" dialog: refine + prep selection with a static preview of expected outcome.
+   * Combined "Craft Setup" dialog: refine + prep selection with a live preview of expected outcome.
    * Replaces the old separate refine/prep offer dialogs in _handleCraftTag.
    * Returns: { refineId, prepId } or 'cancel' if dismissed. Empty {} if nothing to ask about.
    */
@@ -87,25 +87,30 @@ export class AspectsofPowerItem extends Item {
     // Skip the dialog entirely if there's nothing to choose.
     if (!showRefine && !showPrep) return {};
 
-    // ── Preview math (avg-based) ──
     const A = actor.system.abilities;
-    const r = item.system.roll ?? {};
-    const primaryMod = A[r.abilities]?.mod ?? 0;
-    let abMod = primaryMod;
-    if (r.statType === 'hybrid') {
-      const secMod = A[r.secondaryAbility]?.mod ?? 0;
-      const pw = r.primaryWeight ?? 1.0;
-      const sw = r.secondaryWeight ?? 0;
-      abMod = Math.round(primaryMod * pw + secMod * sw);
-    }
-    const dm = String(r.dice || '0').match(/(\d*)d(\d+)/);
-    const diceCount = dm ? (parseInt(dm[1]) || 1) : 0;
-    const diceSize  = dm ? parseInt(dm[2]) : 0;
-    const avgDice = diceCount * (diceSize + 1) / 2;
-    const diceBonus = r.diceBonus ?? 1;
-    const avgSkillRoll = Math.round(((avgDice / 100) + 1) * abMod * diceBonus);
 
-    // Profession augment bonuses (element-filtered).
+    // Helper: compute average skill roll for any skill (used by craft, prep, and refine previews).
+    const avgSkillRollFor = (skill) => {
+      const r = skill.system?.roll ?? {};
+      const primaryMod = A[r.abilities]?.mod ?? 0;
+      let abMod = primaryMod;
+      if (r.statType === 'hybrid') {
+        const secMod = A[r.secondaryAbility]?.mod ?? 0;
+        const pw = r.primaryWeight ?? 1.0;
+        const sw = r.secondaryWeight ?? 0;
+        abMod = Math.round(primaryMod * pw + secMod * sw);
+      }
+      const dm = String(r.dice || '0').match(/(\d*)d(\d+)/);
+      const diceCount = dm ? (parseInt(dm[1]) || 1) : 0;
+      const diceSize  = dm ? parseInt(dm[2]) : 0;
+      const avgDice = diceCount * (diceSize + 1) / 2;
+      const diceBonus = r.diceBonus ?? 1;
+      return Math.round(((avgDice / 100) + 1) * abMod * diceBonus);
+    };
+
+    const avgSkillRoll = avgSkillRollFor(item);
+
+    // Profession augment bonuses (element-filtered, fixed at dialog open).
     const matEl = materialItem ? (materialItem.system.materialElement || '') : '';
     const augBonuses = actor.getProfessionAugmentBonuses(matEl);
     const d100Bonus        = augBonuses.d100Bonus || 0;
@@ -122,8 +127,6 @@ export class AspectsofPowerItem extends Item {
     const avgD100Pct = avgD100 / 100;
     const avgCrafterRoll = Math.round((avgSkillRoll + skillModBonus) * avgD100Pct);
     const avgCrafterCtrb = Math.round(avgCrafterRoll * 0.5);
-    const matCtrb = materialItem ? Math.round((materialItem.system.progress ?? 0) * 0.5) : 0;
-    const avgTotal = matCtrb + avgCrafterCtrb + progressBonus;
 
     // Augment summary line.
     const augLines = [];
@@ -133,7 +136,79 @@ export class AspectsofPowerItem extends Item {
     if (progressBonus)    augLines.push(`Progress +${progressBonus}`);
     const augSummary = augLines.length > 0 ? augLines.join(', ') : '<em>None active</em>';
 
-    // Build form sections.
+    // Quality tiers (sorted high to low) for tier-lookup in preview.
+    const qualitySorted = Object.entries(CONFIG.ASPECTSOFPOWER.craftQuality ?? {})
+      .sort((a, b) => b[1].minProgress - a[1].minProgress);
+    const qualityForProgress = (p) => {
+      for (const [key, def] of qualitySorted) {
+        if (p >= def.minProgress) return { key, label: key.charAt(0).toUpperCase() + key.slice(1), rarity: def.rarity };
+      }
+      return { key: 'cracked', label: 'Cracked', rarity: 'inferior' };
+    };
+
+    // Live preview HTML — recomputes when refine/prep selections change.
+    const computePreview = (refineId, prepId) => {
+      // Refine impact: avg refine gain added to material progress.
+      let effectiveMatProgress = materialItem ? (materialItem.system.progress ?? 0) : 0;
+      let refineGainPreview = 0;
+      if (refineId && materialItem) {
+        const refineSkill = actor.items.get(refineId);
+        if (refineSkill) {
+          const avgRefineSkill = avgSkillRollFor(refineSkill);
+          const avgRefineGain = Math.round(avgRefineSkill * 0.5);  // avg d100Pct = 0.5
+          refineGainPreview = Math.min(avgRefineGain, refineHeadroom);
+          effectiveMatProgress += refineGainPreview;
+        }
+      }
+      const matCtrb = Math.round(effectiveMatProgress * 0.5);
+
+      // Prep impact: avg prep bonus = skill / 10.
+      let prepBonusPreview = 0;
+      if (prepId) {
+        const prepSkill = actor.items.get(prepId);
+        if (prepSkill) {
+          const avgPrepSkill = avgSkillRollFor(prepSkill);
+          prepBonusPreview = Math.round(avgPrepSkill / 10);
+        }
+      }
+
+      const total = matCtrb + avgCrafterCtrb + progressBonus + prepBonusPreview;
+
+      // Min/max range: d100 spans 1-100 (modulated by floor + ceiling).
+      const minD100 = Math.min(1 + rarityRange.floor + rarityFloorBonus + d100Bonus, rarityRange.ceiling);
+      const maxD100 = Math.min(100 + rarityRange.floor + rarityFloorBonus + d100Bonus, rarityRange.ceiling);
+      const skillEffective = avgSkillRoll + skillModBonus;
+      const minCrafterCtrb = Math.round(Math.round(skillEffective * minD100 / 100) * 0.5);
+      const maxCrafterCtrb = Math.round(Math.round(skillEffective * maxD100 / 100) * 0.5);
+      const minTotal = matCtrb + minCrafterCtrb + progressBonus + prepBonusPreview;
+      const maxTotal = matCtrb + maxCrafterCtrb + progressBonus + prepBonusPreview;
+
+      // Cap (theoretical max): perfect d100 outcome. For iterative, use the existing item's stored cap.
+      const cap = reworkTarget
+        ? (reworkTarget.system.maxProgress ?? 0)
+        : Math.round(effectiveMatProgress * 0.5) + Math.round((avgSkillRoll + skillModBonus) * 1.0 * 0.5) + progressBonus + prepBonusPreview;
+
+      const qExpected = qualityForProgress(total);
+      const qCap = qualityForProgress(cap);
+      const qLine = qExpected.key === qCap.key
+        ? `<strong>Expected quality:</strong> ${qExpected.label}`
+        : `<strong>Expected quality:</strong> ${qExpected.label} <span style="opacity:0.7;">(up to ${qCap.label} on a perfect roll)</span>`;
+
+      return `
+        <p style="margin:2px 0;"><strong>Active Profession Augments:</strong> ${augSummary}</p>
+        <p style="margin:2px 0;"><strong>Expected outcome (averages):</strong></p>
+        <ul style="margin:2px 0;padding-left:20px;">
+          <li>Material contribution: ${matCtrb}${refineGainPreview ? ` <span style="opacity:0.7;">(after refine +${refineGainPreview})</span>` : ''}</li>
+          <li>Crafter contribution: ${avgCrafterCtrb} <span style="opacity:0.7;">(skill ${avgSkillRoll + skillModBonus} × d100 ${avgD100.toFixed(0)}%)</span></li>
+          ${progressBonus ? `<li>Augment progress: +${progressBonus}</li>` : ''}
+          ${prepBonusPreview ? `<li>Preparation bonus: +${prepBonusPreview}</li>` : ''}
+        </ul>
+        <p style="margin:4px 0 0 0;"><strong>~${total} progress</strong> on average <span style="opacity:0.7;">(range ${minTotal}–${maxTotal}, cap ${cap})</span>.</p>
+        <p style="margin:2px 0;">${qLine}</p>
+      `;
+    };
+
+    // Build static parts.
     const headerLine = reworkTarget
       ? `<h3 style="margin:4px 0;">Reworking: ${reworkTarget.name}</h3>`
       : `<h3 style="margin:4px 0;">Crafting: ${typeKey ? (typeKey.charAt(0).toUpperCase() + typeKey.slice(1)) : 'Item'}</h3>`;
@@ -145,7 +220,7 @@ export class AspectsofPowerItem extends Item {
     const refineRow = showRefine
       ? `<div class="form-group">
            <label>Refine</label>
-           <select name="refineSkill">
+           <select name="refineSkill" class="craft-setup-refine">
              <option value="">Skip</option>
              ${refineSkills.map(s => `<option value="${s.id}">${s.name}</option>`).join('')}
            </select>
@@ -156,7 +231,7 @@ export class AspectsofPowerItem extends Item {
     const prepRow = showPrep
       ? `<div class="form-group">
            <label>Preparation</label>
-           <select name="prepSkill">
+           <select name="prepSkill" class="craft-setup-prep">
              <option value="">Skip</option>
              ${prepSkills.map(s => `<option value="${s.id}">${s.name}</option>`).join('')}
            </select>
@@ -164,24 +239,31 @@ export class AspectsofPowerItem extends Item {
          </div>`
       : '';
 
-    const previewBlock = `
-      <div style="background:rgba(0,0,0,0.08);padding:6px;border-radius:3px;margin-top:6px;font-size:11px;">
-        <p style="margin:2px 0;"><strong>Active Profession Augments:</strong> ${augSummary}</p>
-        <p style="margin:2px 0;"><strong>Expected outcome (averages, before refine/prep):</strong></p>
-        <ul style="margin:2px 0;padding-left:20px;">
-          <li>Material contribution: ${matCtrb}</li>
-          <li>Crafter contribution: ${avgCrafterCtrb} <span style="opacity:0.7;">(skill ${avgSkillRoll + skillModBonus} × d100 ${avgD100.toFixed(0)}%)</span></li>
-          ${progressBonus ? `<li>Augment progress: +${progressBonus}</li>` : ''}
-        </ul>
-        <p style="margin:4px 0 0 0;"><strong>~${avgTotal} progress</strong> on average. Refine/prep will adjust.</p>
-      </div>
-    `;
+    const initialPreview = computePreview('', '');
+    const previewBlock = `<div class="craft-setup-preview" style="background:rgba(0,0,0,0.08);padding:6px;border-radius:3px;margin-top:6px;font-size:11px;">${initialPreview}</div>`;
 
     const content = `<form>${headerLine}${matInfoLine}${refineRow}${prepRow}${previewBlock}</form>`;
 
     return await foundry.applications.api.DialogV2.wait({
       window: { title: `${item.name} — Craft Setup` },
       content,
+      // Wire up live-update listeners after the dialog renders.
+      render: (event, dialog) => {
+        const root = dialog?.element ?? dialog;
+        if (!root) return;
+        const form    = root.querySelector('form');
+        const preview = form?.querySelector('.craft-setup-preview');
+        const refSel  = form?.querySelector('.craft-setup-refine');
+        const prepSel = form?.querySelector('.craft-setup-prep');
+        if (!preview) return;
+        const recompute = () => {
+          const rid = refSel?.value ?? '';
+          const pid = prepSel?.value ?? '';
+          preview.innerHTML = computePreview(rid, pid);
+        };
+        refSel?.addEventListener('change', recompute);
+        prepSel?.addEventListener('change', recompute);
+      },
       buttons: [
         {
           action: 'craft', label: 'Craft', icon: 'fas fa-hammer', default: true,
@@ -1922,6 +2004,10 @@ export class AspectsofPowerItem extends Item {
     const refineId = combinedSetup?.refineId ?? '';
     const prepId   = combinedSetup?.prepId ?? '';
 
+    // Accumulated pre-craft chat lines — injected into the final craft message.
+    let refineLine = '';
+    let prepLine   = '';
+
     // ── Execute refine (if selected, only on new path with material) ──
     if (refineId && materialItem) {
       const refineSkill = actor.items.get(refineId);
@@ -1945,13 +2031,10 @@ export class AspectsofPowerItem extends Item {
           'system.isRefined': true,
         });
         materialItem = actor.items.get(materialItem.id);
-        ChatMessage.create({
-          speaker,
-          content: `<p><strong>${actor.name}</strong> refines ${materialItem.name}: `
-                 + `Skill ${Math.round(refRoll.total)} × d100 (${refineD100.total}) = ${rawGain}`
-                 + `${rawGain > headroom ? ` (capped at +${headroom})` : ''}. `
-                 + `Progress: ${cur} → <strong>${newProgress}</strong> / ${max}.</p>`,
-        });
+        refineLine = `<p><strong>Refine (${refineSkill.name}):</strong> `
+                   + `Skill ${Math.round(refRoll.total)} × d100 (${refineD100.total}) = ${rawGain}`
+                   + `${rawGain > headroom ? ` <span style="opacity:0.7;">(capped at +${headroom})</span>` : ''}. `
+                   + `Progress: ${cur} → <strong>${newProgress}</strong> / ${max}.</p>`;
       }
     }
 
@@ -1966,11 +2049,8 @@ export class AspectsofPowerItem extends Item {
         await prepRoll.evaluate();
         prepBonus = Math.round(Math.round(prepRoll.total) / 10);
 
-        ChatMessage.create({
-          speaker,
-          content: `<p><strong>${actor.name}</strong> uses ${prepSkill.name}: `
-                 + `Roll ${Math.round(prepRoll.total)} ÷ 10 = <strong>+${prepBonus} preparation bonus</strong>.</p>`,
-        });
+        prepLine = `<p><strong>Preparation (${prepSkill.name}):</strong> `
+                 + `Roll ${Math.round(prepRoll.total)} ÷ 10 = <strong>+${prepBonus}</strong> bonus.</p>`;
       }
     }
 
@@ -2190,11 +2270,12 @@ export class AspectsofPowerItem extends Item {
           <h3>${item.name} — Alchemy Result</h3>
           <hr>
           ${craftNatLine}
+          ${refineLine}
+          ${prepLine}
           <p><strong>Material:</strong> ${materialItem.name} (${matRarity}, progress ${materialProgress})</p>
           <p><strong>Material (50%):</strong> ${materialProgress} × 0.5 = ${materialContribution}</p>
           <p><strong>Crafter (50%):</strong> ${skillRoll} × ${d100Pct.toFixed(2)} = ${crafterRoll} × 0.5 = ${crafterContribution}</p>
           <p><strong>d100:</strong> ${d100Roll.total} + ${rarityRange.floor} = ${effectiveD100} (cap ${rarityRange.ceiling})</p>
-          ${prepBonus ? `<p><strong>Preparation:</strong> +${prepBonus}</p>` : ''}
           ${profAugLine}
           <p><strong>Total Progress:</strong> ${totalProgress}</p>
           <p><strong>Quality:</strong> ${qualityKey.charAt(0).toUpperCase() + qualityKey.slice(1)} (${qualityData.rarity})</p>
@@ -2361,10 +2442,11 @@ export class AspectsofPowerItem extends Item {
           <hr>
           ${craftNatLine}
           ${reworkLine}
+          ${refineLine}
+          ${prepLine}
           ${matLine}
           <p><strong>Crafter (50%):</strong> ${skillRoll} × ${d100Pct.toFixed(2)} = ${crafterRoll} × 0.5 = ${crafterContribution}</p>
           <p><strong>d100:</strong> ${d100Roll.total} + ${rarityRange.floor} = ${effectiveD100} (cap ${rarityRange.ceiling})</p>
-          ${prepBonus ? `<p><strong>Preparation:</strong> +${prepBonus}</p>` : ''}
           ${profAugLine}
           <p><strong>Total Progress:</strong> ${totalProgress}</p>
           <p><strong>Quality:</strong> ${qualityKey.charAt(0).toUpperCase() + qualityKey.slice(1)} (${qualityData.rarity})</p>
