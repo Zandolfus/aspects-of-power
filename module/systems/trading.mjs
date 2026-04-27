@@ -4,8 +4,6 @@
  * NPC vendors, multi-item bundles in future phases.
  */
 
-import { AspectsofPowerItem } from '../documents/item.mjs';
-
 export class TradingSystem {
 
   /**
@@ -233,11 +231,11 @@ export class TradingSystem {
   static async executeTrade(payload) {
     if (!payload.recipientActorUuid) return;
 
-    // GM can do this directly. Players route through GM action.
+    // GM can do this directly. Players emit a socket payload that the active GM picks up.
     if (game.user.isGM) {
       await this._performTransfer(payload);
     } else {
-      await AspectsofPowerItem._gmAction({
+      game.socket.emit('system.aspects-of-power', {
         type: 'gmExecuteTrade',
         ...payload,
       });
