@@ -60,6 +60,148 @@ export class AspectsofPowerItem extends Item {
    * @param {number} maxMana  Current mana available.
    * @returns {Promise<number|null>}  Chosen mana amount, or null if cancelled.
    */
+  /**
+   * Combined "Craft Setup" dialog: refine + prep selection with a static preview of expected outcome.
+   * Replaces the old separate refine/prep offer dialogs in _handleCraftTag.
+   * Returns: { refineId, prepId } or 'cancel' if dismissed. Empty {} if nothing to ask about.
+   */
+  async _showCraftSetupDialog({ item, actor, materialItem, reworkTarget, typeKey }) {
+    // What's available?
+    let refineSkills = [];
+    let refineHeadroom = 0;
+    if (materialItem) {
+      refineSkills = actor.items.filter(i =>
+        i.type === 'skill' && (i.system.tags ?? []).includes('refine')
+      );
+      const cur = materialItem.system.progress ?? 0;
+      const max = materialItem.system.maxProgress ?? Math.round(cur * 1.2);
+      refineHeadroom = Math.max(0, max - cur);
+    }
+    const showRefine = refineSkills.length > 0 && refineHeadroom > 0;
+
+    const prepSkills = actor.items.filter(i =>
+      i.type === 'skill' && (i.system.tags ?? []).includes('preparation')
+    );
+    const showPrep = prepSkills.length > 0;
+
+    // Skip the dialog entirely if there's nothing to choose.
+    if (!showRefine && !showPrep) return {};
+
+    // ── Preview math (avg-based) ──
+    const A = actor.system.abilities;
+    const r = item.system.roll ?? {};
+    const primaryMod = A[r.abilities]?.mod ?? 0;
+    let abMod = primaryMod;
+    if (r.statType === 'hybrid') {
+      const secMod = A[r.secondaryAbility]?.mod ?? 0;
+      const pw = r.primaryWeight ?? 1.0;
+      const sw = r.secondaryWeight ?? 0;
+      abMod = Math.round(primaryMod * pw + secMod * sw);
+    }
+    const dm = String(r.dice || '0').match(/(\d*)d(\d+)/);
+    const diceCount = dm ? (parseInt(dm[1]) || 1) : 0;
+    const diceSize  = dm ? parseInt(dm[2]) : 0;
+    const avgDice = diceCount * (diceSize + 1) / 2;
+    const diceBonus = r.diceBonus ?? 1;
+    const avgSkillRoll = Math.round(((avgDice / 100) + 1) * abMod * diceBonus);
+
+    // Profession augment bonuses (element-filtered).
+    const matEl = materialItem ? (materialItem.system.materialElement || '') : '';
+    const augBonuses = actor.getProfessionAugmentBonuses(matEl);
+    const d100Bonus        = augBonuses.d100Bonus || 0;
+    const progressBonus    = augBonuses.craftProgress || 0;
+    const skillModBonus    = augBonuses.craftSkillMod || 0;
+    const rarityFloorBonus = augBonuses.rarityFloor || 0;
+
+    // d100 expectation under material's rarity range.
+    const matRarity = materialItem
+      ? (materialItem.system.rarity || 'common')
+      : (reworkTarget?.system.rarity || 'common');
+    const rarityRange = CONFIG.ASPECTSOFPOWER.craftRarityRanges?.[matRarity] ?? { floor: 1, ceiling: 100 };
+    const avgD100 = Math.min(50.5 + rarityRange.floor + rarityFloorBonus + d100Bonus, rarityRange.ceiling);
+    const avgD100Pct = avgD100 / 100;
+    const avgCrafterRoll = Math.round((avgSkillRoll + skillModBonus) * avgD100Pct);
+    const avgCrafterCtrb = Math.round(avgCrafterRoll * 0.5);
+    const matCtrb = materialItem ? Math.round((materialItem.system.progress ?? 0) * 0.5) : 0;
+    const avgTotal = matCtrb + avgCrafterCtrb + progressBonus;
+
+    // Augment summary line.
+    const augLines = [];
+    if (skillModBonus)    augLines.push(`Skill +${skillModBonus}`);
+    if (d100Bonus)        augLines.push(`d100 +${d100Bonus}`);
+    if (rarityFloorBonus) augLines.push(`Floor +${rarityFloorBonus}`);
+    if (progressBonus)    augLines.push(`Progress +${progressBonus}`);
+    const augSummary = augLines.length > 0 ? augLines.join(', ') : '<em>None active</em>';
+
+    // Build form sections.
+    const headerLine = reworkTarget
+      ? `<h3 style="margin:4px 0;">Reworking: ${reworkTarget.name}</h3>`
+      : `<h3 style="margin:4px 0;">Crafting: ${typeKey ? (typeKey.charAt(0).toUpperCase() + typeKey.slice(1)) : 'Item'}</h3>`;
+
+    const matInfoLine = materialItem
+      ? `<p style="margin:2px 0;"><strong>Material:</strong> ${materialItem.name} (${matRarity}, progress ${materialItem.system.progress ?? 0})</p>`
+      : `<p style="margin:2px 0;"><em>Iterative rework — no material consumed.</em></p>`;
+
+    const refineRow = showRefine
+      ? `<div class="form-group">
+           <label>Refine</label>
+           <select name="refineSkill">
+             <option value="">Skip</option>
+             ${refineSkills.map(s => `<option value="${s.id}">${s.name}</option>`).join('')}
+           </select>
+           <span class="hint">Refines material first (up to +${refineHeadroom} headroom).</span>
+         </div>`
+      : '';
+
+    const prepRow = showPrep
+      ? `<div class="form-group">
+           <label>Preparation</label>
+           <select name="prepSkill">
+             <option value="">Skip</option>
+             ${prepSkills.map(s => `<option value="${s.id}">${s.name}</option>`).join('')}
+           </select>
+           <span class="hint">Adds prep bonus (skill ÷ 10) to craft.</span>
+         </div>`
+      : '';
+
+    const previewBlock = `
+      <div style="background:rgba(0,0,0,0.08);padding:6px;border-radius:3px;margin-top:6px;font-size:11px;">
+        <p style="margin:2px 0;"><strong>Active Profession Augments:</strong> ${augSummary}</p>
+        <p style="margin:2px 0;"><strong>Expected outcome (averages, before refine/prep):</strong></p>
+        <ul style="margin:2px 0;padding-left:20px;">
+          <li>Material contribution: ${matCtrb}</li>
+          <li>Crafter contribution: ${avgCrafterCtrb} <span style="opacity:0.7;">(skill ${avgSkillRoll + skillModBonus} × d100 ${avgD100.toFixed(0)}%)</span></li>
+          ${progressBonus ? `<li>Augment progress: +${progressBonus}</li>` : ''}
+        </ul>
+        <p style="margin:4px 0 0 0;"><strong>~${avgTotal} progress</strong> on average. Refine/prep will adjust.</p>
+      </div>
+    `;
+
+    const content = `<form>${headerLine}${matInfoLine}${refineRow}${prepRow}${previewBlock}</form>`;
+
+    return await foundry.applications.api.DialogV2.wait({
+      window: { title: `${item.name} — Craft Setup` },
+      content,
+      buttons: [
+        {
+          action: 'craft', label: 'Craft', icon: 'fas fa-hammer', default: true,
+          callback: (event, button, dialog) => {
+            const form = dialog?.element?.querySelector('form')
+              ?? button.form
+              ?? button.closest('.application')?.querySelector('form');
+            if (!form) return null;
+            return {
+              refineId: form.querySelector('[name="refineSkill"]')?.value ?? '',
+              prepId:   form.querySelector('[name="prepSkill"]')?.value ?? '',
+            };
+          },
+        },
+        { action: 'cancel', label: 'Cancel' },
+      ],
+      close: () => 'cancel',
+    });
+  }
+
   async _promptBarrierManaCost(maxMana) {
     const multiplier = this.system.tagConfig?.barrierMultiplier ?? 1;
     return new Promise(resolve => {
@@ -1768,89 +1910,67 @@ export class AspectsofPowerItem extends Item {
         materialItem = actor.items.get(matChoice);
         if (!materialItem) return;
 
-        // Refine offer (only on new path with material).
-        const refineSkills = actor.items.filter(i =>
-          i.type === 'skill' && (i.system.tags ?? []).includes('refine')
-        );
-        const cur = materialItem.system.progress ?? 0;
-        const max = materialItem.system.maxProgress ?? Math.round(cur * 1.2);
-        const headroom = Math.max(0, max - cur);
-
-        if (refineSkills.length > 0 && headroom > 0) {
-          const refineButtons = refineSkills.map(s => ({ action: s.id, label: s.name }));
-          refineButtons.push({ action: 'skip', label: 'Skip' });
-          const refineChoice = await foundry.applications.api.DialogV2.wait({
-            window: { title: `${item.name} — Refine Material` },
-            content: `<p>Refine ${materialItem.name}? (Progress: ${cur}/${max}, ${headroom} headroom)</p>`,
-            buttons: refineButtons,
-            close: () => 'skip',
-          });
-          if (refineChoice && refineChoice !== 'skip') {
-            const refineSkill = actor.items.get(refineChoice);
-            if (refineSkill) {
-              const refineRollData = refineSkill.getRollData();
-              const { dmgFormula: refDmgF } = refineSkill._buildRollFormulas(refineRollData);
-              const refRoll = new Roll(refDmgF, refineRollData);
-              await refRoll.evaluate();
-              const refineD100 = new Roll('1d100');
-              await refineD100.evaluate();
-              const rawGain = Math.round(Math.round(refRoll.total) * (refineD100.total / 100));
-              const refineGain = Math.min(rawGain, headroom);
-              const newProgress = cur + refineGain;
-              const refinedName = `${materialItem.name.replace(/ - \d+$/, '')} - ${newProgress}`;
-              await materialItem.update({
-                name: refinedName,
-                'system.progress': newProgress,
-                'system.isRefined': true,
-              });
-              materialItem = actor.items.get(matChoice);
-              ChatMessage.create({
-                speaker,
-                content: `<p><strong>${actor.name}</strong> refines ${materialItem.name}: `
-                       + `Skill ${Math.round(refRoll.total)} × d100 (${refineD100.total}) = ${rawGain}`
-                       + `${rawGain > headroom ? ` (capped at +${headroom})` : ''}. `
-                       + `Progress: ${cur} → <strong>${newProgress}</strong> / ${max}.</p>`,
-              });
-            }
-          }
-        }
       }
     }
 
-    // ── Step 4: Pre-craft preparation buffs ──
+    // ── Combined Setup dialog: refine + prep selection + preview ──
+    // Replaces the old separate refine/prep offer dialogs.
+    const combinedSetup = await this._showCraftSetupDialog({
+      item, actor, materialItem, reworkTarget, typeKey,
+    });
+    if (combinedSetup === 'cancel' || combinedSetup === null || combinedSetup === undefined) return;
+    const refineId = combinedSetup?.refineId ?? '';
+    const prepId   = combinedSetup?.prepId ?? '';
+
+    // ── Execute refine (if selected, only on new path with material) ──
+    if (refineId && materialItem) {
+      const refineSkill = actor.items.get(refineId);
+      if (refineSkill) {
+        const refineRollData = refineSkill.getRollData();
+        const { dmgFormula: refDmgF } = refineSkill._buildRollFormulas(refineRollData);
+        const refRoll = new Roll(refDmgF, refineRollData);
+        await refRoll.evaluate();
+        const refineD100 = new Roll('1d100');
+        await refineD100.evaluate();
+        const cur = materialItem.system.progress ?? 0;
+        const max = materialItem.system.maxProgress ?? Math.round(cur * 1.2);
+        const headroom = Math.max(0, max - cur);
+        const rawGain = Math.round(Math.round(refRoll.total) * (refineD100.total / 100));
+        const refineGain = Math.min(rawGain, headroom);
+        const newProgress = cur + refineGain;
+        const refinedName = `${materialItem.name.replace(/ - \d+$/, '')} - ${newProgress}`;
+        await materialItem.update({
+          name: refinedName,
+          'system.progress': newProgress,
+          'system.isRefined': true,
+        });
+        materialItem = actor.items.get(materialItem.id);
+        ChatMessage.create({
+          speaker,
+          content: `<p><strong>${actor.name}</strong> refines ${materialItem.name}: `
+                 + `Skill ${Math.round(refRoll.total)} × d100 (${refineD100.total}) = ${rawGain}`
+                 + `${rawGain > headroom ? ` (capped at +${headroom})` : ''}. `
+                 + `Progress: ${cur} → <strong>${newProgress}</strong> / ${max}.</p>`,
+        });
+      }
+    }
+
+    // ── Execute prep (selection came from combined setup dialog) ──
     let prepBonus = 0;
-    const prepSkills = actor.items.filter(i =>
-      i.type === 'skill' && (i.system.tags ?? []).includes('preparation')
-    );
+    if (prepId) {
+      const prepSkill = actor.items.get(prepId);
+      if (prepSkill) {
+        const prepRollData = prepSkill.getRollData();
+        const { dmgFormula: prepDmgF } = prepSkill._buildRollFormulas(prepRollData);
+        const prepRoll = new Roll(prepDmgF, prepRollData);
+        await prepRoll.evaluate();
+        prepBonus = Math.round(Math.round(prepRoll.total) / 10);
 
-    if (prepSkills.length > 0) {
-      const prepButtons = prepSkills.map(s => ({
-        action: s.id, label: s.name,
-      }));
-      prepButtons.push({ action: 'skip', label: 'Skip' });
-
-      const prepChoice = await foundry.applications.api.DialogV2.wait({
-        window: { title: 'Pre-Craft Preparation' },
-        content: '<p>Apply a preparation skill before crafting?</p>',
-        buttons: prepButtons,
-        close: () => 'skip',
-      });
-
-      if (prepChoice && prepChoice !== 'skip') {
-        const prepSkill = actor.items.get(prepChoice);
-        if (prepSkill) {
-          const prepRollData = prepSkill.getRollData();
-          const { dmgFormula: prepDmgF } = prepSkill._buildRollFormulas(prepRollData);
-          const prepRoll = new Roll(prepDmgF, prepRollData);
-          await prepRoll.evaluate();
-          prepBonus = Math.round(Math.round(prepRoll.total) / 10);
-
-          ChatMessage.create({
-            speaker,
-            content: `<p><strong>${actor.name}</strong> uses ${prepSkill.name}: `
-                   + `Roll ${Math.round(prepRoll.total)} ÷ 10 = <strong>+${prepBonus} preparation bonus</strong>.</p>`,
-          });
-        }
+        ChatMessage.create({
+          speaker,
+          content: `<p><strong>${actor.name}</strong> uses ${prepSkill.name}: `
+                 + `Roll ${Math.round(prepRoll.total)} ÷ 10 = <strong>+${prepBonus} preparation bonus</strong>.</p>`,
+        });
       }
     }
 
