@@ -1616,162 +1616,204 @@ export class AspectsofPowerItem extends Item {
 
     const tags = item.system.tags ?? [];
     const craftConfig = item.system.tagConfig;
-
-    // Determine craft sub-type from tags → filter available slots.
-    const craftTypes = CONFIG.ASPECTSOFPOWER.craftTypes ?? {};
-    let allowedSlots = null;
-    let allowedMaterials = null;
-    for (const [typeKey, typeDef] of Object.entries(craftTypes)) {
-      if (tags.includes(typeKey)) {
-        allowedSlots = typeDef.slots;
-        allowedMaterials = typeDef.materials;
-        break;
-      }
-    }
-
-    // Fallback: use skill config or all slots.
-    if (!allowedSlots) {
-      allowedSlots = craftConfig?.craftOutputSlot
-        ? [craftConfig.craftOutputSlot]
-        : Object.keys(CONFIG.ASPECTSOFPOWER.equipmentSlots ?? {});
-    }
-
-    // ── Step 1: Select output slot (skip for alchemy) ──
     const isAlchemySkill = tags.includes('alchemy');
+
+    // Item type registry + skill's allowed types (empty = no restriction, back-compat).
+    const itemTypesConfig = CONFIG.ASPECTSOFPOWER.craftItemTypes ?? {};
+    const categoryDefs = CONFIG.ASPECTSOFPOWER.craftCategories ?? {};
+    const allowedTypeKeys = item.system.craftAllowedTypes ?? [];
+    const filteredTypes = allowedTypeKeys.length > 0
+      ? Object.fromEntries(Object.entries(itemTypesConfig).filter(([k]) => allowedTypeKeys.includes(k)))
+      : itemTypesConfig;
+
+    // Back-compat material filter from craftTypes (legacy tag → material whitelist).
+    const craftTypes = CONFIG.ASPECTSOFPOWER.craftTypes ?? {};
+    let allowedMaterials = null;
+    for (const [tk, td] of Object.entries(craftTypes)) {
+      if (tags.includes(tk)) { allowedMaterials = td.materials; break; }
+    }
+
     let outputSlot = '';
+    let materialItem = null;
+    let reworkTarget = null;
+    let typeKey = null;          // chosen craftItemTypes key (sword/chest/ring/etc.)
+    let inheritedTypeTags = [];  // static tags from craftItemTypes[typeKey]
 
-    if (!isAlchemySkill) {
-      const step1Buttons = allowedSlots.map(s => ({
-        action: s,
-        label: s.charAt(0).toUpperCase() + s.slice(1),
-      }));
-      step1Buttons.push({ action: 'cancel', label: 'Cancel' });
-
-      outputSlot = await foundry.applications.api.DialogV2.wait({
-        window: { title: `${item.name} — What are you crafting?` },
-        content: '<p>Select the item type to craft:</p>',
-        buttons: step1Buttons,
+    if (isAlchemySkill) {
+      // Alchemy: skip slot/category/type — just pick a material.
+      const materials = actor.items.filter(i => i.type === 'item' && i.system.isMaterial);
+      if (materials.length === 0) {
+        ui.notifications.warn('No materials in inventory.');
+        return;
+      }
+      const matButtons = materials.map(m => {
+        const elLabel = m.system.materialElement ? ` [${m.system.materialElement}]` : '';
+        return { action: m.id, label: `${m.name}${elLabel}` };
+      });
+      matButtons.push({ action: 'cancel', label: 'Cancel' });
+      const matChoice = await foundry.applications.api.DialogV2.wait({
+        window: { title: `${item.name} — Select Material` },
+        content: '<p>Pick a material for the brew:</p>',
+        buttons: matButtons,
         close: () => 'cancel',
       });
-      if (outputSlot === 'cancel') return;
-    }
+      if (matChoice === 'cancel') return;
+      materialItem = actor.items.get(matChoice);
+      if (!materialItem) return;
+    } else {
+      // ── Step 1: Mode (New / Iterative) ──
+      const modeChoice = await foundry.applications.api.DialogV2.wait({
+        window: { title: `${item.name} — Craft Mode` },
+        content: '<p>Starting a new item or iterating on an existing one?</p>',
+        buttons: [
+          { action: 'new',  label: 'New Item',         icon: 'fas fa-plus', default: true },
+          { action: 'iter', label: 'Iterative Craft',  icon: 'fas fa-redo' },
+          { action: 'cancel', label: 'Cancel' },
+        ],
+        close: () => 'cancel',
+      });
+      if (modeChoice === 'cancel') return;
 
-    // ── Step 2: Select material ──
-    const materials = actor.items.filter(i => {
-      if (i.type !== 'item' || !i.system.isMaterial) return false;
-      if (!isAlchemySkill && allowedMaterials && i.system.material && !allowedMaterials.includes(i.system.material)) return false;
-      return true;
-    });
-
-    if (materials.length === 0) {
-      ui.notifications.warn('No suitable crafting materials in inventory.');
-      return;
-    }
-
-    const step2Buttons = materials.map(m => {
-      const elLabel = m.system.materialElement ? ` [${m.system.materialElement}]` : '';
-      const refined = m.system.progress > 0 ? ` — Value ${m.system.progress}` : ' — Unrefined';
-      return { action: m.id, label: `${m.name}${elLabel}${refined}` };
-    });
-    step2Buttons.push({ action: 'cancel', label: 'Cancel' });
-
-    const step2Result = await foundry.applications.api.DialogV2.wait({
-      window: { title: `${item.name} — Select Material` },
-      content: `<p>Select a material for your ${outputSlot}:</p>`,
-      buttons: step2Buttons,
-      close: () => 'cancel',
-    });
-    if (step2Result === 'cancel') return;
-
-    let materialItem = actor.items.get(step2Result);
-    if (!materialItem) return;
-
-    // ── Step 3: Offer refinement (multiple times, capped at maxProgress) ──
-    {
-      const refineSkills = actor.items.filter(i =>
-        i.type === 'skill' && (i.system.tags ?? []).includes('refine')
-      );
-      const currentProgress = materialItem.system.progress ?? 0;
-      const maxProgress = materialItem.system.maxProgress ?? Math.round(currentProgress * 1.2);
-      const headroom = Math.max(0, maxProgress - currentProgress);
-
-      if (refineSkills.length > 0 && headroom > 0) {
-        const refineButtons = refineSkills.map(s => ({
-          action: s.id, label: s.name,
-        }));
-        refineButtons.push({ action: 'skip', label: 'Skip' });
-
-        const refineChoice = await foundry.applications.api.DialogV2.wait({
-          window: { title: `${item.name} — Refine Material` },
-          content: `<p>Refine ${materialItem.name}? (Progress: ${currentProgress}/${maxProgress}, ${headroom} headroom)</p>`,
-          buttons: refineButtons,
-          close: () => 'skip',
-        });
-
-        if (refineChoice && refineChoice !== 'skip') {
-          const refineSkill = actor.items.get(refineChoice);
-          if (refineSkill) {
-            const refineRollData = refineSkill.getRollData();
-            const { dmgFormula: refDmgF } = refineSkill._buildRollFormulas(refineRollData);
-            const refRoll = new Roll(refDmgF, refineRollData);
-            await refRoll.evaluate();
-            const refineD100 = new Roll('1d100');
-            await refineD100.evaluate();
-            const rawGain = Math.round(Math.round(refRoll.total) * (refineD100.total / 100));
-            const refineGain = Math.min(rawGain, headroom);
-
-            const newProgress = currentProgress + refineGain;
-            const refinedName = `${materialItem.name.replace(/ - \d+$/, '')} - ${newProgress}`;
-            await materialItem.update({
-              name: refinedName,
-              'system.progress': newProgress,
-              'system.isRefined': true,
-            });
-            materialItem = actor.items.get(step2Result);
-
-            ChatMessage.create({
-              speaker,
-              content: `<p><strong>${actor.name}</strong> refines ${materialItem.name}: `
-                     + `Skill ${Math.round(refRoll.total)} × d100 (${refineD100.total}) = ${rawGain}`
-                     + `${rawGain > headroom ? ` (capped at +${headroom})` : ''}. `
-                     + `Progress: ${currentProgress} → <strong>${newProgress}</strong> / ${maxProgress}.</p>`,
-            });
-          }
+      if (modeChoice === 'iter') {
+        // ── Iterative: pick rework target, no material ──
+        const existing = actor.items.filter(i =>
+          i.type === 'item' && !i.system.isMaterial && (i.system.maxProgress ?? 0) > 0
+        );
+        if (existing.length === 0) {
+          ui.notifications.warn('No existing crafted items to rework.');
+          return;
         }
-      }
-    }
-
-    // ── Step 3.5: Iterative rework — target an existing item or create new ──
-    // Only relevant for equipment crafting (not alchemy).
-    let reworkTarget = null;
-    if (!isAlchemySkill && outputSlot) {
-      const existing = actor.items.filter(i =>
-        i.type === 'item'
-        && !i.system.isMaterial
-        && i.system.slot === outputSlot
-      );
-      if (existing.length > 0) {
-        const reworkButtons = [{ action: 'new', label: 'Create New Item' }];
-        for (const e of existing) {
+        const reworkButtons = existing.map(e => {
           const cnt = e.system.reworkCount ?? 0;
           const cur = e.system.progress ?? 0;
           const max = e.system.maxProgress ?? 0;
           const atMax = max > 0 && cur >= max;
-          reworkButtons.push({
+          return {
             action: e.id,
-            label: `Rework: ${e.name} (×${cnt + 1}, ${cur}${max ? `/${max}` : ''})${atMax ? ' — AT MAX' : ''}`,
-          });
-        }
+            label: `${e.name} (×${cnt + 1}, ${cur}/${max})${atMax ? ' — AT MAX' : ''}`,
+          };
+        });
         reworkButtons.push({ action: 'cancel', label: 'Cancel' });
-
         const reworkChoice = await foundry.applications.api.DialogV2.wait({
-          window: { title: `${item.name} — New or Rework?` },
-          content: '<p>Create a new item, or improve an existing one?</p>',
+          window: { title: 'Choose Item to Rework' },
+          content: '<p>Pick an existing item to improve. (No material consumed.)</p>',
           buttons: reworkButtons,
           close: () => 'cancel',
         });
         if (reworkChoice === 'cancel') return;
-        if (reworkChoice !== 'new') reworkTarget = actor.items.get(reworkChoice);
+        reworkTarget = actor.items.get(reworkChoice);
+        if (!reworkTarget) return;
+        outputSlot = reworkTarget.system.slot;
+        // No material for iterative — materialItem stays null.
+      } else {
+        // ── New: Step 2 (Category) → Step 3 (Type) → Step 4 (Material) ──
+        const availableCategories = new Set(Object.values(filteredTypes).map(t => t.category));
+        if (availableCategories.size === 0) {
+          ui.notifications.warn('This skill cannot craft any items (no allowed types configured).');
+          return;
+        }
+        const catButtons = [...availableCategories].map(c => ({
+          action: c,
+          label: categoryDefs[c]?.label ?? (c.charAt(0).toUpperCase() + c.slice(1)),
+        }));
+        catButtons.push({ action: 'cancel', label: 'Cancel' });
+        const catChoice = await foundry.applications.api.DialogV2.wait({
+          window: { title: `${item.name} — Category` },
+          content: '<p>What category are you crafting?</p>',
+          buttons: catButtons,
+          close: () => 'cancel',
+        });
+        if (catChoice === 'cancel') return;
+
+        const typesInCategory = Object.entries(filteredTypes).filter(([k, t]) => t.category === catChoice);
+        const typeButtons = typesInCategory.map(([k]) => ({
+          action: k,
+          label: k.charAt(0).toUpperCase() + k.slice(1),
+        }));
+        typeButtons.push({ action: 'cancel', label: 'Cancel' });
+        const typeChoice = await foundry.applications.api.DialogV2.wait({
+          window: { title: `${item.name} — Type` },
+          content: `<p>Which ${catChoice} type?</p>`,
+          buttons: typeButtons,
+          close: () => 'cancel',
+        });
+        if (typeChoice === 'cancel') return;
+        typeKey = typeChoice;
+        const typeDef = filteredTypes[typeKey];
+        outputSlot = typeDef.slot;
+        inheritedTypeTags = typeDef.tags ?? [];
+
+        // Material picker.
+        const materials = actor.items.filter(i => {
+          if (i.type !== 'item' || !i.system.isMaterial) return false;
+          if (allowedMaterials && i.system.material && !allowedMaterials.includes(i.system.material)) return false;
+          return true;
+        });
+        if (materials.length === 0) {
+          ui.notifications.warn('No suitable crafting materials in inventory.');
+          return;
+        }
+        const matButtons = materials.map(m => {
+          const elLabel = m.system.materialElement ? ` [${m.system.materialElement}]` : '';
+          return { action: m.id, label: `${m.name}${elLabel}` };
+        });
+        matButtons.push({ action: 'cancel', label: 'Cancel' });
+        const matChoice = await foundry.applications.api.DialogV2.wait({
+          window: { title: `${item.name} — Select Material` },
+          content: `<p>Choose a material for your ${typeKey}:</p>`,
+          buttons: matButtons,
+          close: () => 'cancel',
+        });
+        if (matChoice === 'cancel') return;
+        materialItem = actor.items.get(matChoice);
+        if (!materialItem) return;
+
+        // Refine offer (only on new path with material).
+        const refineSkills = actor.items.filter(i =>
+          i.type === 'skill' && (i.system.tags ?? []).includes('refine')
+        );
+        const cur = materialItem.system.progress ?? 0;
+        const max = materialItem.system.maxProgress ?? Math.round(cur * 1.2);
+        const headroom = Math.max(0, max - cur);
+
+        if (refineSkills.length > 0 && headroom > 0) {
+          const refineButtons = refineSkills.map(s => ({ action: s.id, label: s.name }));
+          refineButtons.push({ action: 'skip', label: 'Skip' });
+          const refineChoice = await foundry.applications.api.DialogV2.wait({
+            window: { title: `${item.name} — Refine Material` },
+            content: `<p>Refine ${materialItem.name}? (Progress: ${cur}/${max}, ${headroom} headroom)</p>`,
+            buttons: refineButtons,
+            close: () => 'skip',
+          });
+          if (refineChoice && refineChoice !== 'skip') {
+            const refineSkill = actor.items.get(refineChoice);
+            if (refineSkill) {
+              const refineRollData = refineSkill.getRollData();
+              const { dmgFormula: refDmgF } = refineSkill._buildRollFormulas(refineRollData);
+              const refRoll = new Roll(refDmgF, refineRollData);
+              await refRoll.evaluate();
+              const refineD100 = new Roll('1d100');
+              await refineD100.evaluate();
+              const rawGain = Math.round(Math.round(refRoll.total) * (refineD100.total / 100));
+              const refineGain = Math.min(rawGain, headroom);
+              const newProgress = cur + refineGain;
+              const refinedName = `${materialItem.name.replace(/ - \d+$/, '')} - ${newProgress}`;
+              await materialItem.update({
+                name: refinedName,
+                'system.progress': newProgress,
+                'system.isRefined': true,
+              });
+              materialItem = actor.items.get(matChoice);
+              ChatMessage.create({
+                speaker,
+                content: `<p><strong>${actor.name}</strong> refines ${materialItem.name}: `
+                       + `Skill ${Math.round(refRoll.total)} × d100 (${refineD100.total}) = ${rawGain}`
+                       + `${rawGain > headroom ? ` (capped at +${headroom})` : ''}. `
+                       + `Progress: ${cur} → <strong>${newProgress}</strong> / ${max}.</p>`,
+              });
+            }
+          }
+        }
       }
     }
 
@@ -1817,7 +1859,8 @@ export class AspectsofPowerItem extends Item {
     await d100Roll.evaluate();
 
     // Profession augment bonuses from equipped profession gear (element-filtered).
-    const matElement = materialItem.system.materialElement || '';
+    // Iterative reworks have no material — no element drift, no rarity from material.
+    const matElement = materialItem ? (materialItem.system.materialElement || '') : '';
     const profAugBonuses = actor.getProfessionAugmentBonuses(matElement);
     const d100Bonus = profAugBonuses.d100Bonus || 0;
     const skillModBonus = profAugBonuses.craftSkillMod || 0;
@@ -1833,7 +1876,10 @@ export class AspectsofPowerItem extends Item {
       : '';
 
     // Additive d100: floor boosts the roll, ceiling caps it.
-    const matRarity = materialItem.system.rarity || 'common';
+    // For iterative reworks (no material), use the existing item's rarity.
+    const matRarity = materialItem
+      ? (materialItem.system.rarity || 'common')
+      : (reworkTarget?.system.rarity || 'common');
     const rarityRange = CONFIG.ASPECTSOFPOWER.craftRarityRanges?.[matRarity]
                      ?? { floor: 1, ceiling: 100 };
     const effectiveD100 = Math.min(d100Roll.total + rarityRange.floor + rarityFloorBonus + d100Bonus, rarityRange.ceiling);
@@ -1869,7 +1915,8 @@ export class AspectsofPowerItem extends Item {
     }
 
     // 50/50 split: material quality + crafter skill.
-    const materialProgress = materialItem.system.progress ?? 0;
+    // Iterative reworks have no material; only crafter contributes via the rework formula below.
+    const materialProgress = materialItem ? (materialItem.system.progress ?? 0) : 0;
     const materialContribution = Math.round(materialProgress * 0.5);
 
     const skillRoll = Math.round(dmgRoll.total) + skillModBonus;
@@ -2034,11 +2081,35 @@ export class AspectsofPowerItem extends Item {
     } else {
       // ── Equipment crafting (existing logic) ──
       const elementDef = CONFIG.ASPECTSOFPOWER.craftElements?.[element];
-      const outputMaterial = craftConfig?.craftOutputMaterial || materialItem.system.material || 'metal';
+      const outputMaterial = craftConfig?.craftOutputMaterial
+        || (materialItem ? materialItem.system.material : null)
+        || (reworkTarget ? reworkTarget.system.material : null)
+        || 'metal';
       const slotValue = CONFIG.ASPECTSOFPOWER.craftSlotValues?.[outputSlot] ?? 0.25;
       const matValue = CONFIG.ASPECTSOFPOWER.craftMaterialValues?.[outputMaterial] ?? 0.5;
 
-      const totalStatBudget = Math.round(totalProgress * slotValue * 0.25);
+      // Resolve type tags up-front so 1H/2H weapons get the right stat-budget percentage.
+      // Priority: new-flow typeKey → reworkTarget's stored tags → outputSlot fallback.
+      const itemTypeDef = typeKey
+        ? (CONFIG.ASPECTSOFPOWER.craftItemTypes?.[typeKey])
+        : (CONFIG.ASPECTSOFPOWER.craftItemTypes?.[outputSlot]);
+      let staticTypeTags;
+      if (inheritedTypeTags.length > 0) {
+        staticTypeTags = inheritedTypeTags;
+      } else if (reworkTarget) {
+        // Iterative: use the existing item's stored systemTags so 1H/2H/shield are correctly detected.
+        staticTypeTags = (reworkTarget.system.systemTags ?? []).map(t => t.id);
+      } else {
+        staticTypeTags = itemTypeDef?.tags ?? [];
+      }
+      const slotCategory = itemTypeDef?.category;
+      const isShield  = staticTypeTags.includes('shield');
+      const isWeapon  = staticTypeTags.includes('weapon');
+      const isTwoHand = staticTypeTags.includes('2H');
+      // Stat-budget percentage: 1H weapons get 25%, 2H weapons get 50%, armor/jewelry/profession use 25%.
+      const statBudgetPct = (isWeapon && !isShield && isTwoHand) ? 0.50 : 0.25;
+
+      const totalStatBudget = Math.round(totalProgress * slotValue * statBudgetPct);
       const statBonuses = [];
 
       if (elementDef?.stats?.length >= 3 && totalStatBudget > 0) {
@@ -2060,14 +2131,11 @@ export class AspectsofPowerItem extends Item {
         }
       }
 
-      // Slot category: armor slots → armor bonus, jewelry → veil, weaponry → neither
-      // (defense value goes into stat budget for weapons; shields will need explicit tagging via dialog rewrite).
-      const itemTypeDef = CONFIG.ASPECTSOFPOWER.craftItemTypes?.[outputSlot];
-      const slotCategory = itemTypeDef?.category;  // 'armor' | 'jewelry' | 'profession' | undefined
+      // Defense routing: armor slots → armor bonus, jewelry → veil, shields → armor, other weapons → neither.
       const isArmorSlot   = slotCategory === 'armor';
       const isJewelrySlot = slotCategory === 'jewelry';
       const defenseValue = Math.round(totalProgress * slotValue * matValue);
-      const armorBonus = isArmorSlot   ? defenseValue : 0;
+      const armorBonus = (isArmorSlot || isShield) ? defenseValue : 0;
       const veilBonus  = isJewelrySlot ? defenseValue : 0;
 
       const rarityDef = CONFIG.ASPECTSOFPOWER.rarities?.[qualityData.rarity];
@@ -2075,14 +2143,16 @@ export class AspectsofPowerItem extends Item {
 
       // Tag inheritance: static type tags + material tag + affinity tag.
       const craftedTags = [];
-      for (const t of (itemTypeDef?.tags ?? [])) craftedTags.push({ id: t, value: 0 });
+      for (const t of staticTypeTags) craftedTags.push({ id: t, value: 0 });
       if (outputMaterial) craftedTags.push({ id: outputMaterial, value: 0 });
       if (element && element !== 'neutral') craftedTags.push({ id: `${element}-affinity`, value: 0 });
 
-      // Name format: "{Element-Prefixed Type} - {progress}"
+      // Name format: "{Element-Prefixed Type} - {progress}". Use typeKey for weapons (sword/axe/etc.),
+      // outputSlot for armor/jewelry/profession (slot == type).
       const elPrefix = element ? `${element.charAt(0).toUpperCase() + element.slice(1)} ` : '';
-      const slotName = outputSlot.charAt(0).toUpperCase() + outputSlot.slice(1);
-      const itemName = `${elPrefix}${slotName} - ${totalProgress}`;
+      const nameRoot = typeKey || outputSlot;
+      const niceName = nameRoot.charAt(0).toUpperCase() + nameRoot.slice(1);
+      const itemName = `${elPrefix}${niceName} - ${totalProgress}`;
 
       if (reworkTarget) {
         // Update the existing item with new totals; bump rework count.
@@ -2145,6 +2215,10 @@ export class AspectsofPowerItem extends Item {
         ? `<p><em>Improved: ${createdItem.name}</em></p>`
         : `<p><em>Created: ${createdItem.name}</em></p>`;
 
+      const matLine = materialItem
+        ? `<p><strong>Material:</strong> ${materialItem.name} (${matRarity}, progress ${materialProgress})</p>
+           <p><strong>Material (50%):</strong> ${materialProgress} × 0.5 = ${materialContribution}</p>`
+        : `<p><em>Iterative rework — no material consumed.</em></p>`;
       ChatMessage.create({
         speaker,
         content: `<div class="craft-result">
@@ -2152,8 +2226,7 @@ export class AspectsofPowerItem extends Item {
           <hr>
           ${craftNatLine}
           ${reworkLine}
-          <p><strong>Material:</strong> ${materialItem.name} (${matRarity}, progress ${materialProgress})</p>
-          <p><strong>Material (50%):</strong> ${materialProgress} × 0.5 = ${materialContribution}</p>
+          ${matLine}
           <p><strong>Crafter (50%):</strong> ${skillRoll} × ${d100Pct.toFixed(2)} = ${crafterRoll} × 0.5 = ${crafterContribution}</p>
           <p><strong>d100:</strong> ${d100Roll.total} + ${rarityRange.floor} = ${effectiveD100} (cap ${rarityRange.ceiling})</p>
           ${prepBonus ? `<p><strong>Preparation:</strong> +${prepBonus}</p>` : ''}
