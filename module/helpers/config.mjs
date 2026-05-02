@@ -114,12 +114,14 @@ ASPECTSOFPOWER.rangedBlend = {
 
 /**
  * Variable resource-invest tuning — shared across casters and weapon users.
- *   safe_invest_mana = Wis_mod × wisCapFactor   (above base_mana, before self-damage)
- *   safe_invest_stam = Tough_mod × toughCapFactor
- *   base_stamina     = weight / staminaBaseDivisor × stat / staminaNormalizer
+ *   safe_invest_stam = Tough_mod × toughCapFactor   (melee soft cap; over-invest = self-damage)
+ *   base_stamina     = weight / staminaBaseDivisor × stat_blend / staminaNormalizer
+ *
+ * Spell-side invest cap is per-tier under the hard-cap design — see
+ * spellMaxInvestAboveBase below. Wisdom doesn't have a flat invest knob
+ * here; the per-tier table is the single source of truth.
  */
 ASPECTSOFPOWER.invest = {
-  wisCapFactor:       0.15,
   toughCapFactor:     0.02,
   staminaBaseDivisor: 20,
   staminaNormalizer:  1085,
