@@ -28,7 +28,7 @@ import { EquipmentSystem } from './systems/equipment.mjs';
 import * as MassLeveler from './systems/mass-leveler.mjs';
 import * as TemplateMigration from './systems/template-migration.mjs';
 import * as Celerity from './systems/celerity.mjs';
-import { CelerityTracker, openTracker as openCelerityTracker, registerCelerityTrackerHooks } from './apps/celerity-tracker.mjs';
+import { CelerityTracker, openTracker as openCelerityTracker, refreshTracker as refreshCelerityTracker, registerCelerityTrackerHooks } from './apps/celerity-tracker.mjs';
 
 /**
  * Check if an actor is an assigned player character (not just owned).
@@ -89,7 +89,7 @@ Hooks.once('init', function () {
     getPositionalTags,
     massLeveler: MassLeveler,
     templateMigration: TemplateMigration,
-    celerity: { ...Celerity, openTracker: openCelerityTracker, CelerityTracker },
+    celerity: { ...Celerity, openTracker: openCelerityTracker, refreshTracker: refreshCelerityTracker, CelerityTracker },
     /**
      * Called when a skill is used to consume an action and reset the movement
      * segment for the given actor.  Returns the new action count, or null

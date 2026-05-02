@@ -79,6 +79,13 @@ export class CelerityTracker extends foundry.applications.api.HandlebarsApplicat
     super._onRender(context, options);
     this.element.querySelector('.cel-advance')?.addEventListener('click', () => this._advance());
     this.element.querySelector('.cel-reset')?.addEventListener('click', () => this._reset());
+    this.element.querySelector('.cel-refresh')?.addEventListener('click', () => this.render());
+  }
+
+  /** @override — clear the module singleton so re-open creates a fresh app. */
+  async _onClose(options) {
+    if (_trackerInstance === this) _trackerInstance = null;
+    return super._onClose(options);
   }
 
   /**
@@ -123,6 +130,15 @@ export class CelerityTracker extends foundry.applications.api.HandlebarsApplicat
   }
 }
 
+// Module-level singleton reference. ApplicationV2 in v14 doesn't reliably
+// populate ui.windows the way v12/13 did, so we track our open instance
+// here directly. Cleared on close via _onClose override.
+let _trackerInstance = null;
+
+function _isAlive(app) {
+  return app && app.element && document.body.contains(app.element);
+}
+
 /**
  * Register hooks that auto-refresh the tracker when combat state changes.
  * Idempotent — safe to call multiple times.
@@ -132,8 +148,7 @@ export function registerCelerityTrackerHooks() {
   if (_registered) return;
   _registered = true;
   const refresh = () => {
-    const app = Object.values(ui.windows).find(a => a instanceof CelerityTracker);
-    if (app) app.render();
+    if (_isAlive(_trackerInstance)) _trackerInstance.render();
   };
   Hooks.on('updateCombatant', refresh);
   Hooks.on('updateCombat',    refresh);
@@ -147,12 +162,19 @@ export function registerCelerityTrackerHooks() {
  */
 export function openTracker() {
   registerCelerityTrackerHooks();
-  const existing = Object.values(ui.windows).find(a => a instanceof CelerityTracker);
-  if (existing) {
-    existing.render(true);
-    return existing;
+  if (_isAlive(_trackerInstance)) {
+    _trackerInstance.render(true);
+    return _trackerInstance;
   }
-  const app = new CelerityTracker();
-  app.render(true);
-  return app;
+  _trackerInstance = new CelerityTracker();
+  _trackerInstance.render(true);
+  return _trackerInstance;
+}
+
+/**
+ * Manually re-render the tracker. Useful from console when hooks don't
+ * fire for some reason; also serves as a UX fallback "refresh" button.
+ */
+export function refreshTracker() {
+  if (_isAlive(_trackerInstance)) _trackerInstance.render();
 }
