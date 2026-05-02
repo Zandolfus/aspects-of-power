@@ -73,6 +73,19 @@ ASPECTSOFPOWER.spellGradeFactors = {
 };
 
 /**
+ * Spell-tier celerity weights per design-magic-system.md.
+ * Drives `wait = weight × multiplier × SCALE / actor_speed` for magic skills.
+ * Mirror of weaponWeights but keyed by spell tier rather than weapon-type tag.
+ */
+ASPECTSOFPOWER.spellTierWeights = {
+  basic:    130,
+  high:     150,
+  greater:  200,
+  major:    400,
+  grand:    700,
+};
+
+/**
  * Melee Option B Str/Dex hybrid blend per design-melee-system.md.
  *   normWeight = clamp01((weight - weightOffset) / weightSpan)
  *   strWeight  = strFloor + slope × normWeight  → [strFloor, strFloor+slope]

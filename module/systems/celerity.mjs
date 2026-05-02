@@ -41,19 +41,38 @@ function _actorSpeedFor(actor, skill) {
   }
 }
 
+const _MAGIC_TYPES = new Set(['magic', 'magic_melee', 'magic_projectile']);
+
+/**
+ * Resolve the celerity weight for a skill:
+ *   Magic skills    → spellTierWeights[tier], else BASELINE_WEIGHT
+ *   Weapon skills   → resolveWeaponWeight on the equipped/required weapon,
+ *                     else BASELINE_WEIGHT (e.g. unarmed without a tag)
+ *
+ * Implements (staves, wands) equipped while casting must NOT contribute their
+ * own weight to spell wait — spell weight is intrinsic to the spell tier.
+ */
+function _resolveCelerityWeight(skill, weapon = null) {
+  const sc = CONFIG.ASPECTSOFPOWER.celerity;
+  const type = skill?.system?.roll?.type ?? '';
+  if (_MAGIC_TYPES.has(type)) {
+    const tier = skill?.system?.roll?.tier ?? '';
+    return CONFIG.ASPECTSOFPOWER.spellTierWeights?.[tier] ?? sc.BASELINE_WEIGHT;
+  }
+  const w = weapon ?? skill._resolveWeaponForSkill?.() ?? null;
+  return w ? AspectsofPowerItem.resolveWeaponWeight(w) : sc.BASELINE_WEIGHT;
+}
+
 /**
  * Wait time in ticks for `actor` performing `skill`. Optionally pass `weapon`
- * to override resolution; otherwise resolves via the same path as item.roll().
+ * to override the weapon resolution (no effect on magic skills).
  */
 export function computeActionWait(actor, skill, weapon = null) {
   const sc = CONFIG.ASPECTSOFPOWER.celerity;
   const speed = Math.max(1, _actorSpeedFor(actor, skill));
-  const w = weapon ?? skill._resolveWeaponForSkill?.() ?? null;
-  const weaponWeight = w
-    ? AspectsofPowerItem.resolveWeaponWeight(w)
-    : sc.BASELINE_WEIGHT; // fall back to sword baseline for weaponless skills (spells)
+  const weight = _resolveCelerityWeight(skill, weapon);
   const multiplier = skill?.system?.roll?.actionWeightMultiplier ?? 1.0;
-  return Math.max(1, Math.round((weaponWeight * multiplier * sc.SCALE) / speed));
+  return Math.max(1, Math.round((weight * multiplier * sc.SCALE) / speed));
 }
 
 /**
