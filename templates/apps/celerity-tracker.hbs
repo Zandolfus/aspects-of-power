@@ -1,0 +1,51 @@
+<div class="celerity-tracker-content" style="padding:6px;">
+  {{#if noCombat}}
+    <p style="text-align:center;padding:16px;color:#888;">
+      No active combat. Start one in the Combat Tracker to begin.
+    </p>
+  {{else}}
+    <div class="cel-clock" style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;padding:4px 8px;background:#222;color:#eee;border-radius:3px;">
+      <span><strong>Clock:</strong> tick {{clockTick}}</span>
+      <span style="font-size:11px;color:#aaa;">{{rows.length}} combatants</span>
+    </div>
+
+    <table class="cel-table" style="width:100%;border-collapse:collapse;font-size:12px;">
+      <thead>
+        <tr style="border-bottom:1px solid #444;">
+          <th style="text-align:left;padding:4px;">Combatant</th>
+          <th style="text-align:left;padding:4px;">Last action</th>
+          <th style="text-align:right;padding:4px;">Wait</th>
+          <th style="text-align:right;padding:4px;">Next @</th>
+          <th style="text-align:right;padding:4px;">In</th>
+        </tr>
+      </thead>
+      <tbody>
+        {{#each rows}}
+          <tr class="cel-row {{#if nextUp}}cel-next-up{{/if}}"
+              style="border-bottom:1px solid #333;{{#if nextUp}}background:rgba(80,160,80,0.18);font-weight:bold;{{/if}}">
+            <td style="padding:4px;">
+              <img src="{{img}}" width="18" height="18" style="vertical-align:middle;margin-right:4px;border:none;" />
+              {{name}}
+              {{#if isPC}}<span style="font-size:10px;color:#6c6;">(PC)</span>{{/if}}
+            </td>
+            <td style="padding:4px;color:#bbb;">{{lastActionName}}</td>
+            <td style="padding:4px;text-align:right;color:#bbb;">{{#if lastActionWait}}{{lastActionWait}}{{else}}—{{/if}}</td>
+            <td style="padding:4px;text-align:right;">{{#if nextActionTick}}{{nextActionTick}}{{else}}—{{/if}}</td>
+            <td style="padding:4px;text-align:right;">
+              {{#if ready}}
+                <span style="color:#6c6;">ready</span>
+              {{else}}
+                {{ticksUntil}}
+              {{/if}}
+            </td>
+          </tr>
+        {{/each}}
+      </tbody>
+    </table>
+
+    <div class="cel-controls" style="display:flex;gap:6px;margin-top:8px;">
+      <button type="button" class="cel-advance" style="flex:1;">Advance to next</button>
+      <button type="button" class="cel-reset" style="flex:1;">Reset clock</button>
+    </div>
+  {{/if}}
+</div>

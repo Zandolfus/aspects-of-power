@@ -28,6 +28,7 @@ import { EquipmentSystem } from './systems/equipment.mjs';
 import * as MassLeveler from './systems/mass-leveler.mjs';
 import * as TemplateMigration from './systems/template-migration.mjs';
 import * as Celerity from './systems/celerity.mjs';
+import { CelerityTracker, openTracker as openCelerityTracker, registerCelerityTrackerHooks } from './apps/celerity-tracker.mjs';
 
 /**
  * Check if an actor is an assigned player character (not just owned).
@@ -88,7 +89,7 @@ Hooks.once('init', function () {
     getPositionalTags,
     massLeveler: MassLeveler,
     templateMigration: TemplateMigration,
-    celerity: Celerity,
+    celerity: { ...Celerity, openTracker: openCelerityTracker, CelerityTracker },
     /**
      * Called when a skill is used to consume an action and reset the movement
      * segment for the given actor.  Returns the new action count, or null
@@ -480,6 +481,9 @@ Hooks.on('renderCompendium', (app, html) => {
 /* -------------------------------------------- */
 
 Hooks.once('ready', async function () {
+  // Register celerity tracker auto-refresh hooks (idempotent).
+  registerCelerityTrackerHooks();
+
   // ── One-time migrations ──
   if (game.user.isGM) {
     const migrationVersion = game.settings.get('aspects-of-power', 'migrationVersion') ?? '0';
