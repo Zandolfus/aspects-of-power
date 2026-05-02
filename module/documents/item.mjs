@@ -318,6 +318,35 @@ export class AspectsofPowerItem extends Item {
   }
 
   /**
+   * Resolve which weapon item drives this skill's weight + tags.
+   *   1. If `system.requiredEquipment` is set and resolves on the actor → that item.
+   *   2. Else, the actor's currently-equipped weaponry-slot item with the highest
+   *      `weight > 0`, excluding shields (so Phil wielding Claymore + Shield picks
+   *      the Claymore for Strike).
+   *   3. Else, null (caller falls back to legacy formula).
+   *
+   * @returns {Item|null}
+   */
+  _resolveWeaponForSkill() {
+    if (!this.actor) return null;
+    if (this.system.requiredEquipment) {
+      const direct = this.actor.items.get(this.system.requiredEquipment);
+      if (direct) return direct;
+    }
+    let best = null;
+    for (const i of this.actor.items) {
+      if (i.type !== 'item') continue;
+      const s = i.system;
+      if (s?.slot !== 'weaponry') continue;
+      if (s?.equipped !== true) continue;
+      if (!(s?.weight > 0)) continue;
+      if ((s?.tags ?? []).includes('shield')) continue;
+      if (!best || s.weight > best.system.weight) best = i;
+    }
+    return best;
+  }
+
+  /**
    * Variable resource-invest dialog. Generic over mana (caster) and stamina
    * (melee/ranged) — same math, different labels and potency stat. Player
    * chooses how much to invest from base up to pool. Past the safe ceiling
@@ -3249,8 +3278,12 @@ export class AspectsofPowerItem extends Item {
         investSelfDamageFlavor = 'over-channeling';
       }
     } else if (isVariableWeapon) {
-      // Find the equipped weapon for weight + hybrid blend.
-      const weapon = this.system.requiredEquipment ? this.actor.items.get(this.system.requiredEquipment) : null;
+      // Find the weapon for weight + hybrid blend. Hard-link via requiredEquipment
+      // takes precedence (e.g. "Soulreaver Strike" must use Soulreaver). For generic
+      // skills like "Strike", fall back to the actor's equipped weaponry-slot item
+      // (highest-weight non-shield) so designers don't have to wire requiredEquipment
+      // on every variant.
+      const weapon = this._resolveWeaponForSkill();
       const weaponWeight = weapon?.system?.weight ?? 0;
       // No weapon weight → fall back to legacy formula path (skill not yet migrated).
       // The else branch below intentionally does nothing; legacy dmgFormula stays.
