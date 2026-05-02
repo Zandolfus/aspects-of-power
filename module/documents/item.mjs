@@ -317,6 +317,102 @@ export class AspectsofPowerItem extends Item {
     });
   }
 
+  /**
+   * Variable spell-invest dialog (per design-magic-system.md).
+   * Player chooses how much mana to invest from base_mana up to their pool.
+   * Past the safe ceiling (base + Wis cap), invest deals quadratic self-damage.
+   *
+   * @param {object} args
+   * @param {number} args.baseMana    Minimum invest (tier_factor × grade_factor).
+   * @param {number} args.safeInvest  Wis_mod × 0.15 — invest above base before self-damage triggers.
+   * @param {number} args.maxPool     Caster's current mana.
+   * @param {number} args.intMod      Caster's Intelligence mod (damage potency).
+   * @param {number} args.multiplier  Per-skill damage multiplier.
+   * @param {string} args.label       Skill name for dialog title.
+   * @returns {Promise<number|null>}  Selected invest amount, or null on cancel.
+   */
+  async _promptSpellInvest({ baseMana, safeInvest, maxPool, intMod, multiplier, label }) {
+    const safeCeiling = baseMana + safeInvest;
+    const startInvest = Math.min(safeCeiling, maxPool);
+    const computeDmg = (v) => Math.round(intMod * multiplier * Math.sqrt(v));
+    const computeSelfDmg = (v) => {
+      const excess = Math.max(0, v - safeCeiling);
+      if (excess <= 0 || safeInvest <= 0) return 0;
+      return Math.round(intMod * Math.pow(excess / safeInvest, 2));
+    };
+
+    const content = `
+      <div class="spell-invest">
+        <div class="invest-meta" style="display:grid;grid-template-columns:1fr 1fr;gap:4px;margin-bottom:8px;font-size:12px;">
+          <div>Base mana: <strong>${baseMana}</strong></div>
+          <div>Safe ceiling: <strong>${safeCeiling}</strong></div>
+          <div>Pool: <strong>${maxPool}</strong></div>
+          <div>Int × Mult: <strong>${intMod} × ${multiplier}</strong></div>
+        </div>
+        <div class="form-group">
+          <label>Invest: <span class="invest-display">${startInvest}</span> mana</label>
+          <input type="range" name="invest" min="${baseMana}" max="${maxPool}" value="${startInvest}" step="1" style="width:100%;" />
+        </div>
+        <div class="invest-readouts" style="display:grid;grid-template-columns:1fr 1fr;gap:4px;margin-top:8px;">
+          <div>Predicted damage: <strong class="dmg-display">${computeDmg(startInvest)}</strong></div>
+          <div>Pool after cast: <strong class="remaining-display">${maxPool - startInvest}</strong></div>
+          <div class="self-dmg-row" style="grid-column:1 / -1;">
+            Self-damage: <strong class="self-dmg-display">${computeSelfDmg(startInvest)}</strong>
+            <span class="self-dmg-hint" style="font-size:11px;color:#888;"> (over-invest past safe ceiling)</span>
+          </div>
+        </div>
+        <p class="hint" style="font-size:11px;margin-top:8px;">Damage = Int × multiplier × √invested. Excess past safe ceiling deals Int × (excess/safe)² self-damage.</p>
+      </div>`;
+
+    let resolveFn;
+    const promise = new Promise(res => { resolveFn = res; });
+    let resolved = false;
+    const safeResolve = (v) => { if (!resolved) { resolved = true; resolveFn(v); } };
+
+    const dlg = new foundry.applications.api.DialogV2({
+      window: { title: `${label} — Mana Investment` },
+      content,
+      buttons: [
+        {
+          action: 'confirm',
+          label: 'Cast',
+          default: true,
+          callback: (event, button) => {
+            const val = parseInt(button.form.elements.invest?.value, 10);
+            safeResolve(Math.min(Math.max(baseMana, val || baseMana), maxPool));
+          },
+        },
+        { action: 'cancel', label: 'Cancel', callback: () => safeResolve(null) },
+      ],
+      close: () => safeResolve(null),
+    });
+    await dlg.render(true);
+
+    // Wire live updates after the dialog mounts.
+    const root = dlg.element;
+    const slider = root.querySelector('input[name="invest"]');
+    const investDisplay = root.querySelector('.invest-display');
+    const dmgDisplay = root.querySelector('.dmg-display');
+    const selfDmgDisplay = root.querySelector('.self-dmg-display');
+    const selfDmgRow = root.querySelector('.self-dmg-row');
+    const remainingDisplay = root.querySelector('.remaining-display');
+    if (slider) {
+      slider.addEventListener('input', () => {
+        const v = parseInt(slider.value, 10);
+        const dmg = computeDmg(v);
+        const selfDmg = computeSelfDmg(v);
+        investDisplay.textContent = v;
+        dmgDisplay.textContent = dmg;
+        selfDmgDisplay.textContent = selfDmg;
+        remainingDisplay.textContent = maxPool - v;
+        selfDmgRow.style.color = selfDmg > 0 ? '#c33' : '';
+        selfDmgRow.style.fontWeight = selfDmg > 0 ? 'bold' : '';
+      });
+    }
+
+    return promise;
+  }
+
   _buildRollFormulas(rollData) {
     const A   = this.actor.system.abilities;
     // Pure (default): use primary ability mod at full weight.
@@ -3086,7 +3182,60 @@ export class AspectsofPowerItem extends Item {
     if (TokenClass?.flushStamina) await TokenClass.flushStamina();
 
     // Build formulas (also populates rollData.roll.abilitymod and resourcevalue).
-    const { hitFormula, dmgFormula } = this._buildRollFormulas(rollData);
+    let { hitFormula, dmgFormula } = this._buildRollFormulas(rollData);
+
+    // ── Variable spell invest (per design-magic-system.md) ─────────────
+    // Gated to mana-resource attack skills with both tier and grade set.
+    // Opens a slider dialog, replaces the damage formula with the new
+    // spell formula (Int × multiplier × √invested), and tracks self-damage
+    // for over-invest past the Wis-derived safe ceiling.
+    let spellSelfDamage = 0;
+    const spellTier  = this.system.roll?.tier  ?? '';
+    const spellGrade = this.system.roll?.grade ?? '';
+    const isVariableSpell = rollData.roll.resource === 'mana'
+      && spellTier && spellGrade
+      && tags.includes('attack');
+    if (isVariableSpell) {
+      const sc = CONFIG.ASPECTSOFPOWER;
+      const tierFactor  = sc.spellTierFactors[spellTier];
+      const gradeFactor = sc.spellGradeFactors[spellGrade];
+      const baseMana    = Math.round(tierFactor * gradeFactor);
+      const wisMod      = this.actor.system.abilities?.wisdom?.mod ?? 0;
+      const safeInvest  = Math.max(0, Math.round(wisMod * 0.15));
+      const maxPool     = Math.round(rollData.roll.resourcevalue);
+      const intMod      = this.actor.system.abilities?.intelligence?.mod ?? 0;
+      // Multiplier: per-tier default, overridable via the skill's diceBonus field
+      // (which the sheet labels "Multiplier"). Designer-set value of 1 is treated
+      // as "use tier default" since 1 is the schema initial.
+      const tierMult = sc.spellTierMultipliers[spellTier];
+      const dbVal    = this.system.roll?.diceBonus ?? 1;
+      const multiplier = (dbVal && dbVal !== 1) ? dbVal : tierMult;
+
+      if (maxPool < baseMana) {
+        ChatMessage.create({
+          speaker, rollMode, ...(whisperGM ? { whisper: whisperGM } : {}),
+          flavor: label,
+          content: `<p>Not enough mana to cast (need ${baseMana}, have ${maxPool}).</p>`,
+        });
+        return;
+      }
+
+      const invested = await this._promptSpellInvest({
+        baseMana, safeInvest, maxPool, intMod, multiplier, label,
+      });
+      if (invested === null) return; // cancelled
+
+      rollData.roll.cost = invested;
+      rollData.roll.variableSpellInvest = invested;
+      // Replace dmg formula with the new spell formula evaluated to a literal.
+      // Roll() accepts a bare integer string and returns it as the total.
+      dmgFormula = String(Math.round(intMod * multiplier * Math.sqrt(invested)));
+
+      const excess = Math.max(0, invested - (baseMana + safeInvest));
+      if (excess > 0 && safeInvest > 0) {
+        spellSelfDamage = Math.round(intMod * Math.pow(excess / safeInvest, 2));
+      }
+    }
 
     // Variable mana cost for barrier skills — prompt user for amount.
     const isBarrier = tags.includes('restoration') && this.system.tagConfig?.restorationResource === 'barrier';
@@ -3152,6 +3301,27 @@ export class AspectsofPowerItem extends Item {
 
     const resource  = rollData.roll.resource;
     const newResVal = Math.max(0, Math.round(rollData.roll.resourcevalue - rollData.roll.cost));
+
+    // Helper to commit resource cost + spell over-invest self-damage atomically.
+    // Called from each cast-completion branch (AOE-after-placement, non-AOE);
+    // never called from cancellation paths so self-damage doesn't commit on a
+    // back-out. Skipped for barrier skills — they defer cost to a GM action.
+    const _commitCastCost = async () => {
+      if (isBarrier) return;
+      const updates = { [`system.${resource}.value`]: newResVal };
+      if (spellSelfDamage > 0) {
+        const curHp = this.actor.system.health?.value ?? 0;
+        updates['system.health.value'] = Math.max(0, curHp - spellSelfDamage);
+      }
+      await this.actor.update(updates);
+      if (spellSelfDamage > 0) {
+        ChatMessage.create({
+          speaker, rollMode, ...(whisperGM ? { whisper: whisperGM } : {}),
+          flavor: label,
+          content: `<p><strong>${this.actor.name}</strong> takes <strong>${spellSelfDamage}</strong> self-damage from over-channeling.</p>`,
+        });
+      }
+    };
 
     // ── Weapon durability: degrade if raw damage exceeds the weapon's limit ──
     if (tags.includes('attack') && this.system.requiredEquipment) {
@@ -3268,9 +3438,7 @@ export class AspectsofPowerItem extends Item {
 
       // Deduct resource cost AFTER effects are applied.
       // Barrier skills defer cost deduction to executeGmAction (after target accepts).
-      if (!isBarrier) {
-        await this.actor.update({ [`system.${resource}.value`]: newResVal });
-      }
+      await _commitCastCost();
 
       // Remove instantaneous AOE regions (duration = 0).
       if ((this.system.aoe.templateDuration ?? 0) === 0) {
@@ -3283,9 +3451,7 @@ export class AspectsofPowerItem extends Item {
 
     // ── Deduct resource cost (non-AOE) ──────────────────────────────────
     // Barrier skills defer cost until after the target accepts.
-    if (!isBarrier) {
-      await this.actor.update({ [`system.${resource}.value`]: newResVal });
-    }
+    await _commitCastCost();
 
     // ── Legacy behavior for tagless skills ──────────────────────────────
     if (tags.length === 0) {
