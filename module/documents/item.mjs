@@ -1,5 +1,6 @@
 import { EquipmentSystem } from '../systems/equipment.mjs';
 import { getPositionalTags } from '../helpers/positioning.mjs';
+import { recordActionFired } from '../systems/celerity.mjs';
 
 /**
  * Check if an actor is an assigned player character (not just owned).
@@ -3450,6 +3451,16 @@ export class AspectsofPowerItem extends Item {
           speaker, rollMode, ...(whisperGM ? { whisper: whisperGM } : {}),
           flavor: label,
           content: `<p><strong>${this.actor.name}</strong> takes <strong>${investSelfDamage}</strong> self-damage from ${investSelfDamageFlavor}.</p>`,
+        });
+      }
+      // Celerity: schedule next-action tick on the combatant if in active combat.
+      // No-op outside combat; safe to call regardless.
+      const cel = await recordActionFired(this.actor, this);
+      if (cel) {
+        ChatMessage.create({
+          speaker, rollMode, ...(whisperGM ? { whisper: whisperGM } : {}),
+          flavor: label,
+          content: `<p><em>Celerity:</em> wait <strong>${cel.wait}</strong> ticks → next action at tick <strong>${cel.scheduledTick}</strong>.</p>`,
         });
       }
     };

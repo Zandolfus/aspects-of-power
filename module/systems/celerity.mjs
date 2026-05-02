@@ -119,6 +119,52 @@ export function referenceRoundLength(rl) {
 }
 
 /**
+ * Find the actor's combatant in the active combat (if any).
+ * Returns null when the actor isn't in combat or no combat is started.
+ */
+export function findCombatantForActor(actor) {
+  const combat = game.combat;
+  if (!combat?.started || !actor) return null;
+  const token = actor.getActiveTokens?.()[0];
+  if (!token) {
+    // Fallback — match by actorId on linked tokens.
+    return combat.combatants.find(c => c.actorId === actor.id) ?? null;
+  }
+  return combat.combatants.find(c => c.tokenId === token.id) ?? null;
+}
+
+/**
+ * Read or initialize the clock tick on the combat document.
+ * Combats start at tick 0; the tracker UI advances it as actions resolve.
+ */
+export function getClockTick(combat = game.combat) {
+  return combat?.flags?.aspectsofpower?.clockTick ?? 0;
+}
+
+/**
+ * Record that `actor` just fired `skill` — schedule their next action tick
+ * relative to the combat clock. Stores on the combatant's flags so the
+ * tracker UI and any future state restore can read it. No-op if the actor
+ * isn't in active combat.
+ *
+ * @returns {object|null} { wait, scheduledTick, lastActionName } or null
+ */
+export async function recordActionFired(actor, skill) {
+  const combatant = findCombatantForActor(actor);
+  if (!combatant) return null;
+  const wait = computeActionWait(actor, skill);
+  const clockTick = getClockTick(combatant.combat);
+  const scheduledTick = clockTick + wait;
+  await combatant.update({
+    'flags.aspectsofpower.nextActionTick': scheduledTick,
+    'flags.aspectsofpower.lastActionWait': wait,
+    'flags.aspectsofpower.lastActionName': skill.name,
+    'flags.aspectsofpower.lastActionAt':   clockTick,
+  });
+  return { wait, scheduledTick, lastActionName: skill.name };
+}
+
+/**
  * Predict the resolution order of declared (actor, skill) pairs from a
  * shared starting tick. Returns one row per pair: { actor, skill, wait,
  * scheduledTick, swingsPerRound }, sorted ascending by scheduledTick.
