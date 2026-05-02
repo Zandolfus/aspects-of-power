@@ -71,7 +71,21 @@ async function _onCelAdvance(event, target) {
     return;
   }
   ui.notifications.info(`Clock → ${declared.scheduledTick}. ${c.name} fires "${declared.label}".`);
-  await item.roll({ executeDeferred: true });
+
+  // If the actor has an online non-GM owner, dispatch the deferred roll to
+  // their client via socket — invest dialogs appear for the actual player,
+  // not for the GM who clicked "Advance". GM-only actors run locally.
+  const owner = game.users.find(u => !u.isGM && u.active && c.actor?.testUserPermission?.(u, 'OWNER'));
+  if (owner) {
+    game.socket.emit('system.aspects-of-power', {
+      action: 'executeQueuedAction',
+      actorId: c.actor.id,
+      itemId: item.id,
+      targetUserId: owner.id,
+    });
+  } else {
+    await item.roll({ executeDeferred: true });
+  }
 
   // Sync Foundry's combat.turn pointer to the new celerity-next-up combatant
   // so pan-to-active and other built-in turn-pointer machinery stays aligned.

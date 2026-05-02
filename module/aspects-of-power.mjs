@@ -489,6 +489,23 @@ Hooks.once('ready', async function () {
   // Register celerity tracker auto-refresh hooks (idempotent).
   registerCelerityTrackerHooks();
 
+  // Socket: when the celerity tracker advances on the GM's client and the
+  // next-up actor is owned by an online player, the GM dispatches an
+  // executeQueuedAction message → the player's client runs item.roll({
+  // executeDeferred: true }) so the variable-invest dialog appears for the
+  // player, not the GM.
+  game.socket.on('system.aspects-of-power', (data) => {
+    if (data?.action !== 'executeQueuedAction') return;
+    if (data.targetUserId !== game.user.id) return;
+    const actor = game.actors.get(data.actorId);
+    const item  = actor?.items?.get(data.itemId);
+    if (!item) {
+      console.warn('[celerity] executeQueuedAction: item not found', data);
+      return;
+    }
+    item.roll({ executeDeferred: true });
+  });
+
   // ── One-time migrations ──
   if (game.user.isGM) {
     const migrationVersion = game.settings.get('aspects-of-power', 'migrationVersion') ?? '0';
