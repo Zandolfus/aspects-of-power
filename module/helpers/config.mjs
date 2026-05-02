@@ -120,7 +120,7 @@ ASPECTSOFPOWER.rangedBlend = {
  */
 ASPECTSOFPOWER.invest = {
   wisCapFactor:       0.15,
-  toughCapFactor:     0.15,
+  toughCapFactor:     0.02,
   staminaBaseDivisor: 20,
   staminaNormalizer:  1085,
 };
@@ -170,12 +170,12 @@ ASPECTSOFPOWER.castingSpeedWeights = {
  * (small spells already have low base; big spells can absorb more channel).
  */
 ASPECTSOFPOWER.spellMaxInvestAboveBase = {
-  basic:   0.5,
-  high:    0.8,
-  greater: 1.2,
-  major:   2.0,
-  grand:   3.0,
-  '':      1.0,  // fallback
+  basic:   0.05,
+  high:    0.08,
+  greater: 0.15,
+  major:   0.25,
+  grand:   0.40,
+  '':      0.10,  // fallback
 };
 
 /**

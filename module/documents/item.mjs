@@ -3373,9 +3373,15 @@ export class AspectsofPowerItem extends Item {
           potencyLabel = 'Str/Dex';
         }
 
-        // base_stamina: melee uses Str/normalizer; ranged uses stat_blend/normalizer (per design).
-        const denomStat = isRanged ? statBlend : strMod;
-        const baseStamina = Math.max(1, Math.round((weaponWeight / sc.invest.staminaBaseDivisor) * (denomStat / sc.invest.staminaNormalizer)));
+        // base_stamina uses stat_blend for both melee and ranged — per the
+        // 2026-05-03 rebalance, "high-output bodies cost more fuel" applies
+        // to BOTH Str specs and Dex specs. The blend reflects whichever stat
+        // is doing the work for the wielded weapon, so cost stays internally
+        // consistent with damage. Old "elegant property" of constant per-round
+        // burn across weapons becomes per-round = 15 × blend / 1085 (now
+        // depends on build-vs-weapon match — off-spec weapons cost less AND
+        // damage less, which is more coherent than purely flat costs).
+        const baseStamina = Math.max(1, Math.round((weaponWeight / sc.invest.staminaBaseDivisor) * (statBlend / sc.invest.staminaNormalizer)));
         const safeInvest = Math.max(0, Math.round(toughMod * sc.invest.toughCapFactor));
         // Live read — see equivalent comment above on the spell path.
         const maxPool = Math.round(this.actor.system[rollData.roll.resource]?.value ?? 0);
