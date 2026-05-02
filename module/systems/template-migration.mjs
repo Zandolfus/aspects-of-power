@@ -32,6 +32,23 @@ const E_SPECIALIST_NEW_FP    = 2;
 const E_PUREFREE_OLD_FP = 18;
 const E_PUREFREE_NEW_FP = 12;
 
+/**
+ * Per-template overrides for outliers and one-off designer redesigns.
+ * Locked decisions 2026-05-02:
+ *   Augur               (E) — keep tri-stat caster identity, scale to 12
+ *   Crusher             (E) — STR-primary, preserve 1-big-2-medium shape
+ *   Head Demonic Butler (E) — was anomalous; redesign to specialist following
+ *                             the new Demonic Butler (G) stat priority
+ *   Demonic Butler      (G) — redesign from pure-free to combat-starter shape
+ *                             with dex/int primary, wis/end secondary
+ */
+const NAMED_OVERRIDES = {
+  'Augur':               { rank: 'E', gains: { vitality: 3, willpower: 3, wisdom: 3 }, fp: 3 },
+  'Crusher':             { rank: 'E', gains: { strength: 4, endurance: 3, dexterity: 3 }, fp: 2 },
+  'Head Demonic Butler': { rank: 'E', gains: { dexterity: 4, intelligence: 3, wisdom: 2, endurance: 1 }, fp: 2 },
+  'Demonic Butler':      { rank: 'G', gains: { dexterity: 2, intelligence: 2, wisdom: 1, endurance: 1 }, fp: 2 },
+};
+
 /* -------------------------------------------------- */
 /*  Classification                                    */
 /* -------------------------------------------------- */
@@ -54,11 +71,19 @@ function _shapeEquals(a, b) {
 }
 
 /**
- * Classify an E-rank template against the migration rules.
- * Returns { kind, reason? } where kind is one of:
- *   'specialist' | 'pureFree' | 'outlier' | 'skip'
+ * Classify a template against the migration rules. Named overrides win
+ * regardless of rank; otherwise only E-rank templates are touched.
+ * Returns { kind, ... } where kind is one of:
+ *   'override' | 'specialist' | 'pureFree' | 'outlier' | 'skip'
  */
 function _classify(template) {
+  const override = NAMED_OVERRIDES[template.name];
+  if (override) {
+    if (template.system.rank !== override.rank) {
+      return { kind: 'outlier', reason: `override expects rank ${override.rank}, got ${template.system.rank}` };
+    }
+    return { kind: 'override', override };
+  }
   if (template.system.rank !== 'E') return { kind: 'skip', reason: 'not E rank' };
   const shape = _gainShape(template.system.gains ?? {});
   const fp = template.system.freePointsPerLevel ?? 0;
@@ -138,6 +163,9 @@ export async function previewE() {
     } else if (cls.kind === 'pureFree') {
       row.afterShape = '(none)';
       row.afterFp = E_PUREFREE_NEW_FP;
+    } else if (cls.kind === 'override') {
+      row.afterShape = _gainShape(cls.override.gains).join(',');
+      row.afterFp = cls.override.fp;
     } else {
       row.reason = cls.reason;
     }
@@ -167,6 +195,9 @@ export async function applyE() {
       update = { 'system.gains': m.gains, 'system.freePointsPerLevel': m.freePointsPerLevel };
     } else if (cls.kind === 'pureFree') {
       update = { 'system.freePointsPerLevel': E_PUREFREE_NEW_FP };
+    } else if (cls.kind === 'override') {
+      const newGains = Object.fromEntries(ABILITY_KEYS.map(k => [k, cls.override.gains[k] ?? 0]));
+      update = { 'system.gains': newGains, 'system.freePointsPerLevel': cls.override.fp };
     }
 
     try {
