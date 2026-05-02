@@ -72,6 +72,24 @@ async function _onCelAdvance(event, target) {
   }
   ui.notifications.info(`Clock → ${declared.scheduledTick}. ${c.name} fires "${declared.label}".`);
   await item.roll({ executeDeferred: true });
+
+  // Sync Foundry's combat.turn pointer to the new celerity-next-up combatant
+  // so pan-to-active and other built-in turn-pointer machinery stays aligned.
+  // If no one is queued, leave combat.turn alone.
+  const remainingClock = getClockTick(combat);
+  const upcoming = [...combat.combatants]
+    .map(cm => ({ cm, next: cm.flags?.[FLAG_NS]?.declaredAction?.scheduledTick ?? null }))
+    .filter(e => e.next !== null && e.next > remainingClock)
+    .sort((a, b) => a.next - b.next);
+  if (upcoming.length > 0) {
+    const allCombatants = [...combat.combatants];
+    const nextIdx = allCombatants.indexOf(upcoming[0].cm);
+    if (nextIdx >= 0 && nextIdx !== combat.turn) {
+      // Avoid the legacy combatTurnChange round-mechanics handler firing again
+      // — celerity already drove round-end via runRoundEnd above.
+      await combat.update({ turn: nextIdx }, { _celerityTurnSync: true });
+    }
+  }
 }
 
 async function _onCelCancel(event, target) {
@@ -149,26 +167,33 @@ export class CelerityCombatTracker extends ParentTracker {
     const combat = context.combat ?? this.viewed;
     context.celerityClockTick = getClockTick(combat);
     if (Array.isArray(context.turns)) {
-      // Strip Foundry's initiative-based 'active' from every row first; we'll
-      // re-apply it to whichever combatant is celerity-next-up so pan-to-active
-      // and other Foundry behaviors point at the right token.
+      // Player visibility: per design-celerity.md "Public allies, opaque
+      // enemies", non-GM users only see PC-owned combatants in the tracker.
+      // (Hidden enemies stay invisible — even on canvas, they don't show.)
+      if (!game.user.isGM) {
+        context.turns = context.turns.filter(t => {
+          const cm = combat.combatants.get(t.id);
+          return cm?.actor?.hasPlayerOwner === true;
+        });
+      }
+      // Strip Foundry's initiative-based 'active' so we can re-apply it to
+      // the celerity-next-up combatant.
       for (const t of context.turns) {
         t.css = (t.css ?? '').replace(/\bactive\b/g, '').trim();
       }
-      // Sort by celerity scheduled tick — null/Infinity (no action queued)
-      // sorts last so anyone with a real schedule appears at the top.
+      // Sort by celerity scheduled tick (null sorts to bottom).
       context.turns.sort((a, b) => {
         const ta = a.celerity?.nextActionTick ?? Infinity;
         const tb = b.celerity?.nextActionTick ?? Infinity;
         return ta - tb;
       });
-      // Mark next-up: prefer the soonest scheduled action; fall back to first
-      // ready combatant if nobody has queued anything yet.
+      // Mark next-up ONLY when an action is actually queued. When the queue
+      // is empty (everyone "ready"), nobody is highlighted — prevents the
+      // green indicator from sticking on the previously-acted combatant.
       const firstScheduled = context.turns.find(t => t.celerity?.nextActionTick !== null);
-      const nextUp = firstScheduled ?? context.turns[0];
-      if (nextUp) {
-        nextUp.celerity.nextUp = true;
-        nextUp.css = (nextUp.css + ' active').trim();
+      if (firstScheduled) {
+        firstScheduled.celerity.nextUp = true;
+        firstScheduled.css = (firstScheduled.css + ' active').trim();
       }
     }
     return context;

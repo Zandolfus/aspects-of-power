@@ -234,6 +234,15 @@ export async function runRoundEnd(combat, combatant) {
   const actor = combatant.actor;
   if (!actor) return;
 
+  // Player-visible round-end announcement. PCs see it broadcast; NPCs
+  // whisper-to-GM only so player chat doesn't fill with enemy round ticks.
+  const isPC = !!actor.hasPlayerOwner;
+  ChatMessage.create({
+    speaker: ChatMessage.getSpeaker({ actor }),
+    content: `<p><em>${actor.name}'s round ends.</em></p>`,
+    ...(isPC ? {} : { whisper: ChatMessage.getWhisperRecipients('GM') }),
+  });
+
   // Round-end via existing onStartTurn handler (effect expiry, sustain
   // upkeep, reactions reset, regen, debuff break rolls).
   if (typeof actor.onStartTurn === 'function') {

@@ -724,6 +724,10 @@ Hooks.on('renderActiveEffectConfig', (app, element, _options) => {
  */
 Hooks.on('combatTurnChange', async (combat, _prior, current) => {
   if (!game.user.isGM) return;
+  // Skip under celerity — round-end mechanics fire from the celerity tracker's
+  // advance handler instead. (Foundry's turn pointer change still happens for
+  // pan-to-active sync, but we don't want to re-run regen/sustain/etc.)
+  if (CONFIG.ui.combat?.name === 'CelerityCombatTracker') return;
   const combatant = combat.combatants.get(current.combatantId);
   if (!combatant?.actor) return;
   await combatant.actor.onStartTurn(combat, current);
@@ -760,6 +764,9 @@ Hooks.on('combatStart', async (combat) => {
  */
 Hooks.on('combatTurnChange', async (combat, _prior, current) => {
   if (!game.user.isGM) return;
+  // Skip under celerity — DoTs fire per-actor at celerity round boundaries
+  // via runRoundEnd. The legacy turn-change DoT pass would double-tick.
+  if (CONFIG.ui.combat?.name === 'CelerityCombatTracker') return;
 
   const combatant = combat.combatants.get(current.combatantId);
   if (!combatant?.actor) return;
