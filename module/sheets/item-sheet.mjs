@@ -708,26 +708,17 @@ export class AspectsofPowerItemSheet extends foundry.applications.api.Handlebars
 
     // Craft bonus is now single-row (no add/delete) — saved via _saveCraftBonuses on form change.
 
-    // --- Augment drop zone + remove buttons (equipment items) ---
+    // --- Drop handling for equipment items ---
+    // Single sheet-wide listener. _onDrop routes by dropped item type:
+    //   skill → grantedSkills  (anywhere on the sheet)
+    //   augment → augment slot (uses event.target to find the closest slot)
     if (this.item.type === 'item') {
-      const augSection = this.element.querySelector('.augment-section');
-      if (augSection) {
-        augSection.addEventListener('dragover', ev => {
-          ev.preventDefault();
-          ev.dataTransfer.dropEffect = 'copy';
-        });
-        augSection.addEventListener('drop', this._onDrop.bind(this));
-      }
+      this.element.addEventListener('dragover', ev => {
+        ev.preventDefault();
+        ev.dataTransfer.dropEffect = 'copy';
+      });
+      this.element.addEventListener('drop', this._onDrop.bind(this));
 
-      // --- Granted-skills drop zone + remove buttons ---
-      const grantedSection = this.element.querySelector('.granted-skills-section');
-      if (grantedSection) {
-        grantedSection.addEventListener('dragover', ev => {
-          ev.preventDefault();
-          ev.dataTransfer.dropEffect = 'copy';
-        });
-        grantedSection.addEventListener('drop', this._onDrop.bind(this));
-      }
       this.element.querySelectorAll('.granted-skill-remove').forEach(el => {
         el.addEventListener('click', async (ev) => {
           const idx = Number(ev.currentTarget.dataset.index);
@@ -823,8 +814,10 @@ export class AspectsofPowerItemSheet extends foundry.applications.api.Handlebars
     const droppedItem = await Item.implementation.fromDropData(data);
     if (!droppedItem) return;
 
-    // Skill drop on the granted-skills section.
-    if (droppedItem.type === 'skill' && event.target.closest('.granted-skills-section')) {
+    // Skill drop anywhere on an equipment item sheet → granted skills list.
+    // (The granted-skills section is small; accepting any drop target makes the
+    // UX forgiving. Augment drops still need to target augment slots.)
+    if (droppedItem.type === 'skill') {
       await this._addGrantedSkill(droppedItem.uuid);
       return;
     }
