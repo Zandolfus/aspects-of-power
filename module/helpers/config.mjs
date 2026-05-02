@@ -113,6 +113,39 @@ ASPECTSOFPOWER.invest = {
 };
 
 /**
+ * Celerity timing constants (per design-celerity.md).
+ *   wait = (weapon_base_weight × skill_multiplier × SCALE) / actor_speed
+ *   round_length = ROUND_K / ref_mod(RL)
+ *   3 sword-equivalent swings per round at any grade by construction.
+ */
+ASPECTSOFPOWER.celerity = {
+  SCALE:              10_000,
+  ROUND_K:            3_000_000,
+  BASELINE_WEIGHT:    100,    // sword reference
+  ACTIONS_PER_ROUND:  3,      // by-construction target swings/round
+};
+
+/**
+ * Per-RL reference round length lookup (build-neutral, drives every
+ * round-anchored mechanic). Computed from the primary-spec stat curve in
+ * design-celerity.md. Treat as authoritative; helpers fall back to actor
+ * mod if RL falls outside the table.
+ */
+ASPECTSOFPOWER.referenceRoundLength = {
+  1:    83333,
+  10:   20408,
+  24:   10563,
+  25:   9836,
+  50:   4702,
+  99:   2475,
+  199:  907,
+  299:  443,
+  399:  245,
+  499:  145,
+  599:  87,
+};
+
+/**
  * Canonical weapon weights by weapon-type tag (per design-melee-system.md
  * and design-ranged-system.md). Weight is a TYPE descriptor, not a tier
  * descriptor — a legendary greatsword and a starter greatsword both weigh 200.

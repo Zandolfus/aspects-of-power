@@ -34,6 +34,11 @@ export class SkillData extends foundry.abstract.TypeDataModel {
         // blank:true required — StringField defaults to blank:false, which rejects '' even when listed in choices.
         tier:  new fields.StringField({ initial: '', blank: true, choices: ['', 'basic', 'high', 'greater', 'major', 'grand'] }),
         grade: new fields.StringField({ initial: '', blank: true, choices: ['', 'G', 'F', 'E', 'D', 'C', 'B', 'A', 'S'] }),
+
+        // Celerity action-weight multiplier (per design-celerity.md):
+        //   wait = (weapon_weight × actionWeightMultiplier × SCALE) / actor_speed
+        // 1.0 = baseline (e.g. a sword swing on a sword); 0.7 = quick-jab; 1.5 = cleave.
+        actionWeightMultiplier: new fields.NumberField({ initial: 1.0, min: 0.1 }),
       }),
 
       // Craft skills: which item types this skill can produce (keys from CONFIG.ASPECTSOFPOWER.craftItemTypes).
