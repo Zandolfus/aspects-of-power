@@ -503,7 +503,7 @@ Hooks.once('ready', async function () {
       console.warn('[celerity] executeQueuedAction: item not found', data);
       return;
     }
-    item.roll({ executeDeferred: true });
+    item.roll({ executeDeferred: true, preInvestAmount: data.preInvestAmount ?? null });
   });
 
   // ── One-time migrations ──

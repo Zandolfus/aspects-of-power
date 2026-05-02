@@ -140,6 +140,42 @@ ASPECTSOFPOWER.celerity = {
   // for step/walk/sprint/dash still TBD. For now: linear cost per 5ft moved,
   // divided by dex.mod for speed scaling.
   MOVEMENT_BASE_WEIGHT_PER_5FT: 10,
+  // Channel rate factor — per the Wis-controlled-channel design, channeling
+  // mana costs additional celerity time:
+  //   channel_ticks = invested × CHANNEL_FACTOR / Wis_mod
+  // Spells fire at MAX(base_cast_time, channel_ticks).
+  CHANNEL_FACTOR: 3000,
+};
+
+/**
+ * Casting-speed Wis/Int weights by spell tier — bigger spells lean more
+ * toward Wis ("mastery shows"). Wis-spec casters are markedly faster on
+ * Major/Grand spells; Int-spec casters retain per-cast damage but pay in
+ * cast time. casting_speed = Wis × wis + Int × int.
+ */
+ASPECTSOFPOWER.castingSpeedWeights = {
+  basic:   { wis: 0.60, int: 0.40 },
+  high:    { wis: 0.65, int: 0.35 },
+  greater: { wis: 0.70, int: 0.30 },
+  major:   { wis: 0.80, int: 0.20 },
+  grand:   { wis: 0.90, int: 0.10 },
+  '':      { wis: 0.60, int: 0.40 },  // fallback for untagged magic skills
+};
+
+/**
+ * Per-tier Wis-derived hard cap on spell invest above base mana:
+ *   max_invest = baseMana + Wis_mod × spellMaxInvestAboveBase[tier]
+ * Then clamped by the actor's mana pool. NO self-damage past this cap —
+ * it's a hard ceiling. Bigger spells reward Wis with more invest headroom
+ * (small spells already have low base; big spells can absorb more channel).
+ */
+ASPECTSOFPOWER.spellMaxInvestAboveBase = {
+  basic:   0.5,
+  high:    0.8,
+  greater: 1.2,
+  major:   2.0,
+  grand:   3.0,
+  '':      1.0,  // fallback
 };
 
 /**

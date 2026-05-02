@@ -18,25 +18,32 @@
 
 import { AspectsofPowerItem } from '../documents/item.mjs';
 
-const HYBRID_60_40_WIS_INT = (a) => 0.6 * (a.wisdom?.mod ?? 0) + 0.4 * (a.intelligence?.mod ?? 0);
 const HYBRID_60_40_WIS_DEX = (a) => 0.6 * (a.wisdom?.mod ?? 0) + 0.4 * (a.dexterity?.mod ?? 0);
+const _MAGIC_TYPES_FOR_SPEED = new Set(['magic', 'magic_melee', 'magic_projectile']);
 
 /**
  * Speed source by skill roll.type, per design-celerity.md table.
- * Returns the actor stat mod that drives the speed for this skill.
+ * For magic skills, the Wis/Int hybrid weighting scales by spell tier — big
+ * spells lean more toward Wis ("mastery shows on bigger workings"). See
+ * CONFIG.ASPECTSOFPOWER.castingSpeedWeights.
  */
 function _actorSpeedFor(actor, skill) {
   const a = actor.system.abilities ?? {};
   const type = skill?.system?.roll?.type ?? '';
   const ability = skill?.system?.roll?.abilities ?? '';
+
+  if (_MAGIC_TYPES_FOR_SPEED.has(type)) {
+    const tier = skill?.system?.roll?.tier ?? '';
+    const weights = CONFIG.ASPECTSOFPOWER.castingSpeedWeights ?? {};
+    const w = weights[tier] ?? weights[''] ?? { wis: 0.6, int: 0.4 };
+    return Math.round(w.wis * (a.wisdom?.mod ?? 0) + w.int * (a.intelligence?.mod ?? 0));
+  }
+
   switch (type) {
     case 'str_weapon':       return a.strength?.mod  ?? 0;
     case 'dex_weapon':       return a.dexterity?.mod ?? 0;
     case 'phys_ranged':      return a.dexterity?.mod ?? 0;
     case 'wisdom_dexterity': return Math.round(HYBRID_60_40_WIS_DEX(a));
-    case 'magic':
-    case 'magic_melee':
-    case 'magic_projectile': return Math.round(HYBRID_60_40_WIS_INT(a));
     default:                 return a[ability]?.mod ?? a.dexterity?.mod ?? 1;
   }
 }
@@ -64,15 +71,37 @@ function _resolveCelerityWeight(skill, weapon = null) {
 }
 
 /**
- * Wait time in ticks for `actor` performing `skill`. Optionally pass `weapon`
- * to override the weapon resolution (no effect on magic skills).
+ * Wait time in ticks for `actor` performing `skill`.
+ *
+ *   For weapons:  wait = base_wait
+ *   For spells:   wait = MAX(base_wait, channel_wait)
+ *     base_wait    = weight × multiplier × SCALE / actor_speed
+ *     channel_wait = investAmount × CHANNEL_FACTOR / Wis_mod
+ *
+ * Spells fire at whichever takes longer — the inherent cast time, or the
+ * time to channel the invested mana. Small/moderate invests hit base time
+ * (free); only heavy invests slow the cast further.
+ *
+ * @param {Actor}  actor
+ * @param {Item}   skill
+ * @param {Item|null} weapon         Optional weapon override
+ * @param {number|null} investAmount Optional pre-captured invest (mana for spells)
  */
-export function computeActionWait(actor, skill, weapon = null) {
+export function computeActionWait(actor, skill, weapon = null, investAmount = null) {
   const sc = CONFIG.ASPECTSOFPOWER.celerity;
   const speed = Math.max(1, _actorSpeedFor(actor, skill));
   const weight = _resolveCelerityWeight(skill, weapon);
   const multiplier = skill?.system?.roll?.actionWeightMultiplier ?? 1.0;
-  return Math.max(1, Math.round((weight * multiplier * sc.SCALE) / speed));
+  const baseWait = Math.max(1, Math.round((weight * multiplier * sc.SCALE) / speed));
+
+  const isMagic = _MAGIC_TYPES.has(skill?.system?.roll?.type ?? '');
+  if (isMagic && investAmount !== null && investAmount > 0) {
+    const wisMod = Math.max(1, actor.system.abilities?.wisdom?.mod ?? 0);
+    const factor = sc.CHANNEL_FACTOR ?? 1000;
+    const channelWait = Math.round(investAmount * factor / wisMod);
+    return Math.max(baseWait, channelWait);
+  }
+  return baseWait;
 }
 
 /**
@@ -176,7 +205,7 @@ export async function recordActionFired(actor, skill) {
  * @returns {object|null} { wait, scheduledTick } or null if not in combat
  *                        / actor already has a queued action
  */
-export async function declareAction(actor, skill) {
+export async function declareAction(actor, skill, options = {}) {
   const combatant = findCombatantForActor(actor);
   if (!combatant) return null;
 
@@ -186,7 +215,8 @@ export async function declareAction(actor, skill) {
     return null;
   }
 
-  const wait = computeActionWait(actor, skill);
+  const investAmount = options.investAmount ?? null;
+  const wait = computeActionWait(actor, skill, null, investAmount);
   const clockTick = getClockTick(combatant.combat);
   const scheduledTick = clockTick + wait;
 
@@ -197,18 +227,20 @@ export async function declareAction(actor, skill) {
       wait,
       scheduledTick,
       declaredAtTick: clockTick,
+      investAmount,
     },
     'flags.aspectsofpower.nextActionTick': scheduledTick,
     'flags.aspectsofpower.lastActionWait': wait,
     'flags.aspectsofpower.lastActionName': skill.name + ' (queued)',
   });
 
+  const investNote = investAmount ? ` — invest ${investAmount}` : '';
   ChatMessage.create({
     speaker: ChatMessage.getSpeaker({ actor }),
-    content: `<p><strong>${actor.name}</strong> declares <strong>${skill.name}</strong> — scheduled for tick <strong>${scheduledTick}</strong> (wait ${wait}).</p>`,
+    content: `<p><strong>${actor.name}</strong> declares <strong>${skill.name}</strong>${investNote} — scheduled for tick <strong>${scheduledTick}</strong> (wait ${wait}).</p>`,
   });
 
-  return { wait, scheduledTick };
+  return { wait, scheduledTick, investAmount };
 }
 
 /**

@@ -73,8 +73,10 @@ async function _onCelAdvance(event, target) {
   ui.notifications.info(`Clock → ${declared.scheduledTick}. ${c.name} fires "${declared.label}".`);
 
   // If the actor has an online non-GM owner, dispatch the deferred roll to
-  // their client via socket — invest dialogs appear for the actual player,
-  // not for the GM who clicked "Advance". GM-only actors run locally.
+  // their client via socket — invest dialogs (legacy fire-time path) appear
+  // for the actual player. Pre-captured invest from declaration is passed
+  // through so Reading-A spell flows skip the dialog at fire time.
+  const investAmount = declared.investAmount ?? null;
   const owner = game.users.find(u => !u.isGM && u.active && c.actor?.testUserPermission?.(u, 'OWNER'));
   if (owner) {
     game.socket.emit('system.aspects-of-power', {
@@ -82,9 +84,10 @@ async function _onCelAdvance(event, target) {
       actorId: c.actor.id,
       itemId: item.id,
       targetUserId: owner.id,
+      preInvestAmount: investAmount,
     });
   } else {
-    await item.roll({ executeDeferred: true });
+    await item.roll({ executeDeferred: true, preInvestAmount: investAmount });
   }
 
   // Sync Foundry's combat.turn pointer to the new celerity-next-up combatant

@@ -386,21 +386,38 @@ export class AspectsofPowerItem extends Item {
    * @param {string} args.label        Skill name for dialog title.
    * @returns {Promise<number|null>}   Selected invest amount, or null on cancel.
    */
-  async _promptResourceInvest({ baseCost, safeInvest, maxPool, potency, multiplier, resourceLabel, potencyLabel, label }) {
+  async _promptResourceInvest({ baseCost, safeInvest, maxPool, potency, multiplier, resourceLabel, potencyLabel, label, channelStat = null, channelFactor = null, hardCap = false }) {
     const safeCeiling = baseCost + safeInvest;
-    const startInvest = Math.min(safeCeiling, maxPool);
+    const startInvest = hardCap ? baseCost : Math.min(safeCeiling, maxPool);
     const computeDmg = (v) => Math.round(potency * multiplier * Math.sqrt(v));
     const computeSelfDmg = (v) => {
       const excess = Math.max(0, v - safeCeiling);
       if (excess <= 0 || safeInvest <= 0) return 0;
       return Math.round(potency * Math.pow(excess / safeInvest, 2));
     };
+    // Channel time for spell invest — Wis_mod controls rate per design memo.
+    const computeChannelTime = (channelStat && channelFactor)
+      ? (v) => Math.round(v * channelFactor / Math.max(1, channelStat))
+      : null;
 
+    const channelRow = computeChannelTime ? `
+          <div class="channel-row" style="grid-column:1 / -1;color:#9cf;">
+            Channel time: <strong class="channel-display">${computeChannelTime(startInvest)}</strong> ticks
+            <span style="font-size:11px;color:#888;"> (added to celerity wait)</span>
+          </div>` : '';
+
+    const ceilingLabel = hardCap ? 'Max invest' : 'Safe ceiling';
+    const ceilingValue = hardCap ? maxPool : safeCeiling;
+    const selfDmgRow = hardCap ? '' : `
+          <div class="self-dmg-row" style="grid-column:1 / -1;">
+            Self-damage: <strong class="self-dmg-display">${computeSelfDmg(startInvest)}</strong>
+            <span class="self-dmg-hint" style="font-size:11px;color:#888;"> (over-invest past safe ceiling)</span>
+          </div>`;
     const content = `
       <div class="resource-invest">
         <div class="invest-meta" style="display:grid;grid-template-columns:1fr 1fr;gap:4px;margin-bottom:8px;font-size:12px;">
           <div>Base ${resourceLabel}: <strong>${baseCost}</strong></div>
-          <div>Safe ceiling: <strong>${safeCeiling}</strong></div>
+          <div>${ceilingLabel}: <strong>${ceilingValue}</strong></div>
           <div>Pool: <strong>${maxPool}</strong></div>
           <div>${potencyLabel} × Mult: <strong>${potency} × ${multiplier}</strong></div>
         </div>
@@ -411,12 +428,10 @@ export class AspectsofPowerItem extends Item {
         <div class="invest-readouts" style="display:grid;grid-template-columns:1fr 1fr;gap:4px;margin-top:8px;">
           <div>Predicted damage: <strong class="dmg-display">${computeDmg(startInvest)}</strong></div>
           <div>Pool after: <strong class="remaining-display">${maxPool - startInvest}</strong></div>
-          <div class="self-dmg-row" style="grid-column:1 / -1;">
-            Self-damage: <strong class="self-dmg-display">${computeSelfDmg(startInvest)}</strong>
-            <span class="self-dmg-hint" style="font-size:11px;color:#888;"> (over-invest past safe ceiling)</span>
-          </div>
+          ${channelRow}
+          ${selfDmgRow}
         </div>
-        <p class="hint" style="font-size:11px;margin-top:8px;">Damage = ${potencyLabel} × multiplier × √invested. Excess past safe ceiling deals ${potencyLabel} × (excess/safe)² self-damage.</p>
+        <p class="hint" style="font-size:11px;margin-top:8px;">Damage = ${potencyLabel} × multiplier × √invested.${computeChannelTime ? ' Channel time scales with invest / Wis.' : ''}${hardCap ? '' : ` Excess past safe ceiling deals ${potencyLabel} × (excess/safe)² self-damage.`}</p>
       </div>`;
 
     let resolveFn;
@@ -449,19 +464,23 @@ export class AspectsofPowerItem extends Item {
     const investDisplay = root.querySelector('.invest-display');
     const dmgDisplay = root.querySelector('.dmg-display');
     const selfDmgDisplay = root.querySelector('.self-dmg-display');
-    const selfDmgRow = root.querySelector('.self-dmg-row');
+    const selfDmgRowEl = root.querySelector('.self-dmg-row');
     const remainingDisplay = root.querySelector('.remaining-display');
+    const channelDisplay = root.querySelector('.channel-display');
     if (slider) {
       slider.addEventListener('input', () => {
         const v = parseInt(slider.value, 10);
         const dmg = computeDmg(v);
-        const selfDmg = computeSelfDmg(v);
         investDisplay.textContent = v;
         dmgDisplay.textContent = dmg;
-        selfDmgDisplay.textContent = selfDmg;
         remainingDisplay.textContent = maxPool - v;
-        selfDmgRow.style.color = selfDmg > 0 ? '#c33' : '';
-        selfDmgRow.style.fontWeight = selfDmg > 0 ? 'bold' : '';
+        if (channelDisplay && computeChannelTime) channelDisplay.textContent = computeChannelTime(v);
+        if (selfDmgDisplay && selfDmgRowEl) {
+          const selfDmg = computeSelfDmg(v);
+          selfDmgDisplay.textContent = selfDmg;
+          selfDmgRowEl.style.color = selfDmg > 0 ? '#c33' : '';
+          selfDmgRowEl.style.fontWeight = selfDmg > 0 ? 'bold' : '';
+        }
       });
     }
 
@@ -3236,18 +3255,9 @@ export class AspectsofPowerItem extends Item {
     const TokenClass = CONFIG.Token.documentClass;
     if (TokenClass?.flushStamina) await TokenClass.flushStamina();
 
-    // ── Celerity declaration gate ─────────────────────────────────────
-    // In an active combat, queue this skill on the combatant's
-    // declaredAction flag and bail. The tracker's "Advance to next" fires
-    // it later via `item.roll({ executeDeferred: true })` once the clock
-    // reaches the scheduled tick. Outside combat or when re-entering via
-    // executeDeferred, fall through and run the normal roll pipeline.
-    if (!options.executeDeferred && this.actor && isInActiveCombat(this.actor)) {
-      const declared = await declareAction(this.actor, this);
-      return declared;
-    }
-
     // Build formulas (also populates rollData.roll.abilitymod and resourcevalue).
+    // Done BEFORE the celerity defer gate so the variable-invest dialog (which
+    // needs formula context) can capture the invest amount at declaration time.
     let { hitFormula, dmgFormula } = this._buildRollFormulas(rollData);
 
     // ── Variable resource invest (per design-magic/melee/ranged-system.md) ─
@@ -3256,8 +3266,16 @@ export class AspectsofPowerItem extends Item {
     //   Weapon: stamina + attack + (str_weapon|dex_weapon|phys_ranged) +
     //           requiredEquipment with weight                → blend × mult × √invested
     // Skills that don't match either path keep the legacy formula.
+    //
+    // The dialog runs HERE (before the celerity defer gate) so the player who
+    // owns the actor confirms the invest amount at click time. The amount is
+    // then passed to declareAction so the celerity wait reflects it (per
+    // Reading-A: Wis controls channel rate, more invest = longer wait). At
+    // fire time (executeDeferred), preInvestAmount is supplied and the dialog
+    // is skipped.
     let investSelfDamage = 0;
     let investSelfDamageFlavor = ''; // "over-channeling" / "over-exerting"
+    let investedAmount = null;       // captured for declareAction
     const sc = CONFIG.ASPECTSOFPOWER;
 
     const spellTier  = this.system.roll?.tier  ?? '';
@@ -3275,43 +3293,50 @@ export class AspectsofPowerItem extends Item {
       const gradeFactor = sc.spellGradeFactors[spellGrade];
       const baseMana    = Math.round(tierFactor * gradeFactor);
       const wisMod      = this.actor.system.abilities?.wisdom?.mod ?? 0;
-      const safeInvest  = Math.max(0, Math.round(wisMod * sc.invest.wisCapFactor));
-      // Live read — slider must cap at the actor's CURRENT mana, not the
-      // stale snapshot from formula build (covers the deferred-fire case
-      // where mana may have changed since declaration).
-      const maxPool     = Math.round(this.actor.system[rollData.roll.resource]?.value ?? 0);
+      // Live read — slider must cap at the actor's CURRENT mana.
+      const livePool    = Math.round(this.actor.system[rollData.roll.resource]?.value ?? 0);
       const intMod      = this.actor.system.abilities?.intelligence?.mod ?? 0;
-      // Multiplier: per-tier default, overridable via the skill's diceBonus field.
-      // Designer-set value of 1 is treated as "use tier default" since 1 is the schema initial.
-      const tierMult = sc.spellTierMultipliers[spellTier];
-      const dbVal    = this.system.roll?.diceBonus ?? 1;
-      const multiplier = (dbVal && dbVal !== 1) ? dbVal : tierMult;
+      const tierMult    = sc.spellTierMultipliers[spellTier];
+      const dbVal       = this.system.roll?.diceBonus ?? 1;
+      const multiplier  = (dbVal && dbVal !== 1) ? dbVal : tierMult;
 
-      if (maxPool < baseMana) {
+      // Hard cap on invest = baseMana + Wis × spellMaxInvestAboveBase[tier],
+      // clamped by mana pool. NO self-damage past this cap — Wis is the
+      // absolute ceiling per locked design.
+      const aboveBaseFactor = sc.spellMaxInvestAboveBase?.[spellTier]
+        ?? sc.spellMaxInvestAboveBase?.['']
+        ?? 1.0;
+      const wisCap   = Math.round(baseMana + wisMod * aboveBaseFactor);
+      const maxInvest = Math.min(livePool, wisCap);
+
+      if (livePool < baseMana) {
         ChatMessage.create({
           speaker, rollMode, ...(whisperGM ? { whisper: whisperGM } : {}),
           flavor: label,
-          content: `<p>Not enough mana to cast (need ${baseMana}, have ${maxPool}).</p>`,
+          content: `<p>Not enough mana to cast (need ${baseMana}, have ${livePool}).</p>`,
         });
         return;
       }
 
-      const invested = await this._promptResourceInvest({
-        baseCost: baseMana, safeInvest, maxPool,
-        potency: intMod, multiplier,
-        resourceLabel: 'mana', potencyLabel: 'Int', label,
-      });
+      const invested = (options.preInvestAmount != null)
+        ? Math.min(options.preInvestAmount, maxInvest)  // clamp pre-capture too
+        : await this._promptResourceInvest({
+            baseCost: baseMana,
+            safeInvest: 0,                              // hard cap = no soft zone
+            maxPool: maxInvest,
+            potency: intMod, multiplier,
+            resourceLabel: 'mana', potencyLabel: 'Int', label,
+            channelStat: wisMod,
+            channelFactor: sc.celerity?.CHANNEL_FACTOR ?? null,
+            hardCap: true,                              // hide safe-ceiling/self-damage rows
+          });
       if (invested === null) return; // cancelled
 
+      investedAmount = invested;
       rollData.roll.cost = invested;
       rollData.roll.variableSpellInvest = invested;
       dmgFormula = String(Math.round(intMod * multiplier * Math.sqrt(invested)));
-
-      const excess = Math.max(0, invested - (baseMana + safeInvest));
-      if (excess > 0 && safeInvest > 0) {
-        investSelfDamage = Math.round(intMod * Math.pow(excess / safeInvest, 2));
-        investSelfDamageFlavor = 'over-channeling';
-      }
+      // Spells: no self-damage path under the hard-cap design. Weapons retain it.
     } else if (isVariableWeapon) {
       // Find the weapon for weight + hybrid blend. Hard-link via requiredEquipment
       // takes precedence (e.g. "Soulreaver Strike" must use Soulreaver). For generic
@@ -3365,13 +3390,17 @@ export class AspectsofPowerItem extends Item {
           return;
         }
 
-        const invested = await this._promptResourceInvest({
-          baseCost: baseStamina, safeInvest, maxPool,
-          potency: statBlend, multiplier,
-          resourceLabel: 'stamina', potencyLabel, label,
-        });
+        // Same pre-capture pattern as the spell path.
+        const invested = (options.preInvestAmount != null)
+          ? options.preInvestAmount
+          : await this._promptResourceInvest({
+              baseCost: baseStamina, safeInvest, maxPool,
+              potency: statBlend, multiplier,
+              resourceLabel: 'stamina', potencyLabel, label,
+            });
         if (invested === null) return; // cancelled
 
+        investedAmount = invested;
         rollData.roll.cost = invested;
         rollData.roll.variableWeaponInvest = invested;
         dmgFormula = String(Math.round(statBlend * multiplier * Math.sqrt(invested)));
@@ -3387,15 +3416,29 @@ export class AspectsofPowerItem extends Item {
     // Variable mana cost for barrier skills — prompt user for amount.
     const isBarrier = tags.includes('restoration') && this.system.tagConfig?.restorationResource === 'barrier';
     if (isBarrier) {
-      const maxMana = rollData.roll.resourcevalue;
+      const maxMana = this.actor.system[rollData.roll.resource]?.value ?? 0;
       if (maxMana <= 0) {
         ChatMessage.create({ speaker, rollMode, ...(whisperGM ? { whisper: whisperGM } : {}), flavor: label, content: `Not enough ${rollData.roll.resource}` });
         return;
       }
-      const chosenMana = await this._promptBarrierManaCost(maxMana);
+      const chosenMana = (options.preInvestAmount != null)
+        ? options.preInvestAmount
+        : await this._promptBarrierManaCost(maxMana);
       if (chosenMana === null) return; // cancelled
+      investedAmount = chosenMana;
       rollData.roll.cost = chosenMana;
       rollData.roll.variableManaCost = chosenMana;
+    }
+
+    // ── Celerity declaration gate ─────────────────────────────────────
+    // In an active combat, queue this skill on the combatant's
+    // declaredAction flag and bail. The tracker's "Advance to next" fires
+    // it later via `item.roll({ executeDeferred: true, preInvestAmount })`
+    // once the clock reaches the scheduled tick. The captured investedAmount
+    // (above) feeds Wis-controlled channel time in the celerity wait calc.
+    if (!options.executeDeferred && this.actor && isInActiveCombat(this.actor)) {
+      const declared = await declareAction(this.actor, this, { investAmount: investedAmount });
+      return declared;
     }
 
     // Not enough resource → warn and abort.
