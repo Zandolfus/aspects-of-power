@@ -221,6 +221,54 @@ export function isInActiveCombat(actor) {
 }
 
 /**
+ * Fire round-end mechanics for a combatant whose personal round just ended.
+ * Per design-celerity.md "Round-Anchored Mechanics", this delegates to:
+ *   - actor.onStartTurn (regen, sustain upkeep, reactions reset, debuff
+ *     break rolls, effect expiry)
+ *   - DoT damage from any effect this actor placed (their applier UUID)
+ *
+ * Called by the celerity tracker's advance handler once per round
+ * boundary crossed, per actor.
+ */
+export async function runRoundEnd(combat, combatant) {
+  const actor = combatant.actor;
+  if (!actor) return;
+
+  // Round-end via existing onStartTurn handler (effect expiry, sustain
+  // upkeep, reactions reset, regen, debuff break rolls).
+  if (typeof actor.onStartTurn === 'function') {
+    try {
+      await actor.onStartTurn(combat, { combatantId: combatant.id });
+    } catch (e) {
+      console.error('Celerity round-end onStartTurn failed for', actor.name, e);
+    }
+  }
+
+  // DoTs: any effect placed by this actor on any combatant ticks now.
+  const applierUuid = actor.uuid;
+  for (const c of combat.combatants) {
+    if (!c.actor) continue;
+    for (const effect of c.actor.effects) {
+      const sys = effect.system ?? {};
+      if (!sys.dot || sys.applierActorUuid !== applierUuid || effect.disabled) continue;
+      const rawDamage = sys.dotDamage ?? 0;
+      if (rawDamage <= 0) continue;
+      const drValue = c.actor.system.defense?.dr?.value ?? 0;
+      const damage  = Math.max(0, rawDamage - drValue);
+      const health  = c.actor.system.health;
+      const newHealth = Math.max(0, health.value - damage);
+      await c.actor.update({ 'system.health.value': newHealth });
+      ChatMessage.create({
+        whisper: ChatMessage.getWhisperRecipients('GM'),
+        content: `<p><strong>${c.actor.name}</strong> takes <strong>${damage}</strong> damage from ${effect.name} (DR: −${drValue}). `
+               + `Health: ${newHealth} / ${health.max}`
+               + `${newHealth === 0 ? ' &mdash; <em>Incapacitated!</em>' : ''}</p>`,
+      });
+    }
+  }
+}
+
+/**
  * Charge celerity cost for a movement that just happened on the canvas.
  * Sets the actor's combatant `nextActionTick = clockTick + cost`. If the
  * actor had a `declaredAction` queued, it's cancelled — movement supersedes

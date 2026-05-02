@@ -8,7 +8,9 @@
  * Wired by setting `CONFIG.ui.combat = CelerityCombatTracker` at init.
  */
 
-import { getClockTick } from '../systems/celerity.mjs';
+import { getClockTick, referenceRoundLength, runRoundEnd } from '../systems/celerity.mjs';
+
+const MAX_ROUND_BOUNDARIES_PER_ADVANCE = 5; // safety cap on multi-round catches
 
 const FLAG_NS = 'aspectsofpower';
 const ParentTracker = foundry.applications.sidebar.tabs.CombatTracker;
@@ -32,9 +34,32 @@ async function _onCelAdvance(event, target) {
     return;
   }
   const { c, declared } = queued[0];
+  const newClock = declared.scheduledTick;
+
+  // Round-end mechanics: fire onStartTurn + DoTs for any actor whose personal
+  // round boundary was crossed by this clock advance. Per design-celerity.md
+  // round length is RL-tied (build-neutral), one boundary every roundLen ticks.
+  for (const member of combat.combatants) {
+    const actor = member.actor;
+    if (!actor) continue;
+    const rl = actor.system.attributes?.race?.level ?? 1;
+    const roundLen = referenceRoundLength(rl);
+    if (roundLen <= 0) continue;
+    const lastEnd = member.flags?.[FLAG_NS]?.lastRoundEndAt ?? 0;
+    let crossings = Math.floor((newClock - lastEnd) / roundLen);
+    if (crossings <= 0) continue;
+    crossings = Math.min(crossings, MAX_ROUND_BOUNDARIES_PER_ADVANCE);
+    for (let i = 0; i < crossings; i++) {
+      await runRoundEnd(combat, member);
+    }
+    await member.update({
+      [`flags.${FLAG_NS}.lastRoundEndAt`]: lastEnd + crossings * roundLen,
+    });
+  }
+
   // Advance clock + clear that combatant's celerity flags BEFORE firing —
   // so the roll can re-queue if the actor declares a follow-up immediately.
-  await combat.update({ [`flags.${FLAG_NS}.clockTick`]: declared.scheduledTick });
+  await combat.update({ [`flags.${FLAG_NS}.clockTick`]: newClock });
   await c.update({
     [`flags.${FLAG_NS}.declaredAction`]: null,
     [`flags.${FLAG_NS}.nextActionTick`]: null,
@@ -69,9 +94,11 @@ async function _onCelReset(event, target) {
   for (const c of combat.combatants) {
     await c.update({
       [`flags.${FLAG_NS}.nextActionTick`]: null,
+      [`flags.${FLAG_NS}.declaredAction`]: null,
       [`flags.${FLAG_NS}.lastActionName`]: null,
       [`flags.${FLAG_NS}.lastActionWait`]: null,
       [`flags.${FLAG_NS}.lastActionAt`]: null,
+      [`flags.${FLAG_NS}.lastRoundEndAt`]: 0,
     });
   }
   ui.notifications.info('Celerity clock reset.');
