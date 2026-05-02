@@ -36,6 +36,19 @@ async function _onCelAdvance(event, target) {
   ui.notifications.info(`Clock advanced to ${next} — ${c.name} is up.`);
 }
 
+async function _onCelCancel(event, target) {
+  const combatantId = target.closest('[data-combatant-id]')?.dataset?.combatantId;
+  if (!combatantId) return;
+  const combat = this.viewed;
+  const c = combat?.combatants.get(combatantId);
+  if (!c) return;
+  await c.update({
+    [`flags.${FLAG_NS}.nextActionTick`]: null,
+    [`flags.${FLAG_NS}.declaredAction`]: null,
+  });
+  ui.notifications.info(`${c.name} — action cancelled.`);
+}
+
 async function _onCelReset(event, target) {
   const combat = this.viewed;
   if (!combat?.started) return;
@@ -61,6 +74,7 @@ export class CelerityCombatTracker extends ParentTracker {
     actions: {
       celAdvance: _onCelAdvance,
       celReset:   _onCelReset,
+      celCancel:  _onCelCancel,
     },
   };
 
@@ -95,13 +109,27 @@ export class CelerityCombatTracker extends ParentTracker {
     const combat = context.combat ?? this.viewed;
     context.celerityClockTick = getClockTick(combat);
     if (Array.isArray(context.turns)) {
+      // Strip Foundry's initiative-based 'active' from every row first; we'll
+      // re-apply it to whichever combatant is celerity-next-up so pan-to-active
+      // and other Foundry behaviors point at the right token.
+      for (const t of context.turns) {
+        t.css = (t.css ?? '').replace(/\bactive\b/g, '').trim();
+      }
+      // Sort by celerity scheduled tick — null/Infinity (no action queued)
+      // sorts last so anyone with a real schedule appears at the top.
       context.turns.sort((a, b) => {
         const ta = a.celerity?.nextActionTick ?? Infinity;
         const tb = b.celerity?.nextActionTick ?? Infinity;
         return ta - tb;
       });
+      // Mark next-up: prefer the soonest scheduled action; fall back to first
+      // ready combatant if nobody has queued anything yet.
       const firstScheduled = context.turns.find(t => t.celerity?.nextActionTick !== null);
-      if (firstScheduled) firstScheduled.celerity.nextUp = true;
+      const nextUp = firstScheduled ?? context.turns[0];
+      if (nextUp) {
+        nextUp.celerity.nextUp = true;
+        nextUp.css = (nextUp.css + ' active').trim();
+      }
     }
     return context;
   }
