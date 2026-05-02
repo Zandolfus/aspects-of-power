@@ -388,7 +388,7 @@ export class AspectsofPowerItem extends Item {
    */
   async _promptResourceInvest({ baseCost, safeInvest, maxPool, potency, multiplier, resourceLabel, potencyLabel, label, channelStat = null, channelFactor = null, hardCap = false }) {
     const safeCeiling = baseCost + safeInvest;
-    const startInvest = hardCap ? baseCost : Math.min(safeCeiling, maxPool);
+    const startInvest = baseCost;
     const computeDmg = (v) => Math.round(potency * multiplier * Math.sqrt(v));
     const computeSelfDmg = (v) => {
       const excess = Math.max(0, v - safeCeiling);
@@ -3307,7 +3307,8 @@ export class AspectsofPowerItem extends Item {
         ?? sc.spellMaxInvestAboveBase?.['']
         ?? 1.0;
       const wisCap   = Math.round(baseMana + wisMod * aboveBaseFactor);
-      const maxInvest = Math.min(livePool, wisCap);
+      const maxHp    = Math.round(this.actor.system.health?.max ?? 0);
+      const maxInvest = Math.min(livePool, wisCap, maxHp);
 
       if (livePool < baseMana) {
         ChatMessage.create({
@@ -3384,21 +3385,23 @@ export class AspectsofPowerItem extends Item {
         const baseStamina = Math.max(1, Math.round((weaponWeight / sc.invest.staminaBaseDivisor) * (statBlend / sc.invest.staminaNormalizer)));
         const safeInvest = Math.max(0, Math.round(toughMod * sc.invest.toughCapFactor));
         // Live read — see equivalent comment above on the spell path.
-        const maxPool = Math.round(this.actor.system[rollData.roll.resource]?.value ?? 0);
+        const livePool = Math.round(this.actor.system[rollData.roll.resource]?.value ?? 0);
+        const maxHp    = Math.round(this.actor.system.health?.max ?? 0);
+        const maxPool  = Math.min(livePool, maxHp);
         const multiplier = this.system.roll?.diceBonus ?? 1;
 
-        if (maxPool < baseStamina) {
+        if (livePool < baseStamina) {
           ChatMessage.create({
             speaker, rollMode, ...(whisperGM ? { whisper: whisperGM } : {}),
             flavor: label,
-            content: `<p>Not enough stamina (need ${baseStamina}, have ${maxPool}).</p>`,
+            content: `<p>Not enough stamina (need ${baseStamina}, have ${livePool}).</p>`,
           });
           return;
         }
 
         // Same pre-capture pattern as the spell path.
         const invested = (options.preInvestAmount != null)
-          ? options.preInvestAmount
+          ? Math.min(options.preInvestAmount, maxPool)
           : await this._promptResourceInvest({
               baseCost: baseStamina, safeInvest, maxPool,
               potency: statBlend, multiplier,
