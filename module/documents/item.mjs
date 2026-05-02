@@ -3276,7 +3276,10 @@ export class AspectsofPowerItem extends Item {
       const baseMana    = Math.round(tierFactor * gradeFactor);
       const wisMod      = this.actor.system.abilities?.wisdom?.mod ?? 0;
       const safeInvest  = Math.max(0, Math.round(wisMod * sc.invest.wisCapFactor));
-      const maxPool     = Math.round(rollData.roll.resourcevalue);
+      // Live read — slider must cap at the actor's CURRENT mana, not the
+      // stale snapshot from formula build (covers the deferred-fire case
+      // where mana may have changed since declaration).
+      const maxPool     = Math.round(this.actor.system[rollData.roll.resource]?.value ?? 0);
       const intMod      = this.actor.system.abilities?.intelligence?.mod ?? 0;
       // Multiplier: per-tier default, overridable via the skill's diceBonus field.
       // Designer-set value of 1 is treated as "use tier default" since 1 is the schema initial.
@@ -3349,7 +3352,8 @@ export class AspectsofPowerItem extends Item {
         const denomStat = isRanged ? statBlend : strMod;
         const baseStamina = Math.max(1, Math.round((weaponWeight / sc.invest.staminaBaseDivisor) * (denomStat / sc.invest.staminaNormalizer)));
         const safeInvest = Math.max(0, Math.round(toughMod * sc.invest.toughCapFactor));
-        const maxPool = Math.round(rollData.roll.resourcevalue);
+        // Live read — see equivalent comment above on the spell path.
+        const maxPool = Math.round(this.actor.system[rollData.roll.resource]?.value ?? 0);
         const multiplier = this.system.roll?.diceBonus ?? 1;
 
         if (maxPool < baseStamina) {
@@ -3395,12 +3399,15 @@ export class AspectsofPowerItem extends Item {
     }
 
     // Not enough resource → warn and abort.
-    if (rollData.roll.resourcevalue < rollData.roll.cost) {
+    // Read live so a state change between formula-build and now (e.g. mana
+    // drained while the variable-invest dialog was open) is caught.
+    const liveResAtCheck = this.actor.system[rollData.roll.resource]?.value ?? 0;
+    if (liveResAtCheck < rollData.roll.cost) {
       ChatMessage.create({
         speaker,
         rollMode,
         flavor: label,
-        content: `Not enough ${rollData.roll.resource}`,
+        content: `Not enough ${rollData.roll.resource} (need ${rollData.roll.cost}, have ${liveResAtCheck}).`,
       });
       return;
     }
@@ -3443,14 +3450,19 @@ export class AspectsofPowerItem extends Item {
     }
 
     const resource  = rollData.roll.resource;
-    const newResVal = Math.max(0, Math.round(rollData.roll.resourcevalue - rollData.roll.cost));
 
     // Helper to commit resource cost + over-invest self-damage atomically.
     // Called from each cast-completion branch (AOE-after-placement, non-AOE);
     // never called from cancellation paths so self-damage doesn't commit on a
     // back-out. Skipped for barrier skills — they defer cost to a GM action.
+    //
+    // Reads the live resource value at commit time (not the cached
+    // rollData.roll.resourcevalue) so a state change between formula-build
+    // and commit can't cause an overspend.
     const _commitCastCost = async () => {
       if (isBarrier) return;
+      const liveRes = this.actor.system[resource]?.value ?? 0;
+      const newResVal = Math.max(0, Math.round(liveRes - rollData.roll.cost));
       const updates = { [`system.${resource}.value`]: newResVal };
       if (investSelfDamage > 0) {
         const curHp = this.actor.system.health?.value ?? 0;
