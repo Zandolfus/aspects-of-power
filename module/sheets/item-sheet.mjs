@@ -194,6 +194,18 @@ export class AspectsofPowerItemSheet extends foundry.applications.api.Handlebars
         }
         context.profAugmentSlots.push(slotData);
       }
+
+      // Granted skills — list display data (name + img). Resolves each UUID
+      // synchronously where possible so the sheet shows missing-vs-resolved.
+      const grantedUuids = this.item.system.grantedSkills ?? [];
+      context.grantedSkillSlots = grantedUuids.map(uuid => {
+        // Only world packs and same-actor items resolve sync via fromUuidSync.
+        const src = foundry.utils.fromUuidSync?.(uuid);
+        if (src && src.type === 'skill') {
+          return { uuid, name: src.name, img: src.img, missing: false };
+        }
+        return { uuid, name: uuid, img: 'icons/svg/mystery-man.svg', missing: true };
+      });
     }
 
     // Build grouped attribute data for buff/debuff multi-select UI.
@@ -706,6 +718,26 @@ export class AspectsofPowerItemSheet extends foundry.applications.api.Handlebars
         });
         augSection.addEventListener('drop', this._onDrop.bind(this));
       }
+
+      // --- Granted-skills drop zone + remove buttons ---
+      const grantedSection = this.element.querySelector('.granted-skills-section');
+      if (grantedSection) {
+        grantedSection.addEventListener('dragover', ev => {
+          ev.preventDefault();
+          ev.dataTransfer.dropEffect = 'copy';
+        });
+        grantedSection.addEventListener('drop', this._onDrop.bind(this));
+      }
+      this.element.querySelectorAll('.granted-skill-remove').forEach(el => {
+        el.addEventListener('click', async (ev) => {
+          const idx = Number(ev.currentTarget.dataset.index);
+          const list = [...(this.item.system.grantedSkills ?? [])];
+          if (idx >= 0 && idx < list.length) {
+            list.splice(idx, 1);
+            await this.item.update({ 'system.grantedSkills': list });
+          }
+        });
+      });
       this.element.querySelectorAll('.augment-remove').forEach(el => {
         el.addEventListener('click', async (ev) => {
           const idx = Number(ev.currentTarget.dataset.index);
@@ -789,9 +821,31 @@ export class AspectsofPowerItemSheet extends foundry.applications.api.Handlebars
     if (data?.type !== 'Item') return;
 
     const droppedItem = await Item.implementation.fromDropData(data);
-    if (!droppedItem || droppedItem.type !== 'augment') return;
+    if (!droppedItem) return;
 
-    await this._slotAugment(droppedItem, event);
+    // Skill drop on the granted-skills section.
+    if (droppedItem.type === 'skill' && event.target.closest('.granted-skills-section')) {
+      await this._addGrantedSkill(droppedItem.uuid);
+      return;
+    }
+
+    if (droppedItem.type === 'augment') {
+      await this._slotAugment(droppedItem, event);
+    }
+  }
+
+  /**
+   * Append a skill UUID to this item's grantedSkills array (deduped).
+   * @param {string} uuid
+   */
+  async _addGrantedSkill(uuid) {
+    const existing = [...(this.item.system.grantedSkills ?? [])];
+    if (existing.includes(uuid)) {
+      ui.notifications.info('That skill is already in the granted list.');
+      return;
+    }
+    existing.push(uuid);
+    await this.item.update({ 'system.grantedSkills': existing });
   }
 
   /**

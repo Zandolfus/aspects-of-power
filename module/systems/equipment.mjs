@@ -87,6 +87,7 @@ export class EquipmentSystem {
    */
   static async unequip(item) {
     await this._removeItemEffects(item);
+    await this._removeGrantedSkills(item);
     await item.update({ 'system.equipped': false });
   }
 
@@ -194,6 +195,66 @@ export class EquipmentSystem {
         effectType: 'equipment',
       },
     }]);
+  }
+
+  /* -------------------------------------------------- */
+  /*  Granted Skills (weapon → embedded skills)         */
+  /* -------------------------------------------------- */
+
+  /**
+   * Embed copies of the item's `grantedSkills` (array of source skill UUIDs)
+   * onto the owning actor. Each cloned skill is tagged via flags so the
+   * companion `_removeGrantedSkills` can find and delete them on unequip.
+   * The clone's `requiredEquipment` is auto-set to the granting item's id
+   * so the variable-invest path resolves correctly.
+   *
+   * Idempotent — skills already granted by this item are not re-cloned.
+   * @param {Item} item  The equipment item granting the skills.
+   */
+  static async _grantSkills(item) {
+    const actor = item.parent;
+    if (!actor) return;
+    const uuids = item.system.grantedSkills ?? [];
+    if (uuids.length === 0) return;
+
+    const alreadyGrantedFrom = new Set(
+      actor.items
+        .filter(i => i.flags?.aspectsofpower?.grantedBy === item.id)
+        .map(i => i.flags?.aspectsofpower?.grantedFrom)
+    );
+
+    const toCreate = [];
+    for (const uuid of uuids) {
+      if (!uuid || alreadyGrantedFrom.has(uuid)) continue;
+      let src;
+      try { src = await fromUuid(uuid); } catch (e) { continue; }
+      if (!src || src.type !== 'skill') continue;
+      const data = src.toObject();
+      delete data._id; // let Foundry assign a new id on the actor
+      data.system = data.system ?? {};
+      data.system.requiredEquipment = item.id;
+      foundry.utils.setProperty(data, 'flags.aspectsofpower.grantedBy', item.id);
+      foundry.utils.setProperty(data, 'flags.aspectsofpower.grantedFrom', uuid);
+      toCreate.push(data);
+    }
+    if (toCreate.length > 0) {
+      await actor.createEmbeddedDocuments('Item', toCreate);
+    }
+  }
+
+  /**
+   * Remove all skill items on the actor that were granted by this item.
+   * @param {Item} item  The equipment item that originally granted them.
+   */
+  static async _removeGrantedSkills(item) {
+    const actor = item.parent;
+    if (!actor) return;
+    const toDelete = actor.items
+      .filter(i => i.flags?.aspectsofpower?.grantedBy === item.id)
+      .map(i => i.id);
+    if (toDelete.length > 0) {
+      await actor.deleteEmbeddedDocuments('Item', toDelete);
+    }
   }
 
   /**
@@ -427,9 +488,17 @@ export class EquipmentSystem {
       return;
     }
 
-    // Equipped state changed — sync effects.
+    // Equipped state changed — sync effects + grant/remove skills.
     if (sys.equipped !== undefined) {
       this._syncEffects(item);
+      if (item.system.equipped) this._grantSkills(item);
+      else this._removeGrantedSkills(item);
+      return;
+    }
+
+    // grantedSkills array edited on an equipped item — re-grant from scratch.
+    if (sys.grantedSkills !== undefined && item.system.equipped) {
+      this._removeGrantedSkills(item).then(() => this._grantSkills(item));
       return;
     }
 
@@ -487,6 +556,16 @@ export class EquipmentSystem {
         .map(e => e.id);
       if (toDelete.length > 0) {
         actor.deleteEmbeddedDocuments('ActiveEffect', toDelete);
+      }
+    }
+
+    // Equipment deleted — also remove any skills it granted.
+    if (item.type === 'item') {
+      const grantedSkillIds = actor.items
+        .filter(i => i.flags?.aspectsofpower?.grantedBy === item.id)
+        .map(i => i.id);
+      if (grantedSkillIds.length > 0) {
+        actor.deleteEmbeddedDocuments('Item', grantedSkillIds);
       }
     }
 

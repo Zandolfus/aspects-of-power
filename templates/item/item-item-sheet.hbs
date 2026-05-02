@@ -224,6 +224,29 @@
           </div>
         </div>
 
+        {{!-- Granted Skills (skills the actor gains while this item is equipped) --}}
+        <div class="equip-section granted-skills-section">
+          <h4>Granted Skills ({{grantedSkillSlots.length}})</h4>
+          <p class="hint" style="font-size:11px;margin:0 0 4px 0;">Drop skill items here. Granted skills appear on the actor while this is equipped, with requiredEquipment auto-pointed at this item.</p>
+          <div class="granted-skill-list">
+            {{#each grantedSkillSlots as |slot idx|}}
+              <div class="granted-skill-slot flexrow filled" data-index="{{idx}}" data-uuid="{{slot.uuid}}">
+                <img class="granted-skill-icon" src="{{slot.img}}" width="24" height="24"/>
+                <span class="granted-skill-name">{{slot.name}}</span>
+                {{#if slot.missing}}<span class="granted-skill-missing" style="color:#c33;font-size:11px;">(missing — UUID unresolved)</span>{{/if}}
+                <a class="granted-skill-remove" data-index="{{idx}}" title="Remove">
+                  <i class="fas fa-times"></i>
+                </a>
+              </div>
+            {{/each}}
+            <div class="granted-skill-slot flexrow empty granted-skill-drop">
+              <span class="augment-empty-slot">
+                <i class="fas fa-bolt"></i> Drop a skill here
+              </span>
+            </div>
+          </div>
+        </div>
+
         {{!-- Profession Augments (only on profession gear) --}}
         {{#if (gt system.profAugmentSlots 0)}}
         <div class="equip-section augment-section profession-augment-section">
