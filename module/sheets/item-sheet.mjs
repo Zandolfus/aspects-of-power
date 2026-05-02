@@ -109,6 +109,16 @@ export class AspectsofPowerItemSheet extends foundry.applications.api.Handlebars
       const debuffSubtypes = CONFIG.ASPECTSOFPOWER.debuffSubtypeTags ?? {};
       const skillTags = this.item.system.tags ?? [];
       context.hasDebuffSubtype = skillTags.some(t => debuffSubtypes[t]);
+
+      // Spell tier/grade derived values (only meaningful when both are set).
+      const tier = this.item.system.roll?.tier ?? '';
+      const grade = this.item.system.roll?.grade ?? '';
+      const tierFactor = CONFIG.ASPECTSOFPOWER.spellTierFactors[tier];
+      const gradeFactor = CONFIG.ASPECTSOFPOWER.spellGradeFactors[grade];
+      context.spellBaseMana = (tierFactor != null && gradeFactor != null)
+        ? Math.round(tierFactor * gradeFactor)
+        : null;
+      context.spellRecommendedMultiplier = CONFIG.ASPECTSOFPOWER.spellTierMultipliers[tier] ?? null;
     }
 
     // Item bonus field labels for augment sheets.
@@ -524,6 +534,10 @@ export class AspectsofPowerItemSheet extends foundry.applications.api.Handlebars
         secondaryAbility: form.querySelector('[name="system.roll.secondaryAbility"]')?.value ?? '',
         primaryWeight:    Number(form.querySelector('[name="system.roll.primaryWeight"]')?.value) || 1.0,
         secondaryWeight:  Number(form.querySelector('[name="system.roll.secondaryWeight"]')?.value) || 0,
+        // Preserve previously-set tier/grade when their inputs aren't in the DOM
+        // (e.g. resource ≠ mana hides the spell-cost block).
+        tier:             form.querySelector('[name="system.roll.tier"]')?.value ?? this.item.system.roll?.tier ?? '',
+        grade:            form.querySelector('[name="system.roll.grade"]')?.value ?? this.item.system.roll?.grade ?? '',
       };
       await this.document.update({ 'system.roll': rollData });
       return;

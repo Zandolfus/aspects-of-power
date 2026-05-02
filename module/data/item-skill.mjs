@@ -29,6 +29,10 @@ export class SkillData extends foundry.abstract.TypeDataModel {
         secondaryAbility: new fields.StringField({ initial: '' }),
         primaryWeight:    new fields.NumberField({ initial: 1.0, min: 0, max: 1 }),
         secondaryWeight:  new fields.NumberField({ initial: 0, min: 0, max: 1 }),
+        // Spell tier/grade — drive base_mana cost computation per design-magic-system.md.
+        // Empty for non-spell skills. base_mana = spellTierFactors[tier] × spellGradeFactors[grade].
+        tier:  new fields.StringField({ initial: '', choices: ['', 'basic', 'high', 'greater', 'major', 'grand'] }),
+        grade: new fields.StringField({ initial: '', choices: ['', 'G', 'F', 'E', 'D', 'C', 'B', 'A', 'S'] }),
       }),
 
       // Craft skills: which item types this skill can produce (keys from CONFIG.ASPECTSOFPOWER.craftItemTypes).

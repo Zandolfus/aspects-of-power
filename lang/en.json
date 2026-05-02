@@ -370,6 +370,17 @@
       "mana": "Mana",
       "health": "Health"
     },
+    "SpellTier": {
+      "label": "Spell Tier",
+      "grade": "Spell Grade",
+      "baseMana": "Base Mana",
+      "recommendedMultiplier": "Recommended Multiplier",
+      "basic": "Basic",
+      "high": "High",
+      "greater": "Greater",
+      "major": "Major",
+      "grand": "Grand"
+    },
     "Gate": {
       "blocked": "cannot use this skill type"
     },

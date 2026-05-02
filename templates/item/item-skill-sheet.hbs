@@ -186,6 +186,42 @@
           </div>
         </div>
 
+        {{! ── Spell Cost block (only for mana-resource skills) ── }}
+        {{#if (eq system.roll.resource "mana")}}
+        <div class='grid grid-4col spell-cost-block'>
+          <div class='grid-span-1'>
+            <label class='resource-label'>{{localize "ASPECTSOFPOWER.SpellTier.label"}}</label>
+            <select name='system.roll.tier' data-dtype='String'>
+              <option value='' {{#if (eq system.roll.tier "")}}selected{{/if}}>—</option>
+              {{#each config.spellTiers as |label key|}}
+                <option value='{{key}}' {{#if (eq key ../system.roll.tier)}}selected{{/if}}>{{localize label}}</option>
+              {{/each}}
+            </select>
+          </div>
+          <div class='grid-span-1'>
+            <label class='resource-label'>{{localize "ASPECTSOFPOWER.SpellTier.grade"}}</label>
+            <select name='system.roll.grade' data-dtype='String'>
+              <option value='' {{#if (eq system.roll.grade "")}}selected{{/if}}>—</option>
+              {{#each config.rankTiers as |tierDef tierKey|}}
+                <option value='{{tierKey}}' {{#if (eq tierKey ../system.roll.grade)}}selected{{/if}}>{{localize tierDef.label}}</option>
+              {{/each}}
+            </select>
+          </div>
+          <div class='grid-span-1'>
+            <label class='resource-label'>{{localize "ASPECTSOFPOWER.SpellTier.baseMana"}}</label>
+            <input type='text' value='{{#if spellBaseMana}}{{spellBaseMana}}{{else}}—{{/if}}' readonly disabled
+                   title='Computed: tier_factor × grade_factor' />
+          </div>
+          {{#if spellRecommendedMultiplier}}
+          <div class='grid-span-1'>
+            <label class='resource-label'>{{localize "ASPECTSOFPOWER.SpellTier.recommendedMultiplier"}}</label>
+            <input type='text' value='{{spellRecommendedMultiplier}}' readonly disabled
+                   title='Per-tier design default; override the Multiplier above to change.' />
+          </div>
+          {{/if}}
+        </div>
+        {{/if}}
+
         {{! ── Pure / Hybrid stat config ── }}
         <div class='grid grid-4col'>
           <div class='grid-span-1'>

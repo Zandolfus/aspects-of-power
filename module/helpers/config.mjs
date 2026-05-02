@@ -48,6 +48,31 @@ ASPECTSOFPOWER.statCurve = {
 };
 
 /**
+ * Spell tiers — display labels and cost/multiplier lookups per design-magic-system.md.
+ *   base_mana  = spellTierFactors[tier] × spellGradeFactors[grade]
+ *   multiplier = spellTierMultipliers[tier]   (designer-overridable per skill)
+ */
+ASPECTSOFPOWER.spellTiers = {
+  basic:   'ASPECTSOFPOWER.SpellTier.basic',
+  high:    'ASPECTSOFPOWER.SpellTier.high',
+  greater: 'ASPECTSOFPOWER.SpellTier.greater',
+  major:   'ASPECTSOFPOWER.SpellTier.major',
+  grand:   'ASPECTSOFPOWER.SpellTier.grand',
+};
+
+ASPECTSOFPOWER.spellTierFactors = {
+  basic: 2, high: 4, greater: 8, major: 25, grand: 50,
+};
+
+ASPECTSOFPOWER.spellTierMultipliers = {
+  basic: 0.20, high: 0.25, greater: 0.30, major: 0.40, grand: 0.60,
+};
+
+ASPECTSOFPOWER.spellGradeFactors = {
+  G: 2.5, F: 5, E: 10, D: 24, C: 56, B: 130, A: 300, S: 700,
+};
+
+/**
  * Skill categories — top-level grouping that determines available tags.
  */
 ASPECTSOFPOWER.skillCategories = {
