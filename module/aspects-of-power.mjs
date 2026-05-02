@@ -25,6 +25,7 @@ import { ASPECTSOFPOWER } from './helpers/config.mjs';
 import { getPositionalTags } from './helpers/positioning.mjs';
 // Import systems.
 import { EquipmentSystem } from './systems/equipment.mjs';
+import * as MassLeveler from './systems/mass-leveler.mjs';
 
 /**
  * Check if an actor is an assigned player character (not just owned).
@@ -83,6 +84,7 @@ Hooks.once('init', function () {
     AspectsofPowerItem,
     rollItemMacro,
     getPositionalTags,
+    massLeveler: MassLeveler,
     /**
      * Called when a skill is used to consume an action and reset the movement
      * segment for the given actor.  Returns the new action count, or null
