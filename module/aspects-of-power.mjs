@@ -29,6 +29,7 @@ import * as MassLeveler from './systems/mass-leveler.mjs';
 import * as TemplateMigration from './systems/template-migration.mjs';
 import * as Celerity from './systems/celerity.mjs';
 import { CelerityTracker, openTracker as openCelerityTracker, refreshTracker as refreshCelerityTracker, registerCelerityTrackerHooks } from './apps/celerity-tracker.mjs';
+import { CelerityCombatTracker } from './apps/celerity-combat-tracker.mjs';
 
 /**
  * Check if an actor is an assigned player character (not just owned).
@@ -80,6 +81,10 @@ function getActiveDebuffs(actor, types) {
 /* -------------------------------------------- */
 
 Hooks.once('init', function () {
+  // Replace Foundry's sidebar combat tracker with our celerity-aware subclass.
+  // Must happen at init, before Foundry instantiates ui.combat.
+  CONFIG.ui.combat = CelerityCombatTracker;
+
   // Add utility classes to the global game object so that they're more easily
   // accessible in global contexts.
   game.aspectsofpower = {

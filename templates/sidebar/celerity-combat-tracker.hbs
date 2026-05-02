@@ -1,0 +1,68 @@
+<section class="celerity-tracker-root" data-application-part="tracker">
+  <div class="cel-clock-row" style="display:flex;justify-content:space-between;align-items:center;padding:4px 8px;background:#222;color:#eee;border-radius:3px;margin-bottom:6px;font-size:12px;">
+    <span><strong>Clock:</strong> tick {{celerityClockTick}}</span>
+    <span class="cel-buttons">
+      <button type="button" class="inline-control icon fa-solid fa-forward" data-action="celAdvance" data-tooltip="Advance to next scheduled action" aria-label="Advance"></button>
+      <button type="button" class="inline-control icon fa-solid fa-rotate-left" data-action="celReset" data-tooltip="Reset clock and clear all celerity flags" aria-label="Reset"></button>
+    </span>
+  </div>
+
+  <ol class="combat-tracker plain celerity-tracker-list">
+    {{#each turns as |t|}}
+      <li class="combatant {{t.css}} {{#if t.celerity.nextUp}}cel-next-up{{/if}}"
+          data-combatant-id="{{t.id}}"
+          data-action="activateCombatant"
+          style="{{#if t.celerity.nextUp}}box-shadow: inset 3px 0 0 #6c6;{{/if}}">
+
+        <img class="token-image" src="{{t.img}}" alt="{{t.name}}" loading="lazy">
+
+        <div class="token-name">
+          <strong class="name">{{t.name}}</strong>
+          <div class="combatant-controls">
+            {{#if t.isOwner}}
+              <button type="button"
+                      class="inline-control combatant-control icon fa-solid {{#if t.hidden}}fa-eye{{else}}fa-eye-slash{{/if}}"
+                      data-action="toggleHidden"
+                      data-tooltip=""
+                      aria-label="Toggle Visibility"></button>
+              <button type="button"
+                      class="inline-control combatant-control icon fa-solid fa-skull"
+                      data-action="toggleDefeated"
+                      data-tooltip=""
+                      aria-label="Mark Defeated"></button>
+            {{/if}}
+            {{#if t.canPing}}
+              <button type="button"
+                      class="inline-control combatant-control icon fa-solid fa-bullseye-arrow"
+                      data-action="pingCombatant"
+                      data-tooltip=""
+                      aria-label="Ping Token"></button>
+            {{/if}}
+            {{#if t.effects.length}}
+              <div class="token-effects">
+                {{#each t.effects}}
+                  <img class="token-effect" src="{{this.img}}" alt="{{this.name}}">
+                {{/each}}
+              </div>
+            {{/if}}
+          </div>
+
+          {{! Celerity status — last action + scheduled tick / time-until-next }}
+          <div class="cel-status" style="font-size:10px;color:#bbb;margin-top:2px;line-height:1.3;">
+            {{#if t.celerity.lastActionName}}
+              <span title="Last action / wait">{{t.celerity.lastActionName}} ({{t.celerity.lastActionWait}}t)</span>
+            {{else}}
+              <span style="color:#888;">no action declared</span>
+            {{/if}}
+            <br>
+            {{#if t.celerity.ready}}
+              <span style="color:#6c6;">ready</span>
+            {{else}}
+              <span>next @ <strong>{{t.celerity.nextActionTick}}</strong> (in <strong>{{t.celerity.ticksUntil}}</strong>)</span>
+            {{/if}}
+          </div>
+        </div>
+      </li>
+    {{/each}}
+  </ol>
+</section>
