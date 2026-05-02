@@ -113,6 +113,38 @@ ASPECTSOFPOWER.invest = {
 };
 
 /**
+ * Canonical weapon weights by weapon-type tag (per design-melee-system.md
+ * and design-ranged-system.md). Weight is a TYPE descriptor, not a tier
+ * descriptor — a legendary greatsword and a starter greatsword both weigh 200.
+ * Identity at higher grades comes from granted skills, multipliers, and
+ * augments — not from heavier weights.
+ *
+ * Lookup is by tag in `system.tags`. First matching tag wins.
+ * Falls back to `system.weight` if no tag matches (designer escape hatch).
+ */
+ASPECTSOFPOWER.weaponWeights = {
+  // Melee
+  unarmed:    40,
+  dagger:     60,
+  spear:      70,
+  rapier:     70,
+  sword:     100,
+  axe:       120,
+  hammer:    130,
+  polearm:   180,
+  greatsword: 200,
+  greataxe:  220,
+  // Ranged
+  pistol:     50,
+  shortbow:   70,
+  bow:       130,
+  crossbow:  150,
+  shotgun:   180,
+  longbow:   200,
+  rifle:     240,
+};
+
+/**
  * Skill categories — top-level grouping that determines available tags.
  */
 ASPECTSOFPOWER.skillCategories = {

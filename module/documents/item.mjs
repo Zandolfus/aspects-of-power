@@ -320,9 +320,9 @@ export class AspectsofPowerItem extends Item {
   /**
    * Resolve which weapon item drives this skill's weight + tags.
    *   1. If `system.requiredEquipment` is set and resolves on the actor → that item.
-   *   2. Else, the actor's currently-equipped weaponry-slot item with the highest
-   *      `weight > 0`, excluding shields (so Phil wielding Claymore + Shield picks
-   *      the Claymore for Strike).
+   *   2. Else, the actor's currently-equipped weaponry-slot item with the heaviest
+   *      canonical weight, excluding shields (so Phil wielding Claymore + Shield
+   *      picks the Claymore for Strike).
    *   3. Else, null (caller falls back to legacy formula).
    *
    * @returns {Item|null}
@@ -334,16 +334,36 @@ export class AspectsofPowerItem extends Item {
       if (direct) return direct;
     }
     let best = null;
+    let bestWeight = 0;
     for (const i of this.actor.items) {
       if (i.type !== 'item') continue;
       const s = i.system;
       if (s?.slot !== 'weaponry') continue;
       if (s?.equipped !== true) continue;
-      if (!(s?.weight > 0)) continue;
       if ((s?.tags ?? []).includes('shield')) continue;
-      if (!best || s.weight > best.system.weight) best = i;
+      const w = AspectsofPowerItem.resolveWeaponWeight(i);
+      if (w <= 0) continue;
+      if (w > bestWeight) { best = i; bestWeight = w; }
     }
     return best;
+  }
+
+  /**
+   * Canonical weapon weight from weapon-type tag (per design memos), with
+   * `system.weight` as a fallback for items that don't carry a known tag.
+   * Tag lookup wins because weight is a form descriptor — all greatswords
+   * are 200, regardless of tier or how the item was authored.
+   *
+   * @param {Item} item
+   * @returns {number}  Canonical weight, or `system.weight` if no tag matches, or 0.
+   */
+  static resolveWeaponWeight(item) {
+    if (!item) return 0;
+    const table = CONFIG.ASPECTSOFPOWER.weaponWeights ?? {};
+    for (const tag of item.system?.tags ?? []) {
+      if (table[tag] != null) return table[tag];
+    }
+    return item.system?.weight ?? 0;
   }
 
   /**
@@ -3284,7 +3304,7 @@ export class AspectsofPowerItem extends Item {
       // (highest-weight non-shield) so designers don't have to wire requiredEquipment
       // on every variant.
       const weapon = this._resolveWeaponForSkill();
-      const weaponWeight = weapon?.system?.weight ?? 0;
+      const weaponWeight = AspectsofPowerItem.resolveWeaponWeight(weapon);
       // No weapon weight → fall back to legacy formula path (skill not yet migrated).
       // The else branch below intentionally does nothing; legacy dmgFormula stays.
       if (weaponWeight > 0) {
