@@ -221,6 +221,47 @@ export function isInActiveCombat(actor) {
 }
 
 /**
+ * Charge celerity cost for a movement that just happened on the canvas.
+ * Sets the actor's combatant `nextActionTick = clockTick + cost`. If the
+ * actor had a `declaredAction` queued, it's cancelled — movement supersedes
+ * (sunk-cost; per design "only your own pending actions can be cancelled").
+ *
+ * Cost formula (placeholder, design open item #4):
+ *   wait = (distanceFt / 5) × MOVEMENT_BASE_WEIGHT_PER_5FT × SCALE / dex.mod
+ *
+ * @param {Actor}  actor
+ * @param {number} distanceFt  Distance moved in feet (post-snap to grid)
+ * @returns {Promise<{wait, scheduledTick}|null>}
+ */
+export async function chargeMovementCelerity(actor, distanceFt) {
+  const combatant = findCombatantForActor(actor);
+  if (!combatant) return null;
+  if (distanceFt <= 0) return null;
+
+  const sc = CONFIG.ASPECTSOFPOWER.celerity;
+  const moveBaseWeight = sc.MOVEMENT_BASE_WEIGHT_PER_5FT ?? 10;
+  const dexMod = Math.max(1, actor.system.abilities?.dexterity?.mod ?? 0);
+  const wait = Math.max(1, Math.round((distanceFt / 5) * moveBaseWeight * sc.SCALE / dexMod));
+  const clockTick = getClockTick(combatant.combat);
+  const scheduledTick = clockTick + wait;
+
+  await combatant.update({
+    'flags.aspectsofpower.declaredAction': null,
+    'flags.aspectsofpower.nextActionTick': scheduledTick,
+    'flags.aspectsofpower.lastActionWait': wait,
+    'flags.aspectsofpower.lastActionName': `Movement (${distanceFt}ft)`,
+    'flags.aspectsofpower.lastActionAt':   clockTick,
+  });
+
+  ChatMessage.create({
+    speaker: ChatMessage.getSpeaker({ actor }),
+    content: `<p><em>${actor.name} moves ${distanceFt}ft — celerity cost ${wait} ticks → next action at tick ${scheduledTick}.</em></p>`,
+  });
+
+  return { wait, scheduledTick };
+}
+
+/**
  * Predict the resolution order of declared (actor, skill) pairs from a
  * shared starting tick. Returns one row per pair: { actor, skill, wait,
  * scheduledTick, swingsPerRound }, sorted ascending by scheduledTick.

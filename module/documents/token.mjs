@@ -1,3 +1,5 @@
+import { chargeMovementCelerity } from '../systems/celerity.mjs';
+
 /**
  * Extended TokenDocument for Aspects of Power.
  * Handles movement enforcement via v14's movement API.
@@ -173,6 +175,12 @@ export class AspectsofPowerToken extends foundry.documents.TokenDocument {
 
     // Lightweight sheet refresh (no full re-render).
     if (actor.sheet?.rendered) actor.sheet.render(false);
+
+    // Charge celerity cost for the movement. Cancels any queued action
+    // (movement supersedes per design). No-op outside combat.
+    if (moveSnapped > 0) {
+      chargeMovementCelerity(actor, moveSnapped);
+    }
   }
 
   /* -------------------------------------------- */

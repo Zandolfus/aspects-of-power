@@ -136,6 +136,10 @@ ASPECTSOFPOWER.celerity = {
   ROUND_K:            3_000_000,
   BASELINE_WEIGHT:    100,    // sword reference
   ACTIONS_PER_ROUND:  3,      // by-construction target swings/round
+  // Placeholder per design-celerity.md open item #4 — exact movement weights
+  // for step/walk/sprint/dash still TBD. For now: linear cost per 5ft moved,
+  // divided by dex.mod for speed scaling.
+  MOVEMENT_BASE_WEIGHT_PER_5FT: 10,
 };
 
 /**
