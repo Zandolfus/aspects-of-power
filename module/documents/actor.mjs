@@ -53,9 +53,14 @@ export class AspectsofPowerActor extends Actor {
     // ── Tag Collection (early — needed for size scaling) ──
     this._collectTags(systemData);
 
-    // Sigmoid modifier formula.
-    const sigmoidMod = (value) => {
-      return Math.round((6000 / (1 + Math.exp(-0.001 * (value - 500)))) - 2265);
+    // Power-curve modifier formula (per design-stat-curves.md):
+    //   mod = round((value/NORM)^P × NORM × MULT_BASE^gradeIndex)
+    // Race rank determines the grade multiplier (G/F/E = 0, D = 1, ..., S = 5).
+    const sc = CONFIG.ASPECTSOFPOWER.statCurve;
+    const _raceRank = systemData.attributes?.race?.rank ?? 'E';
+    const _gradeMult = Math.pow(sc.MULT_BASE, sc.gradeIndex[_raceRank] ?? 0);
+    const calcMod = (value) => {
+      return Math.round(Math.pow(value / sc.NORM, sc.P) * sc.NORM * _gradeMult);
     };
 
     // --- Stat breakdown: classify effect contributions by source ---
@@ -149,7 +154,7 @@ export class AspectsofPowerActor extends Actor {
       const b = ability.breakdown;
       b.final = Math.round(b.calculated + b.equipmentCapped + b.effectBonus);
       ability.value = b.final;
-      ability.mod = sigmoidMod(b.final);
+      ability.mod = calcMod(b.final);
       b.finalMod = ability.mod;
     }
 

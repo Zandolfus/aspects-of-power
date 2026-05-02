@@ -36,6 +36,18 @@ ASPECTSOFPOWER.abilityAbbreviations = {
 };
 
 /**
+ * Stat curve constants — power curve × per-grade multiplier.
+ * Per design-stat-curves.md.
+ *   mod = round((stat / NORM)^P × NORM × MULT_BASE^gradeIndex)
+ */
+ASPECTSOFPOWER.statCurve = {
+  NORM: 1085,
+  P: 0.8,
+  MULT_BASE: 1.25,
+  gradeIndex: { G: 0, F: 0, E: 0, D: 1, C: 2, B: 3, A: 4, S: 5 },
+};
+
+/**
  * Skill categories — top-level grouping that determines available tags.
  */
 ASPECTSOFPOWER.skillCategories = {
