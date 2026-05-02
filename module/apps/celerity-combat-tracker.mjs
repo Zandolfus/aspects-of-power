@@ -72,21 +72,23 @@ async function _onCelAdvance(event, target) {
   }
   ui.notifications.info(`Clock → ${declared.scheduledTick}. ${c.name} fires "${declared.label}".`);
 
-  // If the actor has an online non-GM owner, dispatch the deferred roll to
-  // their client via socket — invest dialogs (legacy fire-time path) appear
-  // for the actual player. Pre-captured invest from declaration is passed
-  // through so Reading-A spell flows skip the dialog at fire time.
+  // Dispatch the deferred roll to the actor's CANONICAL player — the user
+  // whose `character` field IS this actor. Each PC has exactly one such
+  // user. If that player isn't online (or this is an NPC with no linked
+  // user), fall back to running locally on the GM's client. Never picks
+  // a co-owner (e.g., another PC who happens to have OWNER permission).
   const investAmount = declared.investAmount ?? null;
-  const owner = game.users.find(u => !u.isGM && u.active && c.actor?.testUserPermission?.(u, 'OWNER'));
-  if (owner) {
+  const linkedPlayer = game.users.find(u => !u.isGM && u.active && u.character?.id === c.actor?.id);
+  if (linkedPlayer) {
     game.socket.emit('system.aspects-of-power', {
       action: 'executeQueuedAction',
       actorId: c.actor.id,
       itemId: item.id,
-      targetUserId: owner.id,
+      targetUserId: linkedPlayer.id,
       preInvestAmount: investAmount,
     });
   } else {
+    // No linked player online — GM (or whoever clicked Advance) runs it.
     await item.roll({ executeDeferred: true, preInvestAmount: investAmount });
   }
 
