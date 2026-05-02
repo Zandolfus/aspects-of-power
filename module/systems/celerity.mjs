@@ -147,6 +147,9 @@ export function getClockTick(combat = game.combat) {
  * tracker UI and any future state restore can read it. No-op if the actor
  * isn't in active combat.
  *
+ * Used by the LEGACY observer path (now superseded by declareAction +
+ * deferred firing) and by paths that fire actions outside the queue model.
+ *
  * @returns {object|null} { wait, scheduledTick, lastActionName } or null
  */
 export async function recordActionFired(actor, skill) {
@@ -162,6 +165,59 @@ export async function recordActionFired(actor, skill) {
     'flags.aspectsofpower.lastActionAt':   clockTick,
   });
   return { wait, scheduledTick, lastActionName: skill.name };
+}
+
+/**
+ * Declare an action in combat — queues the skill on the combatant's
+ * declaredAction flag without firing it. The tracker's "Advance to next"
+ * fires it later via `item.roll({ executeDeferred: true })` when the clock
+ * reaches the scheduled tick.
+ *
+ * @returns {object|null} { wait, scheduledTick } or null if not in combat
+ *                        / actor already has a queued action
+ */
+export async function declareAction(actor, skill) {
+  const combatant = findCombatantForActor(actor);
+  if (!combatant) return null;
+
+  const existing = combatant.flags?.aspectsofpower?.declaredAction;
+  if (existing && existing.itemId) {
+    ui.notifications.warn(`${actor.name} already has "${existing.label}" queued. Cancel it first.`);
+    return null;
+  }
+
+  const wait = computeActionWait(actor, skill);
+  const clockTick = getClockTick(combatant.combat);
+  const scheduledTick = clockTick + wait;
+
+  await combatant.update({
+    'flags.aspectsofpower.declaredAction': {
+      itemId: skill.id,
+      label: skill.name,
+      wait,
+      scheduledTick,
+      declaredAtTick: clockTick,
+    },
+    'flags.aspectsofpower.nextActionTick': scheduledTick,
+    'flags.aspectsofpower.lastActionWait': wait,
+    'flags.aspectsofpower.lastActionName': skill.name + ' (queued)',
+  });
+
+  ChatMessage.create({
+    speaker: ChatMessage.getSpeaker({ actor }),
+    content: `<p><strong>${actor.name}</strong> declares <strong>${skill.name}</strong> — scheduled for tick <strong>${scheduledTick}</strong> (wait ${wait}).</p>`,
+  });
+
+  return { wait, scheduledTick };
+}
+
+/**
+ * True when `actor` is in an active combat as a combatant. Helper for the
+ * defer check in item.roll().
+ */
+export function isInActiveCombat(actor) {
+  const c = findCombatantForActor(actor);
+  return !!(c?.combat?.started);
 }
 
 /**

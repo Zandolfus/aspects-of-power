@@ -1,6 +1,6 @@
 import { EquipmentSystem } from '../systems/equipment.mjs';
 import { getPositionalTags } from '../helpers/positioning.mjs';
-import { recordActionFired } from '../systems/celerity.mjs';
+import { recordActionFired, declareAction, isInActiveCombat } from '../systems/celerity.mjs';
 
 /**
  * Check if an actor is an assigned player character (not just owned).
@@ -3236,6 +3236,17 @@ export class AspectsofPowerItem extends Item {
     const TokenClass = CONFIG.Token.documentClass;
     if (TokenClass?.flushStamina) await TokenClass.flushStamina();
 
+    // ── Celerity declaration gate ─────────────────────────────────────
+    // In an active combat, queue this skill on the combatant's
+    // declaredAction flag and bail. The tracker's "Advance to next" fires
+    // it later via `item.roll({ executeDeferred: true })` once the clock
+    // reaches the scheduled tick. Outside combat or when re-entering via
+    // executeDeferred, fall through and run the normal roll pipeline.
+    if (!options.executeDeferred && this.actor && isInActiveCombat(this.actor)) {
+      const declared = await declareAction(this.actor, this);
+      return declared;
+    }
+
     // Build formulas (also populates rollData.roll.abilitymod and resourcevalue).
     let { hitFormula, dmgFormula } = this._buildRollFormulas(rollData);
 
@@ -3453,15 +3464,19 @@ export class AspectsofPowerItem extends Item {
           content: `<p><strong>${this.actor.name}</strong> takes <strong>${investSelfDamage}</strong> self-damage from ${investSelfDamageFlavor}.</p>`,
         });
       }
-      // Celerity: schedule next-action tick on the combatant if in active combat.
-      // No-op outside combat; safe to call regardless.
-      const cel = await recordActionFired(this.actor, this);
-      if (cel) {
-        ChatMessage.create({
-          speaker, rollMode, ...(whisperGM ? { whisper: whisperGM } : {}),
-          flavor: label,
-          content: `<p><em>Celerity:</em> wait <strong>${cel.wait}</strong> ticks → next action at tick <strong>${cel.scheduledTick}</strong>.</p>`,
-        });
+      // Celerity recording: in deferred-fire mode the tracker has already
+      // cleared the declaredAction + nextActionTick flags before invoking
+      // this roll, so don't re-queue. For non-combat fires, recordActionFired
+      // is a safe no-op (it returns null when the actor isn't in combat).
+      if (!options.executeDeferred) {
+        const cel = await recordActionFired(this.actor, this);
+        if (cel) {
+          ChatMessage.create({
+            speaker, rollMode, ...(whisperGM ? { whisper: whisperGM } : {}),
+            flavor: label,
+            content: `<p><em>Celerity:</em> wait <strong>${cel.wait}</strong> ticks → next action at tick <strong>${cel.scheduledTick}</strong>.</p>`,
+          });
+        }
       }
     };
 

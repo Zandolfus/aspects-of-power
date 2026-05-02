@@ -22,18 +22,31 @@ async function _onCelAdvance(event, target) {
   const combat = this.viewed;
   if (!combat?.started) return;
   const clockTick = getClockTick(combat);
+  // Find the soonest declared action with a scheduled tick still in the future.
   const queued = [...combat.combatants]
-    .map(c => ({ c, next: c.flags?.[FLAG_NS]?.nextActionTick ?? null }))
-    .filter(e => e.next !== null && e.next > clockTick)
-    .sort((a, b) => a.next - b.next);
+    .map(c => ({ c, declared: c.flags?.[FLAG_NS]?.declaredAction ?? null }))
+    .filter(e => e.declared && typeof e.declared.scheduledTick === 'number' && e.declared.scheduledTick > clockTick)
+    .sort((a, b) => a.declared.scheduledTick - b.declared.scheduledTick);
   if (queued.length === 0) {
     ui.notifications.info('No queued actions to advance to.');
     return;
   }
-  const { c, next } = queued[0];
-  await combat.update({ [`flags.${FLAG_NS}.clockTick`]: next });
-  await c.update({ [`flags.${FLAG_NS}.nextActionTick`]: null });
-  ui.notifications.info(`Clock advanced to ${next} — ${c.name} is up.`);
+  const { c, declared } = queued[0];
+  // Advance clock + clear that combatant's celerity flags BEFORE firing —
+  // so the roll can re-queue if the actor declares a follow-up immediately.
+  await combat.update({ [`flags.${FLAG_NS}.clockTick`]: declared.scheduledTick });
+  await c.update({
+    [`flags.${FLAG_NS}.declaredAction`]: null,
+    [`flags.${FLAG_NS}.nextActionTick`]: null,
+  });
+  // Resolve the queued item and fire it via the deferred-execute path.
+  const item = c.actor?.items?.get(declared.itemId);
+  if (!item) {
+    ui.notifications.warn(`${c.name}: queued item not found (id=${declared.itemId}); action skipped.`);
+    return;
+  }
+  ui.notifications.info(`Clock → ${declared.scheduledTick}. ${c.name} fires "${declared.label}".`);
+  await item.roll({ executeDeferred: true });
 }
 
 async function _onCelCancel(event, target) {
