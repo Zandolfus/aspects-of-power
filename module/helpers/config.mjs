@@ -73,6 +73,46 @@ ASPECTSOFPOWER.spellGradeFactors = {
 };
 
 /**
+ * Melee Option B Str/Dex hybrid blend per design-melee-system.md.
+ *   normWeight = clamp01((weight - weightOffset) / weightSpan)
+ *   strWeight  = strFloor + slope × normWeight  → [strFloor, strFloor+slope]
+ *   dexWeight  = 1 - strWeight
+ *   stat_blend = Str_mod × strWeight + Dex_mod × dexWeight
+ */
+ASPECTSOFPOWER.meleeBlend = {
+  strFloor:     0.30,
+  slope:        0.70,
+  weightOffset: 40,
+  weightSpan:   180,  // weight 40 → strWeight 0.30; weight 220 → strWeight 1.00
+};
+
+/**
+ * Ranged Option α Dex/Per hybrid blend per design-ranged-system.md.
+ *   perWeight  = perFloor + slope × normWeight  → [perFloor, perFloor+slope]
+ *   dexWeight  = 1 - perWeight
+ *   stat_blend = Dex_mod × dexWeight + Per_mod × perWeight
+ */
+ASPECTSOFPOWER.rangedBlend = {
+  perFloor:     0.05,
+  slope:        0.55,
+  weightOffset: 50,
+  weightSpan:   200,  // weight 50 → perWeight 0.05; weight 250 → perWeight 0.60
+};
+
+/**
+ * Variable resource-invest tuning — shared across casters and weapon users.
+ *   safe_invest_mana = Wis_mod × wisCapFactor   (above base_mana, before self-damage)
+ *   safe_invest_stam = Tough_mod × toughCapFactor
+ *   base_stamina     = weight / staminaBaseDivisor × stat / staminaNormalizer
+ */
+ASPECTSOFPOWER.invest = {
+  wisCapFactor:       0.15,
+  toughCapFactor:     0.15,
+  staminaBaseDivisor: 20,
+  staminaNormalizer:  1085,
+};
+
+/**
  * Skill categories — top-level grouping that determines available tags.
  */
 ASPECTSOFPOWER.skillCategories = {

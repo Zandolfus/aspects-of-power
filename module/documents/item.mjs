@@ -318,50 +318,55 @@ export class AspectsofPowerItem extends Item {
   }
 
   /**
-   * Variable spell-invest dialog (per design-magic-system.md).
-   * Player chooses how much mana to invest from base_mana up to their pool.
-   * Past the safe ceiling (base + Wis cap), invest deals quadratic self-damage.
+   * Variable resource-invest dialog. Generic over mana (caster) and stamina
+   * (melee/ranged) — same math, different labels and potency stat. Player
+   * chooses how much to invest from base up to pool. Past the safe ceiling
+   * (base + capStat × 0.15), invest deals quadratic self-damage scaled by
+   * the potency stat. Per design-magic-system.md / design-melee-system.md /
+   * design-ranged-system.md.
    *
    * @param {object} args
-   * @param {number} args.baseMana    Minimum invest (tier_factor × grade_factor).
-   * @param {number} args.safeInvest  Wis_mod × 0.15 — invest above base before self-damage triggers.
-   * @param {number} args.maxPool     Caster's current mana.
-   * @param {number} args.intMod      Caster's Intelligence mod (damage potency).
-   * @param {number} args.multiplier  Per-skill damage multiplier.
-   * @param {string} args.label       Skill name for dialog title.
-   * @returns {Promise<number|null>}  Selected invest amount, or null on cancel.
+   * @param {number} args.baseCost     Minimum invest (e.g. base_mana, base_stamina).
+   * @param {number} args.safeInvest   Headroom above base before self-damage.
+   * @param {number} args.maxPool      Actor's current resource pool.
+   * @param {number} args.potency      Damage stat (Int_mod for spells, stat_blend for weapons).
+   * @param {number} args.multiplier   Per-skill damage multiplier.
+   * @param {string} args.resourceLabel  Lowercase resource label ("mana", "stamina").
+   * @param {string} args.potencyLabel   Display label for the potency stat ("Int", "Str/Dex blend", etc.).
+   * @param {string} args.label        Skill name for dialog title.
+   * @returns {Promise<number|null>}   Selected invest amount, or null on cancel.
    */
-  async _promptSpellInvest({ baseMana, safeInvest, maxPool, intMod, multiplier, label }) {
-    const safeCeiling = baseMana + safeInvest;
+  async _promptResourceInvest({ baseCost, safeInvest, maxPool, potency, multiplier, resourceLabel, potencyLabel, label }) {
+    const safeCeiling = baseCost + safeInvest;
     const startInvest = Math.min(safeCeiling, maxPool);
-    const computeDmg = (v) => Math.round(intMod * multiplier * Math.sqrt(v));
+    const computeDmg = (v) => Math.round(potency * multiplier * Math.sqrt(v));
     const computeSelfDmg = (v) => {
       const excess = Math.max(0, v - safeCeiling);
       if (excess <= 0 || safeInvest <= 0) return 0;
-      return Math.round(intMod * Math.pow(excess / safeInvest, 2));
+      return Math.round(potency * Math.pow(excess / safeInvest, 2));
     };
 
     const content = `
-      <div class="spell-invest">
+      <div class="resource-invest">
         <div class="invest-meta" style="display:grid;grid-template-columns:1fr 1fr;gap:4px;margin-bottom:8px;font-size:12px;">
-          <div>Base mana: <strong>${baseMana}</strong></div>
+          <div>Base ${resourceLabel}: <strong>${baseCost}</strong></div>
           <div>Safe ceiling: <strong>${safeCeiling}</strong></div>
           <div>Pool: <strong>${maxPool}</strong></div>
-          <div>Int × Mult: <strong>${intMod} × ${multiplier}</strong></div>
+          <div>${potencyLabel} × Mult: <strong>${potency} × ${multiplier}</strong></div>
         </div>
         <div class="form-group">
-          <label>Invest: <span class="invest-display">${startInvest}</span> mana</label>
-          <input type="range" name="invest" min="${baseMana}" max="${maxPool}" value="${startInvest}" step="1" style="width:100%;" />
+          <label>Invest: <span class="invest-display">${startInvest}</span> ${resourceLabel}</label>
+          <input type="range" name="invest" min="${baseCost}" max="${maxPool}" value="${startInvest}" step="1" style="width:100%;" />
         </div>
         <div class="invest-readouts" style="display:grid;grid-template-columns:1fr 1fr;gap:4px;margin-top:8px;">
           <div>Predicted damage: <strong class="dmg-display">${computeDmg(startInvest)}</strong></div>
-          <div>Pool after cast: <strong class="remaining-display">${maxPool - startInvest}</strong></div>
+          <div>Pool after: <strong class="remaining-display">${maxPool - startInvest}</strong></div>
           <div class="self-dmg-row" style="grid-column:1 / -1;">
             Self-damage: <strong class="self-dmg-display">${computeSelfDmg(startInvest)}</strong>
             <span class="self-dmg-hint" style="font-size:11px;color:#888;"> (over-invest past safe ceiling)</span>
           </div>
         </div>
-        <p class="hint" style="font-size:11px;margin-top:8px;">Damage = Int × multiplier × √invested. Excess past safe ceiling deals Int × (excess/safe)² self-damage.</p>
+        <p class="hint" style="font-size:11px;margin-top:8px;">Damage = ${potencyLabel} × multiplier × √invested. Excess past safe ceiling deals ${potencyLabel} × (excess/safe)² self-damage.</p>
       </div>`;
 
     let resolveFn;
@@ -370,16 +375,16 @@ export class AspectsofPowerItem extends Item {
     const safeResolve = (v) => { if (!resolved) { resolved = true; resolveFn(v); } };
 
     const dlg = new foundry.applications.api.DialogV2({
-      window: { title: `${label} — Mana Investment` },
+      window: { title: `${label} — ${resourceLabel.charAt(0).toUpperCase() + resourceLabel.slice(1)} Investment` },
       content,
       buttons: [
         {
           action: 'confirm',
-          label: 'Cast',
+          label: 'Use',
           default: true,
           callback: (event, button) => {
             const val = parseInt(button.form.elements.invest?.value, 10);
-            safeResolve(Math.min(Math.max(baseMana, val || baseMana), maxPool));
+            safeResolve(Math.min(Math.max(baseCost, val || baseCost), maxPool));
           },
         },
         { action: 'cancel', label: 'Cancel', callback: () => safeResolve(null) },
@@ -3184,29 +3189,36 @@ export class AspectsofPowerItem extends Item {
     // Build formulas (also populates rollData.roll.abilitymod and resourcevalue).
     let { hitFormula, dmgFormula } = this._buildRollFormulas(rollData);
 
-    // ── Variable spell invest (per design-magic-system.md) ─────────────
-    // Gated to mana-resource attack skills with both tier and grade set.
-    // Opens a slider dialog, replaces the damage formula with the new
-    // spell formula (Int × multiplier × √invested), and tracks self-damage
-    // for over-invest past the Wis-derived safe ceiling.
-    let spellSelfDamage = 0;
+    // ── Variable resource invest (per design-magic/melee/ranged-system.md) ─
+    // Two gated paths share the same dialog:
+    //   Spell: mana + attack + tier+grade set                → Int × mult × √invested
+    //   Weapon: stamina + attack + (str_weapon|dex_weapon|phys_ranged) +
+    //           requiredEquipment with weight                → blend × mult × √invested
+    // Skills that don't match either path keep the legacy formula.
+    let investSelfDamage = 0;
+    let investSelfDamageFlavor = ''; // "over-channeling" / "over-exerting"
+    const sc = CONFIG.ASPECTSOFPOWER;
+
     const spellTier  = this.system.roll?.tier  ?? '';
     const spellGrade = this.system.roll?.grade ?? '';
     const isVariableSpell = rollData.roll.resource === 'mana'
       && spellTier && spellGrade
       && tags.includes('attack');
+
+    const isVariableWeapon = rollData.roll.resource === 'stamina'
+      && tags.includes('attack')
+      && ['str_weapon', 'dex_weapon', 'phys_ranged'].includes(rollData.roll.type);
+
     if (isVariableSpell) {
-      const sc = CONFIG.ASPECTSOFPOWER;
       const tierFactor  = sc.spellTierFactors[spellTier];
       const gradeFactor = sc.spellGradeFactors[spellGrade];
       const baseMana    = Math.round(tierFactor * gradeFactor);
       const wisMod      = this.actor.system.abilities?.wisdom?.mod ?? 0;
-      const safeInvest  = Math.max(0, Math.round(wisMod * 0.15));
+      const safeInvest  = Math.max(0, Math.round(wisMod * sc.invest.wisCapFactor));
       const maxPool     = Math.round(rollData.roll.resourcevalue);
       const intMod      = this.actor.system.abilities?.intelligence?.mod ?? 0;
-      // Multiplier: per-tier default, overridable via the skill's diceBonus field
-      // (which the sheet labels "Multiplier"). Designer-set value of 1 is treated
-      // as "use tier default" since 1 is the schema initial.
+      // Multiplier: per-tier default, overridable via the skill's diceBonus field.
+      // Designer-set value of 1 is treated as "use tier default" since 1 is the schema initial.
       const tierMult = sc.spellTierMultipliers[spellTier];
       const dbVal    = this.system.roll?.diceBonus ?? 1;
       const multiplier = (dbVal && dbVal !== 1) ? dbVal : tierMult;
@@ -3220,20 +3232,86 @@ export class AspectsofPowerItem extends Item {
         return;
       }
 
-      const invested = await this._promptSpellInvest({
-        baseMana, safeInvest, maxPool, intMod, multiplier, label,
+      const invested = await this._promptResourceInvest({
+        baseCost: baseMana, safeInvest, maxPool,
+        potency: intMod, multiplier,
+        resourceLabel: 'mana', potencyLabel: 'Int', label,
       });
       if (invested === null) return; // cancelled
 
       rollData.roll.cost = invested;
       rollData.roll.variableSpellInvest = invested;
-      // Replace dmg formula with the new spell formula evaluated to a literal.
-      // Roll() accepts a bare integer string and returns it as the total.
       dmgFormula = String(Math.round(intMod * multiplier * Math.sqrt(invested)));
 
       const excess = Math.max(0, invested - (baseMana + safeInvest));
       if (excess > 0 && safeInvest > 0) {
-        spellSelfDamage = Math.round(intMod * Math.pow(excess / safeInvest, 2));
+        investSelfDamage = Math.round(intMod * Math.pow(excess / safeInvest, 2));
+        investSelfDamageFlavor = 'over-channeling';
+      }
+    } else if (isVariableWeapon) {
+      // Find the equipped weapon for weight + hybrid blend.
+      const weapon = this.system.requiredEquipment ? this.actor.items.get(this.system.requiredEquipment) : null;
+      const weaponWeight = weapon?.system?.weight ?? 0;
+      // No weapon weight → fall back to legacy formula path (skill not yet migrated).
+      // The else branch below intentionally does nothing; legacy dmgFormula stays.
+      if (weaponWeight > 0) {
+        const isRanged = rollData.roll.type === 'phys_ranged';
+        const A = this.actor.system.abilities;
+        const strMod = A.strength?.mod  ?? 0;
+        const dexMod = A.dexterity?.mod ?? 0;
+        const perMod = A.perception?.mod ?? 0;
+        const toughMod = A.toughness?.mod ?? 0;
+
+        // Compute hybrid stat_blend per design Option B (melee) / Option α (ranged).
+        let statBlend, potencyLabel;
+        if (isRanged) {
+          const b = sc.rangedBlend;
+          const norm = Math.max(0, Math.min(1, (weaponWeight - b.weightOffset) / b.weightSpan));
+          const perWeight = b.perFloor + b.slope * norm;
+          const dexWeight = 1 - perWeight;
+          statBlend = Math.round(dexMod * dexWeight + perMod * perWeight);
+          potencyLabel = 'Dex/Per';
+        } else {
+          const b = sc.meleeBlend;
+          const norm = Math.max(0, Math.min(1, (weaponWeight - b.weightOffset) / b.weightSpan));
+          const strWeight = b.strFloor + b.slope * norm;
+          const dexWeight = 1 - strWeight;
+          statBlend = Math.round(strMod * strWeight + dexMod * dexWeight);
+          potencyLabel = 'Str/Dex';
+        }
+
+        // base_stamina: melee uses Str/normalizer; ranged uses stat_blend/normalizer (per design).
+        const denomStat = isRanged ? statBlend : strMod;
+        const baseStamina = Math.max(1, Math.round((weaponWeight / sc.invest.staminaBaseDivisor) * (denomStat / sc.invest.staminaNormalizer)));
+        const safeInvest = Math.max(0, Math.round(toughMod * sc.invest.toughCapFactor));
+        const maxPool = Math.round(rollData.roll.resourcevalue);
+        const multiplier = this.system.roll?.diceBonus ?? 1;
+
+        if (maxPool < baseStamina) {
+          ChatMessage.create({
+            speaker, rollMode, ...(whisperGM ? { whisper: whisperGM } : {}),
+            flavor: label,
+            content: `<p>Not enough stamina (need ${baseStamina}, have ${maxPool}).</p>`,
+          });
+          return;
+        }
+
+        const invested = await this._promptResourceInvest({
+          baseCost: baseStamina, safeInvest, maxPool,
+          potency: statBlend, multiplier,
+          resourceLabel: 'stamina', potencyLabel, label,
+        });
+        if (invested === null) return; // cancelled
+
+        rollData.roll.cost = invested;
+        rollData.roll.variableWeaponInvest = invested;
+        dmgFormula = String(Math.round(statBlend * multiplier * Math.sqrt(invested)));
+
+        const excess = Math.max(0, invested - (baseStamina + safeInvest));
+        if (excess > 0 && safeInvest > 0) {
+          investSelfDamage = Math.round(statBlend * Math.pow(excess / safeInvest, 2));
+          investSelfDamageFlavor = 'over-exerting';
+        }
       }
     }
 
@@ -3302,23 +3380,23 @@ export class AspectsofPowerItem extends Item {
     const resource  = rollData.roll.resource;
     const newResVal = Math.max(0, Math.round(rollData.roll.resourcevalue - rollData.roll.cost));
 
-    // Helper to commit resource cost + spell over-invest self-damage atomically.
+    // Helper to commit resource cost + over-invest self-damage atomically.
     // Called from each cast-completion branch (AOE-after-placement, non-AOE);
     // never called from cancellation paths so self-damage doesn't commit on a
     // back-out. Skipped for barrier skills — they defer cost to a GM action.
     const _commitCastCost = async () => {
       if (isBarrier) return;
       const updates = { [`system.${resource}.value`]: newResVal };
-      if (spellSelfDamage > 0) {
+      if (investSelfDamage > 0) {
         const curHp = this.actor.system.health?.value ?? 0;
-        updates['system.health.value'] = Math.max(0, curHp - spellSelfDamage);
+        updates['system.health.value'] = Math.max(0, curHp - investSelfDamage);
       }
       await this.actor.update(updates);
-      if (spellSelfDamage > 0) {
+      if (investSelfDamage > 0) {
         ChatMessage.create({
           speaker, rollMode, ...(whisperGM ? { whisper: whisperGM } : {}),
           flavor: label,
-          content: `<p><strong>${this.actor.name}</strong> takes <strong>${spellSelfDamage}</strong> self-damage from over-channeling.</p>`,
+          content: `<p><strong>${this.actor.name}</strong> takes <strong>${investSelfDamage}</strong> self-damage from ${investSelfDamageFlavor}.</p>`,
         });
       }
     };
