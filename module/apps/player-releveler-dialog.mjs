@@ -33,6 +33,11 @@ export class PlayerRelevelDialog extends foundry.applications.api.HandlebarsAppl
     this.pathType = 'threefold-path'; // resolved in _initRaceContext
     this.raceTemplateName = '';
     this.allowRaceChange = false;     // opt-in: pause at each rank boundary to optionally swap race
+    // Starting race for the walk. Defaults to the actor's current race
+    // templateId, but the player can override in step 2 if they actually
+    // started as a different race that evolved into the current one.
+    this.startingRaceId = this.actor.system.attributes?.race?.templateId ?? '';
+    this.availableRaces = [];         // populated by _initRaceContext
     this.runState = null;     // populated during 'run' step
     this.runResults = null;   // populated when run completes
     this._initRaceContext();
@@ -60,13 +65,18 @@ export class PlayerRelevelDialog extends foundry.applications.api.HandlebarsAppl
   /* ---------- init helpers ---------- */
 
   async _initRaceContext() {
-    const raceAttr = this.actor.system.attributes?.race;
-    if (!raceAttr?.templateId) {
-      this.pathType = 'threefold-path'; // fallback when no template is assigned yet
+    // Build the full list of race templates the player can pick as starting race.
+    this.availableRaces = await this._findTemplatesByRank('race', null);
+
+    // Resolve the path-type + display name from the currently-selected starting race.
+    const targetId = this.startingRaceId || this.actor.system.attributes?.race?.templateId;
+    if (!targetId) {
+      this.pathType = 'threefold-path';
+      this.raceTemplateName = '';
       return;
     }
     let raceTemplate;
-    try { raceTemplate = await fromUuid(raceAttr.templateId); } catch (e) { /* unavailable */ }
+    try { raceTemplate = await fromUuid(targetId); } catch (e) { /* unavailable */ }
     if (!raceTemplate) return;
     this.raceTemplateName = raceTemplate.name;
     const tags = (raceTemplate.system.systemTags ?? []).map(t => t.id);
@@ -86,7 +96,11 @@ export class PlayerRelevelDialog extends foundry.applications.api.HandlebarsAppl
 
   async _prepareContext(options) {
     const context = await super._prepareContext(options);
-    if (!this.raceTemplateName) await this._initRaceContext(); // race init may not have completed in constructor
+    // Race init is fire-and-forget in the constructor (can't be async). If it
+    // hasn't populated by first render, await it now.
+    if (!this.availableRaces.length || !this.raceTemplateName) {
+      await this._initRaceContext();
+    }
 
     const sys = this.actor.system;
     const currentValues = Object.fromEntries(
@@ -110,6 +124,8 @@ export class PlayerRelevelDialog extends foundry.applications.api.HandlebarsAppl
     context.derivedRaceLevel = this.raceIsDerived ? this.derivedRaceLevel : null;
     context.targetRaceFinal = this.raceIsDerived ? this.derivedRaceLevel : Number(this.targets.race);
     context.allowRaceChange = this.allowRaceChange;
+    context.startingRaceId  = this.startingRaceId;
+    context.availableRaces  = this.availableRaces;
 
     // Run-step extras
     if (this.step === 'run') {
@@ -150,6 +166,12 @@ export class PlayerRelevelDialog extends foundry.applications.api.HandlebarsAppl
     });
     root.querySelector('input[name="allowRaceChange"]')?.addEventListener('change', e => {
       this.allowRaceChange = e.target.checked;
+    });
+    root.querySelector('select[name="startingRaceId"]')?.addEventListener('change', async e => {
+      this.startingRaceId = e.target.value;
+      // Re-resolve path-type / display name; this can flip the derived-vs-explicit race target UI.
+      await this._initRaceContext();
+      await this.render();
     });
   }
 
@@ -238,6 +260,18 @@ export class PlayerRelevelDialog extends foundry.applications.api.HandlebarsAppl
       'system.attributes.race.level':       0,
       'system.freePoints': 0,
     };
+    // Set race templateId to the player-chosen starting race (defaults to current).
+    // Also refresh name + cachedTags from that race template so equipment/feature
+    // tag resolution stays correct after the swap.
+    if (this.startingRaceId) {
+      let raceTemplate = null;
+      try { raceTemplate = await fromUuid(this.startingRaceId); } catch (e) { /* unavailable */ }
+      updates['system.attributes.race.templateId'] = this.startingRaceId;
+      if (raceTemplate) {
+        updates['system.attributes.race.name']       = raceTemplate.name;
+        updates['system.attributes.race.cachedTags'] = [...(raceTemplate.system.systemTags ?? [])];
+      }
+    }
     for (const k of ABILITY_KEYS) {
       updates[`system.abilities.${k}.value`] = this.baseStats[k] ?? 5;
     }
@@ -416,6 +450,7 @@ export class PlayerRelevelDialog extends foundry.applications.api.HandlebarsAppl
     const matches = (item) => {
       if (item.type !== track) return false;
       if (track === 'race') return true; // race templates span all ranks
+      if (rank == null) return true;     // wildcard — used for "all of this type"
       return (item.system?.rank ?? 'G') === rank;
     };
     // World items
@@ -429,7 +464,7 @@ export class PlayerRelevelDialog extends foundry.applications.api.HandlebarsAppl
         const index = await pack.getIndex({ fields: ['system.rank'] });
         for (const entry of index) {
           if (entry.type !== track) continue;
-          if (track !== 'race' && (entry.system?.rank ?? 'G') !== rank) continue;
+          if (track !== 'race' && rank != null && (entry.system?.rank ?? 'G') !== rank) continue;
           out.push({ uuid: `Compendium.${pack.metadata.id}.Item.${entry._id}`, name: entry.name, source: pack.metadata.label });
         }
       } catch (e) { /* pack unavailable */ }

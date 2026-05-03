@@ -57,12 +57,31 @@
           </tr>
         </tbody>
       </table>
+
+      <div class='form-group' style='margin-top:8px;'>
+        <label style='display:block;'>
+          <strong>Starting race</strong>
+          <span class='hint' style='display:block;font-size:11px;color:#888;'>
+            Defaults to your current race. If you actually started as a different race that
+            evolved into your current one, pick that here — then enable the checkbox below
+            to swap into your current race at the appropriate rank threshold.
+          </span>
+        </label>
+        <select name='startingRaceId' style='width:100%;'>
+          {{#each availableRaces as |r|}}
+            <option value='{{r.uuid}}' {{#if (eq r.uuid @root.startingRaceId)}}selected{{/if}}>
+              {{r.name}} ({{r.source}})
+            </option>
+          {{/each}}
+        </select>
+      </div>
+
       <label style='display:block;margin-top:8px;'>
         <input type='checkbox' name='allowRaceChange' {{#if allowRaceChange}}checked{{/if}} />
         Allow race template change at rank thresholds
         <span class='hint' style='display:block;font-size:11px;color:#888;margin-left:24px;'>
           When enabled, the run will pause at each rank boundary (G→F, F→E, E→D, …) and offer
-          to swap your race template for an evolution / ascended form. Default keeps the current race.
+          to swap your race template for an evolution / ascended form.
         </span>
       </label>
     </section>
