@@ -1,0 +1,46 @@
+<form class='spend-fp-form'>
+  <header style='margin-bottom:8px;'>
+    <h2 style='margin:0 0 4px;'>{{actor.name}} — Spend Free Points</h2>
+    <p class='hint' style='font-size:11px;color:#888;margin:0;'>
+      Allocate any portion of your free-point pool to ability scores. Unspent points stay in the pool for later.
+    </p>
+  </header>
+
+  <p style='font-size:14px;margin:8px 0;'>
+    Pool: <strong>{{pool}}</strong>
+    &nbsp;&nbsp;Allocated: <strong>{{allocated}}</strong>
+    &nbsp;&nbsp;Remaining: <strong style='color:{{#if overspent}}#c33{{else}}#3a5{{/if}};'>{{remaining}}</strong>
+  </p>
+
+  <table class='spend-fp-table' style='width:100%;border-collapse:collapse;font-size:12px;'>
+    <thead>
+      <tr style='border-bottom:1px solid #555;'>
+        <th style='text-align:left;padding:4px;'>Ability</th>
+        <th style='text-align:right;padding:4px;'>Current</th>
+        <th style='text-align:right;padding:4px;'>Spend</th>
+        <th style='text-align:right;padding:4px;'>After</th>
+      </tr>
+    </thead>
+    <tbody>
+      {{#each abilities as |a|}}
+        <tr>
+          <td style='padding:3px 4px;text-transform:capitalize;'>{{a.key}}</td>
+          <td style='padding:3px 4px;text-align:right;'>{{a.current}}</td>
+          <td style='padding:3px 4px;text-align:right;'>
+            <input type='number' name='alloc.{{a.key}}' value='{{a.alloc}}' min='0' style='width:60px;text-align:right;' />
+          </td>
+          <td style='padding:3px 4px;text-align:right;'><strong>{{a.after}}</strong></td>
+        </tr>
+      {{/each}}
+    </tbody>
+  </table>
+
+  {{#if overspent}}
+    <p class='warning' style='color:#c33;margin-top:8px;'>You've allocated more than your available pool — reduce some inputs.</p>
+  {{/if}}
+
+  <footer style='display:flex;gap:8px;margin-top:12px;justify-content:flex-end;'>
+    <button type='button' data-action='cancel'>Cancel</button>
+    <button type='button' data-action='apply' {{#unless canApply}}disabled{{/unless}}>Apply</button>
+  </footer>
+</form>

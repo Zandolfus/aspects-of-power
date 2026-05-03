@@ -5,6 +5,7 @@ import {
 import { EquipmentSystem } from '../systems/equipment.mjs';
 import { LevelUpDialog } from '../apps/level-up-dialog.mjs';
 import { PlayerRelevelDialog } from '../apps/player-releveler-dialog.mjs';
+import { SpendFreePointsDialog } from '../apps/spend-fp-dialog.mjs';
 
 /**
  * Extend ActorSheetV2 with Aspects of Power-specific behaviour.
@@ -633,6 +634,15 @@ export class AspectsofPowerActorSheet extends foundry.applications.api.Handlebar
         return;
       }
       new PlayerRelevelDialog(this.actor).render(true);
+    });
+
+    // Free-points badge — clickable when there are points to spend. Owner-only.
+    this.element.querySelector('.spend-fp-btn')?.addEventListener('click', () => {
+      if (!this.actor.isOwner) {
+        ui.notifications.warn('Only the actor owner can spend free points.');
+        return;
+      }
+      new SpendFreePointsDialog(this.actor).render(true);
     });
 
     // Template link — click to open the source template item sheet.

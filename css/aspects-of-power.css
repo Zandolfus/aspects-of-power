@@ -1918,6 +1918,17 @@
   color: #4488ff;
   margin-top: 2px;
 }
+.aspects-of-power button.free-points-badge {
+  background: transparent;
+  border: 1px solid #4488ff;
+  border-radius: 3px;
+  padding: 1px 6px;
+  cursor: pointer;
+  line-height: 1.2;
+}
+.aspects-of-power button.free-points-badge:hover {
+  background: rgba(68, 136, 255, 0.15);
+}
 .aspects-of-power .free-points-display {
   margin: 8px 0;
 }
