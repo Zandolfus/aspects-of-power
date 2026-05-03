@@ -73,7 +73,13 @@
         try {
           const d = diff(skill);
           if (!d.changed) { skipped++; continue; }
-          await skill.update({ 'system.tags': [...(skill.system.tags ?? []), 'magic'] });
+          // Read source tags (not the prepared system view) so we don't lose
+          // any pre-existing entries to data-prep stripping. `diff: false`
+          // bypasses Foundry's diff comparison which was silently dropping
+          // some array-add updates on certain actors during the first run.
+          const currentSource = skill._source.system.tags ?? [];
+          const next = Array.from(new Set([...currentSource, 'magic']));
+          await skill.update({ 'system.tags': next }, { diff: false });
           updated++;
         } catch (e) {
           errors.push({ actor: actor?.name, skill: skill.name, error: String(e) });
