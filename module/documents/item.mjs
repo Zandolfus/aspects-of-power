@@ -2750,8 +2750,12 @@ export class AspectsofPowerItem extends Item {
       return null;
     }
 
-    const rectSidePx = aoe.diameter * pxPerFt;
-    const rectHalfPx = rectSidePx / 2;
+    // Mutable size: scroll wheel during placement adjusts by ±5 ft.
+    let currentDiameter = aoe.diameter;
+    const SCROLL_STEP_FT = 5;
+    const MIN_SIZE_FT = 5;
+
+    let lastPos = { x: cc.x, y: cc.y };
 
     // Preview graphics overlay.
     const preview = new PIXI.Graphics();
@@ -2759,11 +2763,15 @@ export class AspectsofPowerItem extends Item {
     canvas.stage.addChild(preview);
 
     const drawPreview = (pos) => {
+      lastPos = pos;
       preview.clear();
       preview.beginFill(foundry.utils.Color.from(fillColor), 0.4);
 
+      const rectSidePx = currentDiameter * pxPerFt;
+      const rectHalfPx = rectSidePx / 2;
+
       if (shape === 'circle') {
-        const radiusPx = (aoe.diameter / 2) * pxPerFt;
+        const radiusPx = (currentDiameter / 2) * pxPerFt;
         preview.drawCircle(pos.x, pos.y, radiusPx);
       } else if (shape === 'cone') {
         // Draw cone as a triangle from caster toward cursor.
@@ -2771,7 +2779,7 @@ export class AspectsofPowerItem extends Item {
         const dy = pos.y - cc.y;
         const dir = Math.atan2(dy, dx);
         const halfAngle = (aoe.angle / 2) * (Math.PI / 180);
-        const radiusPx = aoe.diameter * pxPerFt;
+        const radiusPx = currentDiameter * pxPerFt;
         preview.moveTo(cc.x, cc.y);
         preview.lineTo(cc.x + Math.cos(dir - halfAngle) * radiusPx, cc.y + Math.sin(dir - halfAngle) * radiusPx);
         preview.lineTo(cc.x + Math.cos(dir + halfAngle) * radiusPx, cc.y + Math.sin(dir + halfAngle) * radiusPx);
@@ -2781,7 +2789,7 @@ export class AspectsofPowerItem extends Item {
         const dx = pos.x - cc.x;
         const dy = pos.y - cc.y;
         const dir = Math.atan2(dy, dx);
-        const lengthPx = aoe.diameter * pxPerFt;
+        const lengthPx = currentDiameter * pxPerFt;
         const widthPx = (aoe.width ?? 5) * pxPerFt;
         const hw = widthPx / 2;
         const perpX = -Math.sin(dir) * hw;
@@ -2809,6 +2817,23 @@ export class AspectsofPowerItem extends Item {
         drawPreview(pos);
       };
 
+      // Scroll wheel during placement adjusts the AOE size in 5-ft increments.
+      // For directed shapes (cone/ray) this is reach; for circles/rectangles
+      // it's diameter. Min size is 5 ft. Cone reach is also clamped to the
+      // caster's casting range.
+      const onWheel = (event) => {
+        const dir = event.deltaY < 0 ? 1 : -1;
+        let next = currentDiameter + dir * SCROLL_STEP_FT;
+        if (next < MIN_SIZE_FT) next = MIN_SIZE_FT;
+        if (isDirected && next > castingRange) next = castingRange;
+        if (next === currentDiameter) return;
+        currentDiameter = next;
+        drawPreview(lastPos);
+        // Suppress page scrolling while placing.
+        event.preventDefault?.();
+        if (event.stopPropagation) event.stopPropagation();
+      };
+
       const onPointerDown = async (event) => {
         if (resolved) return;
         const pos = event.data?.getLocalPosition(canvas.app.stage)
@@ -2826,23 +2851,27 @@ export class AspectsofPowerItem extends Item {
         resolved = true;
         cleanup();
 
+        // Use the (possibly scroll-adjusted) currentDiameter for the placed shape.
+        const placedDiameterPx = currentDiameter * pxPerFt;
+        const placedHalfPx = placedDiameterPx / 2;
+
         // Build the Region shape data.
         let shapeData;
         if (shape === 'circle') {
-          shapeData = { type: 'circle', x: pos.x, y: pos.y, radius: (aoe.diameter / 2) * pxPerFt };
+          shapeData = { type: 'circle', x: pos.x, y: pos.y, radius: placedHalfPx };
         } else if (shape === 'cone') {
           const dx = pos.x - cc.x;
           const dy = pos.y - cc.y;
           const rotation = Math.toDegrees(Math.atan2(dy, dx));
-          shapeData = { type: 'cone', x: cc.x, y: cc.y, radius: aoe.diameter * pxPerFt, angle: aoe.angle, rotation };
+          shapeData = { type: 'cone', x: cc.x, y: cc.y, radius: placedDiameterPx, angle: aoe.angle, rotation };
         } else if (shape === 'ray') {
           const dx = pos.x - cc.x;
           const dy = pos.y - cc.y;
           const rotation = Math.toDegrees(Math.atan2(dy, dx));
-          shapeData = { type: 'line', x: cc.x, y: cc.y, length: aoe.diameter * pxPerFt, width: (aoe.width ?? 5) * pxPerFt, rotation };
+          shapeData = { type: 'line', x: cc.x, y: cc.y, length: placedDiameterPx, width: (aoe.width ?? 5) * pxPerFt, rotation };
         } else {
           // Rectangle centered on click.
-          shapeData = { type: 'rectangle', x: pos.x - rectHalfPx, y: pos.y - rectHalfPx, width: rectSidePx, height: rectSidePx, rotation: 0 };
+          shapeData = { type: 'rectangle', x: pos.x - placedHalfPx, y: pos.y - placedHalfPx, width: placedDiameterPx, height: placedDiameterPx, rotation: 0 };
         }
 
         // Build region behaviors (e.g., difficult terrain uses native modifyMovementCost).
@@ -2905,6 +2934,7 @@ export class AspectsofPowerItem extends Item {
         canvas.stage.off('pointermove', onPointerMove);
         canvas.stage.off('pointerdown', onPointerDown);
         canvas.stage.off('rightdown', onCancel);
+        canvas.app?.view?.removeEventListener?.('wheel', onWheel, { capture: true, passive: false });
         document.removeEventListener('keydown', onKeyDown);
         canvas.tokens.activate();
       };
@@ -2912,6 +2942,9 @@ export class AspectsofPowerItem extends Item {
       canvas.stage.on('pointermove', onPointerMove);
       canvas.stage.on('pointerdown', onPointerDown);
       canvas.stage.on('rightdown', onCancel);
+      // Wheel needs DOM-level listener (PIXI doesn't surface wheel events).
+      // Capture + non-passive so we can preventDefault and avoid page-zoom.
+      canvas.app?.view?.addEventListener?.('wheel', onWheel, { capture: true, passive: false });
       document.addEventListener('keydown', onKeyDown);
     });
   }
@@ -2926,11 +2959,20 @@ export class AspectsofPowerItem extends Item {
     const targetingMode = this.system.aoe.targetingMode ?? 'all';
     const casterToken = this.actor.getActiveTokens()?.[0] ?? null;
     const casterDisp = casterToken?.document?.disposition ?? CONST.TOKEN_DISPOSITIONS.NEUTRAL;
+    const casterId = casterToken?.id ?? null;
+
+    // Only auto-exclude the caster from shapes that ORIGINATE at the caster
+    // (cone, ray). Circles / rectangles are placed by the player — if their
+    // own token is inside the area, they put it there on purpose.
+    const shapes = regionDoc.shapes ?? [];
+    const originatesAtCaster = shapes.some(s => s?.type === 'cone' || s?.type === 'line');
 
     const qualifying = [];
 
     for (const token of canvas.tokens.placeables) {
       if (token.document.hidden) continue;
+
+      if (originatesAtCaster && casterId && token.id === casterId) continue;
 
       const center = token.center;
 
