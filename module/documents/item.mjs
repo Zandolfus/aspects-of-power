@@ -2738,10 +2738,13 @@ export class AspectsofPowerItem extends Item {
    * v14: uses Scene Regions instead of MeasuredTemplates.
    * @returns {RegionDocument|null}
    */
-  async _placeAoeTemplate(casterToken, aoeOverride = null) {
+  async _placeAoeTemplate(casterToken, aoeOverride = null, maxSizeFt = null) {
     // Optional per-cast aoe override (e.g., Cleave alteration sets
     // shape='cone' and diameter from the weapon's reach). Falls back
     // to the skill's static aoe block when no override is supplied.
+    // `maxSizeFt` (when supplied) caps the scroll-wheel growth — used by
+    // the per-cast AOE-budget flow so players can't scroll past what
+    // their committed mana can afford.
     const aoe = aoeOverride ?? this.system.aoe;
     const shape = aoe.shape ?? 'circle';
     const castingRange = this.actor.system.castingRange ?? 0;
@@ -2827,12 +2830,13 @@ export class AspectsofPowerItem extends Item {
       // Scroll wheel during placement adjusts the AOE size in 5-ft increments.
       // For directed shapes (cone/ray) this is reach; for circles/rectangles
       // it's diameter. Min size is 5 ft. Cone reach is also clamped to the
-      // caster's casting range.
+      // caster's casting range. `maxSizeFt` (per-cast AOE budget) caps growth.
       const onWheel = (event) => {
         const dir = event.deltaY < 0 ? 1 : -1;
         let next = currentDiameter + dir * SCROLL_STEP_FT;
         if (next < MIN_SIZE_FT) next = MIN_SIZE_FT;
         if (isDirected && next > castingRange) next = castingRange;
+        if (maxSizeFt != null && next > maxSizeFt) next = maxSizeFt;
         if (next === currentDiameter) return;
         currentDiameter = next;
         drawPreview(lastPos);
@@ -3370,6 +3374,10 @@ export class AspectsofPowerItem extends Item {
     let investSelfDamage = 0;
     let investSelfDamageFlavor = ''; // "over-channeling" / "over-exerting"
     let investedAmount = null;       // captured for declareAction
+    // Per-cast AOE context for spells with the `aoe` alteration. Captured at
+    // invest-commit time, consumed after AOE template placement to recompute
+    // damage based on the actually-placed size. Null when not in play.
+    let aoePerCastContext = null;
     const sc = CONFIG.ASPECTSOFPOWER;
 
     const spellTier  = this.system.roll?.tier  ?? '';
@@ -3385,19 +3393,15 @@ export class AspectsofPowerItem extends Item {
     if (isVariableSpell) {
       const tierFactor  = sc.spellTierFactors[spellTier];
       const gradeFactor = sc.spellGradeFactors[spellGrade];
-      let   baseMana    = Math.round(tierFactor * gradeFactor);
-      // AOE 2^n cost scaling per pending-variable-mana.md: when this skill
-      // carries the `aoe` alteration, the base mana scales as
-      //   baseMana × 2^((diameter - 5) / 5)
-      // before variable invest. 5ft = 1×, 10ft = 2×, 15ft = 4×, …, 25ft = 16×.
-      // The diameter is the skill's currently-set value; per-cast scaling
-      // via scroll-wheel is a follow-up that will recompute at placement.
+      const baseManaAt5ft = Math.round(tierFactor * gradeFactor);
+      let   baseMana    = baseManaAt5ft;
+      // AOE 2^n cost scaling per pending-variable-mana.md.
+      // For per-cast scaling: player commits a budget X up-front; the
+      // placement scroll-wheel picks the actual size, capped by what X
+      // can afford (maxSize where 2^n × baseMana ≤ X). Damage and cost
+      // recompute after placement based on the chosen size. This keeps
+      // baseMana at 1× for the invest dialog so the player sees "budget."
       const hasAoeAlteration = (this.system.alterations ?? []).some(a => a.id === 'aoe');
-      if (hasAoeAlteration) {
-        const diameter = this.system.aoe?.diameter ?? 5;
-        const aoeMult = Math.pow(2, Math.max(0, (diameter - 5) / 5));
-        baseMana = Math.max(1, Math.round(baseMana * aoeMult));
-      }
       const wisMod      = this.actor.system.abilities?.wisdom?.mod ?? 0;
       // Live read — slider must cap at the actor's CURRENT mana.
       const livePool    = Math.round(this.actor.system[rollData.roll.resource]?.value ?? 0);
@@ -3449,7 +3453,26 @@ export class AspectsofPowerItem extends Item {
       investedAmount = invested;
       rollData.roll.cost = invested;
       rollData.roll.variableSpellInvest = invested;
-      dmgFormula = String(Math.round(intMod * multiplier * Math.pow(Math.max(invested, 1) / Math.max(baseMana, 1), 0.2)));
+      // Per-cast AOE: damage formula recomputes after placement. Use a
+      // placeholder here for the pre-placement chat context (tooltips,
+      // declared-action preview etc.); the actual dmgRoll is rebuilt
+      // post-placement using the placed size. Non-AOE spells use the
+      // standard formula immediately.
+      if (hasAoeAlteration) {
+        const maxAffordableSize = Math.max(5, 5 + 5 * Math.floor(Math.log2(Math.max(1, invested / Math.max(1, baseManaAt5ft)))));
+        aoePerCastContext = {
+          baseMana: baseManaAt5ft,
+          invested,
+          potency: intMod,
+          multiplier,
+          maxSize: Math.min(maxAffordableSize, 25),
+        };
+        // Placeholder formula assumes 5ft (max damage per target). Final
+        // value gets overwritten after _placeAoeTemplate returns.
+        dmgFormula = String(Math.round(intMod * multiplier * Math.pow(Math.max(invested, 1) / Math.max(baseManaAt5ft, 1), 0.2)));
+      } else {
+        dmgFormula = String(Math.round(intMod * multiplier * Math.pow(Math.max(invested, 1) / Math.max(baseMana, 1), 0.2)));
+      }
       // Spells: no self-damage path under the hard-cap design. Weapons retain it.
     } else if (isVariableWeapon) {
       // Find the weapon for weight + hybrid blend. Hard-link via requiredEquipment
@@ -3495,7 +3518,16 @@ export class AspectsofPowerItem extends Item {
         // burn across weapons becomes per-round = 15 × blend / 1085 (now
         // depends on build-vs-weapon match — off-spec weapons cost less AND
         // damage less, which is more coherent than purely flat costs).
-        const baseStamina = Math.max(1, Math.round((weaponWeight / sc.invest.staminaBaseDivisor) * (statBlend / sc.invest.staminaNormalizer)));
+        let baseStamina = Math.max(1, Math.round((weaponWeight / sc.invest.staminaBaseDivisor) * (statBlend / sc.invest.staminaNormalizer)));
+        // Cleave: scales stamina cost 2^((reach - 5) / 5), mirroring the
+        // spell-AOE 2^n model. Reach is derived from the wielded weapon —
+        // dagger (5) = 1×, polearm (10) = 2×, etc.
+        const meleeHasCleave = (this.system.alterations ?? []).some(a => a.id === 'cleave');
+        if (meleeHasCleave && weapon) {
+          const reach = weapon.system?.reach ?? 5;
+          const cleaveMult = Math.pow(2, Math.max(0, (reach - 5) / 5));
+          baseStamina = Math.max(1, Math.round(baseStamina * cleaveMult));
+        }
         const safeInvest = Math.max(0, Math.round(toughMod * sc.invest.toughCapFactor));
         // Live read — see equivalent comment above on the spell path.
         const livePool = Math.round(this.actor.system[rollData.roll.resource]?.value ?? 0);
@@ -3709,14 +3741,35 @@ export class AspectsofPowerItem extends Item {
         return dmgRoll;
       }
 
-      // Interactive placement — cancelled means no cost.
-      const templateDoc = await this._placeAoeTemplate(casterToken, aoeOverride);
+      // Interactive placement — cancelled means no cost. Per-cast AOE
+      // size cap from the budget the player committed during invest.
+      const placementMaxSize = aoePerCastContext?.maxSize ?? null;
+      const templateDoc = await this._placeAoeTemplate(casterToken, aoeOverride, placementMaxSize);
       if (!templateDoc) return dmgRoll;
 
       // Orient caster toward the AOE center.
       const aoeShape = templateDoc.shapes?.[0];
       if (aoeShape) {
         await this._orientToward({ x: aoeShape.x, y: aoeShape.y });
+      }
+
+      // Per-cast AOE: rebuild dmgRoll based on placed size. Smaller
+      // placement = more damage per target (mana goes to over-base);
+      // larger placement = less per target but more targets caught.
+      // Damage = potency × mult × (invested / sizedBase)^0.2 where
+      // sizedBase = baseMana × 2^((diameter - 5) / 5).
+      if (aoePerCastContext && aoeShape) {
+        const pxPerFt = canvas.grid.size / canvas.grid.distance;
+        let placedDiameter = 5;
+        if (aoeShape.type === 'circle') placedDiameter = (aoeShape.radius * 2) / pxPerFt;
+        else if (aoeShape.type === 'cone') placedDiameter = aoeShape.radius / pxPerFt;
+        else if (aoeShape.type === 'line') placedDiameter = aoeShape.length / pxPerFt;
+        else if (aoeShape.type === 'rectangle') placedDiameter = aoeShape.width / pxPerFt;
+        const sizedBase = Math.max(1, aoePerCastContext.baseMana * Math.pow(2, (placedDiameter - 5) / 5));
+        const ratio = Math.max(1, aoePerCastContext.invested) / sizedBase;
+        const newDmg = Math.max(0, Math.round(aoePerCastContext.potency * aoePerCastContext.multiplier * Math.pow(ratio, 0.2)));
+        dmgRoll = new Roll(String(newDmg));
+        await dmgRoll.evaluate();
       }
 
       // Store roll totals on persistent AOE templates for later trigger.
