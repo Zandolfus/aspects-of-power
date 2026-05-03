@@ -7,7 +7,24 @@ export class SkillData extends foundry.abstract.TypeDataModel {
   static defineSchema() {
     return {
       description: new fields.HTMLField({ initial: '' }),
+      // Rarity drives the universal effect multiplier per design-skill-rarity-system.md.
+      // 11 tiers: not_proficient .. divine, mults 0.2 .. 1.2 step 0.1.
+      // Auto-demotes one tier on character grade-up E→D and beyond (floor at not_proficient).
+      // No `choices` here so old data with off-list values doesn't reject; migration normalizes.
       rarity:      new fields.StringField({ initial: 'common' }),
+      // What the skill's primary effect IS — locked at creation. Alterations only add SIDE effects.
+      effectType:  new fields.StringField({ initial: 'damage', choices: ['damage', 'heal', 'debuff', 'utility'] }),
+      // Alteration tags acquired through upgrades. Each entry refs an entry in
+      // CONFIG.ASPECTSOFPOWER.alterationTags (which carries dmgMod/costMod/capability metadata).
+      // Per-instance params (e.g. which debuff a 'debuff' alteration applies) live in `params`.
+      alterations: new fields.ArrayField(new fields.SchemaField({
+        id:     new fields.StringField({ initial: '' }),
+        params: new fields.ObjectField({ initial: {} }),
+      }), { initial: [] }),
+      // Lineage tracking — UUID of the originally-acquired (OG) skill in this lineage.
+      // Per the design, branching is OG-only: a player wanting a parallel build
+      // re-upgrades from the OG, NOT from an intermediate version.
+      originalSkillId: new fields.StringField({ initial: '' }),
       skillCategory: new fields.StringField({ initial: 'combat' }),
       skillType:     new fields.StringField({ initial: 'Passive' }),
       // For Reaction skills: what type of reaction (dodge, parry, barrier).

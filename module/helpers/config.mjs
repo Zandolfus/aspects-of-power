@@ -64,8 +64,74 @@ ASPECTSOFPOWER.spellTierFactors = {
   basic: 2, high: 4, greater: 8, major: 25, grand: 50,
 };
 
+/**
+ * @deprecated Superseded by `skillRarities` (rarity multiplier ladder)
+ * per design-skill-rarity-system.md. Kept readable so the migration script
+ * can bucket old per-spell tier values into the new starting rarity.
+ */
 ASPECTSOFPOWER.spellTierMultipliers = {
   basic: 0.20, high: 0.25, greater: 0.30, major: 0.40, grand: 0.60,
+};
+
+/**
+ * Skill rarity ladder — the universal effect multiplier per
+ * design-skill-rarity-system.md. Shared across melee/ranged/magic/healing.
+ *
+ *   effect = potency × (rarityMult + Σ alterationTag.dmgMod) × (invested/base)^0.2
+ *   base_resource = baseFactor × rarityMult × (1 + Σ alterationTag.costMod)
+ *
+ * Mults are CONSTANT — they never change per grade. What changes is the
+ * skill's `rarity` tag (auto-demotes one tier per grade-up E→D and beyond).
+ * Floor at not_proficient (0.2) — never zero. Below that = GM discretion.
+ */
+ASPECTSOFPOWER.skillRarities = {
+  not_proficient: { mult: 0.2, label: 'ASPECTSOFPOWER.SkillRarity.not_proficient', subInferior: true },
+  neglected:      { mult: 0.3, label: 'ASPECTSOFPOWER.SkillRarity.neglected',      subInferior: true },
+  rusty:          { mult: 0.4, label: 'ASPECTSOFPOWER.SkillRarity.rusty',          subInferior: true },
+  inferior:       { mult: 0.5, label: 'ASPECTSOFPOWER.SkillRarity.inferior'        },
+  common:         { mult: 0.6, label: 'ASPECTSOFPOWER.SkillRarity.common'          },
+  uncommon:       { mult: 0.7, label: 'ASPECTSOFPOWER.SkillRarity.uncommon'        },
+  rare:           { mult: 0.8, label: 'ASPECTSOFPOWER.SkillRarity.rare'            },
+  epic:           { mult: 0.9, label: 'ASPECTSOFPOWER.SkillRarity.epic'            },
+  legendary:      { mult: 1.0, label: 'ASPECTSOFPOWER.SkillRarity.legendary'       },
+  mythic:         { mult: 1.1, label: 'ASPECTSOFPOWER.SkillRarity.mythic'          },
+  divine:         { mult: 1.2, label: 'ASPECTSOFPOWER.SkillRarity.divine'          },
+};
+
+/**
+ * Demotion order — index used by the grade-up demotion hook.
+ * Demoting a rarity = move down one entry in this list.
+ * Floor at not_proficient (index 0).
+ */
+ASPECTSOFPOWER.skillRarityOrder = [
+  'not_proficient', 'neglected', 'rusty', 'inferior',
+  'common', 'uncommon', 'rare', 'epic',
+  'legendary', 'mythic', 'divine',
+];
+
+/**
+ * Alteration tags — the per-upgrade Alteration choice menu.
+ * Each tag carries a damage modifier (subtracts from effective mult, floor 0)
+ * and a cost modifier (added as a fraction to the base resource cost).
+ *
+ *   effective_mult = max(0, rarityMult + Σ tag.dmgMod)
+ *   base_resource  = baseFactor × rarityMult × (1 + Σ tag.costMod)
+ *
+ * `stacking` controls how multiple instances of the same tag interact:
+ *   'multiple' — multiple instances allowed (e.g. multiple debuffs with different params)
+ *   'max_one'  — only one instance per skill
+ *   'replace_aoe' — adding any AOE tag replaces an existing AOE tag
+ */
+ASPECTSOFPOWER.alterationTags = {
+  aoe_small:   { label: 'ASPECTSOFPOWER.Alteration.aoe_small',   dmgMod: -0.20, costMod:  0.50, category: 'area',         stacking: 'replace_aoe' },
+  aoe_large:   { label: 'ASPECTSOFPOWER.Alteration.aoe_large',   dmgMod: -0.30, costMod:  1.00, category: 'area',         stacking: 'replace_aoe' },
+  debuff:      { label: 'ASPECTSOFPOWER.Alteration.debuff',      dmgMod: -0.10, costMod:  0.20, category: 'status',       stacking: 'multiple'    },
+  dot:         { label: 'ASPECTSOFPOWER.Alteration.dot',         dmgMod: -0.15, costMod:  0.30, category: 'status',       stacking: 'max_one'     },
+  penetration: { label: 'ASPECTSOFPOWER.Alteration.penetration', dmgMod: -0.05, costMod:  0.00, category: 'damage_shape', stacking: 'multiple'    },
+  cleave:      { label: 'ASPECTSOFPOWER.Alteration.cleave',      dmgMod: -0.10, costMod:  0.20, category: 'damage_shape', stacking: 'max_one'     },
+  reach:       { label: 'ASPECTSOFPOWER.Alteration.reach',       dmgMod: -0.05, costMod:  0.10, category: 'range',        stacking: 'multiple'    },
+  channeled:   { label: 'ASPECTSOFPOWER.Alteration.channeled',   dmgMod: -0.10, costMod: -0.50, category: 'cost_shape',   stacking: 'max_one'     },
+  self_buff:   { label: 'ASPECTSOFPOWER.Alteration.self_buff',   dmgMod: -0.10, costMod:  0.00, category: 'self',         stacking: 'multiple'    },
 };
 
 ASPECTSOFPOWER.spellGradeFactors = {

@@ -381,6 +381,39 @@
       "major": "Major",
       "grand": "Grand"
     },
+    "SkillRarity": {
+      "label": "Skill Rarity",
+      "not_proficient": "Not Proficient",
+      "neglected": "Neglected",
+      "rusty": "Rusty",
+      "inferior": "Inferior",
+      "common": "Common",
+      "uncommon": "Uncommon",
+      "rare": "Rare",
+      "epic": "Epic",
+      "legendary": "Legendary",
+      "mythic": "Mythic",
+      "divine": "Divine"
+    },
+    "EffectType": {
+      "label": "Effect Type",
+      "damage": "Damage",
+      "heal": "Heal",
+      "debuff": "Debuff",
+      "utility": "Utility"
+    },
+    "Alteration": {
+      "label": "Alteration",
+      "aoe_small": "AOE (Small)",
+      "aoe_large": "AOE (Large)",
+      "debuff": "Debuff Rider",
+      "dot": "Damage over Time",
+      "penetration": "Penetration",
+      "cleave": "Cleave",
+      "reach": "Reach",
+      "channeled": "Channeled",
+      "self_buff": "Self-Buff"
+    },
     "Gate": {
       "blocked": "cannot use this skill type"
     },
