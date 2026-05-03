@@ -368,12 +368,42 @@ export class AspectsofPowerItem extends Item {
   }
 
   /**
+   * Resolve a skill's effective multiplier and cost mod from its rarity
+   * tag + alteration list. Per design-skill-rarity-system.md:
+   *   effective_mult = max(0, rarityMult + Σ alteration.dmgMod)
+   *   cost_mult      = 1 + Σ alteration.costMod
+   * Cost-mult is returned for callers to apply to base resource costs;
+   * this method does NOT touch the resource pool itself.
+   *
+   * @returns {{rarityMult:number, effectiveMult:number, costMultiplier:number}}
+   */
+  _resolveRarityMods() {
+    const sc = CONFIG.ASPECTSOFPOWER;
+    const rarity     = this.system.rarity || 'common';
+    const rarityMult = sc.skillRarities?.[rarity]?.mult ?? 0.6;
+    const alterations = this.system.alterations || [];
+    let dmgMod = 0;
+    let costMod = 0;
+    for (const alt of alterations) {
+      const tag = sc.alterationTags?.[alt.id];
+      if (!tag) continue;
+      dmgMod += tag.dmgMod ?? 0;
+      costMod += tag.costMod ?? 0;
+    }
+    return {
+      rarityMult,
+      effectiveMult:  Math.max(0, rarityMult + dmgMod),
+      costMultiplier: 1 + costMod,
+    };
+  }
+
+  /**
    * Variable resource-invest dialog. Generic over mana (caster) and stamina
    * (melee/ranged) — same math, different labels and potency stat. Player
-   * chooses how much to invest from base up to pool. Past the safe ceiling
-   * (base + capStat × 0.15), invest deals quadratic self-damage scaled by
-   * the potency stat. Per design-magic-system.md / design-melee-system.md /
-   * design-ranged-system.md.
+   * chooses how much to invest from base up to pool. Past the safe ceiling,
+   * invest deals linear self-damage scaled by the potency stat. Per
+   * design-skill-rarity-system.md (effect curve `(invested/base)^0.2`,
+   * self-damage `excess/safeInvest`).
    *
    * @param {object} args
    * @param {number} args.baseCost     Minimum invest (e.g. base_mana, base_stamina).
@@ -389,11 +419,13 @@ export class AspectsofPowerItem extends Item {
   async _promptResourceInvest({ baseCost, safeInvest, maxPool, potency, multiplier, resourceLabel, potencyLabel, label, channelStat = null, channelFactor = null, hardCap = false }) {
     const safeCeiling = baseCost + safeInvest;
     const startInvest = baseCost;
-    const computeDmg = (v) => Math.round(potency * multiplier * Math.sqrt(v));
+    // Damage curve: potency × multiplier × (invested/base)^0.2 — very flat,
+    // invest is a small lever. Self-damage: linear in excess/safeInvest.
+    const computeDmg = (v) => Math.round(potency * multiplier * Math.pow(Math.max(v, 1) / Math.max(baseCost, 1), 0.2));
     const computeSelfDmg = (v) => {
       const excess = Math.max(0, v - safeCeiling);
       if (excess <= 0 || safeInvest <= 0) return 0;
-      return Math.round(potency * Math.pow(excess / safeInvest, 2));
+      return Math.round(potency * (excess / safeInvest));
     };
     // Channel time for spell invest — Wis_mod controls rate per design memo.
     const computeChannelTime = (channelStat && channelFactor)
@@ -431,7 +463,7 @@ export class AspectsofPowerItem extends Item {
           ${channelRow}
           ${selfDmgRow}
         </div>
-        <p class="hint" style="font-size:11px;margin-top:8px;">Damage = ${potencyLabel} × multiplier × √invested.${computeChannelTime ? ' Channel time scales with invest / Wis.' : ''}${hardCap ? '' : ` Excess past safe ceiling deals ${potencyLabel} × (excess/safe)² self-damage.`}</p>
+        <p class="hint" style="font-size:11px;margin-top:8px;">Damage = ${potencyLabel} × multiplier × (invested/base)^0.2.${computeChannelTime ? ' Channel time scales with invest / Wis.' : ''}${hardCap ? '' : ` Excess past safe ceiling deals ${potencyLabel} × (excess/safe) self-damage.`}</p>
       </div>`;
 
     let resolveFn;
@@ -3296,9 +3328,17 @@ export class AspectsofPowerItem extends Item {
       // Live read — slider must cap at the actor's CURRENT mana.
       const livePool    = Math.round(this.actor.system[rollData.roll.resource]?.value ?? 0);
       const intMod      = this.actor.system.abilities?.intelligence?.mod ?? 0;
+      // Multiplier resolution: prefer hand-tuned `diceBonus` (designer-set,
+      // non-default value) so existing spells don't drift before migration.
+      // Otherwise fall back to the rarity-based effective mult; legacy
+      // `spellTierMultipliers` retained as a final fallback for skills that
+      // have neither been migrated nor hand-tuned.
       const tierMult    = sc.spellTierMultipliers[spellTier];
       const dbVal       = this.system.roll?.diceBonus ?? 1;
-      const multiplier  = (dbVal && dbVal !== 1) ? dbVal : tierMult;
+      const { effectiveMult } = this._resolveRarityMods();
+      const multiplier  = (dbVal && dbVal !== 1) ? dbVal
+                        : (this.system.rarity && this.system.rarity !== 'common') ? effectiveMult
+                        : (tierMult ?? effectiveMult);
 
       // Hard cap on invest = baseMana + Wis × spellMaxInvestAboveBase[tier],
       // clamped by mana pool. NO self-damage past this cap — Wis is the
@@ -3335,7 +3375,7 @@ export class AspectsofPowerItem extends Item {
       investedAmount = invested;
       rollData.roll.cost = invested;
       rollData.roll.variableSpellInvest = invested;
-      dmgFormula = String(Math.round(intMod * multiplier * Math.sqrt(invested)));
+      dmgFormula = String(Math.round(intMod * multiplier * Math.pow(Math.max(invested, 1) / Math.max(baseMana, 1), 0.2)));
       // Spells: no self-damage path under the hard-cap design. Weapons retain it.
     } else if (isVariableWeapon) {
       // Find the weapon for weight + hybrid blend. Hard-link via requiredEquipment
@@ -3386,17 +3426,21 @@ export class AspectsofPowerItem extends Item {
         // Live read — see equivalent comment above on the spell path.
         const livePool = Math.round(this.actor.system[rollData.roll.resource]?.value ?? 0);
         // Cap invest so the worst-case self-damage at the slider's max equals
-        // the actor's current HP — past that, it's just nonsense math (the
-        // 6-million self-damage screenshot). Solving the self-damage quadratic
-        // for excess: self_dmg = potency × (excess/safeInvest)² ≤ curHp
-        //   → excess ≤ safeInvest × √(curHp / potency).
+        // the actor's current HP. Self-damage is now linear:
+        //   self_dmg = potency × (excess/safeInvest) ≤ curHp
+        //   → excess ≤ safeInvest × (curHp / potency).
         const curHp = Math.round(this.actor.system.health?.value ?? 0);
         let maxPool = livePool;
         if (safeInvest > 0 && statBlend > 0 && curHp > 0) {
-          const maxExcess = safeInvest * Math.sqrt(curHp / statBlend);
+          const maxExcess = safeInvest * (curHp / statBlend);
           maxPool = Math.min(maxPool, Math.floor(baseStamina + safeInvest + maxExcess));
         }
-        const multiplier = this.system.roll?.diceBonus ?? 1;
+        // Multiplier resolution: prefer hand-tuned `diceBonus` (designer-set,
+        // non-default value) so existing skills don't drift before migration.
+        // Otherwise fall back to the rarity-based effective mult.
+        const dbVal = this.system.roll?.diceBonus ?? 1;
+        const { effectiveMult } = this._resolveRarityMods();
+        const multiplier = (dbVal !== 1) ? dbVal : effectiveMult;
 
         if (livePool < baseStamina) {
           ChatMessage.create({
@@ -3420,11 +3464,13 @@ export class AspectsofPowerItem extends Item {
         investedAmount = invested;
         rollData.roll.cost = invested;
         rollData.roll.variableWeaponInvest = invested;
-        dmgFormula = String(Math.round(statBlend * multiplier * Math.sqrt(invested)));
+        dmgFormula = String(Math.round(statBlend * multiplier * Math.pow(Math.max(invested, 1) / Math.max(baseStamina, 1), 0.2)));
 
         const excess = Math.max(0, invested - (baseStamina + safeInvest));
         if (excess > 0 && safeInvest > 0) {
-          investSelfDamage = Math.round(statBlend * Math.pow(excess / safeInvest, 2));
+          // Linear self-damage per design-skill-rarity-system.md: scales 1:1
+          // with how far past safe ceiling you push.
+          investSelfDamage = Math.round(statBlend * (excess / safeInvest));
           investSelfDamageFlavor = 'over-exerting';
         }
       }
