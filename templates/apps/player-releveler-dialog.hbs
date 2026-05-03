@@ -57,6 +57,14 @@
           </tr>
         </tbody>
       </table>
+      <label style='display:block;margin-top:8px;'>
+        <input type='checkbox' name='allowRaceChange' {{#if allowRaceChange}}checked{{/if}} />
+        Allow race template change at rank thresholds
+        <span class='hint' style='display:block;font-size:11px;color:#888;margin-left:24px;'>
+          When enabled, the run will pause at each rank boundary (G→F, F→E, E→D, …) and offer
+          to swap your race template for an evolution / ascended form. Default keeps the current race.
+        </span>
+      </label>
     </section>
   {{/if}}
 
@@ -84,7 +92,17 @@
       </pre>
 
       {{#if runState.waitingForPick}}
-        <h4>Pick a {{runState.waitingForPick.track}} template (rank {{runState.waitingForPick.neededRank}})</h4>
+        <h4>
+          {{#if runState.waitingForPick.allowSkip}}Optional race change{{else}}Pick a {{runState.waitingForPick.track}} template{{/if}}
+          (rank {{runState.waitingForPick.neededRank}})
+        </h4>
+        {{#if runState.waitingForPick.allowSkip}}
+          <p style='margin:4px 0;'>
+            <button type='button' data-action='pickTemplate' data-uuid='__skip__' style='background:#3a5;color:white;'>
+              ✓ Keep current race (no change)
+            </button>
+          </p>
+        {{/if}}
         {{#if runState.waitingForPick.candidates.length}}
           <ul class='template-pick-list' style='max-height:200px;overflow-y:auto;'>
             {{#each runState.waitingForPick.candidates as |t|}}
@@ -95,7 +113,9 @@
             {{/each}}
           </ul>
         {{else}}
-          <p class='warning' style='color:#c33;'>No matching templates found in world or compendiums for {{runState.waitingForPick.track}} rank {{runState.waitingForPick.neededRank}}. Ask your GM to create or assign one.</p>
+          {{#unless runState.waitingForPick.allowSkip}}
+            <p class='warning' style='color:#c33;'>No matching templates found in world or compendiums for {{runState.waitingForPick.track}} rank {{runState.waitingForPick.neededRank}}. Ask your GM to create or assign one.</p>
+          {{/unless}}
         {{/if}}
       {{/if}}
     </section>

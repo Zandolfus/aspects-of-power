@@ -32,6 +32,7 @@ export class PlayerRelevelDialog extends foundry.applications.api.HandlebarsAppl
     this.targets = { class: 0, profession: 0, race: 0 };
     this.pathType = 'threefold-path'; // resolved in _initRaceContext
     this.raceTemplateName = '';
+    this.allowRaceChange = false;     // opt-in: pause at each rank boundary to optionally swap race
     this.runState = null;     // populated during 'run' step
     this.runResults = null;   // populated when run completes
     this._initRaceContext();
@@ -108,6 +109,7 @@ export class PlayerRelevelDialog extends foundry.applications.api.HandlebarsAppl
     context.raceTemplateName = this.raceTemplateName || '(none assigned)';
     context.derivedRaceLevel = this.raceIsDerived ? this.derivedRaceLevel : null;
     context.targetRaceFinal = this.raceIsDerived ? this.derivedRaceLevel : Number(this.targets.race);
+    context.allowRaceChange = this.allowRaceChange;
 
     // Run-step extras
     if (this.step === 'run') {
@@ -145,6 +147,9 @@ export class PlayerRelevelDialog extends foundry.applications.api.HandlebarsAppl
           if (display) display.textContent = this.derivedRaceLevel;
         }
       });
+    });
+    root.querySelector('input[name="allowRaceChange"]')?.addEventListener('change', e => {
+      this.allowRaceChange = e.target.checked;
     });
   }
 
@@ -243,10 +248,17 @@ export class PlayerRelevelDialog extends foundry.applications.api.HandlebarsAppl
    * Walk a track up to the target level, calling applyTrackLevels in a loop
    * and pausing for a template pick whenever it halts at a rank boundary.
    *
+   * For race specifically, when `allowRaceChange` is enabled, the walk is
+   * segmented per rank — at each rank threshold we pause and offer an
+   * optional race template swap before continuing.
+   *
    * @param {'class'|'profession'|'race'} track
    * @param {number} targetLevel
    */
   async _walkTrack(track, targetLevel) {
+    if (track === 'race' && this.allowRaceChange) {
+      return this._walkRaceWithBoundaryPrompts(targetLevel);
+    }
     let safetyCounter = 0;
     while (true) {
       if (++safetyCounter > 50) throw new Error(`${track} walk exceeded safety counter`);
@@ -284,13 +296,74 @@ export class PlayerRelevelDialog extends foundry.applications.api.HandlebarsAppl
   }
 
   /**
+   * Walk race in per-rank segments. After each segment that lands at the top
+   * of a rank with more target above it, prompt the player for an optional
+   * race template swap before continuing. "Keep current" is always offered.
+   */
+  async _walkRaceWithBoundaryPrompts(targetLevel) {
+    const sc = CONFIG.ASPECTSOFPOWER;
+    let safety = 0;
+    while (true) {
+      if (++safety > 50) throw new Error('race walk exceeded safety counter');
+
+      const cur = this.actor.system.attributes?.race?.level ?? 0;
+      if (cur >= targetLevel) return;
+
+      const nextLevel = cur + 1;
+      const nextRank  = sc.getRankForLevel(nextLevel);
+      const tier      = sc.rankTiers[nextRank];
+      const segmentMax = Math.min(targetLevel, tier.max);
+      const segmentSize = segmentMax - cur;
+
+      // Need a template before applying.
+      if (!this.actor.system.attributes?.race?.templateId) {
+        await this._promptTemplatePick('race', nextRank);
+        continue;
+      }
+
+      const result = await applyTrackLevels(this.actor, 'race', segmentSize);
+      this.runState.logLines.push(
+        `race: applied ${result.applied}/${segmentSize} (now level ${cur + result.applied}, rank ${nextRank})`
+      );
+      await this.render();
+
+      // Halted mid-segment (template lacked rankGains for this rank).
+      if (result.halted && result.applied < segmentSize) {
+        await this.actor.update({ 'system.attributes.race.templateId': '' });
+        await this._promptTemplatePick('race', nextRank);
+        continue;
+      }
+
+      // If more target remains, we're about to cross into the next rank — offer optional race swap.
+      const nowAt = this.actor.system.attributes?.race?.level ?? 0;
+      if (nowAt < targetLevel) {
+        const upcomingRank = sc.getRankForLevel(nowAt + 1);
+        await this._promptOptionalRaceChange(upcomingRank);
+      }
+    }
+  }
+
+  /**
    * Show the template picker step and await the player's choice. Returns
    * after the picker action handler has assigned the template to the actor.
    */
   async _promptTemplatePick(track, neededRank) {
     const candidates = await this._findTemplatesByRank(track, neededRank);
-    this.runState.waitingForPick = { track, neededRank, candidates };
+    this.runState.waitingForPick = { track, neededRank, candidates, allowSkip: false };
     this.runState.logLines.push(`Pick a ${track} template for rank ${neededRank}…`);
+    await this.render();
+    return new Promise(resolve => { this._pickResolve = resolve; });
+  }
+
+  /**
+   * Prompt for an OPTIONAL race template change at a rank threshold. Same
+   * picker UI as `_promptTemplatePick` but with `allowSkip: true` so the
+   * player can choose "Keep current race" to proceed without changing.
+   */
+  async _promptOptionalRaceChange(upcomingRank) {
+    const candidates = await this._findTemplatesByRank('race', upcomingRank);
+    this.runState.waitingForPick = { track: 'race', neededRank: upcomingRank, candidates, allowSkip: true };
+    this.runState.logLines.push(`Optional race change at the rank ${upcomingRank} threshold…`);
     await this.render();
     return new Promise(resolve => { this._pickResolve = resolve; });
   }
@@ -300,6 +373,24 @@ export class PlayerRelevelDialog extends foundry.applications.api.HandlebarsAppl
     if (!uuid) return;
     const pick = this.runState?.waitingForPick;
     if (!pick) return;
+
+    const resolvePick = () => {
+      this.runState.waitingForPick = null;
+      if (this._pickResolve) {
+        const r = this._pickResolve;
+        this._pickResolve = null;
+        r();
+      }
+    };
+
+    // Skip sentinel — keep the current template (only valid when allowSkip).
+    if (uuid === '__skip__') {
+      this.runState.logLines.push(`Race kept (no change at rank ${pick.neededRank} threshold).`);
+      await this.render();
+      resolvePick();
+      return;
+    }
+
     const item = await fromUuid(uuid);
     if (!item) {
       ui.notifications.warn('Template not found');
@@ -310,14 +401,9 @@ export class PlayerRelevelDialog extends foundry.applications.api.HandlebarsAppl
       [`system.attributes.${pick.track}.name`]:       item.name,
       [`system.attributes.${pick.track}.cachedTags`]: [...(item.system.systemTags ?? [])],
     });
-    this.runState.waitingForPick = null;
     this.runState.logLines.push(`${pick.track} → ${item.name} (rank ${pick.neededRank})`);
     await this.render();
-    if (this._pickResolve) {
-      const r = this._pickResolve;
-      this._pickResolve = null;
-      r();
-    }
+    resolvePick();
   }
 
   /**
