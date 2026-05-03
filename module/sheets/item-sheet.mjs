@@ -125,6 +125,57 @@ export class AspectsofPowerItemSheet extends foundry.applications.api.Handlebars
         ? Math.round(tierFactor * gradeFactor)
         : null;
       context.spellRecommendedMultiplier = CONFIG.ASPECTSOFPOWER.spellTierMultipliers[tier] ?? null;
+
+      // ── Derived stats readout (rarity + alterations → live values) ──
+      const sc = CONFIG.ASPECTSOFPOWER;
+      const rarityKey = this.item.system.rarity || 'common';
+      const rarityDef = sc.skillRarities?.[rarityKey];
+      const mods = this.item._resolveRarityMods?.() ?? null;
+      if (mods) {
+        const alterations = (this.item.system.alterations ?? []).map(a => {
+          const def = sc.alterationTags?.[a.id];
+          return def ? {
+            id: a.id,
+            label: def.label,
+            dmgMod: def.dmgMod,
+            costMod: def.costMod,
+            weightMod: def.weightMod ?? 0,
+          } : null;
+        }).filter(Boolean);
+        const dmgSum    = alterations.reduce((s, a) => s + (a.dmgMod ?? 0), 0);
+        const costSum   = alterations.reduce((s, a) => s + (a.costMod ?? 0), 0);
+        const weightSum = alterations.reduce((s, a) => s + (a.weightMod ?? 0), 0);
+        // Round display values; underlying mods retain full precision.
+        const r = (n, d = 2) => Math.round(n * Math.pow(10, d)) / Math.pow(10, d);
+        context.derivedStats = {
+          rarityKey,
+          rarityLabel: rarityDef?.label ?? rarityKey,
+          rarityMult: r(mods.rarityMult),
+          alterations,
+          dmgSum: r(dmgSum),
+          costSum: r(costSum),
+          weightSum: r(weightSum),
+          effectiveMult: r(mods.effectiveMult),
+          costMultiplier: r(mods.costMultiplier),
+          effectiveWeightMultiplier: r(mods.effectiveWeightMultiplier),
+          // Spell-specific: scaled base mana (rarity + cost alteration applied).
+          // Per design, the runtime spell formula uses raw tierFactor × gradeFactor as baseMana
+          // and applies the AOE 2^n on top — this is the predicted MIN-cost-at-base-size.
+          spellBaseManaScaled: context.spellBaseMana != null
+            ? Math.round(context.spellBaseMana * mods.costMultiplier)
+            : null,
+          // AOE 2^n preview when the aoe alteration is present.
+          aoeCostScale: alterations.some(a => a.id === 'aoe')
+            ? [5, 10, 15, 20, 25].map(d => ({
+                ft: d,
+                mult: Math.pow(2, (d - 5) / 5),
+                cost: context.spellBaseMana != null
+                  ? Math.round(context.spellBaseMana * mods.costMultiplier * Math.pow(2, (d - 5) / 5))
+                  : null,
+              }))
+            : null,
+        };
+      }
     }
 
     // Item bonus field labels for augment sheets.
