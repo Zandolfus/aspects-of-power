@@ -1,0 +1,1499 @@
+{
+  "timestamp": "2026-05-03T06:44:49.248Z",
+  "worldTitle": "Aspects of Power",
+  "systemVersion": "2.1.0",
+  "itemCount": 149,
+  "items": [
+    {
+      "actorId": null,
+      "actorName": null,
+      "itemId": "UlIcQbHNKpBXsequ",
+      "itemName": "Item",
+      "itemType": "item",
+      "tags": [],
+      "systemTags": []
+    },
+    {
+      "actorId": "6xsJdiKE6MPdKHF6",
+      "actorName": "Aiden Fig",
+      "itemId": "nvfme2x1yGPCIkIu",
+      "itemName": "Mana Ring - Air",
+      "itemType": "item",
+      "tags": [],
+      "systemTags": []
+    },
+    {
+      "actorId": "5smlWMSqNvK7Qe1B",
+      "actorName": "Amina Wright",
+      "itemId": "OQwnFs8Ao6nDNt8H",
+      "itemName": "Lunar ProfWeapon",
+      "itemType": "item",
+      "tags": [],
+      "systemTags": []
+    },
+    {
+      "actorId": "61lVck8zsj28k0PT",
+      "actorName": "Animate Easel",
+      "itemId": "7l8Oi832KHl6gMbv",
+      "itemName": "Hardwood Frame",
+      "itemType": "item",
+      "tags": [],
+      "systemTags": []
+    },
+    {
+      "actorId": "61lVck8zsj28k0PT",
+      "actorName": "Animate Easel",
+      "itemId": "TgbfnjNFdJBEmjoD",
+      "itemName": "Sharpened Leg-Spikes",
+      "itemType": "item",
+      "tags": [],
+      "systemTags": []
+    },
+    {
+      "actorId": "mXPfRMfDeaKRlHUO",
+      "actorName": "Bristle Fiend",
+      "itemId": "EwB5tQwJ0YEO4ibp",
+      "itemName": "Barbed Bristle Array",
+      "itemType": "item",
+      "tags": [],
+      "systemTags": []
+    },
+    {
+      "actorId": "mXPfRMfDeaKRlHUO",
+      "actorName": "Bristle Fiend",
+      "itemId": "u57ZouGkmsjPa14L",
+      "itemName": "Pigment-Stained Hide",
+      "itemType": "item",
+      "tags": [],
+      "systemTags": []
+    },
+    {
+      "actorId": "JqTC8LJbMyhbkEpk",
+      "actorName": "Canvas Phantom",
+      "itemId": "TnLoZA0tKDUoYdQQ",
+      "itemName": "Ethereal Shroud",
+      "itemType": "item",
+      "tags": [],
+      "systemTags": []
+    },
+    {
+      "actorId": "TD90MPKGpT70WZ1p",
+      "actorName": "Character",
+      "itemId": "x5TbuifHYM2EgiiK",
+      "itemName": "testitem",
+      "itemType": "item",
+      "tags": [],
+      "systemTags": []
+    },
+    {
+      "actorId": "TD90MPKGpT70WZ1p",
+      "actorName": "Character",
+      "itemId": "GQHcvGAXDMPHOUR7",
+      "itemName": "New Item",
+      "itemType": "item",
+      "tags": [],
+      "systemTags": []
+    },
+    {
+      "actorId": "TD90MPKGpT70WZ1p",
+      "actorName": "Character",
+      "itemId": "RuWsqB0xMucZr6L7",
+      "itemName": "New Item",
+      "itemType": "item",
+      "tags": [],
+      "systemTags": []
+    },
+    {
+      "actorId": "osca1g3VO0ynGfOP",
+      "actorName": "Character (2)",
+      "itemId": "Tgh1MDX9iMlQ5Dw9",
+      "itemName": "New Item",
+      "itemType": "item",
+      "tags": [],
+      "systemTags": []
+    },
+    {
+      "actorId": "yT8VJqjB5hXfyc1q",
+      "actorName": "Felicia",
+      "itemId": "xZ2qFaiuTvpGxI2d",
+      "itemName": "Outer Leather Cowl",
+      "itemType": "item",
+      "tags": [],
+      "systemTags": []
+    },
+    {
+      "actorId": "yT8VJqjB5hXfyc1q",
+      "actorName": "Felicia",
+      "itemId": "4ycuY6MAVw2i39me",
+      "itemName": "Solar Mana Necklace",
+      "itemType": "item",
+      "tags": [],
+      "systemTags": []
+    },
+    {
+      "actorId": "yT8VJqjB5hXfyc1q",
+      "actorName": "Felicia",
+      "itemId": "d2n5mMAgCboDTLFB",
+      "itemName": "Emerald Earring of Resuscitation",
+      "itemType": "item",
+      "tags": [],
+      "systemTags": []
+    },
+    {
+      "actorId": "yT8VJqjB5hXfyc1q",
+      "actorName": "Felicia",
+      "itemId": "kcPCB37GjlsDgZGc",
+      "itemName": "Fine Ring of the Ironclad Mind",
+      "itemType": "item",
+      "tags": [],
+      "systemTags": []
+    },
+    {
+      "actorId": "yT8VJqjB5hXfyc1q",
+      "actorName": "Felicia",
+      "itemId": "ZubY7mtobbMwrOqm",
+      "itemName": "Scouts Leather Chaps",
+      "itemType": "item",
+      "tags": [],
+      "systemTags": []
+    },
+    {
+      "actorId": "yT8VJqjB5hXfyc1q",
+      "actorName": "Felicia",
+      "itemId": "q5897V0nYFxT6ZpM",
+      "itemName": "Scout’s Leather Jerkin",
+      "itemType": "item",
+      "tags": [],
+      "systemTags": []
+    },
+    {
+      "actorId": "yT8VJqjB5hXfyc1q",
+      "actorName": "Felicia",
+      "itemId": "wlO1M9Mk8o9nS4gD",
+      "itemName": "Maia's Lament",
+      "itemType": "item",
+      "tags": [],
+      "systemTags": []
+    },
+    {
+      "actorId": "yT8VJqjB5hXfyc1q",
+      "actorName": "Felicia",
+      "itemId": "7BcfMCad51YUABYz",
+      "itemName": "Solar Mana Bracelet",
+      "itemType": "item",
+      "tags": [],
+      "systemTags": []
+    },
+    {
+      "actorId": "pUOl427mCsvAG1El",
+      "actorName": "Gabriel",
+      "itemId": "PMzVgGsXvciHCisv",
+      "itemName": "Boots of Item Finding",
+      "itemType": "item",
+      "tags": [],
+      "systemTags": []
+    },
+    {
+      "actorId": "pUOl427mCsvAG1El",
+      "actorName": "Gabriel",
+      "itemId": "oEgLgnP8X7hhE1h3",
+      "itemName": "Curass of the Hydra",
+      "itemType": "item",
+      "tags": [],
+      "systemTags": []
+    },
+    {
+      "actorId": "pUOl427mCsvAG1El",
+      "actorName": "Gabriel",
+      "itemId": "mq1QsDUGtwgS50Bn",
+      "itemName": "Maya's Bag of Knives",
+      "itemType": "item",
+      "tags": [],
+      "systemTags": []
+    },
+    {
+      "actorId": "pUOl427mCsvAG1El",
+      "actorName": "Gabriel",
+      "itemId": "Q75W4L6N5GIv6PjK",
+      "itemName": "Cloak of Infused Mana",
+      "itemType": "item",
+      "tags": [],
+      "systemTags": []
+    },
+    {
+      "actorId": "pUOl427mCsvAG1El",
+      "actorName": "Gabriel",
+      "itemId": "819jE6ybkLk7ppI2",
+      "itemName": "Mermaid Kebob",
+      "itemType": "item",
+      "tags": [],
+      "systemTags": []
+    },
+    {
+      "actorId": "pUOl427mCsvAG1El",
+      "actorName": "Gabriel",
+      "itemId": "ECv3p3fRCSbQ92Eb",
+      "itemName": "Leather Pants",
+      "itemType": "item",
+      "tags": [],
+      "systemTags": []
+    },
+    {
+      "actorId": "pUOl427mCsvAG1El",
+      "actorName": "Gabriel",
+      "itemId": "xZ0vxepoInG3a7o3",
+      "itemName": "Math Book",
+      "itemType": "item",
+      "tags": [],
+      "systemTags": []
+    },
+    {
+      "actorId": "pUOl427mCsvAG1El",
+      "actorName": "Gabriel",
+      "itemId": "3pB3TRO49Akn1MPS",
+      "itemName": "King's Crown",
+      "itemType": "item",
+      "tags": [],
+      "systemTags": []
+    },
+    {
+      "actorId": "pUOl427mCsvAG1El",
+      "actorName": "Gabriel",
+      "itemId": "OxcNrCQQxuckwN6I",
+      "itemName": "Race 25 Title",
+      "itemType": "item",
+      "tags": [],
+      "systemTags": []
+    },
+    {
+      "actorId": "pUOl427mCsvAG1El",
+      "actorName": "Gabriel",
+      "itemId": "R1hlq9QGvaep2MHP",
+      "itemName": "Thunder Stone",
+      "itemType": "item",
+      "tags": [],
+      "systemTags": []
+    },
+    {
+      "actorId": "pUOl427mCsvAG1El",
+      "actorName": "Gabriel",
+      "itemId": "B5ax2sZVWqI7pGvo",
+      "itemName": "Noble Title (Baron)",
+      "itemType": "item",
+      "tags": [],
+      "systemTags": []
+    },
+    {
+      "actorId": "pUOl427mCsvAG1El",
+      "actorName": "Gabriel",
+      "itemId": "4ddazoBucDVFnhM5",
+      "itemName": "Necklace of Space Storage",
+      "itemType": "item",
+      "tags": [],
+      "systemTags": []
+    },
+    {
+      "actorId": "pUOl427mCsvAG1El",
+      "actorName": "Gabriel",
+      "itemId": "p1MLRv9fMjUxNm9j",
+      "itemName": "Gemstone Tides Ear Cuffs (Low)",
+      "itemType": "item",
+      "tags": [],
+      "systemTags": []
+    },
+    {
+      "actorId": "pUOl427mCsvAG1El",
+      "actorName": "Gabriel",
+      "itemId": "ZHgiOGfx2QUPsZnM",
+      "itemName": "Wallet of spatial storage",
+      "itemType": "item",
+      "tags": [],
+      "systemTags": []
+    },
+    {
+      "actorId": "pUOl427mCsvAG1El",
+      "actorName": "Gabriel",
+      "itemId": "NfLylGl9OOPfF0a2",
+      "itemName": "Skysteel Dagger",
+      "itemType": "item",
+      "tags": [
+        "metal",
+        "dagger"
+      ],
+      "systemTags": []
+    },
+    {
+      "actorId": "pUOl427mCsvAG1El",
+      "actorName": "Gabriel",
+      "itemId": "z9PocycKOUH16ORu",
+      "itemName": "Amulet of Suspension",
+      "itemType": "item",
+      "tags": [],
+      "systemTags": []
+    },
+    {
+      "actorId": "pUOl427mCsvAG1El",
+      "actorName": "Gabriel",
+      "itemId": "fSkDcj0eEP2wcEXh",
+      "itemName": "Fine Ring of Flickerstep",
+      "itemType": "item",
+      "tags": [],
+      "systemTags": []
+    },
+    {
+      "actorId": "pUOl427mCsvAG1El",
+      "actorName": "Gabriel",
+      "itemId": "oqImlqzWaI4UxS6x",
+      "itemName": "Scout’s Leather Jerkin",
+      "itemType": "item",
+      "tags": [],
+      "systemTags": []
+    },
+    {
+      "actorId": "pUOl427mCsvAG1El",
+      "actorName": "Gabriel",
+      "itemId": "1Pk0U0aqqm25B3Gs",
+      "itemName": "Scouts Leather Chaps",
+      "itemType": "item",
+      "tags": [],
+      "systemTags": []
+    },
+    {
+      "actorId": "pUOl427mCsvAG1El",
+      "actorName": "Gabriel",
+      "itemId": "6thCclvd6JZXLhd0",
+      "itemName": "Gold Rush Gloves",
+      "itemType": "item",
+      "tags": [],
+      "systemTags": []
+    },
+    {
+      "actorId": "pUOl427mCsvAG1El",
+      "actorName": "Gabriel",
+      "itemId": "QY5MwRqw1cjpvy72",
+      "itemName": "Outer Leather Cowl",
+      "itemType": "item",
+      "tags": [],
+      "systemTags": []
+    },
+    {
+      "actorId": "pUOl427mCsvAG1El",
+      "actorName": "Gabriel",
+      "itemId": "xh550Z9Q72K6FynB",
+      "itemName": "Tide Cuffs",
+      "itemType": "item",
+      "tags": [],
+      "systemTags": []
+    },
+    {
+      "actorId": "pUOl427mCsvAG1El",
+      "actorName": "Gabriel",
+      "itemId": "fC1S010SJ2VZk964",
+      "itemName": "Lightning Earrings",
+      "itemType": "item",
+      "tags": [],
+      "systemTags": []
+    },
+    {
+      "actorId": "pXLfBocQuLHQ7aah",
+      "actorName": "Half-Finished Abomination",
+      "itemId": "26NWW8wI770sRq0L",
+      "itemName": "Layered Paint Hide",
+      "itemType": "item",
+      "tags": [],
+      "systemTags": []
+    },
+    {
+      "actorId": "pXLfBocQuLHQ7aah",
+      "actorName": "Half-Finished Abomination",
+      "itemId": "afwCWwiPAGKRQASv",
+      "itemName": "Misshapen Claws",
+      "itemType": "item",
+      "tags": [],
+      "systemTags": []
+    },
+    {
+      "actorId": "zE0omeIFCCMBFxCz",
+      "actorName": "Harvey McKay",
+      "itemId": "BbQJTL7Ish8ElCBl",
+      "itemName": "Blessed Sea Bracelet",
+      "itemType": "item",
+      "tags": [],
+      "systemTags": []
+    },
+    {
+      "actorId": "zE0omeIFCCMBFxCz",
+      "actorName": "Harvey McKay",
+      "itemId": "21MYxS24USiS6Zw8",
+      "itemName": "Outer Leather Cowl",
+      "itemType": "item",
+      "tags": [],
+      "systemTags": []
+    },
+    {
+      "actorId": "zE0omeIFCCMBFxCz",
+      "actorName": "Harvey McKay",
+      "itemId": "cijzC1y999cN3JzI",
+      "itemName": "Fine Ring of the Illuminant Eye",
+      "itemType": "item",
+      "tags": [],
+      "systemTags": []
+    },
+    {
+      "actorId": "zE0omeIFCCMBFxCz",
+      "actorName": "Harvey McKay",
+      "itemId": "YXgLE1TDNDMdliKu",
+      "itemName": "Water Mana Necklace",
+      "itemType": "item",
+      "tags": [],
+      "systemTags": []
+    },
+    {
+      "actorId": "S9Z52yHulPLpVCKm",
+      "actorName": "Ink Serpent",
+      "itemId": "ugy9yhPbNTMxlRt2",
+      "itemName": "Ink-Slick Scales",
+      "itemType": "item",
+      "tags": [],
+      "systemTags": []
+    },
+    {
+      "actorId": "nMa2Iin5xeRNXHGT",
+      "actorName": "John",
+      "itemId": "56p1bqdXnZO8E1CU",
+      "itemName": "Boots of Fire Resistance",
+      "itemType": "item",
+      "tags": [],
+      "systemTags": []
+    },
+    {
+      "actorId": "nMa2Iin5xeRNXHGT",
+      "actorName": "John",
+      "itemId": "MgLgQYAYi1jbnXjw",
+      "itemName": "Fulgurite Smithing Hammer",
+      "itemType": "item",
+      "tags": [],
+      "systemTags": []
+    },
+    {
+      "actorId": "nMa2Iin5xeRNXHGT",
+      "actorName": "John",
+      "itemId": "6Yp87Jtdk2306P9o",
+      "itemName": "Ring of Brilliance",
+      "itemType": "item",
+      "tags": [],
+      "systemTags": []
+    },
+    {
+      "actorId": "nMa2Iin5xeRNXHGT",
+      "actorName": "John",
+      "itemId": "qJDMjT8Gln44PECz",
+      "itemName": "Magic Cotton Shirt (Inferior)",
+      "itemType": "item",
+      "tags": [],
+      "systemTags": []
+    },
+    {
+      "actorId": "nMa2Iin5xeRNXHGT",
+      "actorName": "John",
+      "itemId": "koiyGeUrnd2gld2i",
+      "itemName": "Black Flame Torpedo",
+      "itemType": "item",
+      "tags": [],
+      "systemTags": []
+    },
+    {
+      "actorId": "nMa2Iin5xeRNXHGT",
+      "actorName": "John",
+      "itemId": "LBtrIi485f1cXOqJ",
+      "itemName": "Black Iron Buckler",
+      "itemType": "item",
+      "tags": [],
+      "systemTags": []
+    },
+    {
+      "actorId": "nMa2Iin5xeRNXHGT",
+      "actorName": "John",
+      "itemId": "6gsdGycWWyzPtUuZ",
+      "itemName": "Black Iron Greaves",
+      "itemType": "item",
+      "tags": [],
+      "systemTags": []
+    },
+    {
+      "actorId": "nMa2Iin5xeRNXHGT",
+      "actorName": "John",
+      "itemId": "z8f08SSHUxWc8aWc",
+      "itemName": "Black Iron Helm(destroyed)",
+      "itemType": "item",
+      "tags": [],
+      "systemTags": []
+    },
+    {
+      "actorId": "nMa2Iin5xeRNXHGT",
+      "actorName": "John",
+      "itemId": "J6KuGhufSRktVHRP",
+      "itemName": "Black Iron Bracers",
+      "itemType": "item",
+      "tags": [],
+      "systemTags": []
+    },
+    {
+      "actorId": "nMa2Iin5xeRNXHGT",
+      "actorName": "John",
+      "itemId": "EgA8LPUbuXRPDECd",
+      "itemName": "Ring of Solar Light",
+      "itemType": "item",
+      "tags": [],
+      "systemTags": []
+    },
+    {
+      "actorId": "nMa2Iin5xeRNXHGT",
+      "actorName": "John",
+      "itemId": "ylSU8hugpkf3yOb7",
+      "itemName": "Fulgurite Boots",
+      "itemType": "item",
+      "tags": [],
+      "systemTags": []
+    },
+    {
+      "actorId": "nMa2Iin5xeRNXHGT",
+      "actorName": "John",
+      "itemId": "NGnb2kz8JNRBFJM5",
+      "itemName": "Benjamin's Final Joy",
+      "itemType": "item",
+      "tags": [],
+      "systemTags": []
+    },
+    {
+      "actorId": "nMa2Iin5xeRNXHGT",
+      "actorName": "John",
+      "itemId": "JbPnWRHtWDWjRjkM",
+      "itemName": "Fulgurite Chestpiece",
+      "itemType": "item",
+      "tags": [],
+      "systemTags": []
+    },
+    {
+      "actorId": "nMa2Iin5xeRNXHGT",
+      "actorName": "John",
+      "itemId": "EtkPxYpFsZpgB6VE",
+      "itemName": "Fulgurite Bracers",
+      "itemType": "item",
+      "tags": [],
+      "systemTags": []
+    },
+    {
+      "actorId": "nMa2Iin5xeRNXHGT",
+      "actorName": "John",
+      "itemId": "NFLRpVQ4NOxe9kzV",
+      "itemName": "Fulgurite Greaves",
+      "itemType": "item",
+      "tags": [],
+      "systemTags": []
+    },
+    {
+      "actorId": "nMa2Iin5xeRNXHGT",
+      "actorName": "John",
+      "itemId": "bxYv5u1Mb33KAWSK",
+      "itemName": "Fulgurite Helm",
+      "itemType": "item",
+      "tags": [],
+      "systemTags": []
+    },
+    {
+      "actorId": "nMa2Iin5xeRNXHGT",
+      "actorName": "John",
+      "itemId": "kAdpMTvTd2WOL0sH",
+      "itemName": "Fulgurite Longsword",
+      "itemType": "item",
+      "tags": [],
+      "systemTags": []
+    },
+    {
+      "actorId": "nMa2Iin5xeRNXHGT",
+      "actorName": "John",
+      "itemId": "0jNewM9JFui3aosh",
+      "itemName": "Solar Mana Necklace",
+      "itemType": "item",
+      "tags": [],
+      "systemTags": []
+    },
+    {
+      "actorId": "nMa2Iin5xeRNXHGT",
+      "actorName": "John",
+      "itemId": "vVTDPlS6E4CCzfA0",
+      "itemName": "Water Mana Bracelet",
+      "itemType": "item",
+      "tags": [],
+      "systemTags": []
+    },
+    {
+      "actorId": "nMa2Iin5xeRNXHGT",
+      "actorName": "John",
+      "itemId": "Hy6eUq3fG7Hu4aZ5",
+      "itemName": "Outer Leather Boots",
+      "itemType": "item",
+      "tags": [],
+      "systemTags": []
+    },
+    {
+      "actorId": "nMa2Iin5xeRNXHGT",
+      "actorName": "John",
+      "itemId": "VtxihbZEKwfuYSs5",
+      "itemName": "Lightning Gloves",
+      "itemType": "item",
+      "tags": [],
+      "systemTags": []
+    },
+    {
+      "actorId": "nMa2Iin5xeRNXHGT",
+      "actorName": "John",
+      "itemId": "qHVPjL2kNAKoPav6",
+      "itemName": "Fulgurite - 409",
+      "itemType": "item",
+      "tags": [
+        "metal"
+      ],
+      "systemTags": [
+        {
+          "id": "lightning-affinity",
+          "value": 0
+        }
+      ]
+    },
+    {
+      "actorId": "Nmwy8KWMbGwSXQZn",
+      "actorName": "Living Fresco",
+      "itemId": "IogjTho0l8oTBYyY",
+      "itemName": "Gilded Frame",
+      "itemType": "item",
+      "tags": [],
+      "systemTags": []
+    },
+    {
+      "actorId": "hcktz780p4cXd7Uz",
+      "actorName": "Palette Golem",
+      "itemId": "EH3q0PhsWAQcHRJl",
+      "itemName": "Lacquered Shell",
+      "itemType": "item",
+      "tags": [],
+      "systemTags": []
+    },
+    {
+      "actorId": "hcktz780p4cXd7Uz",
+      "actorName": "Palette Golem",
+      "itemId": "oTlfBQUK6tzhFZQ2",
+      "itemName": "Palette Blade",
+      "itemType": "item",
+      "tags": [],
+      "systemTags": []
+    },
+    {
+      "actorId": "V2EXOPBFP2WjcVSe",
+      "actorName": "Phil",
+      "itemId": "JWlH3fqXCZ1diIst",
+      "itemName": "Fulgurite Claymore",
+      "itemType": "item",
+      "tags": [
+        "metal",
+        "greatsword"
+      ],
+      "systemTags": []
+    },
+    {
+      "actorId": "V2EXOPBFP2WjcVSe",
+      "actorName": "Phil",
+      "itemId": "qSKdC6dHaA4QNgrn",
+      "itemName": "Fulgurite Cuirass",
+      "itemType": "item",
+      "tags": [],
+      "systemTags": []
+    },
+    {
+      "actorId": "V2EXOPBFP2WjcVSe",
+      "actorName": "Phil",
+      "itemId": "J0ZwToP1ySOLcAyP",
+      "itemName": "Fulgurite Greaves",
+      "itemType": "item",
+      "tags": [],
+      "systemTags": []
+    },
+    {
+      "actorId": "V2EXOPBFP2WjcVSe",
+      "actorName": "Phil",
+      "itemId": "g1bu4bW1STas3gfv",
+      "itemName": "Fulgurite Helm",
+      "itemType": "item",
+      "tags": [],
+      "systemTags": []
+    },
+    {
+      "actorId": "V2EXOPBFP2WjcVSe",
+      "actorName": "Phil",
+      "itemId": "McTsZCUmikvVSdlz",
+      "itemName": "Fulgurite Bracers",
+      "itemType": "item",
+      "tags": [],
+      "systemTags": []
+    },
+    {
+      "actorId": "V2EXOPBFP2WjcVSe",
+      "actorName": "Phil",
+      "itemId": "L1gruvNn8KZ6HzlN",
+      "itemName": "Gemstone Tides Ear Cuffs (Low)",
+      "itemType": "item",
+      "tags": [],
+      "systemTags": []
+    },
+    {
+      "actorId": "V2EXOPBFP2WjcVSe",
+      "actorName": "Phil",
+      "itemId": "PzlttgulSfzhZ7hY",
+      "itemName": "Solar Ring",
+      "itemType": "item",
+      "tags": [],
+      "systemTags": []
+    },
+    {
+      "actorId": "V2EXOPBFP2WjcVSe",
+      "actorName": "Phil",
+      "itemId": "2Xt6CCC6nzg4I34d",
+      "itemName": "Phil's Shield - 530",
+      "itemType": "item",
+      "tags": [
+        "weapon",
+        "1H",
+        "shield",
+        "greatshield",
+        "metal"
+      ],
+      "systemTags": [
+        {
+          "id": "lightning-affinity",
+          "value": 0
+        }
+      ]
+    },
+    {
+      "actorId": "aWvGxCvftSOnRFSl",
+      "actorName": "Poisonous Rat",
+      "itemId": "FkvtKU6CAJJBBqjz",
+      "itemName": "Venom Glands",
+      "itemType": "item",
+      "tags": [],
+      "systemTags": []
+    },
+    {
+      "actorId": "aWvGxCvftSOnRFSl",
+      "actorName": "Poisonous Rat",
+      "itemId": "FbO0RCKaLQhzz0aR",
+      "itemName": "Mottled Hide",
+      "itemType": "item",
+      "tags": [],
+      "systemTags": []
+    },
+    {
+      "actorId": "wfZXNTEcQbmQy7tb",
+      "actorName": "Rat King",
+      "itemId": "RWfi9wsgao8fmaBU",
+      "itemName": "Matted Fur Hide",
+      "itemType": "item",
+      "tags": [],
+      "systemTags": []
+    },
+    {
+      "actorId": "wfZXNTEcQbmQy7tb",
+      "actorName": "Rat King",
+      "itemId": "1jcQBZHBa4FprPfE",
+      "itemName": "Crown of Knotted Tails",
+      "itemType": "item",
+      "tags": [],
+      "systemTags": []
+    },
+    {
+      "actorId": "wfZXNTEcQbmQy7tb",
+      "actorName": "Rat King",
+      "itemId": "euFtRJIB61VAgo52",
+      "itemName": "Gnawing Fangs",
+      "itemType": "item",
+      "tags": [],
+      "systemTags": []
+    },
+    {
+      "actorId": "wfZXNTEcQbmQy7tb",
+      "actorName": "Rat King",
+      "itemId": "1gAYWNUPQnhMsjd1",
+      "itemName": "Calloused Paws",
+      "itemType": "item",
+      "tags": [],
+      "systemTags": []
+    },
+    {
+      "actorId": "hSusGfPVrYp2j4Kt",
+      "actorName": "Rat Knight",
+      "itemId": "9lVDtCRAEDq3zF0l",
+      "itemName": "Scrapplate Cuirass",
+      "itemType": "item",
+      "tags": [],
+      "systemTags": []
+    },
+    {
+      "actorId": "hSusGfPVrYp2j4Kt",
+      "actorName": "Rat Knight",
+      "itemId": "EbJwvHWZX60rLlWL",
+      "itemName": "Dented Buckler",
+      "itemType": "item",
+      "tags": [],
+      "systemTags": []
+    },
+    {
+      "actorId": "hSusGfPVrYp2j4Kt",
+      "actorName": "Rat Knight",
+      "itemId": "Ny6Hubyj2dPsun1U",
+      "itemName": "Rusted Knight's Lance",
+      "itemType": "item",
+      "tags": [],
+      "systemTags": []
+    },
+    {
+      "actorId": "mkSOWGVQILYeMIMl",
+      "actorName": "Rat Warrior",
+      "itemId": "15quHMzoqkxV6VH7",
+      "itemName": "Sharpened Bone Blades",
+      "itemType": "item",
+      "tags": [],
+      "systemTags": []
+    },
+    {
+      "actorId": "mkSOWGVQILYeMIMl",
+      "actorName": "Rat Warrior",
+      "itemId": "LFyBmMdkQTbLc7C4",
+      "itemName": "Ragged Leather Harness",
+      "itemType": "item",
+      "tags": [],
+      "systemTags": []
+    },
+    {
+      "actorId": "RlVZ58eJ2zWBlXgL",
+      "actorName": "Sebastian",
+      "itemId": "uDIwRiu7g2i1nWOf",
+      "itemName": "Fulgurite Cane Sword",
+      "itemType": "item",
+      "tags": [],
+      "systemTags": []
+    },
+    {
+      "actorId": "Pj7ydlLGssBQQrD7",
+      "actorName": "Turpentine Ooze",
+      "itemId": "xbJ8atxhXoRqXL4K",
+      "itemName": "Corrosive Membrane",
+      "itemType": "item",
+      "tags": [],
+      "systemTags": []
+    },
+    {
+      "actorId": "S38VFGpZijXwloLY",
+      "actorName": "Willy",
+      "itemId": "T02iRdBCkrhC6Oll",
+      "itemName": "Basic Wand",
+      "itemType": "item",
+      "tags": [],
+      "systemTags": []
+    },
+    {
+      "actorId": "S38VFGpZijXwloLY",
+      "actorName": "Willy",
+      "itemId": "Bg918Bk5C4EwNxlb",
+      "itemName": "Basic Cane",
+      "itemType": "item",
+      "tags": [],
+      "systemTags": []
+    },
+    {
+      "actorId": "S38VFGpZijXwloLY",
+      "actorName": "Willy",
+      "itemId": "RcabWHTgHCnIoqNq",
+      "itemName": "Basic Robes",
+      "itemType": "item",
+      "tags": [],
+      "systemTags": []
+    },
+    {
+      "actorId": "S38VFGpZijXwloLY",
+      "actorName": "Willy",
+      "itemId": "wNpMIZkWPprcqX93",
+      "itemName": "Knee Gaurds",
+      "itemType": "item",
+      "tags": [],
+      "systemTags": []
+    },
+    {
+      "actorId": "S38VFGpZijXwloLY",
+      "actorName": "Willy",
+      "itemId": "xip6zKA9ewvbf74m",
+      "itemName": "Staff of the Ancient Sleepwalker",
+      "itemType": "item",
+      "tags": [],
+      "systemTags": []
+    },
+    {
+      "actorId": "S38VFGpZijXwloLY",
+      "actorName": "Willy",
+      "itemId": "eq2JKbomhsCs5hwN",
+      "itemName": "Book of the Elementals (Used)",
+      "itemType": "item",
+      "tags": [],
+      "systemTags": []
+    },
+    {
+      "actorId": "S38VFGpZijXwloLY",
+      "actorName": "Willy",
+      "itemId": "obiNG1oE6KPafuaw",
+      "itemName": "Crystalwood Staff",
+      "itemType": "item",
+      "tags": [],
+      "systemTags": []
+    },
+    {
+      "actorId": "S38VFGpZijXwloLY",
+      "actorName": "Willy",
+      "itemId": "Pm6Bas6AI3tYpYfE",
+      "itemName": "Blessed Robes of Shiva",
+      "itemType": "item",
+      "tags": [],
+      "systemTags": []
+    },
+    {
+      "actorId": "S38VFGpZijXwloLY",
+      "actorName": "Willy",
+      "itemId": "v3u9mO9aCTPW3NDr",
+      "itemName": "Ice Heart (Rare)",
+      "itemType": "item",
+      "tags": [],
+      "systemTags": []
+    },
+    {
+      "actorId": "S38VFGpZijXwloLY",
+      "actorName": "Willy",
+      "itemId": "KF8U2d1p95Q8QMAI",
+      "itemName": "Moon Drop",
+      "itemType": "item",
+      "tags": [],
+      "systemTags": []
+    },
+    {
+      "actorId": "S38VFGpZijXwloLY",
+      "actorName": "Willy",
+      "itemId": "vA7xvG7gStpSEBQ0",
+      "itemName": "Crystallized Neutral Mana Diadem",
+      "itemType": "item",
+      "tags": [],
+      "systemTags": []
+    },
+    {
+      "actorId": "S38VFGpZijXwloLY",
+      "actorName": "Willy",
+      "itemId": "58cj9UfsgYqKBGWg",
+      "itemName": "Pair of Harnessed light rings",
+      "itemType": "item",
+      "tags": [],
+      "systemTags": []
+    },
+    {
+      "actorId": "S38VFGpZijXwloLY",
+      "actorName": "Willy",
+      "itemId": "vOUoQAbolrB0M30V",
+      "itemName": "Lunar Mana Necklace",
+      "itemType": "item",
+      "tags": [],
+      "systemTags": []
+    },
+    {
+      "actorId": "S38VFGpZijXwloLY",
+      "actorName": "Willy",
+      "itemId": "4OR3EyKQWYFAwCDy",
+      "itemName": "Solar Mana Necklace",
+      "itemType": "item",
+      "tags": [],
+      "systemTags": []
+    },
+    {
+      "actorId": "S38VFGpZijXwloLY",
+      "actorName": "Willy",
+      "itemId": "rlqUxMTOMkQtORmt",
+      "itemName": "Fire Mana Gem",
+      "itemType": "item",
+      "tags": [],
+      "systemTags": []
+    },
+    {
+      "actorId": "S38VFGpZijXwloLY",
+      "actorName": "Willy",
+      "itemId": "VEPS3mE0jBhWDWIq",
+      "itemName": "Gem of Tides",
+      "itemType": "item",
+      "tags": [],
+      "systemTags": []
+    },
+    {
+      "actorId": "S38VFGpZijXwloLY",
+      "actorName": "Willy",
+      "itemId": "DKyOSeFOz7jRlSYr",
+      "itemName": "Gemstone Tides Ear Cuffs (Low)",
+      "itemType": "item",
+      "tags": [],
+      "systemTags": []
+    },
+    {
+      "actorId": "S38VFGpZijXwloLY",
+      "actorName": "Willy",
+      "itemId": "Tel1e0dGWflQzF55",
+      "itemName": "Gemstone Tides Ear Cuffs (Low)",
+      "itemType": "item",
+      "tags": [],
+      "systemTags": []
+    },
+    {
+      "actorId": "S38VFGpZijXwloLY",
+      "actorName": "Willy",
+      "itemId": "sgLYE2KFZpfuwo8C",
+      "itemName": "Socketed Bracelets",
+      "itemType": "item",
+      "tags": [],
+      "systemTags": []
+    },
+    {
+      "actorId": "S38VFGpZijXwloLY",
+      "actorName": "Willy",
+      "itemId": "2KcUIHXP7sEDPc0S",
+      "itemName": "Lunar Necklace",
+      "itemType": "item",
+      "tags": [],
+      "systemTags": []
+    },
+    {
+      "actorId": "S38VFGpZijXwloLY",
+      "actorName": "Willy",
+      "itemId": "QgvWbLzi2ETW8UYZ",
+      "itemName": "Solar Necklace",
+      "itemType": "item",
+      "tags": [],
+      "systemTags": []
+    },
+    {
+      "actorId": "S38VFGpZijXwloLY",
+      "actorName": "Willy",
+      "itemId": "7eInBV7e4FpQ9LlY",
+      "itemName": "Fire Necklace",
+      "itemType": "item",
+      "tags": [],
+      "systemTags": []
+    },
+    {
+      "actorId": "S38VFGpZijXwloLY",
+      "actorName": "Willy",
+      "itemId": "LCAUh4qmuQXMMOhh",
+      "itemName": "Lightning Necklace",
+      "itemType": "item",
+      "tags": [],
+      "systemTags": []
+    },
+    {
+      "actorId": "S38VFGpZijXwloLY",
+      "actorName": "Willy",
+      "itemId": "VpAkPyclSmFubuO3",
+      "itemName": "Lunar Ring",
+      "itemType": "item",
+      "tags": [],
+      "systemTags": []
+    },
+    {
+      "actorId": "S38VFGpZijXwloLY",
+      "actorName": "Willy",
+      "itemId": "Sz7SWKPPQDc4CIV4",
+      "itemName": "Solar Ring",
+      "itemType": "item",
+      "tags": [],
+      "systemTags": []
+    },
+    {
+      "actorId": "S38VFGpZijXwloLY",
+      "actorName": "Willy",
+      "itemId": "nWbwx43TXFbVvUqC",
+      "itemName": "Fire Ring",
+      "itemType": "item",
+      "tags": [],
+      "systemTags": []
+    },
+    {
+      "actorId": "S38VFGpZijXwloLY",
+      "actorName": "Willy",
+      "itemId": "MlUgoVG9tESMymJn",
+      "itemName": "Lightning Ring",
+      "itemType": "item",
+      "tags": [],
+      "systemTags": []
+    },
+    {
+      "actorId": "S38VFGpZijXwloLY",
+      "actorName": "Willy",
+      "itemId": "Pzee61cSlUmns9PM",
+      "itemName": "Lunar Bracelet",
+      "itemType": "item",
+      "tags": [],
+      "systemTags": []
+    },
+    {
+      "actorId": "S38VFGpZijXwloLY",
+      "actorName": "Willy",
+      "itemId": "GneDWy6WmpmMXRyz",
+      "itemName": "Lightning Bracelet",
+      "itemType": "item",
+      "tags": [],
+      "systemTags": []
+    },
+    {
+      "actorId": "S38VFGpZijXwloLY",
+      "actorName": "Willy",
+      "itemId": "eQemN3JVsM8c1UxL",
+      "itemName": "Lunar Necklace",
+      "itemType": "item",
+      "tags": [],
+      "systemTags": []
+    },
+    {
+      "actorId": "S38VFGpZijXwloLY",
+      "actorName": "Willy",
+      "itemId": "7bCmBeRDTU0DC3CW",
+      "itemName": "Solar Necklace",
+      "itemType": "item",
+      "tags": [],
+      "systemTags": []
+    },
+    {
+      "actorId": "S38VFGpZijXwloLY",
+      "actorName": "Willy",
+      "itemId": "RuGVezp4lBn4eldt",
+      "itemName": "Fire Necklace",
+      "itemType": "item",
+      "tags": [],
+      "systemTags": []
+    },
+    {
+      "actorId": "S38VFGpZijXwloLY",
+      "actorName": "Willy",
+      "itemId": "bZmqajcUTSpozYkN",
+      "itemName": "Lightning Necklace",
+      "itemType": "item",
+      "tags": [],
+      "systemTags": []
+    },
+    {
+      "actorId": "S38VFGpZijXwloLY",
+      "actorName": "Willy",
+      "itemId": "NL4SI8Qba3gyOexg",
+      "itemName": "Lunar Bracelet",
+      "itemType": "item",
+      "tags": [],
+      "systemTags": []
+    },
+    {
+      "actorId": "S38VFGpZijXwloLY",
+      "actorName": "Willy",
+      "itemId": "PcnCiDbCtUxUJtEH",
+      "itemName": "Solar Bracelet",
+      "itemType": "item",
+      "tags": [],
+      "systemTags": []
+    },
+    {
+      "actorId": "S38VFGpZijXwloLY",
+      "actorName": "Willy",
+      "itemId": "3Cp6raZCotEvZqIH",
+      "itemName": "Fire Bracelet",
+      "itemType": "item",
+      "tags": [],
+      "systemTags": []
+    },
+    {
+      "actorId": "S38VFGpZijXwloLY",
+      "actorName": "Willy",
+      "itemId": "EQKJM90tZDsA6qBH",
+      "itemName": "Lightning Bracelet",
+      "itemType": "item",
+      "tags": [],
+      "systemTags": []
+    },
+    {
+      "actorId": "S38VFGpZijXwloLY",
+      "actorName": "Willy",
+      "itemId": "EuPUrK7fJlcKBrTZ",
+      "itemName": "Lunar Ring",
+      "itemType": "item",
+      "tags": [],
+      "systemTags": []
+    },
+    {
+      "actorId": "S38VFGpZijXwloLY",
+      "actorName": "Willy",
+      "itemId": "vwbTJEKeeh56U8W3",
+      "itemName": "Fire Ring",
+      "itemType": "item",
+      "tags": [],
+      "systemTags": []
+    },
+    {
+      "actorId": "S38VFGpZijXwloLY",
+      "actorName": "Willy",
+      "itemId": "npIBca285ayS6QmH",
+      "itemName": "Ice Earring - 464",
+      "itemType": "item",
+      "tags": [
+        "jewelry",
+        "earring",
+        "crystal"
+      ],
+      "systemTags": [
+        {
+          "id": "ice-affinity",
+          "value": 0
+        }
+      ]
+    },
+    {
+      "actorId": "S38VFGpZijXwloLY",
+      "actorName": "Willy",
+      "itemId": "ojlFexohmeazSM8P",
+      "itemName": "Water Earring - 410",
+      "itemType": "item",
+      "tags": [
+        "jewelry",
+        "earring",
+        "crystal"
+      ],
+      "systemTags": [
+        {
+          "id": "water-affinity",
+          "value": 0
+        }
+      ]
+    },
+    {
+      "actorId": "S38VFGpZijXwloLY",
+      "actorName": "Willy",
+      "itemId": "3k5lJylWVnfJH9hL",
+      "itemName": "Earth Earring - 305",
+      "itemType": "item",
+      "tags": [
+        "jewelry",
+        "earring",
+        "crystal"
+      ],
+      "systemTags": [
+        {
+          "id": "earth-affinity",
+          "value": 0
+        }
+      ]
+    },
+    {
+      "actorId": "S38VFGpZijXwloLY",
+      "actorName": "Willy",
+      "itemId": "pTcIQX4etn9OGeG0",
+      "itemName": "Space Earring - 268",
+      "itemType": "item",
+      "tags": [
+        "jewelry",
+        "earring",
+        "crystal"
+      ],
+      "systemTags": [
+        {
+          "id": "space-affinity",
+          "value": 0
+        }
+      ]
+    },
+    {
+      "actorId": "S38VFGpZijXwloLY",
+      "actorName": "Willy",
+      "itemId": "RzuTaVRXxrW7RPMQ",
+      "itemName": "Ice Necklace - 479",
+      "itemType": "item",
+      "tags": [
+        "jewelry",
+        "necklace",
+        "crystal"
+      ],
+      "systemTags": [
+        {
+          "id": "ice-affinity",
+          "value": 0
+        }
+      ]
+    },
+    {
+      "actorId": "S38VFGpZijXwloLY",
+      "actorName": "Willy",
+      "itemId": "8TplBGgcEmYQJ6Kx",
+      "itemName": "Ice Necklace - 514",
+      "itemType": "item",
+      "tags": [
+        "jewelry",
+        "necklace",
+        "crystal"
+      ],
+      "systemTags": [
+        {
+          "id": "ice-affinity",
+          "value": 0
+        }
+      ]
+    },
+    {
+      "actorId": "S38VFGpZijXwloLY",
+      "actorName": "Willy",
+      "itemId": "DMbJ3JZn73wCDSYw",
+      "itemName": "Earth Necklace - 422",
+      "itemType": "item",
+      "tags": [
+        "jewelry",
+        "necklace",
+        "crystal"
+      ],
+      "systemTags": [
+        {
+          "id": "earth-affinity",
+          "value": 0
+        }
+      ]
+    },
+    {
+      "actorId": "S38VFGpZijXwloLY",
+      "actorName": "Willy",
+      "itemId": "DnvloxWFnjlYUmIY",
+      "itemName": "Ice Bracelet - 472",
+      "itemType": "item",
+      "tags": [
+        "jewelry",
+        "bracelet",
+        "crystal"
+      ],
+      "systemTags": [
+        {
+          "id": "ice-affinity",
+          "value": 0
+        }
+      ]
+    },
+    {
+      "actorId": "S38VFGpZijXwloLY",
+      "actorName": "Willy",
+      "itemId": "QIcxXaauoVDq8Kw7",
+      "itemName": "Earth Bracelet - 388",
+      "itemType": "item",
+      "tags": [
+        "jewelry",
+        "bracelet",
+        "crystal"
+      ],
+      "systemTags": [
+        {
+          "id": "earth-affinity",
+          "value": 0
+        }
+      ]
+    },
+    {
+      "actorId": "S38VFGpZijXwloLY",
+      "actorName": "Willy",
+      "itemId": "NbBXZrXXPSC4BWdx",
+      "itemName": "Lunar Necklace - 452",
+      "itemType": "item",
+      "tags": [
+        "jewelry",
+        "necklace",
+        "crystal"
+      ],
+      "systemTags": [
+        {
+          "id": "lunar-affinity",
+          "value": 0
+        }
+      ]
+    },
+    {
+      "actorId": "S38VFGpZijXwloLY",
+      "actorName": "Willy",
+      "itemId": "gYLbZSb2W91pHPTB",
+      "itemName": "Lunar Necklace - 417",
+      "itemType": "item",
+      "tags": [
+        "jewelry",
+        "necklace",
+        "crystal"
+      ],
+      "systemTags": [
+        {
+          "id": "lunar-affinity",
+          "value": 0
+        }
+      ]
+    },
+    {
+      "actorId": "S38VFGpZijXwloLY",
+      "actorName": "Willy",
+      "itemId": "Gp9NXMB9MbFJ8tHH",
+      "itemName": "Lunar Necklace - 542",
+      "itemType": "item",
+      "tags": [
+        "jewelry",
+        "necklace",
+        "crystal"
+      ],
+      "systemTags": [
+        {
+          "id": "lunar-affinity",
+          "value": 0
+        }
+      ]
+    },
+    {
+      "actorId": "S38VFGpZijXwloLY",
+      "actorName": "Willy",
+      "itemId": "uKv6nyfPpVcqR3jz",
+      "itemName": "Lunar Necklace - 458",
+      "itemType": "item",
+      "tags": [
+        "jewelry",
+        "necklace",
+        "crystal"
+      ],
+      "systemTags": [
+        {
+          "id": "lunar-affinity",
+          "value": 0
+        }
+      ]
+    },
+    {
+      "actorId": "S38VFGpZijXwloLY",
+      "actorName": "Willy",
+      "itemId": "GXm2z6F6TtS13qGL",
+      "itemName": "Lunar Necklace - 520",
+      "itemType": "item",
+      "tags": [
+        "jewelry",
+        "necklace",
+        "crystal"
+      ],
+      "systemTags": [
+        {
+          "id": "lunar-affinity",
+          "value": 0
+        }
+      ]
+    }
+  ]
+}

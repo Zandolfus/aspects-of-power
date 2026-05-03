@@ -104,7 +104,11 @@
         }
       }
 
-      // Refresh per-actor cachedTags from each assigned template's now-merged tags.
+      // Refresh per-actor cachedTags from each assigned template. Read the
+      // UNION of tags + systemTags on the template — compendium templates
+      // may still be unmigrated (locked packs), so legacy systemTags is the
+      // only source there. Without the union we'd silently drop cached
+      // affinities on templates that haven't been migrated themselves.
       let cacheUpdated = 0;
       for (const a of game.actors) {
         const updates = {};
@@ -114,8 +118,12 @@
           let tpl;
           try { tpl = await fromUuid(attr.templateId); } catch (e) { continue; }
           if (!tpl) continue;
-          const ids = tpl.system?.tags ?? [];
-          updates[`system.attributes.${type}.cachedTags`] = ids.map(id => ({ id, value: 0 }));
+          const ids = [
+            ...(tpl.system?.tags ?? []),
+            ...(tpl.system?.systemTags ?? []).map(t => t.id),
+          ];
+          const unique = [...new Set(ids.filter(Boolean))];
+          updates[`system.attributes.${type}.cachedTags`] = unique.map(id => ({ id, value: 0 }));
         }
         if (Object.keys(updates).length > 0) {
           await a.update(updates);
