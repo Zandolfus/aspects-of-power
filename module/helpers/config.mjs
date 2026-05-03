@@ -123,15 +123,21 @@ ASPECTSOFPOWER.skillRarityOrder = [
  *   'replace_aoe' — adding any AOE tag replaces an existing AOE tag
  */
 ASPECTSOFPOWER.alterationTags = {
-  aoe_small:   { label: 'ASPECTSOFPOWER.Alteration.aoe_small',   dmgMod: -0.20, costMod:  0.50, category: 'area',         stacking: 'replace_aoe' },
-  aoe_large:   { label: 'ASPECTSOFPOWER.Alteration.aoe_large',   dmgMod: -0.30, costMod:  1.00, category: 'area',         stacking: 'replace_aoe' },
-  debuff:      { label: 'ASPECTSOFPOWER.Alteration.debuff',      dmgMod: -0.10, costMod:  0.20, category: 'status',       stacking: 'multiple'    },
-  dot:         { label: 'ASPECTSOFPOWER.Alteration.dot',         dmgMod: -0.15, costMod:  0.30, category: 'status',       stacking: 'max_one'     },
-  penetration: { label: 'ASPECTSOFPOWER.Alteration.penetration', dmgMod: -0.05, costMod:  0.00, category: 'damage_shape', stacking: 'multiple'    },
-  cleave:      { label: 'ASPECTSOFPOWER.Alteration.cleave',      dmgMod: -0.10, costMod:  0.20, category: 'damage_shape', stacking: 'max_one'     },
-  reach:       { label: 'ASPECTSOFPOWER.Alteration.reach',       dmgMod: -0.05, costMod:  0.10, category: 'range',        stacking: 'multiple'    },
-  channeled:   { label: 'ASPECTSOFPOWER.Alteration.channeled',   dmgMod: -0.10, costMod: -0.50, category: 'cost_shape',   stacking: 'max_one'     },
-  self_buff:   { label: 'ASPECTSOFPOWER.Alteration.self_buff',   dmgMod: -0.10, costMod:  0.00, category: 'self',         stacking: 'multiple'    },
+  // Single AOE tag — caster picks size at placement (scroll wheel during preview).
+  // Cost scales 2^((diameter - 5) / 5) — see item.mjs spell-invest path.
+  // dmgMod: per-target damage drop (you split your output across targets).
+  // weightMod: flat slowdown for the AOE wind-up; bigger casts are also
+  //   slowed automatically via Wis-controlled channel time on bigger mana.
+  aoe:         { label: 'ASPECTSOFPOWER.Alteration.aoe',         dmgMod: -0.20, costMod:  0.00, weightMod: 0.50, category: 'area',         stacking: 'max_one' },
+  // Cleave: melee-only. Cone shape with size = wielded weapon's reach.
+  // Damage/cost penalties; weightMod is small because reach itself is the gate.
+  cleave:      { label: 'ASPECTSOFPOWER.Alteration.cleave',      dmgMod: -0.10, costMod:  0.20, weightMod: 0.30, category: 'damage_shape', stacking: 'max_one' },
+  debuff:      { label: 'ASPECTSOFPOWER.Alteration.debuff',      dmgMod: -0.10, costMod:  0.20, weightMod: 0.20, category: 'status',       stacking: 'multiple' },
+  dot:         { label: 'ASPECTSOFPOWER.Alteration.dot',         dmgMod: -0.15, costMod:  0.30, weightMod: 0.30, category: 'status',       stacking: 'max_one'  },
+  penetration: { label: 'ASPECTSOFPOWER.Alteration.penetration', dmgMod: -0.05, costMod:  0.00, weightMod: 0.10, category: 'damage_shape', stacking: 'multiple' },
+  reach:       { label: 'ASPECTSOFPOWER.Alteration.reach',       dmgMod: -0.05, costMod:  0.10, weightMod: 0.10, category: 'range',        stacking: 'multiple' },
+  channeled:   { label: 'ASPECTSOFPOWER.Alteration.channeled',   dmgMod: -0.10, costMod: -0.50, weightMod: 1.00, category: 'cost_shape',   stacking: 'max_one'  },
+  self_buff:   { label: 'ASPECTSOFPOWER.Alteration.self_buff',   dmgMod: -0.10, costMod:  0.00, weightMod: 0.10, category: 'self',         stacking: 'multiple' },
 };
 
 ASPECTSOFPOWER.spellGradeFactors = {

@@ -43,6 +43,12 @@ export class ItemItemData extends foundry.abstract.TypeDataModel {
       armorBonus: new fields.NumberField({ initial: 0, min: 0, integer: true }),
       veilBonus:  new fields.NumberField({ initial: 0, min: 0, integer: true }),
 
+      // Reach (in feet) for melee weapons. Used by skills tagged with the
+      // `cleave` alteration to derive a cone-shape AOE matching the
+      // weapon's natural arc — daggers stay short, polearms reach far.
+      // Default 5 ft (one square). Designer-set per weapon item.
+      reach: new fields.NumberField({ initial: 5, min: 5, integer: true }),
+
       // Augment slots (auto-set from rarity, but stored for override).
       augmentSlots: new fields.NumberField({ initial: 0, min: 0, integer: true }),
       augments: new fields.ArrayField(new fields.SchemaField({

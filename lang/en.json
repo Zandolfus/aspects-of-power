@@ -404,12 +404,11 @@
     },
     "Alteration": {
       "label": "Alteration",
-      "aoe_small": "AOE (Small)",
-      "aoe_large": "AOE (Large)",
+      "aoe": "AOE",
+      "cleave": "Cleave (weapon-reach cone)",
       "debuff": "Debuff Rider",
       "dot": "Damage over Time",
       "penetration": "Penetration",
-      "cleave": "Cleave",
       "reach": "Reach",
       "channeled": "Channeled",
       "self_buff": "Self-Buff"

@@ -22,6 +22,10 @@
           <label class='resource-label'>{{localize "ASPECTSOFPOWER.Equip.weight"}}</label>
           <input type='number' name='system.weight' value='{{system.weight}}' min='0'/>
         </div>
+        <div class='resource'>
+          <label class='resource-label' title='Melee reach in feet — used by Cleave alteration to shape the cone.'>Reach (ft)</label>
+          <input type='number' name='system.reach' value='{{system.reach}}' min='5' step='5'/>
+        </div>
       </div>
 
       {{! Free-form tag chips + autocomplete (always visible) }}

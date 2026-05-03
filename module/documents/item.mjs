@@ -368,14 +368,15 @@ export class AspectsofPowerItem extends Item {
   }
 
   /**
-   * Resolve a skill's effective multiplier and cost mod from its rarity
-   * tag + alteration list. Per design-skill-rarity-system.md:
-   *   effective_mult = max(0, rarityMult + Σ alteration.dmgMod)
-   *   cost_mult      = 1 + Σ alteration.costMod
-   * Cost-mult is returned for callers to apply to base resource costs;
-   * this method does NOT touch the resource pool itself.
+   * Resolve a skill's effective multiplier, cost mod, and weight mod
+   * from its rarity tag + alteration list. Per design-skill-rarity-system.md:
+   *   effective_mult            = max(0, rarityMult + Σ alteration.dmgMod)
+   *   cost_mult                 = 1 + Σ alteration.costMod
+   *   effective_weight_mult     = 1 + Σ alteration.weightMod
+   * Returned for callers to apply to base resource costs and action
+   * weight; this method does NOT touch the actor or update anything.
    *
-   * @returns {{rarityMult:number, effectiveMult:number, costMultiplier:number}}
+   * @returns {{rarityMult:number, effectiveMult:number, costMultiplier:number, effectiveWeightMultiplier:number}}
    */
   _resolveRarityMods() {
     const sc = CONFIG.ASPECTSOFPOWER;
@@ -384,16 +385,19 @@ export class AspectsofPowerItem extends Item {
     const alterations = this.system.alterations || [];
     let dmgMod = 0;
     let costMod = 0;
+    let weightMod = 0;
     for (const alt of alterations) {
       const tag = sc.alterationTags?.[alt.id];
       if (!tag) continue;
-      dmgMod += tag.dmgMod ?? 0;
-      costMod += tag.costMod ?? 0;
+      dmgMod    += tag.dmgMod    ?? 0;
+      costMod   += tag.costMod   ?? 0;
+      weightMod += tag.weightMod ?? 0;
     }
     return {
       rarityMult,
-      effectiveMult:  Math.max(0, rarityMult + dmgMod),
-      costMultiplier: 1 + costMod,
+      effectiveMult:             Math.max(0, rarityMult + dmgMod),
+      costMultiplier:            1 + costMod,
+      effectiveWeightMultiplier: 1 + weightMod,
     };
   }
 
@@ -2734,8 +2738,11 @@ export class AspectsofPowerItem extends Item {
    * v14: uses Scene Regions instead of MeasuredTemplates.
    * @returns {RegionDocument|null}
    */
-  async _placeAoeTemplate(casterToken) {
-    const aoe = this.system.aoe;
+  async _placeAoeTemplate(casterToken, aoeOverride = null) {
+    // Optional per-cast aoe override (e.g., Cleave alteration sets
+    // shape='cone' and diameter from the weapon's reach). Falls back
+    // to the skill's static aoe block when no override is supplied.
+    const aoe = aoeOverride ?? this.system.aoe;
     const shape = aoe.shape ?? 'circle';
     const castingRange = this.actor.system.castingRange ?? 0;
     const pxPerFt = canvas.grid.size / canvas.grid.distance;
@@ -3378,7 +3385,19 @@ export class AspectsofPowerItem extends Item {
     if (isVariableSpell) {
       const tierFactor  = sc.spellTierFactors[spellTier];
       const gradeFactor = sc.spellGradeFactors[spellGrade];
-      const baseMana    = Math.round(tierFactor * gradeFactor);
+      let   baseMana    = Math.round(tierFactor * gradeFactor);
+      // AOE 2^n cost scaling per pending-variable-mana.md: when this skill
+      // carries the `aoe` alteration, the base mana scales as
+      //   baseMana × 2^((diameter - 5) / 5)
+      // before variable invest. 5ft = 1×, 10ft = 2×, 15ft = 4×, …, 25ft = 16×.
+      // The diameter is the skill's currently-set value; per-cast scaling
+      // via scroll-wheel is a follow-up that will recompute at placement.
+      const hasAoeAlteration = (this.system.alterations ?? []).some(a => a.id === 'aoe');
+      if (hasAoeAlteration) {
+        const diameter = this.system.aoe?.diameter ?? 5;
+        const aoeMult = Math.pow(2, Math.max(0, (diameter - 5) / 5));
+        baseMana = Math.max(1, Math.round(baseMana * aoeMult));
+      }
       const wisMod      = this.actor.system.abilities?.wisdom?.mod ?? 0;
       // Live read — slider must cap at the actor's CURRENT mana.
       const livePool    = Math.round(this.actor.system[rollData.roll.resource]?.value ?? 0);
@@ -3665,7 +3684,24 @@ export class AspectsofPowerItem extends Item {
     game.aspectsofpower?.consumeAction?.(this.actor);
 
     // ── AOE branch: place template, detect targets, then deduct cost ──
-    const isAoe = this.system.aoe?.enabled && tags.length > 0;
+    // Cleave alteration: melee skill with the cleave tag becomes a cone
+    // sized to the wielded weapon's reach. Treats Cleave as an AOE even
+    // when system.aoe.enabled is false on the underlying skill.
+    const hasCleave = (this.system.alterations ?? []).some(a => a.id === 'cleave');
+    let aoeOverride = null;
+    if (hasCleave) {
+      const wpn = this._resolveWeaponForSkill?.();
+      const reach = wpn?.system?.reach ?? 5;
+      aoeOverride = {
+        ...(this.system.aoe ?? {}),
+        enabled: true,
+        shape: 'cone',
+        diameter: reach,
+        angle: 60,
+        targetingMode: this.system.aoe?.targetingMode ?? 'enemies',
+      };
+    }
+    const isAoe = (this.system.aoe?.enabled || hasCleave) && tags.length > 0;
     if (isAoe) {
       const casterToken = this.actor.getActiveTokens()?.[0];
       if (!casterToken) {
@@ -3674,7 +3710,7 @@ export class AspectsofPowerItem extends Item {
       }
 
       // Interactive placement — cancelled means no cost.
-      const templateDoc = await this._placeAoeTemplate(casterToken);
+      const templateDoc = await this._placeAoeTemplate(casterToken, aoeOverride);
       if (!templateDoc) return dmgRoll;
 
       // Orient caster toward the AOE center.

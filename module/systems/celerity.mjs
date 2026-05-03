@@ -91,7 +91,13 @@ export function computeActionWait(actor, skill, weapon = null, investAmount = nu
   const sc = CONFIG.ASPECTSOFPOWER.celerity;
   const speed = Math.max(1, _actorSpeedFor(actor, skill));
   const weight = _resolveCelerityWeight(skill, weapon);
-  const multiplier = skill?.system?.roll?.actionWeightMultiplier ?? 1.0;
+  // Total weight multiplier = manual designer override (legacy) ×
+  // alteration-derived weight multiplier (rarity + tags). Vanilla
+  // skill = 1 × 1 = 1 (unchanged); a Cleave-altered skill picks up
+  // the cleave tag's weightMod automatically.
+  const manualMult = skill?.system?.roll?.actionWeightMultiplier ?? 1.0;
+  const altMult    = skill?._resolveRarityMods?.()?.effectiveWeightMultiplier ?? 1.0;
+  const multiplier = manualMult * altMult;
   const baseWait = Math.max(1, Math.round((weight * multiplier * sc.SCALE) / speed));
 
   const isMagic = _MAGIC_TYPES.has(skill?.system?.roll?.type ?? '');
