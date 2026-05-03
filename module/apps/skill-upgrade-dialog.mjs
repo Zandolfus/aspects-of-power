@@ -108,9 +108,14 @@ export class SkillUpgradeDialog extends foundry.applications.api.HandlebarsAppli
       id: a.id,
       label: sc.alterationTags?.[a.id]?.label ?? a.id,
     }));
-    context.previewDmgMod = previewDmgMod;
-    context.previewCostMod = previewCostMod;
-    context.previewEffectiveMult = previewEffectiveMult;
+    // Round display values — float arithmetic on rarityMult ± dmgMod can
+    // produce 0.49999999999999994-style noise even though the underlying
+    // computation in item.mjs handles it via Math.max + the formula.
+    context.previewDmgMod = Math.round(previewDmgMod * 100) / 100;
+    context.previewCostMod = Math.round(previewCostMod * 100) / 100;
+    context.previewEffectiveMult = previewEffectiveMult != null
+      ? Math.round(previewEffectiveMult * 100) / 100
+      : null;
     context.previewCostMultiplier = (1 + previewCostMod).toFixed(2);
     context.previewName = this._suggestName(nextRarity);
     context.canConfirm = this.actor && !isMaxRarity && (this.upgradeType === 'specialization' || this.selectedAlterationId);
