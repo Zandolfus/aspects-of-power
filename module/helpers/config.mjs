@@ -928,6 +928,30 @@ ASPECTSOFPOWER.rankTiers = {
 };
 
 /**
+ * Rank equivalence for class / profession templates: which target ranks does
+ * a template assigned at a given rank actually cover? Race templates use
+ * per-rank `rankGains` and are unaffected by this table.
+ *
+ * G and F share class / profession structure (a G template's gains apply
+ * unchanged through both G-rank and F-rank levels). Higher ranks are each
+ * self-contained.
+ *
+ * Consumed by:
+ *   - mass-leveler.applyTrackLevels (engine compatibility check)
+ *   - player-releveler-dialog._findTemplatesByRank (picker filtering)
+ */
+ASPECTSOFPOWER.rankEquivalence = {
+  G: ['G', 'F'],
+  F: ['F'],
+  E: ['E'],
+  D: ['D'],
+  C: ['C'],
+  B: ['B'],
+  A: ['A'],
+  S: ['S'],
+};
+
+/**
  * Determine rank letter from a level value.
  * @param {number} level
  * @returns {string}

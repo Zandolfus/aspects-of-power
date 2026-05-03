@@ -451,7 +451,11 @@ export class PlayerRelevelDialog extends foundry.applications.api.HandlebarsAppl
       if (item.type !== track) return false;
       if (track === 'race') return true; // race templates span all ranks
       if (rank == null) return true;     // wildcard — used for "all of this type"
-      return (item.system?.rank ?? 'G') === rank;
+      // Honor rank equivalence: a template at rank X is acceptable for any
+      // rank in `rankEquivalence[X]`. Default is single-rank coverage.
+      const tplRank = item.system?.rank ?? 'G';
+      const covered = CONFIG.ASPECTSOFPOWER.rankEquivalence?.[tplRank] ?? [tplRank];
+      return covered.includes(rank);
     };
     // World items
     for (const i of game.items) {
@@ -464,7 +468,11 @@ export class PlayerRelevelDialog extends foundry.applications.api.HandlebarsAppl
         const index = await pack.getIndex({ fields: ['system.rank'] });
         for (const entry of index) {
           if (entry.type !== track) continue;
-          if (track !== 'race' && rank != null && (entry.system?.rank ?? 'G') !== rank) continue;
+          if (track !== 'race' && rank != null) {
+            const tplRank = entry.system?.rank ?? 'G';
+            const covered = CONFIG.ASPECTSOFPOWER.rankEquivalence?.[tplRank] ?? [tplRank];
+            if (!covered.includes(rank)) continue;
+          }
           out.push({ uuid: `Compendium.${pack.metadata.id}.Item.${entry._id}`, name: entry.name, source: pack.metadata.label });
         }
       } catch (e) { /* pack unavailable */ }

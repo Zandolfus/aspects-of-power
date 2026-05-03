@@ -60,7 +60,12 @@ export async function applyTrackLevels(actor, track, levelsToAdd) {
 
     if (track === 'class' || track === 'profession') {
       const templateRank = templateItem.system.rank ?? 'G';
-      if (nextRank !== templateRank) {
+      // Rank equivalence per CONFIG.ASPECTSOFPOWER.rankEquivalence — a
+      // template assigned at rank X may cover multiple adjacent ranks
+      // (G covers G+F by default). Halt only when the next level's rank
+      // isn't in the template's coverage list.
+      const coveredRanks = CONFIG.ASPECTSOFPOWER.rankEquivalence?.[templateRank] ?? [templateRank];
+      if (!coveredRanks.includes(nextRank)) {
         haltReason = `${track} template "${templateItem.name}" is rank ${templateRank}; level ${nextLevel} needs rank ${nextRank}. Assign a new ${track} template and re-run.`;
         break;
       }
