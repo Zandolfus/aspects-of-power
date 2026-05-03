@@ -676,6 +676,21 @@ export class AspectsofPowerItemSheet extends foundry.applications.api.Handlebars
       el.addEventListener('click', ev => onManageActiveEffect(ev, this.item));
     });
 
+    // --- Skill: Add / Delete alteration rows ---
+    this.element.querySelector('.alteration-add')?.addEventListener('click', async () => {
+      const alterations = [...(this.item.system.alterations ?? []), { id: '', params: {} }];
+      await this.document.update({ 'system.alterations': alterations });
+    });
+
+    this.element.querySelectorAll('.alteration-delete').forEach(el => {
+      el.addEventListener('click', async () => {
+        const idx = Number(el.dataset.index);
+        const alterations = [...(this.item.system.alterations ?? [])];
+        alterations.splice(idx, 1);
+        await this.document.update({ 'system.alterations': alterations });
+      });
+    });
+
     // --- Equipment: Add / Delete stat bonus rows ---
     this.element.querySelector('.stat-bonus-add')?.addEventListener('click', async () => {
       const bonuses = [...(this.item.system.statBonuses ?? []), { ability: 'strength', value: 0 }];

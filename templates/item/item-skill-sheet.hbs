@@ -607,16 +607,50 @@
       </div>
 
       <div class='resource'>
-        <label class='resource-label'>{{localize "ASPECTSOFPOWER.Equip.rarity"}}</label>
-        <select name='system.rarity' class='rarity-select'>
-          {{#each config.rarities as |rarDef rarKey|}}
+        <label class='resource-label'>{{localize "ASPECTSOFPOWER.SkillRarity.label"}}</label>
+        <select name='system.rarity' class='rarity-select'
+                style="color: {{lookup (lookup config.skillRarities system.rarity) 'color'}}">
+          {{#each config.skillRarities as |rarDef rarKey|}}
             <option value='{{rarKey}}' {{#if (eq rarKey @root.system.rarity)}}selected{{/if}}
                     style="color: {{rarDef.color}}">
-              {{localize rarDef.label}}
+              {{localize rarDef.label}} ({{rarDef.mult}})
             </option>
           {{/each}}
         </select>
       </div>
+
+      <div class='resource'>
+        <label class='resource-label'>{{localize "ASPECTSOFPOWER.EffectType.label"}}</label>
+        <select name='system.effectType'>
+          <option value='damage'  {{#if (eq system.effectType "damage")}}selected{{/if}}>{{localize "ASPECTSOFPOWER.EffectType.damage"}}</option>
+          <option value='heal'    {{#if (eq system.effectType "heal")}}selected{{/if}}>{{localize "ASPECTSOFPOWER.EffectType.heal"}}</option>
+          <option value='debuff'  {{#if (eq system.effectType "debuff")}}selected{{/if}}>{{localize "ASPECTSOFPOWER.EffectType.debuff"}}</option>
+          <option value='utility' {{#if (eq system.effectType "utility")}}selected{{/if}}>{{localize "ASPECTSOFPOWER.EffectType.utility"}}</option>
+        </select>
+      </div>
+    </div>
+
+    {{! ── Alterations editor ── }}
+    <div class='form-section alterations-section'>
+      <h3>{{localize "ASPECTSOFPOWER.Alteration.label"}}</h3>
+      <p class='hint' style='font-size:11px;color:#888;margin:0 0 6px;'>
+        Effective mult = rarity ({{lookup (lookup config.skillRarities system.rarity) 'mult'}})
+        + Σ alteration dmgMod (floor 0). Cost = base × rarityMult × (1 + Σ costMod).
+      </p>
+      {{#each system.alterations as |alt idx|}}
+        <div class='alteration-row' style='display:flex;gap:6px;align-items:center;margin-bottom:4px;'>
+          <select name='system.alterations.{{idx}}.id' style='flex:1;'>
+            <option value=''>— pick an alteration —</option>
+            {{#each @root.config.alterationTags as |tag tagKey|}}
+              <option value='{{tagKey}}' {{#if (eq alt.id tagKey)}}selected{{/if}}>
+                {{localize tag.label}} (dmg {{tag.dmgMod}}, cost {{tag.costMod}})
+              </option>
+            {{/each}}
+          </select>
+          <button type='button' class='alteration-delete' data-index='{{idx}}' title='Remove'>×</button>
+        </div>
+      {{/each}}
+      <button type='button' class='alteration-add'>+ Add Alteration</button>
     </div>
   </section>
 </form>

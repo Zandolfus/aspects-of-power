@@ -85,17 +85,17 @@ ASPECTSOFPOWER.spellTierMultipliers = {
  * Floor at not_proficient (0.2) — never zero. Below that = GM discretion.
  */
 ASPECTSOFPOWER.skillRarities = {
-  not_proficient: { mult: 0.2, label: 'ASPECTSOFPOWER.SkillRarity.not_proficient', subInferior: true },
-  neglected:      { mult: 0.3, label: 'ASPECTSOFPOWER.SkillRarity.neglected',      subInferior: true },
-  rusty:          { mult: 0.4, label: 'ASPECTSOFPOWER.SkillRarity.rusty',          subInferior: true },
-  inferior:       { mult: 0.5, label: 'ASPECTSOFPOWER.SkillRarity.inferior'        },
-  common:         { mult: 0.6, label: 'ASPECTSOFPOWER.SkillRarity.common'          },
-  uncommon:       { mult: 0.7, label: 'ASPECTSOFPOWER.SkillRarity.uncommon'        },
-  rare:           { mult: 0.8, label: 'ASPECTSOFPOWER.SkillRarity.rare'            },
-  epic:           { mult: 0.9, label: 'ASPECTSOFPOWER.SkillRarity.epic'            },
-  legendary:      { mult: 1.0, label: 'ASPECTSOFPOWER.SkillRarity.legendary'       },
-  mythic:         { mult: 1.1, label: 'ASPECTSOFPOWER.SkillRarity.mythic'          },
-  divine:         { mult: 1.2, label: 'ASPECTSOFPOWER.SkillRarity.divine'          },
+  not_proficient: { mult: 0.2, label: 'ASPECTSOFPOWER.SkillRarity.not_proficient', color: '#5a3030', subInferior: true },
+  neglected:      { mult: 0.3, label: 'ASPECTSOFPOWER.SkillRarity.neglected',      color: '#704040', subInferior: true },
+  rusty:          { mult: 0.4, label: 'ASPECTSOFPOWER.SkillRarity.rusty',          color: '#8a5040', subInferior: true },
+  inferior:       { mult: 0.5, label: 'ASPECTSOFPOWER.SkillRarity.inferior',       color: '#888888' },
+  common:         { mult: 0.6, label: 'ASPECTSOFPOWER.SkillRarity.common',         color: '#ffffff' },
+  uncommon:       { mult: 0.7, label: 'ASPECTSOFPOWER.SkillRarity.uncommon',       color: '#1eff00' },
+  rare:           { mult: 0.8, label: 'ASPECTSOFPOWER.SkillRarity.rare',           color: '#0070dd' },
+  epic:           { mult: 0.9, label: 'ASPECTSOFPOWER.SkillRarity.epic',           color: '#a335ee' },
+  legendary:      { mult: 1.0, label: 'ASPECTSOFPOWER.SkillRarity.legendary',      color: '#ff8000' },
+  mythic:         { mult: 1.1, label: 'ASPECTSOFPOWER.SkillRarity.mythic',         color: '#e6cc80' },
+  divine:         { mult: 1.2, label: 'ASPECTSOFPOWER.SkillRarity.divine',         color: '#ff4444' },
 };
 
 /**
