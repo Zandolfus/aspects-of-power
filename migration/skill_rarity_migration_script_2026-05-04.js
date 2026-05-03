@@ -65,6 +65,11 @@
     if (tags.includes('restoration')) return 'heal';
     if (tags.includes('debuff')) return 'debuff';
     if (tags.includes('attack')) return 'damage';
+    // No clear effect-type tag — fall back to "damage" if the skill has any
+    // damage-formula evidence (formula string or non-default diceBonus).
+    // Catches legacy damage skills that forgot the 'attack' tag.
+    const r = skill.system.roll || {};
+    if (skill.system.formula || (r.diceBonus != null && r.diceBonus !== 1)) return 'damage';
     return 'utility';
   }
 
