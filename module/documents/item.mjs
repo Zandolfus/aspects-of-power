@@ -3307,8 +3307,7 @@ export class AspectsofPowerItem extends Item {
         ?? sc.spellMaxInvestAboveBase?.['']
         ?? 1.0;
       const wisCap   = Math.round(baseMana + wisMod * aboveBaseFactor);
-      const maxHp    = Math.round(this.actor.system.health?.max ?? 0);
-      const maxInvest = Math.min(livePool, wisCap, maxHp);
+      const maxInvest = Math.min(livePool, wisCap);
 
       if (livePool < baseMana) {
         ChatMessage.create({
@@ -3386,8 +3385,17 @@ export class AspectsofPowerItem extends Item {
         const safeInvest = Math.max(0, Math.round(toughMod * sc.invest.toughCapFactor));
         // Live read — see equivalent comment above on the spell path.
         const livePool = Math.round(this.actor.system[rollData.roll.resource]?.value ?? 0);
-        const maxHp    = Math.round(this.actor.system.health?.max ?? 0);
-        const maxPool  = Math.min(livePool, maxHp);
+        // Cap invest so the worst-case self-damage at the slider's max equals
+        // the actor's current HP — past that, it's just nonsense math (the
+        // 6-million self-damage screenshot). Solving the self-damage quadratic
+        // for excess: self_dmg = potency × (excess/safeInvest)² ≤ curHp
+        //   → excess ≤ safeInvest × √(curHp / potency).
+        const curHp = Math.round(this.actor.system.health?.value ?? 0);
+        let maxPool = livePool;
+        if (safeInvest > 0 && statBlend > 0 && curHp > 0) {
+          const maxExcess = safeInvest * Math.sqrt(curHp / statBlend);
+          maxPool = Math.min(maxPool, Math.floor(baseStamina + safeInvest + maxExcess));
+        }
         const multiplier = this.system.roll?.diceBonus ?? 1;
 
         if (livePool < baseStamina) {
