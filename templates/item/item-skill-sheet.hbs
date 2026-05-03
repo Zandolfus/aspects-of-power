@@ -2,7 +2,12 @@
   <header class='sheet-header'>
     <img class='profile-img' src='{{item.img}}' data-edit='img' title='{{item.name}}' />
     <div class='header-fields'>
-      <h1 class='charname'><input name='name' type='text' value='{{item.name}}' placeholder='Name' /></h1>
+      <h1 class='charname'>
+        <input name='name' type='text' value='{{item.name}}' placeholder='Name' />
+        <button type='button' class='skill-upgrade-btn' title='Create a new linked higher-rarity version on the owning actor.' style='font-size:11px;padding:2px 8px;margin-left:6px;'>
+          ⬆ Upgrade
+        </button>
+      </h1>
 
       {{! Tag chips + autocomplete (always visible) }}
       <div class='skill-tags'>

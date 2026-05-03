@@ -1,0 +1,83 @@
+<form class='skill-upgrade-form'>
+  <header style='margin-bottom:8px;'>
+    <h2 style='margin:0 0 4px;'>Upgrade: {{skill.name}}</h2>
+    {{#if ownedByActor}}
+      <p class='hint' style='font-size:11px;color:#888;margin:0;'>
+        Creates a new linked skill on <strong>{{actorName}}</strong>. The original is preserved.
+      </p>
+    {{else}}
+      <p class='warning' style='color:#c33;font-weight:bold;margin:0;'>
+        This skill is not owned by an actor. Drag it onto a character first to upgrade.
+      </p>
+    {{/if}}
+  </header>
+
+  {{#if isMaxRarity}}
+    <p class='warning' style='color:#c33;font-weight:bold;'>
+      This skill is already at maximum rarity ({{currentRarityLabel}}). No further upgrades available.
+    </p>
+  {{else}}
+
+  <section class='rarity-display' style='display:flex;gap:12px;align-items:center;margin:8px 0;font-size:14px;'>
+    <span>{{localize currentRarityLabel}} <small style='color:#888;'>(mult {{currentMult}})</small></span>
+    <span style='font-size:18px;'>→</span>
+    <span><strong>{{localize nextRarityLabel}}</strong> <small style='color:#888;'>(mult {{nextMult}})</small></span>
+  </section>
+
+  <section class='upgrade-choice' style='margin:12px 0;'>
+    <label style='display:block;margin:6px 0;'>
+      <input type='radio' name='upgradeType' value='specialization' {{#if (eq upgradeType "specialization")}}checked{{/if}} />
+      <strong>Specialization</strong>
+      <span class='hint' style='font-size:11px;color:#888;'> — clean rarity bump, no new behavior</span>
+    </label>
+    <label style='display:block;margin:6px 0;'>
+      <input type='radio' name='upgradeType' value='alteration' {{#if (eq upgradeType "alteration")}}checked{{/if}} />
+      <strong>Alteration</strong>
+      <span class='hint' style='font-size:11px;color:#888;'> — add a tag (trades effect mult for capability)</span>
+    </label>
+  </section>
+
+  {{#if (eq upgradeType "alteration")}}
+    <section class='alteration-pick' style='margin:8px 0;padding-left:24px;'>
+      <label class='resource-label'>Pick an alteration tag</label>
+      <select name='alterationId' style='width:100%;'>
+        <option value=''>— pick one —</option>
+        {{#each availableAlts as |a|}}
+          <option value='{{a.id}}' {{#if a.disabled}}disabled{{/if}} {{#if (eq a.id @root.selectedAlterationId)}}selected{{/if}}>
+            {{localize a.label}} (dmg {{a.dmgMod}}, cost {{a.costMod}}){{#if a.disabled}} — {{a.disabledReason}}{{/if}}
+          </option>
+        {{/each}}
+      </select>
+    </section>
+  {{/if}}
+
+  <section class='preview' style='margin-top:12px;padding:8px;background:#222;border-radius:4px;font-size:12px;'>
+    <h4 style='margin:0 0 6px;'>Preview — new skill</h4>
+    <ul style='list-style:none;padding:0;margin:0;'>
+      <li><strong>Name:</strong> {{previewName}}</li>
+      <li><strong>Rarity:</strong> {{localize nextRarityLabel}} (base mult {{nextMult}})</li>
+      <li><strong>Alterations:</strong>
+        {{#if previewAlterations.length}}
+          {{#each previewAlterations as |a|}}{{localize a.label}}{{#unless @last}}, {{/unless}}{{/each}}
+        {{else}}
+          (none)
+        {{/if}}
+      </li>
+      <li><strong>Effective mult:</strong> {{previewEffectiveMult}}
+        <span class='hint' style='color:#888;'>= {{nextMult}} {{#if previewDmgMod}}+ ({{previewDmgMod}}){{/if}} (floor 0)</span>
+      </li>
+      <li><strong>Cost multiplier:</strong> ×{{previewCostMultiplier}}
+        <span class='hint' style='color:#888;'>= 1 + {{previewCostMod}}</span>
+      </li>
+    </ul>
+  </section>
+
+  {{/if}}
+
+  <footer style='display:flex;gap:8px;margin-top:12px;justify-content:flex-end;'>
+    <button type='button' data-action='cancel'>Cancel</button>
+    <button type='button' data-action='confirm' {{#unless canConfirm}}disabled{{/unless}}>
+      {{#if (eq upgradeType "alteration")}}Upgrade with Alteration{{else}}Upgrade (Specialization){{/if}}
+    </button>
+  </footer>
+</form>

@@ -2,6 +2,7 @@ import {
   onManageActiveEffect,
   prepareActiveEffectCategories,
 } from '../helpers/effects.mjs';
+import { SkillUpgradeDialog } from '../apps/skill-upgrade-dialog.mjs';
 
 /**
  * Extend ItemSheetV2 with Aspects of Power-specific behaviour.
@@ -674,6 +675,18 @@ export class AspectsofPowerItemSheet extends foundry.applications.api.Handlebars
 
     this.element.querySelectorAll('.effect-control').forEach(el => {
       el.addEventListener('click', ev => onManageActiveEffect(ev, this.item));
+    });
+
+    // --- Skill: Upgrade button (opens spec / alteration dialog) ---
+    this.element.querySelector('.skill-upgrade-btn')?.addEventListener('click', () => {
+      if (this.item.type !== 'skill') return;
+      // Owner-or-GM gating mirrors the actor sheet's relevel/spend buttons.
+      const actor = this.item.actor;
+      if (actor && !actor.isOwner) {
+        ui.notifications.warn('Only the actor owner can upgrade this skill.');
+        return;
+      }
+      new SkillUpgradeDialog(this.item).render(true);
     });
 
     // --- Skill: Add / Delete alteration rows ---
