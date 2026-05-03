@@ -173,6 +173,9 @@
             <button type="button" class="level-up-btn">
               <i class="fas fa-arrow-up"></i> {{localize "ASPECTSOFPOWER.Level.levelUp"}}
             </button>
+            <button type="button" class="relevel-btn" title="Reset and re-level the character with template prompts at each rank boundary">
+              <i class="fas fa-recycle"></i> Re-Level
+            </button>
             {{#if (gt freePoints 0)}}
               <span class="free-points-badge">{{localize "ASPECTSOFPOWER.Level.freePoints"}}: {{freePoints}}</span>
             {{/if}}

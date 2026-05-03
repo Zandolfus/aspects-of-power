@@ -4,6 +4,7 @@ import {
 } from '../helpers/effects.mjs';
 import { EquipmentSystem } from '../systems/equipment.mjs';
 import { LevelUpDialog } from '../apps/level-up-dialog.mjs';
+import { PlayerRelevelDialog } from '../apps/player-releveler-dialog.mjs';
 
 /**
  * Extend ActorSheetV2 with Aspects of Power-specific behaviour.
@@ -623,6 +624,15 @@ export class AspectsofPowerActorSheet extends foundry.applications.api.Handlebar
     // Level Up button — opens the level-up dialog (all players).
     this.element.querySelector('.level-up-btn')?.addEventListener('click', () => {
       new LevelUpDialog(this.actor).render(true);
+    });
+
+    // Re-Level button — opens the player re-leveler wizard. Owner-only.
+    this.element.querySelector('.relevel-btn')?.addEventListener('click', () => {
+      if (!this.actor.isOwner) {
+        ui.notifications.warn('Only the actor owner can re-level.');
+        return;
+      }
+      new PlayerRelevelDialog(this.actor).render(true);
     });
 
     // Template link — click to open the source template item sheet.

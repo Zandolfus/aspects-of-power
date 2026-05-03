@@ -1,0 +1,147 @@
+<form class='player-releveler-form'>
+  <header class='wizard-header'>
+    <h2>Re-Level: {{actor.name}}</h2>
+    <ol class='step-indicator'>
+      <li class='{{#if (eq step "baseStats")}}active{{/if}}'>1. Base Stats</li>
+      <li class='{{#if (eq step "targets")}}active{{/if}}'>2. Targets</li>
+      <li class='{{#if (eq step "confirm")}}active{{/if}}'>3. Confirm</li>
+      <li class='{{#if (eq step "run")}}active{{/if}}'>4. Run</li>
+      <li class='{{#if (eq step "summary")}}active{{/if}}'>5. Summary</li>
+    </ol>
+  </header>
+
+  {{#if (eq step "baseStats")}}
+    <section class='wizard-step'>
+      <h3>Base Ability Values</h3>
+      <p class='hint'>Set the base values your character starts with (before any level-up gains). Defaults to 5 across the board (NPC default). Your current values are shown for reference.</p>
+      <table class='base-stats-table'>
+        <thead><tr><th>Ability</th><th>Base</th><th>Currently</th></tr></thead>
+        <tbody>
+          {{#each abilityKeys as |key|}}
+            <tr>
+              <td>{{key}}</td>
+              <td><input type='number' name='base.{{key}}' value='{{lookup ../baseStats key}}' min='0' style='width:60px;' /></td>
+              <td class='current-value'>{{lookup ../currentValues key}}</td>
+            </tr>
+          {{/each}}
+        </tbody>
+      </table>
+    </section>
+  {{/if}}
+
+  {{#if (eq step "targets")}}
+    <section class='wizard-step'>
+      <h3>Target Levels</h3>
+      <p class='hint'>Where do you want each track to land? Race level is auto-derived for threefold-path races (`floor((class + profession) / 2)`); for two-/onefold races you set it explicitly.</p>
+      <table class='targets-table'>
+        <thead><tr><th>Track</th><th>Currently</th><th>Target</th></tr></thead>
+        <tbody>
+          <tr>
+            <td>Class</td>
+            <td>{{currentLevels.class}}</td>
+            <td><input type='number' name='target.class' value='{{targets.class}}' min='0' style='width:80px;' /></td>
+          </tr>
+          <tr>
+            <td>Profession</td>
+            <td>{{currentLevels.profession}}</td>
+            <td><input type='number' name='target.profession' value='{{targets.profession}}' min='0' style='width:80px;' /></td>
+          </tr>
+          <tr>
+            <td>Race ({{raceTemplateName}}, {{pathType}})</td>
+            <td>{{currentLevels.race}}</td>
+            {{#if raceIsDerived}}
+              <td>auto-derived: <strong class='derived-race-level'>{{derivedRaceLevel}}</strong></td>
+            {{else}}
+              <td><input type='number' name='target.race' value='{{targets.race}}' min='0' style='width:80px;' /></td>
+            {{/if}}
+          </tr>
+        </tbody>
+      </table>
+    </section>
+  {{/if}}
+
+  {{#if (eq step "confirm")}}
+    <section class='wizard-step'>
+      <h3>Confirm Reset & Run</h3>
+      <p class='warning' style='color:#c33;font-weight:bold;'>This will OVERWRITE your character. There's no undo.</p>
+      <ul>
+        <li>All 9 abilities will be set to your entered base values.</li>
+        <li>All level tracks (class, profession, race) reset to 0.</li>
+        <li>Class and profession templates will be cleared (you'll re-pick at each rank boundary). Race template is preserved.</li>
+        <li>Free points reset to 0 — they re-accumulate from level-up gains.</li>
+        <li>Then I'll auto-walk you to: class {{targets.class}}, profession {{targets.profession}}, race {{targetRaceFinal}}.</li>
+      </ul>
+      <p>Continue?</p>
+    </section>
+  {{/if}}
+
+  {{#if (eq step "run")}}
+    <section class='wizard-step'>
+      <h3>Running…</h3>
+      <pre class='run-log' style='max-height:240px;overflow-y:auto;background:#111;color:#ddd;padding:8px;font-size:11px;'>
+{{#each runState.logLines as |line|}}{{line}}
+{{/each}}
+      </pre>
+
+      {{#if runState.waitingForPick}}
+        <h4>Pick a {{runState.waitingForPick.track}} template (rank {{runState.waitingForPick.neededRank}})</h4>
+        {{#if runState.waitingForPick.candidates.length}}
+          <ul class='template-pick-list' style='max-height:200px;overflow-y:auto;'>
+            {{#each runState.waitingForPick.candidates as |t|}}
+              <li style='margin:4px 0;'>
+                <button type='button' data-action='pickTemplate' data-uuid='{{t.uuid}}'>{{t.name}}</button>
+                <span class='hint' style='font-size:11px;color:#888;'>({{t.source}})</span>
+              </li>
+            {{/each}}
+          </ul>
+        {{else}}
+          <p class='warning' style='color:#c33;'>No matching templates found in world or compendiums for {{runState.waitingForPick.track}} rank {{runState.waitingForPick.neededRank}}. Ask your GM to create or assign one.</p>
+        {{/if}}
+      {{/if}}
+    </section>
+  {{/if}}
+
+  {{#if (eq step "summary")}}
+    <section class='wizard-step'>
+      <h3>Done</h3>
+      <p>Levels reached:</p>
+      <ul>
+        <li>Class: {{results.post.class}}</li>
+        <li>Profession: {{results.post.profession}}</li>
+        <li>Race: {{results.post.race}}</li>
+      </ul>
+      <p>Free points credited: <strong>{{results.freePointsCredited}}</strong> — spend them via your character sheet.</p>
+      <h4>Ability changes</h4>
+      <table class='ability-diff-table'>
+        <thead><tr><th>Ability</th><th>Pre-reset</th><th>Base</th><th>After</th><th>Gained</th></tr></thead>
+        <tbody>
+          {{#each results.abilityDiff as |row|}}
+            <tr>
+              <td>{{row.key}}</td>
+              <td>{{row.before}}</td>
+              <td>{{row.base}}</td>
+              <td>{{row.after}}</td>
+              <td>{{row.gained}}</td>
+            </tr>
+          {{/each}}
+        </tbody>
+      </table>
+    </section>
+  {{/if}}
+
+  <footer class='wizard-footer' style='display:flex;gap:8px;margin-top:12px;justify-content:flex-end;'>
+    {{#if (or (eq step "targets") (eq step "confirm"))}}
+      <button type='button' data-action='back'>Back</button>
+    {{/if}}
+    {{#if (or (eq step "baseStats") (eq step "targets"))}}
+      <button type='button' data-action='next'>Next</button>
+    {{/if}}
+    {{#if (eq step "confirm")}}
+      <button type='button' data-action='cancel'>Cancel</button>
+      <button type='button' data-action='run' style='background:#c33;color:white;'>Reset and Run</button>
+    {{/if}}
+    {{#if (eq step "summary")}}
+      <button type='button' data-action='close'>Close</button>
+    {{/if}}
+  </footer>
+</form>
