@@ -1958,7 +1958,15 @@ export class AspectsofPowerItem extends Item {
     // Roll d100 for gathering conditions.
     const d100Roll = new Roll('1d100');
     await d100Roll.evaluate();
-    const effectiveD100 = Math.min(d100Roll.total + gatherD100Bonus, 100 + gatherD100Bonus);
+    // Apply the same rarity floor/ceiling clamping as crafting: floor adds
+    // a flat boost, ceiling caps the result. Failure check below still
+    // uses the raw roll, so a natural 1 still ruins the attempt regardless.
+    const gatherRarityRange = CONFIG.ASPECTSOFPOWER.craftRarityRanges?.[selectedRarity]
+                           ?? { floor: 1, ceiling: 100 };
+    const effectiveD100 = Math.min(
+      d100Roll.total + gatherRarityRange.floor + gatherD100Bonus,
+      gatherRarityRange.ceiling,
+    );
     const d100Pct = effectiveD100 / 100;
 
     const skillRoll = Math.round(dmgRoll.total) + gatherSkillBonus;
