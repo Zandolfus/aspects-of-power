@@ -354,13 +354,15 @@ Hooks.once('init', function () {
   // Initialize the equipment system hooks.
   EquipmentSystem.initialize();
 
-  // ── Auto-sync cached tags when a template item's systemTags change ──
+  // ── Auto-sync cached tags when a template item's tags change ──
+  // cachedTags on the actor track is the structured `[{id, value}]` form
+  // (kept for backward compat); we wrap the new flat string array for the cache.
   Hooks.on('updateItem', (item, changes, _options, _userId) => {
     if (!game.user.isGM) return;
-    if (!changes.system?.systemTags) return;
+    if (!changes.system?.tags) return;
     if (!['race', 'class', 'profession'].includes(item.type)) return;
 
-    const newTags = item.system.systemTags ?? [];
+    const newTags = (item.system.tags ?? []).map(id => ({ id, value: 0 }));
     const itemUuid = item.uuid;
     const itemId = item.id;
 

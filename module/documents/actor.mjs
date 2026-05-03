@@ -433,21 +433,24 @@ export class AspectsofPowerActor extends Actor {
     };
 
     // Collect from race/class/profession cached tags.
+    // cachedTags entries are objects {id, value} for backward compat with the
+    // pre-merge schema; iterate by id and ignore value (no current tag uses it).
     if (systemData.attributes) {
       for (const type of ['race', 'class', 'profession']) {
         const attr = systemData.attributes[type];
         if (!attr?.cachedTags) continue;
         for (const tag of attr.cachedTags) {
-          if (tag.id) addTag(tag.id, tag.value ?? 0, `${type}: ${attr.name}`);
+          const id = typeof tag === 'string' ? tag : tag?.id;
+          if (id) addTag(id, 0, `${type}: ${attr.name}`);
         }
       }
     }
 
-    // Collect from equipped items.
+    // Collect from equipped items — read the unified `tags` array.
     for (const item of this.items) {
       if (item.type !== 'item' || !item.system.equipped) continue;
-      for (const tag of (item.system.systemTags ?? [])) {
-        if (tag.id) addTag(tag.id, tag.value ?? 0, `equip: ${item.name}`);
+      for (const tagId of (item.system.tags ?? [])) {
+        if (tagId) addTag(tagId, 0, `equip: ${item.name}`);
       }
     }
 

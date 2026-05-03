@@ -989,6 +989,13 @@ export class AspectsofPowerItemSheet extends foundry.applications.api.Handlebars
         }
       }
       allTags = [...seen.entries()].map(([key, label]) => ({ key, label }));
+    } else if (['race', 'class', 'profession'].includes(this.item.type)) {
+      // Entity-property templates: full tag registry (affinities, immunities,
+      // resistances, capability gates, passives, path-types, sizes, etc.).
+      allTags = Object.entries(CONFIG.ASPECTSOFPOWER.tagRegistry ?? {}).map(([key, def]) => ({
+        key,
+        label: game.i18n.localize(def.label),
+      }));
     } else {
       const category = this.item.system.skillCategory;
       const tagSource = category === 'profession'

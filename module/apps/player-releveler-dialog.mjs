@@ -79,9 +79,14 @@ export class PlayerRelevelDialog extends foundry.applications.api.HandlebarsAppl
     try { raceTemplate = await fromUuid(targetId); } catch (e) { /* unavailable */ }
     if (!raceTemplate) return;
     this.raceTemplateName = raceTemplate.name;
-    const tags = (raceTemplate.system.systemTags ?? []).map(t => t.id);
+    // Prefer the unified `tags` field; fall back to legacy `systemTags` for
+    // pre-migration data (transitional — will be removed when systemTags is dropped).
+    const tagIds = [
+      ...(raceTemplate.system.tags ?? []),
+      ...(raceTemplate.system.systemTags ?? []).map(t => t.id),
+    ];
     for (const p of PATH_TAGS) {
-      if (tags.includes(p)) { this.pathType = p; return; }
+      if (tagIds.includes(p)) { this.pathType = p; return; }
     }
     this.pathType = 'threefold-path';
   }
@@ -269,7 +274,13 @@ export class PlayerRelevelDialog extends foundry.applications.api.HandlebarsAppl
       updates['system.attributes.race.templateId'] = this.startingRaceId;
       if (raceTemplate) {
         updates['system.attributes.race.name']       = raceTemplate.name;
-        updates['system.attributes.race.cachedTags'] = [...(raceTemplate.system.systemTags ?? [])];
+        // Cache the unified tags array as `[{id, value:0}]` for back-compat
+        // with the cachedTags structured schema. systemTags fallback preserved.
+        const tagIds = [
+          ...(raceTemplate.system.tags ?? []),
+          ...(raceTemplate.system.systemTags ?? []).map(t => t.id),
+        ];
+        updates['system.attributes.race.cachedTags'] = tagIds.map(id => ({ id, value: 0 }));
       }
     }
     for (const k of ABILITY_KEYS) {
@@ -430,10 +441,15 @@ export class PlayerRelevelDialog extends foundry.applications.api.HandlebarsAppl
       ui.notifications.warn('Template not found');
       return;
     }
+    // Cache the picked template's unified `tags` (with legacy systemTags fallback).
+    const tagIds = [
+      ...(item.system.tags ?? []),
+      ...(item.system.systemTags ?? []).map(t => t.id),
+    ];
     await this.actor.update({
       [`system.attributes.${pick.track}.templateId`]: item.uuid,
       [`system.attributes.${pick.track}.name`]:       item.name,
-      [`system.attributes.${pick.track}.cachedTags`]: [...(item.system.systemTags ?? [])],
+      [`system.attributes.${pick.track}.cachedTags`]: tagIds.map(id => ({ id, value: 0 })),
     });
     this.runState.logLines.push(`${pick.track} → ${item.name} (rank ${pick.neededRank})`);
     await this.render();

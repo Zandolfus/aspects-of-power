@@ -21,7 +21,22 @@
       <prose-mirror name="system.description" value="{{system.description}}" compact>
         {{{enrichedDescription}}}
       </prose-mirror>
-      {{> "systems/aspects-of-power/templates/parts/tag-editor.hbs"}}
+      {{!-- Tags (registry-aware autocomplete + free-form) --}}
+      <div class='skill-tags'>
+        <label class='resource-label'>Tags</label>
+        <div class='skill-tag-chips'>
+          {{#each system.tags as |tag|}}
+            <span class='skill-tag-chip'>
+              {{tag}}
+              <a class='skill-tag-remove' data-tag='{{tag}}' title='Remove'>×</a>
+            </span>
+          {{/each}}
+        </div>
+        <div class='skill-tag-autocomplete'>
+          <input type='text' class='skill-tag-input' placeholder='Type to search tags...' autocomplete='off' />
+          <ul class='skill-tag-suggestions'></ul>
+        </div>
+      </div>
 
       {{#if isTwofold}}
         <div class="form-group twofold-config">

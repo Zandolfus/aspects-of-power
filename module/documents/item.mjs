@@ -1991,8 +1991,9 @@ export class AspectsofPowerItem extends Item {
     // Tag inheritance for gathered materials: free-form (material type) + registry (affinity).
     const matFreeTags = [];
     if (materialType) matFreeTags.push(materialType);
-    const matSystemTags = [];
-    if (element && element !== 'neutral') matSystemTags.push({ id: `${element}-affinity`, value: 0 });
+    // Per the unified tags merge — append affinity to the same `tags` array
+    // (registry awareness drives behavior; the field type is uniform).
+    if (element && element !== 'neutral') matFreeTags.push(`${element}-affinity`);
 
     // Create the material item and open its sheet for renaming.
     // Max potential is +20% above the gathered progress — refinement can grow toward this.
@@ -2010,7 +2011,6 @@ export class AspectsofPowerItem extends Item {
         progress: gatherProgress,
         maxProgress: Math.round(gatherProgress * 1.2),
         tags: matFreeTags,
-        systemTags: matSystemTags,
       },
     }]);
 
@@ -2393,8 +2393,13 @@ export class AspectsofPowerItem extends Item {
     // For iterative reworks (no material), extract element from reworkTarget's stored affinity tag.
     let element = materialItem ? (materialItem.system.materialElement || '') : '';
     if (!element && reworkTarget) {
-      const affTag = (reworkTarget.system.systemTags ?? []).find(t => t.id?.endsWith('-affinity'));
-      if (affTag) element = affTag.id.replace(/-affinity$/, '');
+      // Look in the unified `tags` field; legacy systemTags retained as fallback.
+      const tagIds = [
+        ...(reworkTarget.system.tags ?? []),
+        ...(reworkTarget.system.systemTags ?? []).map(t => t.id),
+      ];
+      const aff = tagIds.find(id => id?.endsWith('-affinity'));
+      if (aff) element = aff.replace(/-affinity$/, '');
     }
     const craftNatLine = d100Roll.total === 100
       ? '<p style="color:#ffca28;font-size:1.2em;">&#9733; Masterwork! Natural 100! &#9733;</p>'

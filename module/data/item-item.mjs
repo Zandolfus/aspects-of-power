@@ -59,14 +59,16 @@ export class ItemItemData extends foundry.abstract.TypeDataModel {
       // Skill IDs this item grants access to when equipped.
       grantedSkills: new fields.ArrayField(new fields.StringField(), { initial: [] }),
 
-      // System tags (affinities, resistances, passives from equipment) — registry-backed.
+      // Tags — unified field for free-form labels (weapon/armor/material/element)
+      // AND registry-backed entity properties (affinities, resistances, passives).
+      // Registry lookup via `CONFIG.ASPECTSOFPOWER.tagRegistry` when defined.
+      tags: new fields.ArrayField(new fields.StringField(), { initial: [] }),
+      // @deprecated — merged into `tags`. Kept readable for the one-off
+      // tag merge migration; consumers should read `tags` exclusively.
       systemTags: new fields.ArrayField(new fields.SchemaField({
         id:    new fields.StringField({ initial: '' }),
         value: new fields.NumberField({ initial: 0 }),
       }), { initial: [] }),
-
-      // Free-form tags (weapon/armor/material/element identifiers — same shape as skill.tags).
-      tags: new fields.ArrayField(new fields.StringField(), { initial: [] }),
 
       // Repair kit fields.
       isRepairKit:  new fields.BooleanField({ initial: false }),

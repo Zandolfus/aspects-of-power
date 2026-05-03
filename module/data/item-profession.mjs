@@ -29,7 +29,10 @@ export class ProfessionData extends foundry.abstract.TypeDataModel {
       // Free points gained per level within this rank.
       freePointsPerLevel: new fields.NumberField({ initial: 0, min: 0, integer: true }),
 
-      // System tags.
+      // Tags (affinities, immunities, resistances, gates, passives, free-form).
+      tags: new fields.ArrayField(new fields.StringField(), { initial: [] }),
+      // @deprecated — superseded by `tags`. Kept readable for the one-off
+      // tag merge migration; consumers should read `tags` exclusively.
       systemTags: new fields.ArrayField(new fields.SchemaField({
         id:    new fields.StringField({ initial: '' }),
         value: new fields.NumberField({ initial: 0 }),

@@ -53,12 +53,17 @@ export class RaceData extends foundry.abstract.TypeDataModel {
         S: freePointsField(),
       }),
 
-      // System tags (affinities, immunities, resistances, gates, passives).
-      // New races default to threefold-path; GM can swap to twofold-path / onefold-path on the race sheet.
+      // Tags (affinities, immunities, resistances, gates, passives, free-form).
+      // Drives entity-property dispatch via `CONFIG.ASPECTSOFPOWER.tagRegistry`
+      // when the tag is registered, and accepts free-form strings otherwise.
+      // New races default to threefold-path; GM can swap to twofold/onefold on the race sheet.
+      tags: new fields.ArrayField(new fields.StringField(), { initial: ['threefold-path'] }),
+      // @deprecated — superseded by `tags`. Kept readable for the one-off
+      // tag merge migration; consumers should read `tags` exclusively.
       systemTags: new fields.ArrayField(new fields.SchemaField({
         id:    new fields.StringField({ initial: '' }),
         value: new fields.NumberField({ initial: 0 }),
-      }), { initial: [{ id: 'threefold-path', value: 0 }] }),
+      }), { initial: [] }),
     };
   }
 }
