@@ -403,6 +403,38 @@ Hooks.once('init', function () {
     }
   });
 
+  // ── Skill rarity demotion on character grade-up ──
+  // Per design-skill-rarity-system.md: each grade-up at or after E→D
+  // demotes every stored skill version one rarity tier (floor at the
+  // bottom of skillRarityOrder). G/F/E share gradeIndex 0, so transitions
+  // within them don't demote. Multi-grade jumps (e.g., level 99 → 200 =
+  // E→C) demote by the full delta in one go.
+  Hooks.on('preUpdateActor', (actor, update, options, _userId) => {
+    const newRaceLevel = foundry.utils.getProperty(update, 'system.attributes.race.level');
+    if (newRaceLevel == null) return;
+    const oldRaceLevel = actor.system.attributes?.race?.level ?? 0;
+    if (newRaceLevel <= oldRaceLevel) return;
+    const sc = CONFIG.ASPECTSOFPOWER;
+    const oldRank = sc.getRankForLevel(oldRaceLevel);
+    const newRank = sc.getRankForLevel(newRaceLevel);
+    const oldIdx = sc.statCurve.gradeIndex[oldRank] ?? 0;
+    const newIdx = sc.statCurve.gradeIndex[newRank] ?? 0;
+    if (newIdx <= oldIdx) return;
+    // Stash for the post-update hook so it fires after the level write
+    // commits and the embedded-update doesn't race the parent update.
+    options.aopGradeUp = { tiers: newIdx - oldIdx, from: oldRank, to: newRank };
+  });
+
+  Hooks.on('updateActor', async (actor, _update, options, userId) => {
+    if (game.user.id !== userId) return; // only the initiating client demotes
+    if (!options.aopGradeUp) return;
+    const { tiers, from, to } = options.aopGradeUp;
+    const count = await actor.demoteSkillsByTiers(tiers);
+    if (count > 0) {
+      ui.notifications.info(`${actor.name} graded ${from}→${to}: ${count} skill version(s) demoted ${tiers} tier${tiers > 1 ? 's' : ''}.`);
+    }
+  });
+
   // Preload Handlebars templates.
   return preloadHandlebarsTemplates();
 });

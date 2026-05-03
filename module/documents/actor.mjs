@@ -823,4 +823,34 @@ export class AspectsofPowerActor extends Actor {
   async onEndTurn(combat, context) {
     // AOE region expiry is handled by a separate hook since it's scene-level, not actor-level.
   }
+
+  /**
+   * Demote each stored skill on this actor by N rarity tiers (floor at the
+   * bottom of `skillRarityOrder`, currently `not_proficient`). Per
+   * design-skill-rarity-system.md: fires on character grade-up E→D and
+   * beyond. Each stored skill version demotes independently.
+   *
+   * @param {number} tiers  Number of tiers to demote (typically 1, but
+   *   level jumps can cross multiple grade boundaries).
+   * @returns {Promise<number>}  Count of skill items actually updated.
+   */
+  async demoteSkillsByTiers(tiers) {
+    if (!Number.isInteger(tiers) || tiers <= 0) return 0;
+    const order = CONFIG.ASPECTSOFPOWER.skillRarityOrder || [];
+    if (order.length === 0) return 0;
+    const updates = [];
+    for (const item of this.items) {
+      if (item.type !== 'skill') continue;
+      const currentRarity = item.system.rarity || 'common';
+      const currentIdx = order.indexOf(currentRarity);
+      if (currentIdx <= 0) continue; // already at floor or rarity not in registry
+      const newIdx = Math.max(0, currentIdx - tiers);
+      if (newIdx === currentIdx) continue;
+      updates.push({ _id: item.id, 'system.rarity': order[newIdx] });
+    }
+    if (updates.length > 0) {
+      await this.updateEmbeddedDocuments('Item', updates);
+    }
+    return updates.length;
+  }
 }
