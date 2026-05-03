@@ -111,9 +111,14 @@ export class AspectsofPowerItemSheet extends foundry.applications.api.Handlebars
       const skillTags = this.item.system.tags ?? [];
       context.hasDebuffSubtype = skillTags.some(t => debuffSubtypes[t]);
 
-      // Spell tier/grade derived values (only meaningful when both are set).
+      // Spell tier/grade derived values. Grade auto-resolves from the
+      // owning actor's race rank when present (matches the runtime path
+      // in item.mjs); falls back to the skill's stored grade for
+      // unowned skills (compendium/world).
       const tier = this.item.system.roll?.tier ?? '';
-      const grade = this.item.system.roll?.grade ?? '';
+      const grade = this.item.actor?.system?.attributes?.race?.rank
+                 || this.item.system.roll?.grade
+                 || '';
       const tierFactor = CONFIG.ASPECTSOFPOWER.spellTierFactors[tier];
       const gradeFactor = CONFIG.ASPECTSOFPOWER.spellGradeFactors[grade];
       context.spellBaseMana = (tierFactor != null && gradeFactor != null)

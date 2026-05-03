@@ -3381,7 +3381,12 @@ export class AspectsofPowerItem extends Item {
     const sc = CONFIG.ASPECTSOFPOWER;
 
     const spellTier  = this.system.roll?.tier  ?? '';
-    const spellGrade = this.system.roll?.grade ?? '';
+    // Spell grade auto-derives from the casting actor's race rank (G/F/E/D/…)
+    // so designers don't have to set it per-skill. Falls back to the skill's
+    // own `grade` field for compendium / world skills with no actor.
+    const spellGrade = this.actor?.system?.attributes?.race?.rank
+                    || this.system.roll?.grade
+                    || '';
     const isVariableSpell = rollData.roll.resource === 'mana'
       && spellTier && spellGrade
       && tags.includes('attack');

@@ -151,10 +151,6 @@
             <input type='text' name='system.roll.dice' value='{{system.roll.dice}}' data-dtype='String' />
           </div>
           <div class='grid-span-1'>
-            <label class='resource-label'>Multiplier</label>
-            <input type='number' name='system.roll.diceBonus' value='{{system.roll.diceBonus}}' min='0' step='0.01' />
-          </div>
-          <div class='grid-span-1'>
             <label class='resource-label'>Resource</label>
             <select name='system.roll.resource'>
               {{#if availableResources}}
@@ -191,9 +187,9 @@
           </div>
         </div>
 
-        {{! ── Spell Cost block (only for mana-resource skills) ── }}
-        {{#if (eq system.roll.resource "mana")}}
-        <div class='grid grid-4col spell-cost-block'>
+        {{! ── Spell Tier block — only for skills tagged 'magic'. Grade auto-derives from the wielder's race rank at cast time, so no grade dropdown here. ── }}
+        {{#if (includes system.tags "magic")}}
+        <div class='grid grid-3col spell-cost-block'>
           <div class='grid-span-1'>
             <label class='resource-label'>{{localize "ASPECTSOFPOWER.SpellTier.label"}}</label>
             <select name='system.roll.tier' data-dtype='String'>
@@ -204,63 +200,63 @@
             </select>
           </div>
           <div class='grid-span-1'>
-            <label class='resource-label'>{{localize "ASPECTSOFPOWER.SpellTier.grade"}}</label>
-            <select name='system.roll.grade' data-dtype='String'>
-              <option value='' {{#if (eq system.roll.grade "")}}selected{{/if}}>—</option>
-              {{#each config.rankTiers as |tierDef tierKey|}}
-                <option value='{{tierKey}}' {{#if (eq tierKey ../system.roll.grade)}}selected{{/if}}>{{localize tierDef.label}}</option>
-              {{/each}}
-            </select>
-          </div>
-          <div class='grid-span-1'>
             <label class='resource-label'>{{localize "ASPECTSOFPOWER.SpellTier.baseMana"}}</label>
             <input type='text' value='{{#if spellBaseMana}}{{spellBaseMana}}{{else}}—{{/if}}' readonly disabled
-                   title='Computed: tier_factor × grade_factor' />
+                   title='Computed: tier_factor × grade_factor (grade = caster rank).' />
           </div>
-          {{#if spellRecommendedMultiplier}}
           <div class='grid-span-1'>
-            <label class='resource-label'>{{localize "ASPECTSOFPOWER.SpellTier.recommendedMultiplier"}}</label>
-            <input type='text' value='{{spellRecommendedMultiplier}}' readonly disabled
-                   title='Per-tier design default; override the Multiplier above to change.' />
+            <label class='resource-label'>Grade (auto)</label>
+            <input type='text' value='caster rank' readonly disabled
+                   title='Spell grade auto-derives from the casting actor’s race rank — no per-skill setting needed.' />
           </div>
-          {{/if}}
         </div>
         {{/if}}
 
-        {{! ── Pure / Hybrid stat config ── }}
-        <div class='grid grid-4col'>
-          <div class='grid-span-1'>
-            <label class='resource-label'>Stat Mode</label>
-            <select name='system.roll.statType' data-dtype='String'>
-              <option value="pure" {{#if (eq system.roll.statType "pure")}}selected{{/if}}>Pure</option>
-              <option value="hybrid" {{#if (eq system.roll.statType "hybrid")}}selected{{/if}}>Hybrid</option>
-            </select>
-          </div>
-          {{#if (eq system.roll.statType "hybrid")}}
+        {{! ── Advanced (legacy escape hatches: manual multiplier override, statType, manual action weight). The new schema derives multiplier from rarity + alterations and weight from alterations + manual override; these fields stay for the rare designer-tweaked skill. ── }}
+        <details class='advanced-section' style='margin-top:8px;'>
+          <summary style='cursor:pointer;font-size:12px;color:#888;padding:4px 0;'>Advanced</summary>
+          <div class='grid grid-4col' style='margin-top:6px;'>
             <div class='grid-span-1'>
-              <label class='resource-label'>Secondary Ability</label>
-              <select name='system.roll.secondaryAbility' data-dtype='String'>
-                <option value="vitality" {{#if (eq system.roll.secondaryAbility "vitality")}}selected{{/if}}>Vitality</option>
-                <option value="endurance" {{#if (eq system.roll.secondaryAbility "endurance")}}selected{{/if}}>Endurance</option>
-                <option value="strength" {{#if (eq system.roll.secondaryAbility "strength")}}selected{{/if}}>Strength</option>
-                <option value="dexterity" {{#if (eq system.roll.secondaryAbility "dexterity")}}selected{{/if}}>Dexterity</option>
-                <option value="toughness" {{#if (eq system.roll.secondaryAbility "toughness")}}selected{{/if}}>Toughness</option>
-                <option value="intelligence" {{#if (eq system.roll.secondaryAbility "intelligence")}}selected{{/if}}>Intelligence</option>
-                <option value="willpower" {{#if (eq system.roll.secondaryAbility "willpower")}}selected{{/if}}>Willpower</option>
-                <option value="wisdom" {{#if (eq system.roll.secondaryAbility "wisdom")}}selected{{/if}}>Wisdom</option>
-                <option value="perception" {{#if (eq system.roll.secondaryAbility "perception")}}selected{{/if}}>Perception</option>
+              <label class='resource-label' title='Manual multiplier override — leave at 1 for the rarity ladder to drive damage.'>Manual Mult Override</label>
+              <input type='number' name='system.roll.diceBonus' value='{{system.roll.diceBonus}}' min='0' step='0.01' />
+            </div>
+            <div class='grid-span-1'>
+              <label class='resource-label' title='Manual action weight multiplier — leave at 1 for alteration-derived weight to drive cast time.'>Manual Weight Override</label>
+              <input type='number' name='system.roll.actionWeightMultiplier' value='{{system.roll.actionWeightMultiplier}}' min='0.1' step='0.05' />
+            </div>
+            <div class='grid-span-1'>
+              <label class='resource-label'>Stat Mode</label>
+              <select name='system.roll.statType' data-dtype='String'>
+                <option value="pure" {{#if (eq system.roll.statType "pure")}}selected{{/if}}>Pure</option>
+                <option value="hybrid" {{#if (eq system.roll.statType "hybrid")}}selected{{/if}}>Hybrid</option>
               </select>
             </div>
-            <div class='grid-span-1'>
-              <label class='resource-label'>Primary Weight</label>
-              <input type='number' name='system.roll.primaryWeight' value='{{system.roll.primaryWeight}}' min='0' max='1' step='0.05' />
-            </div>
-            <div class='grid-span-1'>
-              <label class='resource-label'>Secondary Weight</label>
-              <input type='number' name='system.roll.secondaryWeight' value='{{system.roll.secondaryWeight}}' min='0' max='1' step='0.05' />
-            </div>
-          {{/if}}
-        </div>
+            {{#if (eq system.roll.statType "hybrid")}}
+              <div class='grid-span-1'>
+                <label class='resource-label'>Secondary Ability</label>
+                <select name='system.roll.secondaryAbility' data-dtype='String'>
+                  <option value="vitality" {{#if (eq system.roll.secondaryAbility "vitality")}}selected{{/if}}>Vitality</option>
+                  <option value="endurance" {{#if (eq system.roll.secondaryAbility "endurance")}}selected{{/if}}>Endurance</option>
+                  <option value="strength" {{#if (eq system.roll.secondaryAbility "strength")}}selected{{/if}}>Strength</option>
+                  <option value="dexterity" {{#if (eq system.roll.secondaryAbility "dexterity")}}selected{{/if}}>Dexterity</option>
+                  <option value="toughness" {{#if (eq system.roll.secondaryAbility "toughness")}}selected{{/if}}>Toughness</option>
+                  <option value="intelligence" {{#if (eq system.roll.secondaryAbility "intelligence")}}selected{{/if}}>Intelligence</option>
+                  <option value="willpower" {{#if (eq system.roll.secondaryAbility "willpower")}}selected{{/if}}>Willpower</option>
+                  <option value="wisdom" {{#if (eq system.roll.secondaryAbility "wisdom")}}selected{{/if}}>Wisdom</option>
+                  <option value="perception" {{#if (eq system.roll.secondaryAbility "perception")}}selected{{/if}}>Perception</option>
+                </select>
+              </div>
+              <div class='grid-span-1'>
+                <label class='resource-label'>Primary Weight</label>
+                <input type='number' name='system.roll.primaryWeight' value='{{system.roll.primaryWeight}}' min='0' max='1' step='0.05' />
+              </div>
+              <div class='grid-span-1'>
+                <label class='resource-label'>Secondary Weight</label>
+                <input type='number' name='system.roll.secondaryWeight' value='{{system.roll.secondaryWeight}}' min='0' max='1' step='0.05' />
+              </div>
+            {{/if}}
+          </div>
+        </details>
       </div>
 
       {{! ── Attack Tag Config ── }}
