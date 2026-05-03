@@ -684,6 +684,21 @@ export class AspectsofPowerActorSheet extends foundry.applications.api.Handlebar
           ev.dataTransfer.setData('text/plain', JSON.stringify({ type: 'Item', uuid: item.uuid }));
         }, false);
       });
+
+      // ActiveEffect drag — titles, blessings, passives etc. are draggable
+      // off this actor onto another actor's sheet. Foundry's V2 base
+      // _onDropActiveEffect handles the receive side; we just have to set
+      // the right dataTransfer payload on dragstart.
+      this.element.querySelectorAll('li.item.effect').forEach(li => {
+        const effectId = li.dataset.effectId;
+        if (!effectId) return;
+        li.setAttribute('draggable', true);
+        li.addEventListener('dragstart', ev => {
+          const effect = this.actor.effects.get(effectId);
+          if (!effect) return;
+          ev.dataTransfer.setData('text/plain', JSON.stringify({ type: 'ActiveEffect', uuid: effect.uuid }));
+        }, false);
+      });
     }
   }
 
