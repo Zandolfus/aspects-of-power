@@ -704,6 +704,17 @@ export class AspectsofPowerItemSheet extends foundry.applications.api.Handlebars
       });
     });
 
+    // --- Equipment: Toggle auto-derive locks ---
+    this.element.querySelectorAll('.derive-lock').forEach(el => {
+      el.addEventListener('click', async () => {
+        const field = el.dataset.field;
+        if (!field) return;
+        const cur = new Set(this.item.system.lockedFields ?? []);
+        if (cur.has(field)) cur.delete(field); else cur.add(field);
+        await this.document.update({ 'system.lockedFields': [...cur] }, { skipAutoDerive: true });
+      });
+    });
+
     // --- Equipment: Add / Delete stat bonus rows ---
     this.element.querySelector('.stat-bonus-add')?.addEventListener('click', async () => {
       const bonuses = [...(this.item.system.statBonuses ?? []), { ability: 'strength', value: 0 }];

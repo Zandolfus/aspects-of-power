@@ -152,31 +152,51 @@
           <input type="number" name="system.progress" value="{{system.progress}}" min="0" />
         </div>
 
-        {{!-- Durability (derived from progress) --}}
+        {{!-- Durability (auto-derived from progress unless locked) --}}
         <div class="equip-field">
-          <label>{{localize "ASPECTSOFPOWER.Equip.durability"}}</label>
+          <label>
+            {{localize "ASPECTSOFPOWER.Equip.durability"}}
+            <a class="derive-lock" data-field="durabilityMax" title="Toggle auto-derive lock for max durability">
+              <i class="fas {{#if (includes system.lockedFields "durabilityMax")}}fa-lock{{else}}fa-lock-open{{/if}}"></i>
+            </a>
+          </label>
           <div class="durability-inputs flexrow">
             <input type="number" name="system.durability.value" value="{{system.durability.value}}" min="0" />
-            <span>/ {{system.durability.max}}</span>
+            <span>/ <input type="number" name="system.durability.max" value="{{system.durability.max}}" min="0" style="width:60px;" /></span>
           </div>
         </div>
 
-        {{!-- Armor / Veil Bonuses --}}
+        {{!-- Armor / Veil Bonuses (auto-derived unless locked) --}}
         <div class="grid grid-2col">
           <div class="equip-field">
-            <label>{{localize "ASPECTSOFPOWER.Equip.armorBonus"}}</label>
+            <label>
+              {{localize "ASPECTSOFPOWER.Equip.armorBonus"}}
+              <a class="derive-lock" data-field="armorBonus" title="Toggle auto-derive lock">
+                <i class="fas {{#if (includes system.lockedFields "armorBonus")}}fa-lock{{else}}fa-lock-open{{/if}}"></i>
+              </a>
+            </label>
             <input type="number" name="system.armorBonus" value="{{system.armorBonus}}" min="0" />
           </div>
           <div class="equip-field">
-            <label>{{localize "ASPECTSOFPOWER.Equip.veilBonus"}}</label>
+            <label>
+              {{localize "ASPECTSOFPOWER.Equip.veilBonus"}}
+              <a class="derive-lock" data-field="veilBonus" title="Toggle auto-derive lock">
+                <i class="fas {{#if (includes system.lockedFields "veilBonus")}}fa-lock{{else}}fa-lock-open{{/if}}"></i>
+              </a>
+            </label>
             <input type="number" name="system.veilBonus" value="{{system.veilBonus}}" min="0" />
           </div>
         </div>
 
-        {{!-- Stat Bonuses --}}
+        {{!-- Stat Bonuses (auto-derived array; lock to manage manually) --}}
         <div class="equip-section">
           <div class="equip-section-header flexrow">
-            <h4>{{localize "ASPECTSOFPOWER.Equip.statBonuses"}}</h4>
+            <h4>
+              {{localize "ASPECTSOFPOWER.Equip.statBonuses"}}
+              <a class="derive-lock" data-field="statBonuses" title="Toggle auto-derive lock for the entire stat-bonus array">
+                <i class="fas {{#if (includes system.lockedFields "statBonuses")}}fa-lock{{else}}fa-lock-open{{/if}}"></i>
+              </a>
+            </h4>
             <a class="stat-bonus-add" title="Add Stat Bonus"><i class="fas fa-plus"></i></a>
           </div>
           <div class="stat-bonus-list">
@@ -199,9 +219,14 @@
           </div>
         </div>
 
-        {{!-- Augments --}}
+        {{!-- Augments (slot count auto-derived from rarity unless locked) --}}
         <div class="equip-section augment-section">
-          <h4>{{localize "ASPECTSOFPOWER.Equip.augments"}} ({{system.augmentSlots}})</h4>
+          <h4>
+            {{localize "ASPECTSOFPOWER.Equip.augments"}} ({{system.augmentSlots}})
+            <a class="derive-lock" data-field="augmentSlots" title="Toggle auto-derive lock for slot count">
+              <i class="fas {{#if (includes system.lockedFields "augmentSlots")}}fa-lock{{else}}fa-lock-open{{/if}}"></i>
+            </a>
+          </h4>
           <div class="augment-list">
             {{#each augmentSlots as |slot idx|}}
               <div class="augment-slot flexrow {{#if slot.filled}}filled{{else}}empty{{/if}}"

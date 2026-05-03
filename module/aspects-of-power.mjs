@@ -22,6 +22,7 @@ import { AopEffectData } from './data/effect-base.mjs';
 // Import helper/utility classes and constants.
 import { preloadHandlebarsTemplates } from './helpers/templates.mjs';
 import { ASPECTSOFPOWER } from './helpers/config.mjs';
+import { deriveItemStats } from './systems/item-derivation.mjs';
 import { getPositionalTags } from './helpers/positioning.mjs';
 // Import systems.
 import { EquipmentSystem } from './systems/equipment.mjs';
@@ -401,6 +402,46 @@ Hooks.once('init', function () {
             }
           }
         }
+      }
+    }
+  });
+
+  // ── Item auto-derive on input changes ──
+  // When a craftable item's progress / slot / material / rarity / tags
+  // changes, re-derive its statBonuses / armorBonus / veilBonus /
+  // augmentSlots / durability.max from the new state. Per-field locks
+  // in `system.lockedFields` skip individual outputs so manual overrides
+  // are preserved across input edits.
+  Hooks.on('preUpdateItem', (item, changes, options, _userId) => {
+    if (item.type !== 'item') return;
+    if (options.skipAutoDerive) return; // escape hatch
+    const cs = changes.system;
+    if (!cs) return;
+    const TRIGGERS = ['progress', 'slot', 'material', 'rarity', 'tags'];
+    if (!TRIGGERS.some(t => cs[t] !== undefined)) return;
+
+    // Build the post-update view of the item to derive against.
+    const futureSys = foundry.utils.mergeObject(
+      foundry.utils.deepClone(item.system),
+      cs,
+      { inplace: false },
+    );
+    const derived = deriveItemStats({ system: futureSys });
+    const locked = new Set(item.system.lockedFields ?? []);
+
+    // Patch only unlocked fields the caller hasn't already explicitly set
+    // in this update (so an explicit user edit always wins over derivation).
+    if (!locked.has('statBonuses')   && cs.statBonuses === undefined)   cs.statBonuses = derived.statBonuses;
+    if (!locked.has('armorBonus')    && cs.armorBonus === undefined)    cs.armorBonus = derived.armorBonus;
+    if (!locked.has('veilBonus')     && cs.veilBonus === undefined)     cs.veilBonus = derived.veilBonus;
+    if (!locked.has('augmentSlots')  && cs.augmentSlots === undefined)  cs.augmentSlots = derived.augmentSlots;
+    if (!locked.has('durabilityMax')) {
+      cs.durability = cs.durability ?? {};
+      if (cs.durability.max === undefined) cs.durability.max = derived.durabilityMax;
+      // Cap value at the new max if unspecified.
+      const curValue = cs.durability.value ?? item.system.durability?.value ?? 0;
+      if (curValue > derived.durabilityMax && cs.durability.value === undefined) {
+        cs.durability.value = derived.durabilityMax;
       }
     }
   });

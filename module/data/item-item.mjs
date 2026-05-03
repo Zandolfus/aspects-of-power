@@ -82,6 +82,13 @@ export class ItemItemData extends foundry.abstract.TypeDataModel {
 
       // Crafting iteration tracking — 0 = freshly crafted, increments per rework.
       reworkCount:     new fields.NumberField({ initial: 0, min: 0, integer: true }),
+
+      // Per-field locks for the auto-derivation hook. When a field name
+      // (e.g. 'armorBonus', 'statBonuses') is in this array, the
+      // preUpdateItem auto-derive step skips it so user manual values
+      // are preserved across progress / slot / material / rarity edits.
+      // Lock UI lives on the item sheet next to each derivable field.
+      lockedFields: new fields.ArrayField(new fields.StringField(), { initial: [] }),
     };
   }
 }
