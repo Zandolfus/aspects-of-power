@@ -32,7 +32,7 @@ async () => {
       gradeIdx: gradeIndex(actor.system.attributes.race?.rank ?? "E"),
       hp: actor.system.health.value, hpMax: actor.system.health.max,
       mana: actor.system.mana.value, manaMax: actor.system.mana.max,
-      stam: actor.system.stamina.value, stamMax: actor.system.stamina.max,
+      stamina: actor.system.stamina.value, stamMax: actor.system.stamina.max,
       armor: actor.system.defense.armor.value,
       veil: actor.system.defense.veil.value,
       dr: actor.system.defense.dr.value,
