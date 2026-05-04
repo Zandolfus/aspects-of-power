@@ -13,12 +13,16 @@
 //
 // Returns: per-actor summary { name, raceLvl/classLvl/profLvl segments, errors }.
 
+// Pass an array of names via window.NPA_FILTER before running to limit scope.
+//   window.NPA_FILTER = ["Sebastian"];  // single test
+//   window.NPA_FILTER = null;            // run all
 async () => {
   const ABILITY_KEYS = ["vitality", "endurance", "strength", "dexterity", "toughness", "intelligence", "willpower", "wisdom", "perception"];
+  const FILTER = (typeof window !== "undefined" && window.NPA_FILTER) ? new Set(window.NPA_FILTER) : null;
 
   // Per-NPA feeder picks. classFeeder/profFeeder = G-rank template name to use
   // for levels 1-24 if the original template is rank E. null = no feeder needed.
-  const NPA_CONFIG = [
+  const NPA_CONFIG_ALL = [
     // class: G-rank original (no feeder needed)
     { name: "Bridget Sutherland", classFeeder: null,             profFeeder: "Chef" },
     { name: "Bruce Bradley",      classFeeder: null,             profFeeder: "Gatherer" },
@@ -43,6 +47,7 @@ async () => {
     { name: "Valentine Fig",      classFeeder: "Mage",           profFeeder: "Alchemist of Flame's Heart" },
     { name: "Woody Dalton",       classFeeder: "Archer",         profFeeder: "Student Shaper of the Asrai" },
   ];
+  const NPA_CONFIG = FILTER ? NPA_CONFIG_ALL.filter(c => FILTER.has(c.name)) : NPA_CONFIG_ALL;
 
   const { applyTrackLevelsByHistory } = await import("/systems/aspects-of-power/module/systems/mass-leveler.mjs");
 
