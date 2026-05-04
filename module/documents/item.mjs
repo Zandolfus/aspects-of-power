@@ -2030,6 +2030,21 @@ export class AspectsofPowerItem extends Item {
       ? '<p style="color:#ffca28;font-size:1.2em;">&#9733; Perfect Harvest! Natural 100! &#9733;</p>'
       : '';
 
+    // Mirror crafting's chat layout — show all bonus contributions and floor/cap breakdown
+    // so the player can audit why the result came out the way it did.
+    const rawSkillRoll = Math.round(dmgRoll.total);
+    const skillLine = gatherSkillBonus
+      ? `${rawSkillRoll} + ${gatherSkillBonus} (augment) = ${skillRoll}`
+      : `${skillRoll}`;
+    const d100Floor = gatherRarityRange.floor + gatherD100Bonus;
+    const d100Line = d100Floor
+      ? `${d100Roll.total} + ${d100Floor} = ${effectiveD100} (cap ${gatherRarityRange.ceiling})`
+      : `${d100Roll.total} (cap ${gatherRarityRange.ceiling})`;
+    const rawProgress = Math.round(skillRoll * d100Pct);
+    const progressLine = gatherProgressBonus
+      ? `${skillRoll} × ${d100Pct.toFixed(2)} = ${rawProgress} + ${gatherProgressBonus} (augment) = ${gatherProgress}`
+      : `${skillRoll} × ${d100Pct.toFixed(2)} = ${gatherProgress}`;
+
     ChatMessage.create({
       speaker,
       content: `<div class="craft-result">
@@ -2037,9 +2052,10 @@ export class AspectsofPowerItem extends Item {
         <hr>
         ${natLine}
         <p><strong>Rarity:</strong> ${rarityLabel}</p>
-        <p><strong>Skill Roll:</strong> ${skillRoll}</p>
-        <p><strong>d100:</strong> ${d100Roll.total} (${d100Pct.toFixed(2)})</p>
-        <p><strong>Progress:</strong> ${skillRoll} × ${d100Pct.toFixed(2)} = ${gatherProgress}</p>
+        ${element ? `<p><strong>Element:</strong> ${element.charAt(0).toUpperCase() + element.slice(1)}</p>` : ''}
+        <p><strong>Skill Roll:</strong> ${skillLine}</p>
+        <p><strong>d100:</strong> ${d100Line}</p>
+        <p><strong>Progress:</strong> ${progressLine}</p>
         ${gatherAugLine}
         <p><em>Created: ${itemName}</em></p>
       </div>`,
