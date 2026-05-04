@@ -3426,7 +3426,12 @@ export class AspectsofPowerItem extends Item {
       // a sized baseMana from the placed diameter. The invest dialog then
       // uses sizedBaseMana as its minimum — the player commits to that as
       // the cost and may go above for damage scaling. Cost = invested.
-      const hasAoeAlteration = (this.system.alterations ?? []).some(a => a.id === 'aoe');
+      // Trigger the new sized-base + scroll-wheel flow whenever a skill
+       // exposes any AOE — either via the new alteration system OR the legacy
+       // system.aoe.enabled flag. Without this, in-world spells (which all
+       // still use the legacy flag) skip the new flow entirely.
+      const hasAoeAlteration = (this.system.alterations ?? []).some(a => a.id === 'aoe')
+        || !!this.system.aoe?.enabled;
       const wisMod      = this.actor.system.abilities?.wisdom?.mod ?? 0;
       // Live read — slider must cap at the actor's CURRENT mana.
       const livePool    = Math.round(this.actor.system[rollData.roll.resource]?.value ?? 0);
