@@ -99,13 +99,28 @@ export async function applyTrackLevelsByHistory(actor, track, levelsToAdd) {
     }
     if (track === 'race') {
       const nextRank = CONFIG.ASPECTSOFPOWER.getRankForLevel(nextLevel);
-      const rankGains = templateItem.system.rankGains?.[nextRank];
+      // Race grade is implicit: lowest rank with any non-zero gain. If the
+      // requested rank is below the race's grade (e.g., Demon is F-grade —
+      // its G entry is all zero), fall back to the race's minimum effective
+      // rank. Mirrors the class/profession rankEquivalence concept that "F
+      // covers G" for races whose lore starts at F+.
+      const allRanks = ['G','F','E','D','C','B','A','S'];
+      const allRankGains = templateItem.system.rankGains ?? {};
+      let minEffectiveRank = null;
+      for (const r of allRanks) {
+        const g = allRankGains[r];
+        if (g && Object.values(g).some(v => v && v !== 0)) { minEffectiveRank = r; break; }
+      }
+      const wantIdx = allRanks.indexOf(nextRank);
+      const minIdx = minEffectiveRank ? allRanks.indexOf(minEffectiveRank) : 0;
+      const useRank = wantIdx < minIdx ? minEffectiveRank : nextRank;
+      const rankGains = allRankGains[useRank];
       if (!rankGains) {
-        haltReason = `race template "${templateItem.name}" has no rankGains for rank ${nextRank} (level ${nextLevel})`;
+        haltReason = `race template "${templateItem.name}" has no rankGains for rank ${useRank} (level ${nextLevel})`;
         break;
       }
       for (const k of ABILITY_KEYS) gainsAccum[k] += rankGains[k] ?? 0;
-      freePointsAccum += templateItem.system.freePointsPerLevel?.[nextRank] ?? 0;
+      freePointsAccum += templateItem.system.freePointsPerLevel?.[useRank] ?? 0;
     } else {
       const gains = templateItem.system.gains ?? {};
       for (const k of ABILITY_KEYS) gainsAccum[k] += gains[k] ?? 0;

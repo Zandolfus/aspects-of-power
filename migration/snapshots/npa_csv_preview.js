@@ -5,6 +5,7 @@ async () => {
     "Aiden": "Aiden Fig", "Valentine": "Valentine Fig", "Bruce": "Bruce Bradley",
     "Bridget": "Bridget Sutherland", "Lincoln": "Lincoln Christensen",
     "Damian": "Damian Flynn", "Woody": "Woody Dalton", "Deanna": "Deanna Mendez",
+    "Fei": "Faye",
   };
   function parseCsv(text) {
     const rows = []; let row = []; let cell = ""; let inQuotes = false;

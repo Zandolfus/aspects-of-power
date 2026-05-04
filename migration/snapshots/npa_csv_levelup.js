@@ -23,6 +23,7 @@ async () => {
     "Damian":   "Damian Flynn",
     "Woody":    "Woody Dalton",
     "Deanna":   "Deanna Mendez",
+    "Fei":      "Faye",
   };
 
   // Minimal CSV parser handling RFC4180-style quoted fields.
