@@ -81,8 +81,15 @@ export class AspectsofPowerActorSheet extends foundry.applications.api.Handlebar
 
     // Build new breakdowns by replacing equipmentBonusRaw with the filtered total,
     // then re-applying the per-stat and global caps.
-    const sigmoidMod = (value) =>
-      Math.round((6000 / (1 + Math.exp(-0.001 * (value - 500)))) - 2265);
+    // Mod formula must mirror actor.mjs prepareDerivedData (power curve per
+    // design-stat-curves.md). The old sigmoid formula was a leftover from
+    // before the 2026-05-01 stat squish and made the Stats tab disagree
+    // with the Features tab.
+    const sc = CONFIG.ASPECTSOFPOWER.statCurve;
+    const _raceRank = actor.system.attributes?.race?.rank ?? 'E';
+    const _gradeMult = Math.pow(sc.MULT_BASE, sc.gradeIndex[_raceRank] ?? 0);
+    const calcMod = (value) =>
+      Math.round(Math.pow(value / sc.NORM, sc.P) * sc.NORM * _gradeMult);
 
     const filtered = {};
     for (const key of abilityKeys) {
@@ -111,7 +118,7 @@ export class AspectsofPowerActorSheet extends foundry.applications.api.Handlebar
     for (const key of abilityKeys) {
       const b = filtered[key];
       b.final = Math.round(b.calculated + b.equipmentCapped + b.effectBonus);
-      b.finalMod = sigmoidMod(b.final);
+      b.finalMod = calcMod(b.final);
     }
 
     return filtered;
