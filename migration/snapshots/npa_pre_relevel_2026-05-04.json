@@ -1,0 +1,4367 @@
+{
+  "timestamp": "2026-05-04T22:35:59.087Z",
+  "worldTitle": "Aspects of Power",
+  "systemVersion": "2.1.0",
+  "actors": [
+    {
+      "id": "6xsJdiKE6MPdKHF6",
+      "name": "Aiden Fig",
+      "folder": "Profession Group",
+      "health": {
+        "value": 326,
+        "max": 338
+      },
+      "mana": {
+        "value": 299,
+        "max": 310
+      },
+      "stamina": {
+        "value": 140,
+        "max": 219
+      },
+      "freePoints": 30,
+      "attributes": {
+        "race": {
+          "templateId": "Compendium.aspects-of-power.races.Item.hsK5h7UEYtJZy33g",
+          "name": "Human",
+          "level": 30,
+          "rank": "E"
+        },
+        "class": {
+          "templateId": "Compendium.aspects-of-power.classes.Item.PYvyfpEM1tUmu803",
+          "name": "",
+          "level": 40,
+          "rank": "E"
+        },
+        "profession": {
+          "templateId": "Compendium.aspects-of-power.professions.Item.watUhbLCRk9fN3jZ",
+          "name": "",
+          "level": 20,
+          "rank": "F"
+        }
+      },
+      "abilities": {
+        "vitality": {
+          "value": 191,
+          "mod": 270,
+          "breakdown": {
+            "base": 181,
+            "titleBonus": 0,
+            "blessingMultiplier": 1,
+            "blessingAdd": 0,
+            "calculated": 181,
+            "effectBonus": 10,
+            "equipmentBonusRaw": 0,
+            "perStatCap": 54,
+            "equipmentCapped": 0,
+            "final": 191,
+            "finalMod": 270
+          }
+        },
+        "endurance": {
+          "value": 147,
+          "mod": 219,
+          "breakdown": {
+            "base": 128,
+            "titleBonus": 0,
+            "blessingMultiplier": 1,
+            "blessingAdd": 0,
+            "calculated": 128,
+            "effectBonus": 19,
+            "equipmentBonusRaw": 0,
+            "perStatCap": 38,
+            "equipmentCapped": 0,
+            "final": 147,
+            "finalMod": 219
+          }
+        },
+        "strength": {
+          "value": 69,
+          "mod": 120,
+          "breakdown": {
+            "base": 59,
+            "titleBonus": 0,
+            "blessingMultiplier": 1,
+            "blessingAdd": 0,
+            "calculated": 59,
+            "effectBonus": 10,
+            "equipmentBonusRaw": 0,
+            "perStatCap": 17,
+            "equipmentCapped": 0,
+            "final": 69,
+            "finalMod": 120
+          }
+        },
+        "dexterity": {
+          "value": 280,
+          "mod": 367,
+          "breakdown": {
+            "base": 252,
+            "titleBonus": 0,
+            "blessingMultiplier": 1,
+            "blessingAdd": 0,
+            "calculated": 252,
+            "effectBonus": 28,
+            "equipmentBonusRaw": 0,
+            "perStatCap": 75,
+            "equipmentCapped": 0,
+            "final": 280,
+            "finalMod": 367
+          }
+        },
+        "toughness": {
+          "value": 123,
+          "mod": 190,
+          "breakdown": {
+            "base": 113,
+            "titleBonus": 0,
+            "blessingMultiplier": 1,
+            "blessingAdd": 0,
+            "calculated": 113,
+            "effectBonus": 10,
+            "equipmentBonusRaw": 0,
+            "perStatCap": 33,
+            "equipmentCapped": 0,
+            "final": 123,
+            "finalMod": 190
+          }
+        },
+        "intelligence": {
+          "value": 360,
+          "mod": 449,
+          "breakdown": {
+            "base": 330,
+            "titleBonus": 0,
+            "blessingMultiplier": 1,
+            "blessingAdd": 0,
+            "calculated": 330,
+            "effectBonus": 30,
+            "equipmentBonusRaw": 0,
+            "perStatCap": 99,
+            "equipmentCapped": 0,
+            "final": 360,
+            "finalMod": 449
+          }
+        },
+        "willpower": {
+          "value": 227,
+          "mod": 310,
+          "breakdown": {
+            "base": 207,
+            "titleBonus": 0,
+            "blessingMultiplier": 1,
+            "blessingAdd": 0,
+            "calculated": 207,
+            "effectBonus": 20,
+            "equipmentBonusRaw": 0,
+            "perStatCap": 62,
+            "equipmentCapped": 0,
+            "final": 227,
+            "finalMod": 310
+          }
+        },
+        "wisdom": {
+          "value": 148,
+          "mod": 220,
+          "breakdown": {
+            "base": 118,
+            "titleBonus": 0,
+            "blessingMultiplier": 1,
+            "blessingAdd": 0,
+            "calculated": 118,
+            "effectBonus": 30,
+            "equipmentBonusRaw": 0,
+            "perStatCap": 35,
+            "equipmentCapped": 0,
+            "final": 148,
+            "finalMod": 220
+          }
+        },
+        "perception": {
+          "value": 177,
+          "mod": 254,
+          "breakdown": {
+            "base": 149,
+            "titleBonus": 0,
+            "blessingMultiplier": 1,
+            "blessingAdd": 0,
+            "calculated": 149,
+            "effectBonus": 28,
+            "equipmentBonusRaw": 0,
+            "perStatCap": 44,
+            "equipmentCapped": 0,
+            "final": 177,
+            "finalMod": 254
+          }
+        }
+      },
+      "defense": {
+        "armor": 54,
+        "veil": 100,
+        "dr": 95,
+        "melee": {
+          "value": 443,
+          "pool": 0,
+          "poolMax": 886
+        },
+        "ranged": {
+          "value": 401,
+          "pool": 0,
+          "poolMax": 802
+        },
+        "mind": {
+          "value": 567,
+          "pool": 0,
+          "poolMax": 1134
+        },
+        "soul": {
+          "value": 344,
+          "pool": 0,
+          "poolMax": 688
+        }
+      }
+    },
+    {
+      "id": "3D2SqB6tlFiWWbkd",
+      "name": "Alda",
+      "folder": "Humans",
+      "health": {
+        "value": 359,
+        "max": 349
+      },
+      "mana": {
+        "value": 80,
+        "max": 101
+      },
+      "stamina": {
+        "value": 265,
+        "max": 273
+      },
+      "freePoints": 0,
+      "attributes": {
+        "race": {
+          "templateId": "Compendium.aspects-of-power.races.Item.hsK5h7UEYtJZy33g",
+          "name": "Human",
+          "level": 35,
+          "rank": "E"
+        },
+        "class": {
+          "templateId": "Compendium.aspects-of-power.classes.Item.kw7Q7lUUuFjagU9g",
+          "name": "Treewalker",
+          "level": 45,
+          "rank": "E"
+        },
+        "profession": {
+          "templateId": "Compendium.aspects-of-power.professions.Item.AjqADQ0MP719hUYK",
+          "name": "Beast-Tamer",
+          "level": 25,
+          "rank": "E"
+        }
+      },
+      "abilities": {
+        "vitality": {
+          "value": 199,
+          "mod": 279,
+          "breakdown": {
+            "base": 199,
+            "titleBonus": 0,
+            "blessingMultiplier": 1,
+            "blessingAdd": 0,
+            "calculated": 199,
+            "effectBonus": 0,
+            "equipmentBonusRaw": 0,
+            "perStatCap": 59,
+            "equipmentCapped": 0,
+            "final": 199,
+            "finalMod": 279
+          }
+        },
+        "endurance": {
+          "value": 193,
+          "mod": 273,
+          "breakdown": {
+            "base": 184,
+            "titleBonus": 0,
+            "blessingMultiplier": 1,
+            "blessingAdd": 0,
+            "calculated": 184,
+            "effectBonus": 9,
+            "equipmentBonusRaw": 0,
+            "perStatCap": 55,
+            "equipmentCapped": 0,
+            "final": 193,
+            "finalMod": 273
+          }
+        },
+        "strength": {
+          "value": 61,
+          "mod": 108,
+          "breakdown": {
+            "base": 61,
+            "titleBonus": 0,
+            "blessingMultiplier": 1,
+            "blessingAdd": 0,
+            "calculated": 61,
+            "effectBonus": 0,
+            "equipmentBonusRaw": 0,
+            "perStatCap": 18,
+            "equipmentCapped": 0,
+            "final": 61,
+            "finalMod": 108
+          }
+        },
+        "dexterity": {
+          "value": 301,
+          "mod": 389,
+          "breakdown": {
+            "base": 283,
+            "titleBonus": 0,
+            "blessingMultiplier": 1,
+            "blessingAdd": 0,
+            "calculated": 283,
+            "effectBonus": 18,
+            "equipmentBonusRaw": 0,
+            "perStatCap": 84,
+            "equipmentCapped": 0,
+            "final": 301,
+            "finalMod": 389
+          }
+        },
+        "toughness": {
+          "value": 69,
+          "mod": 120,
+          "breakdown": {
+            "base": 66,
+            "titleBonus": 0,
+            "blessingMultiplier": 1,
+            "blessingAdd": 0,
+            "calculated": 66,
+            "effectBonus": 3,
+            "equipmentBonusRaw": 0,
+            "perStatCap": 19,
+            "equipmentCapped": 0,
+            "final": 69,
+            "finalMod": 120
+          }
+        },
+        "intelligence": {
+          "value": 57,
+          "mod": 103,
+          "breakdown": {
+            "base": 51,
+            "titleBonus": 0,
+            "blessingMultiplier": 1,
+            "blessingAdd": 0,
+            "calculated": 51,
+            "effectBonus": 6,
+            "equipmentBonusRaw": 0,
+            "perStatCap": 15,
+            "equipmentCapped": 0,
+            "final": 57,
+            "finalMod": 103
+          }
+        },
+        "willpower": {
+          "value": 56,
+          "mod": 101,
+          "breakdown": {
+            "base": 56,
+            "titleBonus": 0,
+            "blessingMultiplier": 1,
+            "blessingAdd": 0,
+            "calculated": 56,
+            "effectBonus": 0,
+            "equipmentBonusRaw": 0,
+            "perStatCap": 16,
+            "equipmentCapped": 0,
+            "final": 56,
+            "finalMod": 101
+          }
+        },
+        "wisdom": {
+          "value": 123,
+          "mod": 190,
+          "breakdown": {
+            "base": 123,
+            "titleBonus": 0,
+            "blessingMultiplier": 1,
+            "blessingAdd": 0,
+            "calculated": 123,
+            "effectBonus": 0,
+            "equipmentBonusRaw": 0,
+            "perStatCap": 36,
+            "equipmentCapped": 0,
+            "final": 123,
+            "finalMod": 190
+          }
+        },
+        "perception": {
+          "value": 324,
+          "mod": 413,
+          "breakdown": {
+            "base": 302,
+            "titleBonus": 0,
+            "blessingMultiplier": 1,
+            "blessingAdd": 0,
+            "calculated": 302,
+            "effectBonus": 22,
+            "equipmentBonusRaw": 0,
+            "perStatCap": 90,
+            "equipmentCapped": 0,
+            "final": 324,
+            "finalMod": 413
+          }
+        }
+      },
+      "defense": {
+        "armor": 54,
+        "veil": 53,
+        "dr": 60,
+        "melee": {
+          "value": 464,
+          "pool": 0,
+          "poolMax": 928
+        },
+        "ranged": {
+          "value": 583,
+          "pool": 0,
+          "poolMax": 1166
+        },
+        "mind": {
+          "value": 176,
+          "pool": 0,
+          "poolMax": 352
+        },
+        "soul": {
+          "value": 242,
+          "pool": 0,
+          "poolMax": 484
+        }
+      }
+    },
+    {
+      "id": "5smlWMSqNvK7Qe1B",
+      "name": "Amina Wright",
+      "folder": "Kelp Kraken",
+      "health": {
+        "value": 273,
+        "max": 316
+      },
+      "mana": {
+        "value": 498,
+        "max": 444
+      },
+      "stamina": {
+        "value": 50,
+        "max": 131
+      },
+      "freePoints": 0,
+      "attributes": {
+        "race": {
+          "templateId": "Compendium.aspects-of-power.races.Item.hsK5h7UEYtJZy33g",
+          "name": "Human",
+          "level": 39,
+          "rank": "E"
+        },
+        "class": {
+          "templateId": "Compendium.aspects-of-power.classes.Item.NoSboeMYNpHDjweu",
+          "name": "Witch of Ages",
+          "level": 46,
+          "rank": "E"
+        },
+        "profession": {
+          "templateId": "Compendium.aspects-of-power.professions.Item.jIkg4PmplFKhYpXj",
+          "name": "Witch-Wright of Jewels",
+          "level": 32,
+          "rank": "E"
+        }
+      },
+      "abilities": {
+        "vitality": {
+          "value": 176,
+          "mod": 253,
+          "breakdown": {
+            "base": 166,
+            "titleBonus": 0,
+            "blessingMultiplier": 1,
+            "blessingAdd": 0,
+            "calculated": 166,
+            "effectBonus": 10,
+            "equipmentBonusRaw": 0,
+            "perStatCap": 49,
+            "equipmentCapped": 0,
+            "final": 176,
+            "finalMod": 253
+          }
+        },
+        "endurance": {
+          "value": 77,
+          "mod": 131,
+          "breakdown": {
+            "base": 67,
+            "titleBonus": 0,
+            "blessingMultiplier": 1,
+            "blessingAdd": 0,
+            "calculated": 67,
+            "effectBonus": 10,
+            "equipmentBonusRaw": 0,
+            "perStatCap": 20,
+            "equipmentCapped": 0,
+            "final": 77,
+            "finalMod": 131
+          }
+        },
+        "strength": {
+          "value": 69,
+          "mod": 120,
+          "breakdown": {
+            "base": 59,
+            "titleBonus": 0,
+            "blessingMultiplier": 1,
+            "blessingAdd": 0,
+            "calculated": 59,
+            "effectBonus": 10,
+            "equipmentBonusRaw": 0,
+            "perStatCap": 17,
+            "equipmentCapped": 0,
+            "final": 69,
+            "finalMod": 120
+          }
+        },
+        "dexterity": {
+          "value": 192,
+          "mod": 271,
+          "breakdown": {
+            "base": 182,
+            "titleBonus": 0,
+            "blessingMultiplier": 1,
+            "blessingAdd": 0,
+            "calculated": 182,
+            "effectBonus": 10,
+            "equipmentBonusRaw": 0,
+            "perStatCap": 54,
+            "equipmentCapped": 0,
+            "final": 192,
+            "finalMod": 271
+          }
+        },
+        "toughness": {
+          "value": 69,
+          "mod": 120,
+          "breakdown": {
+            "base": 59,
+            "titleBonus": 0,
+            "blessingMultiplier": 1,
+            "blessingAdd": 0,
+            "calculated": 59,
+            "effectBonus": 10,
+            "equipmentBonusRaw": 0,
+            "perStatCap": 17,
+            "equipmentCapped": 0,
+            "final": 69,
+            "finalMod": 120
+          }
+        },
+        "intelligence": {
+          "value": 288,
+          "mod": 375,
+          "breakdown": {
+            "base": 264,
+            "titleBonus": 0,
+            "blessingMultiplier": 1,
+            "blessingAdd": 0,
+            "calculated": 264,
+            "effectBonus": 10,
+            "equipmentBonusRaw": 14,
+            "perStatCap": 79,
+            "equipmentCapped": 14,
+            "final": 288,
+            "finalMod": 375
+          }
+        },
+        "willpower": {
+          "value": 355,
+          "mod": 444,
+          "breakdown": {
+            "base": 332,
+            "titleBonus": 0,
+            "blessingMultiplier": 1,
+            "blessingAdd": 0,
+            "calculated": 332,
+            "effectBonus": 10,
+            "equipmentBonusRaw": 13,
+            "perStatCap": 99,
+            "equipmentCapped": 13,
+            "final": 355,
+            "finalMod": 444
+          }
+        },
+        "wisdom": {
+          "value": 336,
+          "mod": 425,
+          "breakdown": {
+            "base": 315,
+            "titleBonus": 0,
+            "blessingMultiplier": 1,
+            "blessingAdd": 0,
+            "calculated": 315,
+            "effectBonus": 10,
+            "equipmentBonusRaw": 11,
+            "perStatCap": 94,
+            "equipmentCapped": 11,
+            "final": 336,
+            "finalMod": 425
+          }
+        },
+        "perception": {
+          "value": 144,
+          "mod": 216,
+          "breakdown": {
+            "base": 134,
+            "titleBonus": 0,
+            "blessingMultiplier": 1,
+            "blessingAdd": 0,
+            "calculated": 134,
+            "effectBonus": 10,
+            "equipmentBonusRaw": 0,
+            "perStatCap": 40,
+            "equipmentCapped": 0,
+            "final": 144,
+            "finalMod": 216
+          }
+        }
+      },
+      "defense": {
+        "armor": 0,
+        "veil": 0,
+        "dr": 60,
+        "melee": {
+          "value": 338,
+          "pool": 0,
+          "poolMax": 676
+        },
+        "ranged": {
+          "value": 327,
+          "pool": 0,
+          "poolMax": 654
+        },
+        "mind": {
+          "value": 553,
+          "pool": 0,
+          "poolMax": 1106
+        },
+        "soul": {
+          "value": 614,
+          "pool": 0,
+          "poolMax": 1228
+        }
+      }
+    },
+    {
+      "id": "6Z3Wfm83ukgMz1hK",
+      "name": "Bridget Sutherland",
+      "folder": "Profession Group",
+      "health": {
+        "value": 73,
+        "max": 135
+      },
+      "mana": {
+        "value": 53,
+        "max": 136
+      },
+      "stamina": {
+        "value": 60,
+        "max": 267
+      },
+      "freePoints": 0,
+      "attributes": {
+        "race": {
+          "templateId": "Compendium.aspects-of-power.races.Item.hsK5h7UEYtJZy33g",
+          "name": "Human",
+          "level": 31,
+          "rank": "E"
+        },
+        "class": {
+          "templateId": "Compendium.aspects-of-power.classes.Item.d1O4OWswkjrqeJV7",
+          "name": "Mage",
+          "level": 10,
+          "rank": "F"
+        },
+        "profession": {
+          "templateId": "Compendium.aspects-of-power.professions.Item.j66aJy27KoWNkpA9",
+          "name": "Chef for the Masses",
+          "level": 52,
+          "rank": "E"
+        }
+      },
+      "abilities": {
+        "vitality": {
+          "value": 61,
+          "mod": 108,
+          "breakdown": {
+            "base": 51,
+            "titleBonus": 0,
+            "blessingMultiplier": 1,
+            "blessingAdd": 0,
+            "calculated": 51,
+            "effectBonus": 10,
+            "equipmentBonusRaw": 0,
+            "perStatCap": 15,
+            "equipmentCapped": 0,
+            "final": 61,
+            "finalMod": 108
+          }
+        },
+        "endurance": {
+          "value": 188,
+          "mod": 267,
+          "breakdown": {
+            "base": 178,
+            "titleBonus": 0,
+            "blessingMultiplier": 1,
+            "blessingAdd": 0,
+            "calculated": 178,
+            "effectBonus": 10,
+            "equipmentBonusRaw": 0,
+            "perStatCap": 53,
+            "equipmentCapped": 0,
+            "final": 188,
+            "finalMod": 267
+          }
+        },
+        "strength": {
+          "value": 217,
+          "mod": 299,
+          "breakdown": {
+            "base": 207,
+            "titleBonus": 0,
+            "blessingMultiplier": 1,
+            "blessingAdd": 0,
+            "calculated": 207,
+            "effectBonus": 10,
+            "equipmentBonusRaw": 0,
+            "perStatCap": 62,
+            "equipmentCapped": 0,
+            "final": 217,
+            "finalMod": 299
+          }
+        },
+        "dexterity": {
+          "value": 281,
+          "mod": 368,
+          "breakdown": {
+            "base": 271,
+            "titleBonus": 0,
+            "blessingMultiplier": 1,
+            "blessingAdd": 0,
+            "calculated": 271,
+            "effectBonus": 10,
+            "equipmentBonusRaw": 0,
+            "perStatCap": 81,
+            "equipmentCapped": 0,
+            "final": 281,
+            "finalMod": 368
+          }
+        },
+        "toughness": {
+          "value": 53,
+          "mod": 97,
+          "breakdown": {
+            "base": 43,
+            "titleBonus": 0,
+            "blessingMultiplier": 1,
+            "blessingAdd": 0,
+            "calculated": 43,
+            "effectBonus": 10,
+            "equipmentBonusRaw": 0,
+            "perStatCap": 12,
+            "equipmentCapped": 0,
+            "final": 53,
+            "finalMod": 97
+          }
+        },
+        "intelligence": {
+          "value": 77,
+          "mod": 131,
+          "breakdown": {
+            "base": 67,
+            "titleBonus": 0,
+            "blessingMultiplier": 1,
+            "blessingAdd": 0,
+            "calculated": 67,
+            "effectBonus": 10,
+            "equipmentBonusRaw": 0,
+            "perStatCap": 20,
+            "equipmentCapped": 0,
+            "final": 77,
+            "finalMod": 131
+          }
+        },
+        "willpower": {
+          "value": 81,
+          "mod": 136,
+          "breakdown": {
+            "base": 71,
+            "titleBonus": 0,
+            "blessingMultiplier": 1,
+            "blessingAdd": 0,
+            "calculated": 71,
+            "effectBonus": 10,
+            "equipmentBonusRaw": 0,
+            "perStatCap": 21,
+            "equipmentCapped": 0,
+            "final": 81,
+            "finalMod": 136
+          }
+        },
+        "wisdom": {
+          "value": 88,
+          "mod": 145,
+          "breakdown": {
+            "base": 78,
+            "titleBonus": 0,
+            "blessingMultiplier": 1,
+            "blessingAdd": 0,
+            "calculated": 78,
+            "effectBonus": 10,
+            "equipmentBonusRaw": 0,
+            "perStatCap": 23,
+            "equipmentCapped": 0,
+            "final": 88,
+            "finalMod": 145
+          }
+        },
+        "perception": {
+          "value": 281,
+          "mod": 368,
+          "breakdown": {
+            "base": 271,
+            "titleBonus": 0,
+            "blessingMultiplier": 1,
+            "blessingAdd": 0,
+            "calculated": 271,
+            "effectBonus": 10,
+            "equipmentBonusRaw": 0,
+            "perStatCap": 81,
+            "equipmentCapped": 0,
+            "final": 281,
+            "finalMod": 368
+          }
+        }
+      },
+      "defense": {
+        "armor": 0,
+        "veil": 0,
+        "dr": 49,
+        "melee": {
+          "value": 503,
+          "pool": 0,
+          "poolMax": 1006
+        },
+        "ranged": {
+          "value": 526,
+          "pool": 0,
+          "poolMax": 1052
+        },
+        "mind": {
+          "value": 192,
+          "pool": 0,
+          "poolMax": 384
+        },
+        "soul": {
+          "value": 204,
+          "pool": 0,
+          "poolMax": 408
+        }
+      }
+    },
+    {
+      "id": "276HPAin8mygycjA",
+      "name": "Bruce Bradley",
+      "folder": "Profession Group",
+      "health": {
+        "value": 104,
+        "max": 245
+      },
+      "mana": {
+        "value": 41,
+        "max": 111
+      },
+      "stamina": {
+        "value": 227,
+        "max": 379
+      },
+      "freePoints": 0,
+      "attributes": {
+        "race": {
+          "templateId": "Compendium.aspects-of-power.races.Item.hsK5h7UEYtJZy33g",
+          "name": "Human",
+          "level": 36,
+          "rank": "E"
+        },
+        "class": {
+          "templateId": "Compendium.aspects-of-power.classes.Item.VEGWuKUeLkFOjCd4",
+          "name": "Heavy Warrior",
+          "level": 18,
+          "rank": "F"
+        },
+        "profession": {
+          "templateId": "Compendium.aspects-of-power.professions.Item.0Pw8lKGwvz2BFAuq",
+          "name": "Crusher",
+          "level": 54,
+          "rank": "E"
+        }
+      },
+      "abilities": {
+        "vitality": {
+          "value": 128,
+          "mod": 196,
+          "breakdown": {
+            "base": 118,
+            "titleBonus": 0,
+            "blessingMultiplier": 1,
+            "blessingAdd": 0,
+            "calculated": 118,
+            "effectBonus": 10,
+            "equipmentBonusRaw": 0,
+            "perStatCap": 35,
+            "equipmentCapped": 0,
+            "final": 128,
+            "finalMod": 196
+          }
+        },
+        "endurance": {
+          "value": 291,
+          "mod": 379,
+          "breakdown": {
+            "base": 281,
+            "titleBonus": 0,
+            "blessingMultiplier": 1,
+            "blessingAdd": 0,
+            "calculated": 281,
+            "effectBonus": 10,
+            "equipmentBonusRaw": 0,
+            "perStatCap": 84,
+            "equipmentCapped": 0,
+            "final": 291,
+            "finalMod": 379
+          }
+        },
+        "strength": {
+          "value": 517,
+          "mod": 600,
+          "breakdown": {
+            "base": 507,
+            "titleBonus": 0,
+            "blessingMultiplier": 1,
+            "blessingAdd": 0,
+            "calculated": 507,
+            "effectBonus": 10,
+            "equipmentBonusRaw": 0,
+            "perStatCap": 152,
+            "equipmentCapped": 0,
+            "final": 517,
+            "finalMod": 600
+          }
+        },
+        "dexterity": {
+          "value": 222,
+          "mod": 305,
+          "breakdown": {
+            "base": 212,
+            "titleBonus": 0,
+            "blessingMultiplier": 1,
+            "blessingAdd": 0,
+            "calculated": 212,
+            "effectBonus": 10,
+            "equipmentBonusRaw": 0,
+            "perStatCap": 63,
+            "equipmentCapped": 0,
+            "final": 222,
+            "finalMod": 305
+          }
+        },
+        "toughness": {
+          "value": 96,
+          "mod": 156,
+          "breakdown": {
+            "base": 86,
+            "titleBonus": 0,
+            "blessingMultiplier": 1,
+            "blessingAdd": 0,
+            "calculated": 86,
+            "effectBonus": 10,
+            "equipmentBonusRaw": 0,
+            "perStatCap": 25,
+            "equipmentCapped": 0,
+            "final": 96,
+            "finalMod": 156
+          }
+        },
+        "intelligence": {
+          "value": 63,
+          "mod": 111,
+          "breakdown": {
+            "base": 53,
+            "titleBonus": 0,
+            "blessingMultiplier": 1,
+            "blessingAdd": 0,
+            "calculated": 53,
+            "effectBonus": 10,
+            "equipmentBonusRaw": 0,
+            "perStatCap": 15,
+            "equipmentCapped": 0,
+            "final": 63,
+            "finalMod": 111
+          }
+        },
+        "willpower": {
+          "value": 63,
+          "mod": 111,
+          "breakdown": {
+            "base": 53,
+            "titleBonus": 0,
+            "blessingMultiplier": 1,
+            "blessingAdd": 0,
+            "calculated": 53,
+            "effectBonus": 10,
+            "equipmentBonusRaw": 0,
+            "perStatCap": 15,
+            "equipmentCapped": 0,
+            "final": 63,
+            "finalMod": 111
+          }
+        },
+        "wisdom": {
+          "value": 63,
+          "mod": 111,
+          "breakdown": {
+            "base": 53,
+            "titleBonus": 0,
+            "blessingMultiplier": 1,
+            "blessingAdd": 0,
+            "calculated": 53,
+            "effectBonus": 10,
+            "equipmentBonusRaw": 0,
+            "perStatCap": 15,
+            "equipmentCapped": 0,
+            "final": 63,
+            "finalMod": 111
+          }
+        },
+        "perception": {
+          "value": 111,
+          "mod": 175,
+          "breakdown": {
+            "base": 101,
+            "titleBonus": 0,
+            "blessingMultiplier": 1,
+            "blessingAdd": 0,
+            "calculated": 101,
+            "effectBonus": 10,
+            "equipmentBonusRaw": 0,
+            "perStatCap": 30,
+            "equipmentCapped": 0,
+            "final": 111,
+            "finalMod": 175
+          }
+        }
+      },
+      "defense": {
+        "armor": 0,
+        "veil": 0,
+        "dr": 78,
+        "melee": {
+          "value": 534,
+          "pool": 0,
+          "poolMax": 1068
+        },
+        "ranged": {
+          "value": 293,
+          "pool": 0,
+          "poolMax": 586
+        },
+        "mind": {
+          "value": 159,
+          "pool": 0,
+          "poolMax": 318
+        },
+        "soul": {
+          "value": 159,
+          "pool": 0,
+          "poolMax": 318
+        }
+      }
+    },
+    {
+      "id": "8LaGcmQE8418julR",
+      "name": "Damian Flynn",
+      "folder": "Profession Group",
+      "health": {
+        "value": 64,
+        "max": 161
+      },
+      "mana": {
+        "value": 67,
+        "max": 278
+      },
+      "stamina": {
+        "value": 93,
+        "max": 157
+      },
+      "freePoints": 0,
+      "attributes": {
+        "race": {
+          "templateId": "Compendium.aspects-of-power.races.Item.hsK5h7UEYtJZy33g",
+          "name": "Human",
+          "level": 32,
+          "rank": "E"
+        },
+        "class": {
+          "templateId": "Compendium.aspects-of-power.classes.Item.28TnENKazsadZeHt",
+          "name": "Light Warrior",
+          "level": 21,
+          "rank": "F"
+        },
+        "profession": {
+          "templateId": "Compendium.aspects-of-power.professions.Item.nMf2oclokUdQvLdj",
+          "name": "Student Leatherworker of the Cosmos",
+          "level": 44,
+          "rank": "E"
+        }
+      },
+      "abilities": {
+        "vitality": {
+          "value": 76,
+          "mod": 129,
+          "breakdown": {
+            "base": 76,
+            "titleBonus": 0,
+            "blessingMultiplier": 1,
+            "blessingAdd": 0,
+            "calculated": 76,
+            "effectBonus": 0,
+            "equipmentBonusRaw": 0,
+            "perStatCap": 22,
+            "equipmentCapped": 0,
+            "final": 76,
+            "finalMod": 129
+          }
+        },
+        "endurance": {
+          "value": 97,
+          "mod": 157,
+          "breakdown": {
+            "base": 97,
+            "titleBonus": 0,
+            "blessingMultiplier": 1,
+            "blessingAdd": 0,
+            "calculated": 97,
+            "effectBonus": 0,
+            "equipmentBonusRaw": 0,
+            "perStatCap": 29,
+            "equipmentCapped": 0,
+            "final": 97,
+            "finalMod": 157
+          }
+        },
+        "strength": {
+          "value": 182,
+          "mod": 260,
+          "breakdown": {
+            "base": 182,
+            "titleBonus": 0,
+            "blessingMultiplier": 1,
+            "blessingAdd": 0,
+            "calculated": 182,
+            "effectBonus": 0,
+            "equipmentBonusRaw": 0,
+            "perStatCap": 54,
+            "equipmentCapped": 0,
+            "final": 182,
+            "finalMod": 260
+          }
+        },
+        "dexterity": {
+          "value": 351,
+          "mod": 440,
+          "breakdown": {
+            "base": 351,
+            "titleBonus": 0,
+            "blessingMultiplier": 1,
+            "blessingAdd": 0,
+            "calculated": 351,
+            "effectBonus": 0,
+            "equipmentBonusRaw": 0,
+            "perStatCap": 105,
+            "equipmentCapped": 0,
+            "final": 351,
+            "finalMod": 440
+          }
+        },
+        "toughness": {
+          "value": 71,
+          "mod": 122,
+          "breakdown": {
+            "base": 71,
+            "titleBonus": 0,
+            "blessingMultiplier": 1,
+            "blessingAdd": 0,
+            "calculated": 71,
+            "effectBonus": 0,
+            "equipmentBonusRaw": 0,
+            "perStatCap": 21,
+            "equipmentCapped": 0,
+            "final": 71,
+            "finalMod": 122
+          }
+        },
+        "intelligence": {
+          "value": 119,
+          "mod": 185,
+          "breakdown": {
+            "base": 119,
+            "titleBonus": 0,
+            "blessingMultiplier": 1,
+            "blessingAdd": 0,
+            "calculated": 119,
+            "effectBonus": 0,
+            "equipmentBonusRaw": 0,
+            "perStatCap": 35,
+            "equipmentCapped": 0,
+            "final": 119,
+            "finalMod": 185
+          }
+        },
+        "willpower": {
+          "value": 198,
+          "mod": 278,
+          "breakdown": {
+            "base": 198,
+            "titleBonus": 0,
+            "blessingMultiplier": 1,
+            "blessingAdd": 0,
+            "calculated": 198,
+            "effectBonus": 0,
+            "equipmentBonusRaw": 0,
+            "perStatCap": 59,
+            "equipmentCapped": 0,
+            "final": 198,
+            "finalMod": 278
+          }
+        },
+        "wisdom": {
+          "value": 65,
+          "mod": 114,
+          "breakdown": {
+            "base": 65,
+            "titleBonus": 0,
+            "blessingMultiplier": 1,
+            "blessingAdd": 0,
+            "calculated": 65,
+            "effectBonus": 0,
+            "equipmentBonusRaw": 0,
+            "perStatCap": 19,
+            "equipmentCapped": 0,
+            "final": 65,
+            "finalMod": 114
+          }
+        },
+        "perception": {
+          "value": 45,
+          "mod": 85,
+          "breakdown": {
+            "base": 45,
+            "titleBonus": 0,
+            "blessingMultiplier": 1,
+            "blessingAdd": 0,
+            "calculated": 45,
+            "effectBonus": 0,
+            "equipmentBonusRaw": 0,
+            "perStatCap": 13,
+            "equipmentCapped": 0,
+            "final": 45,
+            "finalMod": 85
+          }
+        }
+      },
+      "defense": {
+        "armor": 0,
+        "veil": 0,
+        "dr": 61,
+        "melee": {
+          "value": 570,
+          "pool": 0,
+          "poolMax": 1140
+        },
+        "ranged": {
+          "value": 239,
+          "pool": 0,
+          "poolMax": 478
+        },
+        "mind": {
+          "value": 241,
+          "pool": 0,
+          "poolMax": 482
+        },
+        "soul": {
+          "value": 217,
+          "pool": 0,
+          "poolMax": 434
+        }
+      }
+    },
+    {
+      "id": "gqJgVuirEGBvZGiL",
+      "name": "Deanna Mendez",
+      "folder": "Profession Group",
+      "health": {
+        "value": 10,
+        "max": 143
+      },
+      "mana": {
+        "value": 5,
+        "max": 74
+      },
+      "stamina": {
+        "value": 10,
+        "max": 205
+      },
+      "freePoints": 0,
+      "attributes": {
+        "race": {
+          "templateId": "Compendium.aspects-of-power.races.Item.hsK5h7UEYtJZy33g",
+          "name": "Human",
+          "level": 18,
+          "rank": "F"
+        },
+        "class": {
+          "templateId": "Compendium.aspects-of-power.classes.Item.28TnENKazsadZeHt",
+          "name": "Light Warrior",
+          "level": 15,
+          "rank": "F"
+        },
+        "profession": {
+          "templateId": "Compendium.aspects-of-power.professions.Item.vsaUJCA65gCj2lZ9",
+          "name": "Thief",
+          "level": 22,
+          "rank": "F"
+        }
+      },
+      "abilities": {
+        "vitality": {
+          "value": 65,
+          "mod": 114,
+          "breakdown": {
+            "base": 55,
+            "titleBonus": 0,
+            "blessingMultiplier": 1,
+            "blessingAdd": 0,
+            "calculated": 55,
+            "effectBonus": 10,
+            "equipmentBonusRaw": 0,
+            "perStatCap": 16,
+            "equipmentCapped": 0,
+            "final": 65,
+            "finalMod": 114
+          }
+        },
+        "endurance": {
+          "value": 135,
+          "mod": 205,
+          "breakdown": {
+            "base": 116,
+            "titleBonus": 0,
+            "blessingMultiplier": 1,
+            "blessingAdd": 0,
+            "calculated": 116,
+            "effectBonus": 19,
+            "equipmentBonusRaw": 0,
+            "perStatCap": 34,
+            "equipmentCapped": 0,
+            "final": 135,
+            "finalMod": 205
+          }
+        },
+        "strength": {
+          "value": 93,
+          "mod": 152,
+          "breakdown": {
+            "base": 83,
+            "titleBonus": 0,
+            "blessingMultiplier": 1,
+            "blessingAdd": 0,
+            "calculated": 83,
+            "effectBonus": 10,
+            "equipmentBonusRaw": 0,
+            "perStatCap": 24,
+            "equipmentCapped": 0,
+            "final": 93,
+            "finalMod": 152
+          }
+        },
+        "dexterity": {
+          "value": 254,
+          "mod": 340,
+          "breakdown": {
+            "base": 226,
+            "titleBonus": 0,
+            "blessingMultiplier": 1,
+            "blessingAdd": 0,
+            "calculated": 226,
+            "effectBonus": 28,
+            "equipmentBonusRaw": 0,
+            "perStatCap": 67,
+            "equipmentCapped": 0,
+            "final": 254,
+            "finalMod": 340
+          }
+        },
+        "toughness": {
+          "value": 38,
+          "mod": 74,
+          "breakdown": {
+            "base": 28,
+            "titleBonus": 0,
+            "blessingMultiplier": 1,
+            "blessingAdd": 0,
+            "calculated": 28,
+            "effectBonus": 10,
+            "equipmentBonusRaw": 0,
+            "perStatCap": 8,
+            "equipmentCapped": 0,
+            "final": 38,
+            "finalMod": 74
+          }
+        },
+        "intelligence": {
+          "value": 53,
+          "mod": 97,
+          "breakdown": {
+            "base": 28,
+            "titleBonus": 0,
+            "blessingMultiplier": 1,
+            "blessingAdd": 0,
+            "calculated": 28,
+            "effectBonus": 25,
+            "equipmentBonusRaw": 0,
+            "perStatCap": 8,
+            "equipmentCapped": 0,
+            "final": 53,
+            "finalMod": 97
+          }
+        },
+        "willpower": {
+          "value": 38,
+          "mod": 74,
+          "breakdown": {
+            "base": 28,
+            "titleBonus": 0,
+            "blessingMultiplier": 1,
+            "blessingAdd": 0,
+            "calculated": 28,
+            "effectBonus": 10,
+            "equipmentBonusRaw": 0,
+            "perStatCap": 8,
+            "equipmentCapped": 0,
+            "final": 38,
+            "finalMod": 74
+          }
+        },
+        "wisdom": {
+          "value": 53,
+          "mod": 97,
+          "breakdown": {
+            "base": 28,
+            "titleBonus": 0,
+            "blessingMultiplier": 1,
+            "blessingAdd": 0,
+            "calculated": 28,
+            "effectBonus": 25,
+            "equipmentBonusRaw": 0,
+            "perStatCap": 8,
+            "equipmentCapped": 0,
+            "final": 53,
+            "finalMod": 97
+          }
+        },
+        "perception": {
+          "value": 201,
+          "mod": 282,
+          "breakdown": {
+            "base": 153,
+            "titleBonus": 0,
+            "blessingMultiplier": 1,
+            "blessingAdd": 0,
+            "calculated": 153,
+            "effectBonus": 48,
+            "equipmentBonusRaw": 0,
+            "perStatCap": 45,
+            "equipmentCapped": 0,
+            "final": 201,
+            "finalMod": 282
+          }
+        }
+      },
+      "defense": {
+        "armor": 54,
+        "veil": 100,
+        "dr": 37,
+        "melee": {
+          "value": 424,
+          "pool": 0,
+          "poolMax": 848
+        },
+        "ranged": {
+          "value": 422,
+          "pool": 0,
+          "poolMax": 844
+        },
+        "mind": {
+          "value": 139,
+          "pool": 0,
+          "poolMax": 278
+        },
+        "soul": {
+          "value": 131,
+          "pool": 0,
+          "poolMax": 262
+        }
+      }
+    },
+    {
+      "id": "tqr3A5BU2ZbrHCg9",
+      "name": "Faye",
+      "folder": "Ex-Mil Group",
+      "health": {
+        "value": 301,
+        "max": 223
+      },
+      "mana": {
+        "value": 328,
+        "max": 326
+      },
+      "stamina": {
+        "value": 36,
+        "max": 91
+      },
+      "freePoints": 0,
+      "attributes": {
+        "race": {
+          "templateId": "Compendium.aspects-of-power.races.Item.RbaL80PjvQ4viXGw",
+          "name": "Half-Asrai",
+          "level": 26,
+          "rank": "E"
+        },
+        "class": {
+          "templateId": "Compendium.aspects-of-power.classes.Item.8D7DmhrA1sO2H35a",
+          "name": "Glamourweaver",
+          "level": 48,
+          "rank": "E"
+        },
+        "profession": {
+          "templateId": "Compendium.aspects-of-power.professions.Item.Z33UfGL1rnds8f4U",
+          "name": "Seed of New Life",
+          "level": 17,
+          "rank": "F"
+        }
+      },
+      "abilities": {
+        "vitality": {
+          "value": 113,
+          "mod": 178,
+          "breakdown": {
+            "base": 94,
+            "titleBonus": 0,
+            "blessingMultiplier": 1,
+            "blessingAdd": 0,
+            "calculated": 94,
+            "effectBonus": 19,
+            "equipmentBonusRaw": 0,
+            "perStatCap": 28,
+            "equipmentCapped": 0,
+            "final": 113,
+            "finalMod": 178
+          }
+        },
+        "endurance": {
+          "value": 49,
+          "mod": 91,
+          "breakdown": {
+            "base": 25,
+            "titleBonus": 0,
+            "blessingMultiplier": 1,
+            "blessingAdd": 0,
+            "calculated": 25,
+            "effectBonus": 24,
+            "equipmentBonusRaw": 0,
+            "perStatCap": 7,
+            "equipmentCapped": 0,
+            "final": 49,
+            "finalMod": 91
+          }
+        },
+        "strength": {
+          "value": 27,
+          "mod": 57,
+          "breakdown": {
+            "base": 17,
+            "titleBonus": 0,
+            "blessingMultiplier": 1,
+            "blessingAdd": 0,
+            "calculated": 17,
+            "effectBonus": 10,
+            "equipmentBonusRaw": 0,
+            "perStatCap": 5,
+            "equipmentCapped": 0,
+            "final": 27,
+            "finalMod": 57
+          }
+        },
+        "dexterity": {
+          "value": 74,
+          "mod": 127,
+          "breakdown": {
+            "base": 46,
+            "titleBonus": 0,
+            "blessingMultiplier": 1,
+            "blessingAdd": 0,
+            "calculated": 46,
+            "effectBonus": 28,
+            "equipmentBonusRaw": 0,
+            "perStatCap": 13,
+            "equipmentCapped": 0,
+            "final": 74,
+            "finalMod": 127
+          }
+        },
+        "toughness": {
+          "value": 99,
+          "mod": 160,
+          "breakdown": {
+            "base": 89,
+            "titleBonus": 0,
+            "blessingMultiplier": 1,
+            "blessingAdd": 0,
+            "calculated": 89,
+            "effectBonus": 10,
+            "equipmentBonusRaw": 0,
+            "perStatCap": 26,
+            "equipmentCapped": 0,
+            "final": 99,
+            "finalMod": 160
+          }
+        },
+        "intelligence": {
+          "value": 148,
+          "mod": 220,
+          "breakdown": {
+            "base": 137,
+            "titleBonus": 0,
+            "blessingMultiplier": 1,
+            "blessingAdd": 0,
+            "calculated": 137,
+            "effectBonus": 11,
+            "equipmentBonusRaw": 0,
+            "perStatCap": 41,
+            "equipmentCapped": 0,
+            "final": 148,
+            "finalMod": 220
+          }
+        },
+        "willpower": {
+          "value": 241,
+          "mod": 326,
+          "breakdown": {
+            "base": 216,
+            "titleBonus": 0,
+            "blessingMultiplier": 1,
+            "blessingAdd": 0,
+            "calculated": 216,
+            "effectBonus": 25,
+            "equipmentBonusRaw": 0,
+            "perStatCap": 64,
+            "equipmentCapped": 0,
+            "final": 241,
+            "finalMod": 326
+          }
+        },
+        "wisdom": {
+          "value": 370,
+          "mod": 459,
+          "breakdown": {
+            "base": 343,
+            "titleBonus": 0,
+            "blessingMultiplier": 1,
+            "blessingAdd": 0,
+            "calculated": 343,
+            "effectBonus": 27,
+            "equipmentBonusRaw": 0,
+            "perStatCap": 102,
+            "equipmentCapped": 0,
+            "final": 370,
+            "finalMod": 459
+          }
+        },
+        "perception": {
+          "value": 121,
+          "mod": 188,
+          "breakdown": {
+            "base": 93,
+            "titleBonus": 0,
+            "blessingMultiplier": 1,
+            "blessingAdd": 0,
+            "calculated": 93,
+            "effectBonus": 28,
+            "equipmentBonusRaw": 0,
+            "perStatCap": 27,
+            "equipmentCapped": 0,
+            "final": 121,
+            "finalMod": 188
+          }
+        }
+      },
+      "defense": {
+        "armor": 54,
+        "veil": 72,
+        "dr": 80,
+        "melee": {
+          "value": 159,
+          "pool": 0,
+          "poolMax": 318
+        },
+        "ranged": {
+          "value": 249,
+          "pool": 0,
+          "poolMax": 498
+        },
+        "mind": {
+          "value": 393,
+          "pool": 0,
+          "poolMax": 786
+        },
+        "soul": {
+          "value": 612,
+          "pool": 0,
+          "poolMax": 1224
+        }
+      }
+    },
+    {
+      "id": "6lkp95lcQOqpXOqb",
+      "name": "Frieda",
+      "folder": "Ex-Mil Group",
+      "health": {
+        "value": 258,
+        "max": 270
+      },
+      "mana": {
+        "value": 98,
+        "max": 120
+      },
+      "stamina": {
+        "value": 242,
+        "max": 247
+      },
+      "freePoints": 0,
+      "attributes": {
+        "race": {
+          "templateId": "Compendium.aspects-of-power.races.Item.hsK5h7UEYtJZy33g",
+          "name": "Human",
+          "level": 39,
+          "rank": "E"
+        },
+        "class": {
+          "templateId": "Compendium.aspects-of-power.classes.Item.AUkoyfYdvqOY9uTM",
+          "name": "Waywatcher",
+          "level": 48,
+          "rank": "E"
+        },
+        "profession": {
+          "templateId": "Compendium.aspects-of-power.professions.Item.P6Xt20cPybDtkYhP",
+          "name": "Trapper of the Asrai",
+          "level": 30,
+          "rank": "E"
+        }
+      },
+      "abilities": {
+        "vitality": {
+          "value": 144,
+          "mod": 216,
+          "breakdown": {
+            "base": 134,
+            "titleBonus": 0,
+            "blessingMultiplier": 1,
+            "blessingAdd": 0,
+            "calculated": 134,
+            "effectBonus": 10,
+            "equipmentBonusRaw": 0,
+            "perStatCap": 40,
+            "equipmentCapped": 0,
+            "final": 144,
+            "finalMod": 216
+          }
+        },
+        "endurance": {
+          "value": 171,
+          "mod": 247,
+          "breakdown": {
+            "base": 149,
+            "titleBonus": 0,
+            "blessingMultiplier": 1,
+            "blessingAdd": 0,
+            "calculated": 149,
+            "effectBonus": 22,
+            "equipmentBonusRaw": 0,
+            "perStatCap": 44,
+            "equipmentCapped": 0,
+            "final": 171,
+            "finalMod": 247
+          }
+        },
+        "strength": {
+          "value": 79,
+          "mod": 133,
+          "breakdown": {
+            "base": 69,
+            "titleBonus": 0,
+            "blessingMultiplier": 1,
+            "blessingAdd": 0,
+            "calculated": 69,
+            "effectBonus": 10,
+            "equipmentBonusRaw": 0,
+            "perStatCap": 20,
+            "equipmentCapped": 0,
+            "final": 79,
+            "finalMod": 133
+          }
+        },
+        "dexterity": {
+          "value": 379,
+          "mod": 468,
+          "breakdown": {
+            "base": 346,
+            "titleBonus": 0,
+            "blessingMultiplier": 1,
+            "blessingAdd": 0,
+            "calculated": 346,
+            "effectBonus": 33,
+            "equipmentBonusRaw": 0,
+            "perStatCap": 103,
+            "equipmentCapped": 0,
+            "final": 379,
+            "finalMod": 468
+          }
+        },
+        "toughness": {
+          "value": 142,
+          "mod": 213,
+          "breakdown": {
+            "base": 132,
+            "titleBonus": 0,
+            "blessingMultiplier": 1,
+            "blessingAdd": 0,
+            "calculated": 132,
+            "effectBonus": 10,
+            "equipmentBonusRaw": 0,
+            "perStatCap": 39,
+            "equipmentCapped": 0,
+            "final": 142,
+            "finalMod": 213
+          }
+        },
+        "intelligence": {
+          "value": 69,
+          "mod": 120,
+          "breakdown": {
+            "base": 59,
+            "titleBonus": 0,
+            "blessingMultiplier": 1,
+            "blessingAdd": 0,
+            "calculated": 59,
+            "effectBonus": 10,
+            "equipmentBonusRaw": 0,
+            "perStatCap": 17,
+            "equipmentCapped": 0,
+            "final": 69,
+            "finalMod": 120
+          }
+        },
+        "willpower": {
+          "value": 69,
+          "mod": 120,
+          "breakdown": {
+            "base": 59,
+            "titleBonus": 0,
+            "blessingMultiplier": 1,
+            "blessingAdd": 0,
+            "calculated": 59,
+            "effectBonus": 10,
+            "equipmentBonusRaw": 0,
+            "perStatCap": 17,
+            "equipmentCapped": 0,
+            "final": 69,
+            "finalMod": 120
+          }
+        },
+        "wisdom": {
+          "value": 151,
+          "mod": 224,
+          "breakdown": {
+            "base": 141,
+            "titleBonus": 0,
+            "blessingMultiplier": 1,
+            "blessingAdd": 0,
+            "calculated": 141,
+            "effectBonus": 10,
+            "equipmentBonusRaw": 0,
+            "perStatCap": 42,
+            "equipmentCapped": 0,
+            "final": 151,
+            "finalMod": 224
+          }
+        },
+        "perception": {
+          "value": 510,
+          "mod": 593,
+          "breakdown": {
+            "base": 480,
+            "titleBonus": 0,
+            "blessingMultiplier": 1,
+            "blessingAdd": 0,
+            "calculated": 480,
+            "effectBonus": 30,
+            "equipmentBonusRaw": 0,
+            "perStatCap": 144,
+            "equipmentCapped": 0,
+            "final": 510,
+            "finalMod": 593
+          }
+        }
+      },
+      "defense": {
+        "armor": 54,
+        "veil": 36,
+        "dr": 107,
+        "melee": {
+          "value": 559,
+          "pool": 0,
+          "poolMax": 1118
+        },
+        "ranged": {
+          "value": 807,
+          "pool": 0,
+          "poolMax": 1614
+        },
+        "mind": {
+          "value": 206,
+          "pool": 0,
+          "poolMax": 412
+        },
+        "soul": {
+          "value": 286,
+          "pool": 0,
+          "poolMax": 572
+        }
+      }
+    },
+    {
+      "id": "Yw7Fy0MMYTgNvbPu",
+      "name": "George",
+      "folder": "Ex-Mil Group",
+      "health": {
+        "value": 853,
+        "max": 689
+      },
+      "mana": {
+        "value": 290,
+        "max": 282
+      },
+      "stamina": {
+        "value": 252,
+        "max": 252
+      },
+      "freePoints": 0,
+      "attributes": {
+        "race": {
+          "templateId": "Compendium.aspects-of-power.races.Item.hsK5h7UEYtJZy33g",
+          "name": "Human",
+          "level": 50,
+          "rank": "E"
+        },
+        "class": {
+          "templateId": "Compendium.aspects-of-power.classes.Item.eHqLP7ePso4ZryIz",
+          "name": "Blood Warden",
+          "level": 50,
+          "rank": "E"
+        },
+        "profession": {
+          "templateId": "Compendium.aspects-of-power.professions.Item.P7PrhYSieU1WP3Di",
+          "name": "Drums of War, Andante",
+          "level": 50,
+          "rank": "E"
+        }
+      },
+      "abilities": {
+        "vitality": {
+          "value": 465,
+          "mod": 551,
+          "breakdown": {
+            "base": 414,
+            "titleBonus": 0,
+            "blessingMultiplier": 1,
+            "blessingAdd": 0,
+            "calculated": 414,
+            "effectBonus": 51,
+            "equipmentBonusRaw": 0,
+            "perStatCap": 124,
+            "equipmentCapped": 0,
+            "final": 465,
+            "finalMod": 551
+          }
+        },
+        "endurance": {
+          "value": 175,
+          "mod": 252,
+          "breakdown": {
+            "base": 157,
+            "titleBonus": 0,
+            "blessingMultiplier": 1,
+            "blessingAdd": 0,
+            "calculated": 157,
+            "effectBonus": 18,
+            "equipmentBonusRaw": 0,
+            "perStatCap": 47,
+            "equipmentCapped": 0,
+            "final": 175,
+            "finalMod": 252
+          }
+        },
+        "strength": {
+          "value": 550,
+          "mod": 630,
+          "breakdown": {
+            "base": 509,
+            "titleBonus": 0,
+            "blessingMultiplier": 1,
+            "blessingAdd": 0,
+            "calculated": 509,
+            "effectBonus": 41,
+            "equipmentBonusRaw": 0,
+            "perStatCap": 152,
+            "equipmentCapped": 0,
+            "final": 550,
+            "finalMod": 630
+          }
+        },
+        "dexterity": {
+          "value": 429,
+          "mod": 516,
+          "breakdown": {
+            "base": 398,
+            "titleBonus": 0,
+            "blessingMultiplier": 1,
+            "blessingAdd": 0,
+            "calculated": 398,
+            "effectBonus": 31,
+            "equipmentBonusRaw": 0,
+            "perStatCap": 119,
+            "equipmentCapped": 0,
+            "final": 429,
+            "finalMod": 516
+          }
+        },
+        "toughness": {
+          "value": 230,
+          "mod": 314,
+          "breakdown": {
+            "base": 215,
+            "titleBonus": 0,
+            "blessingMultiplier": 1,
+            "blessingAdd": 0,
+            "calculated": 215,
+            "effectBonus": 15,
+            "equipmentBonusRaw": 0,
+            "perStatCap": 64,
+            "equipmentCapped": 0,
+            "final": 230,
+            "finalMod": 314
+          }
+        },
+        "intelligence": {
+          "value": 97,
+          "mod": 157,
+          "breakdown": {
+            "base": 82,
+            "titleBonus": 0,
+            "blessingMultiplier": 1,
+            "blessingAdd": 0,
+            "calculated": 82,
+            "effectBonus": 15,
+            "equipmentBonusRaw": 0,
+            "perStatCap": 24,
+            "equipmentCapped": 0,
+            "final": 97,
+            "finalMod": 157
+          }
+        },
+        "willpower": {
+          "value": 201,
+          "mod": 282,
+          "breakdown": {
+            "base": 186,
+            "titleBonus": 0,
+            "blessingMultiplier": 1,
+            "blessingAdd": 0,
+            "calculated": 186,
+            "effectBonus": 15,
+            "equipmentBonusRaw": 0,
+            "perStatCap": 55,
+            "equipmentCapped": 0,
+            "final": 201,
+            "finalMod": 282
+          }
+        },
+        "wisdom": {
+          "value": 192,
+          "mod": 271,
+          "breakdown": {
+            "base": 177,
+            "titleBonus": 0,
+            "blessingMultiplier": 1,
+            "blessingAdd": 0,
+            "calculated": 177,
+            "effectBonus": 15,
+            "equipmentBonusRaw": 0,
+            "perStatCap": 53,
+            "equipmentCapped": 0,
+            "final": 192,
+            "finalMod": 271
+          }
+        },
+        "perception": {
+          "value": 113,
+          "mod": 178,
+          "breakdown": {
+            "base": 94,
+            "titleBonus": 0,
+            "blessingMultiplier": 1,
+            "blessingAdd": 0,
+            "calculated": 94,
+            "effectBonus": 19,
+            "equipmentBonusRaw": 0,
+            "perStatCap": 28,
+            "equipmentCapped": 0,
+            "final": 113,
+            "finalMod": 178
+          }
+        }
+      },
+      "defense": {
+        "armor": 130,
+        "veil": 97,
+        "dr": 157,
+        "melee": {
+          "value": 776,
+          "pool": 0,
+          "poolMax": 1552
+        },
+        "ranged": {
+          "value": 366,
+          "pool": 0,
+          "poolMax": 732
+        },
+        "mind": {
+          "value": 262,
+          "pool": 0,
+          "poolMax": 524
+        },
+        "soul": {
+          "value": 391,
+          "pool": 0,
+          "poolMax": 782
+        }
+      }
+    },
+    {
+      "id": "tLmsg6wCK7BprMDj",
+      "name": "Harry Hess",
+      "folder": "Kelp Kraken",
+      "health": {
+        "value": 342,
+        "max": 336
+      },
+      "mana": {
+        "value": 449,
+        "max": 418
+      },
+      "stamina": {
+        "value": 172,
+        "max": 111
+      },
+      "freePoints": 0,
+      "attributes": {
+        "race": {
+          "templateId": "Compendium.aspects-of-power.races.Item.hsK5h7UEYtJZy33g",
+          "name": "Human",
+          "level": 36,
+          "rank": "E"
+        },
+        "class": {
+          "templateId": "Compendium.aspects-of-power.classes.Item.6mGJUe29F82MkOGt",
+          "name": "Hydromancer",
+          "level": 52,
+          "rank": "E"
+        },
+        "profession": {
+          "templateId": "Compendium.aspects-of-power.professions.Item.KGLkYWC32Uhlc4xB",
+          "name": "Novice Tailor",
+          "level": 20,
+          "rank": "F"
+        }
+      },
+      "abilities": {
+        "vitality": {
+          "value": 190,
+          "mod": 269,
+          "breakdown": {
+            "base": 180,
+            "titleBonus": 0,
+            "blessingMultiplier": 1,
+            "blessingAdd": 0,
+            "calculated": 180,
+            "effectBonus": 10,
+            "equipmentBonusRaw": 0,
+            "perStatCap": 54,
+            "equipmentCapped": 0,
+            "final": 190,
+            "finalMod": 269
+          }
+        },
+        "endurance": {
+          "value": 63,
+          "mod": 111,
+          "breakdown": {
+            "base": 53,
+            "titleBonus": 0,
+            "blessingMultiplier": 1,
+            "blessingAdd": 0,
+            "calculated": 53,
+            "effectBonus": 10,
+            "equipmentBonusRaw": 0,
+            "perStatCap": 15,
+            "equipmentCapped": 0,
+            "final": 63,
+            "finalMod": 111
+          }
+        },
+        "strength": {
+          "value": 63,
+          "mod": 111,
+          "breakdown": {
+            "base": 53,
+            "titleBonus": 0,
+            "blessingMultiplier": 1,
+            "blessingAdd": 0,
+            "calculated": 53,
+            "effectBonus": 10,
+            "equipmentBonusRaw": 0,
+            "perStatCap": 15,
+            "equipmentCapped": 0,
+            "final": 63,
+            "finalMod": 111
+          }
+        },
+        "dexterity": {
+          "value": 125,
+          "mod": 193,
+          "breakdown": {
+            "base": 115,
+            "titleBonus": 0,
+            "blessingMultiplier": 1,
+            "blessingAdd": 0,
+            "calculated": 115,
+            "effectBonus": 10,
+            "equipmentBonusRaw": 0,
+            "perStatCap": 34,
+            "equipmentCapped": 0,
+            "final": 125,
+            "finalMod": 193
+          }
+        },
+        "toughness": {
+          "value": 63,
+          "mod": 111,
+          "breakdown": {
+            "base": 53,
+            "titleBonus": 0,
+            "blessingMultiplier": 1,
+            "blessingAdd": 0,
+            "calculated": 53,
+            "effectBonus": 10,
+            "equipmentBonusRaw": 0,
+            "perStatCap": 15,
+            "equipmentCapped": 0,
+            "final": 63,
+            "finalMod": 111
+          }
+        },
+        "intelligence": {
+          "value": 374,
+          "mod": 463,
+          "breakdown": {
+            "base": 344,
+            "titleBonus": 0,
+            "blessingMultiplier": 1,
+            "blessingAdd": 0,
+            "calculated": 344,
+            "effectBonus": 30,
+            "equipmentBonusRaw": 0,
+            "perStatCap": 103,
+            "equipmentCapped": 0,
+            "final": 374,
+            "finalMod": 463
+          }
+        },
+        "willpower": {
+          "value": 329,
+          "mod": 418,
+          "breakdown": {
+            "base": 299,
+            "titleBonus": 0,
+            "blessingMultiplier": 1,
+            "blessingAdd": 0,
+            "calculated": 299,
+            "effectBonus": 30,
+            "equipmentBonusRaw": 0,
+            "perStatCap": 89,
+            "equipmentCapped": 0,
+            "final": 329,
+            "finalMod": 418
+          }
+        },
+        "wisdom": {
+          "value": 155,
+          "mod": 229,
+          "breakdown": {
+            "base": 145,
+            "titleBonus": 0,
+            "blessingMultiplier": 1,
+            "blessingAdd": 0,
+            "calculated": 145,
+            "effectBonus": 10,
+            "equipmentBonusRaw": 0,
+            "perStatCap": 43,
+            "equipmentCapped": 0,
+            "final": 155,
+            "finalMod": 229
+          }
+        },
+        "perception": {
+          "value": 202,
+          "mod": 283,
+          "breakdown": {
+            "base": 182,
+            "titleBonus": 0,
+            "blessingMultiplier": 1,
+            "blessingAdd": 0,
+            "calculated": 182,
+            "effectBonus": 20,
+            "equipmentBonusRaw": 0,
+            "perStatCap": 54,
+            "equipmentCapped": 0,
+            "final": 202,
+            "finalMod": 283
+          }
+        }
+      },
+      "defense": {
+        "armor": 50,
+        "veil": 0,
+        "dr": 56,
+        "melee": {
+          "value": 249,
+          "pool": 0,
+          "poolMax": 498
+        },
+        "ranged": {
+          "value": 375,
+          "pool": 0,
+          "poolMax": 750
+        },
+        "mind": {
+          "value": 585,
+          "pool": 0,
+          "poolMax": 1170
+        },
+        "soul": {
+          "value": 390,
+          "pool": 0,
+          "poolMax": 780
+        }
+      }
+    },
+    {
+      "id": "S8o1V0tYF8gqrIQS",
+      "name": "Khalid Holman",
+      "folder": "Kelp Kraken",
+      "health": {
+        "value": 538,
+        "max": 450
+      },
+      "mana": {
+        "value": 131,
+        "max": 151
+      },
+      "stamina": {
+        "value": 182,
+        "max": 195
+      },
+      "freePoints": 0,
+      "attributes": {
+        "race": {
+          "templateId": "Compendium.aspects-of-power.races.Item.hsK5h7UEYtJZy33g",
+          "name": "Human",
+          "level": 36,
+          "rank": "E"
+        },
+        "class": {
+          "templateId": "Compendium.aspects-of-power.classes.Item.X2Us7iI7LrXRpoOJ",
+          "name": "Spearman",
+          "level": 42,
+          "rank": "E"
+        },
+        "profession": {
+          "templateId": "Compendium.aspects-of-power.professions.Item.Cxs1ERjIJbYphorD",
+          "name": "Proficient Smith of the Moonshadow",
+          "level": 30,
+          "rank": "E"
+        }
+      },
+      "abilities": {
+        "vitality": {
+          "value": 273,
+          "mod": 360,
+          "breakdown": {
+            "base": 260,
+            "titleBonus": 0,
+            "blessingMultiplier": 1,
+            "blessingAdd": 0,
+            "calculated": 260,
+            "effectBonus": 13,
+            "equipmentBonusRaw": 0,
+            "perStatCap": 78,
+            "equipmentCapped": 0,
+            "final": 273,
+            "finalMod": 360
+          }
+        },
+        "endurance": {
+          "value": 127,
+          "mod": 195,
+          "breakdown": {
+            "base": 112,
+            "titleBonus": 0,
+            "blessingMultiplier": 1,
+            "blessingAdd": 0,
+            "calculated": 112,
+            "effectBonus": 15,
+            "equipmentBonusRaw": 0,
+            "perStatCap": 33,
+            "equipmentCapped": 0,
+            "final": 127,
+            "finalMod": 195
+          }
+        },
+        "strength": {
+          "value": 370,
+          "mod": 459,
+          "breakdown": {
+            "base": 354,
+            "titleBonus": 0,
+            "blessingMultiplier": 1,
+            "blessingAdd": 0,
+            "calculated": 354,
+            "effectBonus": 16,
+            "equipmentBonusRaw": 0,
+            "perStatCap": 106,
+            "equipmentCapped": 0,
+            "final": 370,
+            "finalMod": 459
+          }
+        },
+        "dexterity": {
+          "value": 253,
+          "mod": 339,
+          "breakdown": {
+            "base": 237,
+            "titleBonus": 0,
+            "blessingMultiplier": 1,
+            "blessingAdd": 0,
+            "calculated": 237,
+            "effectBonus": 16,
+            "equipmentBonusRaw": 0,
+            "perStatCap": 71,
+            "equipmentCapped": 0,
+            "final": 253,
+            "finalMod": 339
+          }
+        },
+        "toughness": {
+          "value": 108,
+          "mod": 171,
+          "breakdown": {
+            "base": 98,
+            "titleBonus": 0,
+            "blessingMultiplier": 1,
+            "blessingAdd": 0,
+            "calculated": 98,
+            "effectBonus": 10,
+            "equipmentBonusRaw": 0,
+            "perStatCap": 29,
+            "equipmentCapped": 0,
+            "final": 108,
+            "finalMod": 171
+          }
+        },
+        "intelligence": {
+          "value": 117,
+          "mod": 183,
+          "breakdown": {
+            "base": 98,
+            "titleBonus": 0,
+            "blessingMultiplier": 1,
+            "blessingAdd": 0,
+            "calculated": 98,
+            "effectBonus": 19,
+            "equipmentBonusRaw": 0,
+            "perStatCap": 29,
+            "equipmentCapped": 0,
+            "final": 117,
+            "finalMod": 183
+          }
+        },
+        "willpower": {
+          "value": 92,
+          "mod": 151,
+          "breakdown": {
+            "base": 73,
+            "titleBonus": 0,
+            "blessingMultiplier": 1,
+            "blessingAdd": 0,
+            "calculated": 73,
+            "effectBonus": 19,
+            "equipmentBonusRaw": 0,
+            "perStatCap": 21,
+            "equipmentCapped": 0,
+            "final": 92,
+            "finalMod": 151
+          }
+        },
+        "wisdom": {
+          "value": 63,
+          "mod": 111,
+          "breakdown": {
+            "base": 53,
+            "titleBonus": 0,
+            "blessingMultiplier": 1,
+            "blessingAdd": 0,
+            "calculated": 53,
+            "effectBonus": 10,
+            "equipmentBonusRaw": 0,
+            "perStatCap": 15,
+            "equipmentCapped": 0,
+            "final": 63,
+            "finalMod": 111
+          }
+        },
+        "perception": {
+          "value": 150,
+          "mod": 223,
+          "breakdown": {
+            "base": 135,
+            "titleBonus": 0,
+            "blessingMultiplier": 1,
+            "blessingAdd": 0,
+            "calculated": 135,
+            "effectBonus": 15,
+            "equipmentBonusRaw": 0,
+            "perStatCap": 40,
+            "equipmentCapped": 0,
+            "final": 150,
+            "finalMod": 223
+          }
+        }
+      },
+      "defense": {
+        "armor": 0,
+        "veil": 32,
+        "dr": 86,
+        "melee": {
+          "value": 524,
+          "pool": 0,
+          "poolMax": 1048
+        },
+        "ranged": {
+          "value": 357,
+          "pool": 0,
+          "poolMax": 714
+        },
+        "mind": {
+          "value": 238,
+          "pool": 0,
+          "poolMax": 476
+        },
+        "soul": {
+          "value": 172,
+          "pool": 0,
+          "poolMax": 344
+        }
+      }
+    },
+    {
+      "id": "ddhphFEiv9f6RlHW",
+      "name": "Lincoln Christensen",
+      "folder": "Profession Group",
+      "health": {
+        "value": 101,
+        "max": 203
+      },
+      "mana": {
+        "value": 110,
+        "max": 287
+      },
+      "stamina": {
+        "value": 209,
+        "max": 329
+      },
+      "freePoints": 0,
+      "attributes": {
+        "race": {
+          "templateId": "Compendium.aspects-of-power.races.Item.hsK5h7UEYtJZy33g",
+          "name": "Human",
+          "level": 37,
+          "rank": "E"
+        },
+        "class": {
+          "templateId": "Compendium.aspects-of-power.classes.Item.I1DZ2EO59k1zz0ML",
+          "name": "Medium Warrior",
+          "level": 13,
+          "rank": "F"
+        },
+        "profession": {
+          "templateId": "Compendium.aspects-of-power.professions.Item.wF7094KtlS8TyT6D",
+          "name": "Architect",
+          "level": 62,
+          "rank": "E"
+        }
+      },
+      "abilities": {
+        "vitality": {
+          "value": 101,
+          "mod": 162,
+          "breakdown": {
+            "base": 91,
+            "titleBonus": 0,
+            "blessingMultiplier": 1,
+            "blessingAdd": 0,
+            "calculated": 91,
+            "effectBonus": 10,
+            "equipmentBonusRaw": 0,
+            "perStatCap": 27,
+            "equipmentCapped": 0,
+            "final": 101,
+            "finalMod": 162
+          }
+        },
+        "endurance": {
+          "value": 244,
+          "mod": 329,
+          "breakdown": {
+            "base": 234,
+            "titleBonus": 0,
+            "blessingMultiplier": 1,
+            "blessingAdd": 0,
+            "calculated": 234,
+            "effectBonus": 10,
+            "equipmentBonusRaw": 0,
+            "perStatCap": 70,
+            "equipmentCapped": 0,
+            "final": 244,
+            "finalMod": 329
+          }
+        },
+        "strength": {
+          "value": 399,
+          "mod": 487,
+          "breakdown": {
+            "base": 389,
+            "titleBonus": 0,
+            "blessingMultiplier": 1,
+            "blessingAdd": 0,
+            "calculated": 389,
+            "effectBonus": 10,
+            "equipmentBonusRaw": 0,
+            "perStatCap": 116,
+            "equipmentCapped": 0,
+            "final": 399,
+            "finalMod": 487
+          }
+        },
+        "dexterity": {
+          "value": 366,
+          "mod": 455,
+          "breakdown": {
+            "base": 356,
+            "titleBonus": 0,
+            "blessingMultiplier": 1,
+            "blessingAdd": 0,
+            "calculated": 356,
+            "effectBonus": 10,
+            "equipmentBonusRaw": 0,
+            "perStatCap": 106,
+            "equipmentCapped": 0,
+            "final": 366,
+            "finalMod": 455
+          }
+        },
+        "toughness": {
+          "value": 65,
+          "mod": 114,
+          "breakdown": {
+            "base": 55,
+            "titleBonus": 0,
+            "blessingMultiplier": 1,
+            "blessingAdd": 0,
+            "calculated": 55,
+            "effectBonus": 10,
+            "equipmentBonusRaw": 0,
+            "perStatCap": 16,
+            "equipmentCapped": 0,
+            "final": 65,
+            "finalMod": 114
+          }
+        },
+        "intelligence": {
+          "value": 111,
+          "mod": 175,
+          "breakdown": {
+            "base": 101,
+            "titleBonus": 0,
+            "blessingMultiplier": 1,
+            "blessingAdd": 0,
+            "calculated": 101,
+            "effectBonus": 10,
+            "equipmentBonusRaw": 0,
+            "perStatCap": 30,
+            "equipmentCapped": 0,
+            "final": 111,
+            "finalMod": 175
+          }
+        },
+        "willpower": {
+          "value": 206,
+          "mod": 287,
+          "breakdown": {
+            "base": 196,
+            "titleBonus": 0,
+            "blessingMultiplier": 1,
+            "blessingAdd": 0,
+            "calculated": 196,
+            "effectBonus": 10,
+            "equipmentBonusRaw": 0,
+            "perStatCap": 58,
+            "equipmentCapped": 0,
+            "final": 206,
+            "finalMod": 287
+          }
+        },
+        "wisdom": {
+          "value": 112,
+          "mod": 176,
+          "breakdown": {
+            "base": 102,
+            "titleBonus": 0,
+            "blessingMultiplier": 1,
+            "blessingAdd": 0,
+            "calculated": 102,
+            "effectBonus": 10,
+            "equipmentBonusRaw": 0,
+            "perStatCap": 30,
+            "equipmentCapped": 0,
+            "final": 112,
+            "finalMod": 176
+          }
+        },
+        "perception": {
+          "value": 65,
+          "mod": 114,
+          "breakdown": {
+            "base": 55,
+            "titleBonus": 0,
+            "blessingMultiplier": 1,
+            "blessingAdd": 0,
+            "calculated": 55,
+            "effectBonus": 10,
+            "equipmentBonusRaw": 0,
+            "perStatCap": 16,
+            "equipmentCapped": 0,
+            "final": 65,
+            "finalMod": 114
+          }
+        }
+      },
+      "defense": {
+        "armor": 0,
+        "veil": 0,
+        "dr": 57,
+        "melee": {
+          "value": 661,
+          "pool": 0,
+          "poolMax": 1322
+        },
+        "ranged": {
+          "value": 276,
+          "pool": 0,
+          "poolMax": 552
+        },
+        "mind": {
+          "value": 251,
+          "pool": 0,
+          "poolMax": 502
+        },
+        "soul": {
+          "value": 288,
+          "pool": 0,
+          "poolMax": 576
+        }
+      }
+    },
+    {
+      "id": "nbfzKIkYEkIFCHTS",
+      "name": "Mary",
+      "folder": "Ex-Mil Group",
+      "health": {
+        "value": 586,
+        "max": 744
+      },
+      "mana": {
+        "value": 563,
+        "max": 646
+      },
+      "stamina": {
+        "value": 87,
+        "max": 228
+      },
+      "freePoints": 0,
+      "attributes": {
+        "race": {
+          "templateId": "Compendium.aspects-of-power.races.Item.hsK5h7UEYtJZy33g",
+          "name": "Human",
+          "level": 40,
+          "rank": "E"
+        },
+        "class": {
+          "templateId": "Compendium.aspects-of-power.classes.Item.ME8BTuconYsiQlpO",
+          "name": "Augur",
+          "level": 60,
+          "rank": "E"
+        },
+        "profession": {
+          "templateId": "Compendium.aspects-of-power.professions.Item.GlqeXsF2bVPRmaQq",
+          "name": "Advocate",
+          "level": 20,
+          "rank": "F"
+        }
+      },
+      "abilities": {
+        "vitality": {
+          "value": 512,
+          "mod": 595,
+          "breakdown": {
+            "base": 502,
+            "titleBonus": 0,
+            "blessingMultiplier": 1,
+            "blessingAdd": 0,
+            "calculated": 502,
+            "effectBonus": 10,
+            "equipmentBonusRaw": 0,
+            "perStatCap": 150,
+            "equipmentCapped": 0,
+            "final": 512,
+            "finalMod": 595
+          }
+        },
+        "endurance": {
+          "value": 154,
+          "mod": 228,
+          "breakdown": {
+            "base": 144,
+            "titleBonus": 0,
+            "blessingMultiplier": 1,
+            "blessingAdd": 0,
+            "calculated": 144,
+            "effectBonus": 10,
+            "equipmentBonusRaw": 0,
+            "perStatCap": 43,
+            "equipmentCapped": 0,
+            "final": 154,
+            "finalMod": 228
+          }
+        },
+        "strength": {
+          "value": 71,
+          "mod": 122,
+          "breakdown": {
+            "base": 61,
+            "titleBonus": 0,
+            "blessingMultiplier": 1,
+            "blessingAdd": 0,
+            "calculated": 61,
+            "effectBonus": 10,
+            "equipmentBonusRaw": 0,
+            "perStatCap": 18,
+            "equipmentCapped": 0,
+            "final": 71,
+            "finalMod": 122
+          }
+        },
+        "dexterity": {
+          "value": 71,
+          "mod": 122,
+          "breakdown": {
+            "base": 61,
+            "titleBonus": 0,
+            "blessingMultiplier": 1,
+            "blessingAdd": 0,
+            "calculated": 61,
+            "effectBonus": 10,
+            "equipmentBonusRaw": 0,
+            "perStatCap": 18,
+            "equipmentCapped": 0,
+            "final": 71,
+            "finalMod": 122
+          }
+        },
+        "toughness": {
+          "value": 111,
+          "mod": 175,
+          "breakdown": {
+            "base": 101,
+            "titleBonus": 0,
+            "blessingMultiplier": 1,
+            "blessingAdd": 0,
+            "calculated": 101,
+            "effectBonus": 10,
+            "equipmentBonusRaw": 0,
+            "perStatCap": 30,
+            "equipmentCapped": 0,
+            "final": 111,
+            "finalMod": 175
+          }
+        },
+        "intelligence": {
+          "value": 95,
+          "mod": 155,
+          "breakdown": {
+            "base": 85,
+            "titleBonus": 0,
+            "blessingMultiplier": 1,
+            "blessingAdd": 0,
+            "calculated": 85,
+            "effectBonus": 10,
+            "equipmentBonusRaw": 0,
+            "perStatCap": 25,
+            "equipmentCapped": 0,
+            "final": 95,
+            "finalMod": 155
+          }
+        },
+        "willpower": {
+          "value": 567,
+          "mod": 646,
+          "breakdown": {
+            "base": 557,
+            "titleBonus": 0,
+            "blessingMultiplier": 1,
+            "blessingAdd": 0,
+            "calculated": 557,
+            "effectBonus": 10,
+            "equipmentBonusRaw": 0,
+            "perStatCap": 167,
+            "equipmentCapped": 0,
+            "final": 567,
+            "finalMod": 646
+          }
+        },
+        "wisdom": {
+          "value": 570,
+          "mod": 648,
+          "breakdown": {
+            "base": 560,
+            "titleBonus": 0,
+            "blessingMultiplier": 1,
+            "blessingAdd": 0,
+            "calculated": 560,
+            "effectBonus": 10,
+            "equipmentBonusRaw": 0,
+            "perStatCap": 168,
+            "equipmentCapped": 0,
+            "final": 570,
+            "finalMod": 648
+          }
+        },
+        "perception": {
+          "value": 111,
+          "mod": 175,
+          "breakdown": {
+            "base": 101,
+            "titleBonus": 0,
+            "blessingMultiplier": 1,
+            "blessingAdd": 0,
+            "calculated": 101,
+            "effectBonus": 10,
+            "equipmentBonusRaw": 0,
+            "perStatCap": 30,
+            "equipmentCapped": 0,
+            "final": 111,
+            "finalMod": 175
+          }
+        }
+      },
+      "defense": {
+        "armor": 0,
+        "veil": 0,
+        "dr": 88,
+        "melee": {
+          "value": 174,
+          "pool": 0,
+          "poolMax": 348
+        },
+        "ranged": {
+          "value": 233,
+          "pool": 0,
+          "poolMax": 466
+        },
+        "mind": {
+          "value": 384,
+          "pool": 0,
+          "poolMax": 768
+        },
+        "soul": {
+          "value": 926,
+          "pool": 0,
+          "poolMax": 1852
+        }
+      }
+    },
+    {
+      "id": "n4XInPnD4VmUL6Eo",
+      "name": "Mathilda Fry",
+      "folder": "Kelp Kraken",
+      "health": {
+        "value": 464,
+        "max": 428
+      },
+      "mana": {
+        "value": 436,
+        "max": 388
+      },
+      "stamina": {
+        "value": 38,
+        "max": 106
+      },
+      "freePoints": 0,
+      "attributes": {
+        "race": {
+          "templateId": "Compendium.aspects-of-power.races.Item.hsK5h7UEYtJZy33g",
+          "name": "Human",
+          "level": 34,
+          "rank": "E"
+        },
+        "class": {
+          "templateId": "Compendium.aspects-of-power.classes.Item.5qqHCgeiZnthAj91",
+          "name": "Bloodmage",
+          "level": 52,
+          "rank": "E"
+        },
+        "profession": {
+          "templateId": "Compendium.aspects-of-power.professions.Item.NGhDcWP2Dl1JKrv0",
+          "name": "Student Blood Alchemist",
+          "level": 17,
+          "rank": "F"
+        }
+      },
+      "abilities": {
+        "vitality": {
+          "value": 256,
+          "mod": 342,
+          "breakdown": {
+            "base": 246,
+            "titleBonus": 0,
+            "blessingMultiplier": 1,
+            "blessingAdd": 0,
+            "calculated": 246,
+            "effectBonus": 10,
+            "equipmentBonusRaw": 0,
+            "perStatCap": 73,
+            "equipmentCapped": 0,
+            "final": 256,
+            "finalMod": 342
+          }
+        },
+        "endurance": {
+          "value": 59,
+          "mod": 106,
+          "breakdown": {
+            "base": 49,
+            "titleBonus": 0,
+            "blessingMultiplier": 1,
+            "blessingAdd": 0,
+            "calculated": 49,
+            "effectBonus": 10,
+            "equipmentBonusRaw": 0,
+            "perStatCap": 14,
+            "equipmentCapped": 0,
+            "final": 59,
+            "finalMod": 106
+          }
+        },
+        "strength": {
+          "value": 59,
+          "mod": 106,
+          "breakdown": {
+            "base": 49,
+            "titleBonus": 0,
+            "blessingMultiplier": 1,
+            "blessingAdd": 0,
+            "calculated": 49,
+            "effectBonus": 10,
+            "equipmentBonusRaw": 0,
+            "perStatCap": 14,
+            "equipmentCapped": 0,
+            "final": 59,
+            "finalMod": 106
+          }
+        },
+        "dexterity": {
+          "value": 80,
+          "mod": 135,
+          "breakdown": {
+            "base": 70,
+            "titleBonus": 0,
+            "blessingMultiplier": 1,
+            "blessingAdd": 0,
+            "calculated": 70,
+            "effectBonus": 10,
+            "equipmentBonusRaw": 0,
+            "perStatCap": 21,
+            "equipmentCapped": 0,
+            "final": 80,
+            "finalMod": 135
+          }
+        },
+        "toughness": {
+          "value": 59,
+          "mod": 106,
+          "breakdown": {
+            "base": 49,
+            "titleBonus": 0,
+            "blessingMultiplier": 1,
+            "blessingAdd": 0,
+            "calculated": 49,
+            "effectBonus": 10,
+            "equipmentBonusRaw": 0,
+            "perStatCap": 14,
+            "equipmentCapped": 0,
+            "final": 59,
+            "finalMod": 106
+          }
+        },
+        "intelligence": {
+          "value": 337,
+          "mod": 426,
+          "breakdown": {
+            "base": 307,
+            "titleBonus": 0,
+            "blessingMultiplier": 1,
+            "blessingAdd": 0,
+            "calculated": 307,
+            "effectBonus": 30,
+            "equipmentBonusRaw": 0,
+            "perStatCap": 92,
+            "equipmentCapped": 0,
+            "final": 337,
+            "finalMod": 426
+          }
+        },
+        "willpower": {
+          "value": 300,
+          "mod": 388,
+          "breakdown": {
+            "base": 250,
+            "titleBonus": 0,
+            "blessingMultiplier": 1,
+            "blessingAdd": 0,
+            "calculated": 250,
+            "effectBonus": 50,
+            "equipmentBonusRaw": 0,
+            "perStatCap": 75,
+            "equipmentCapped": 0,
+            "final": 300,
+            "finalMod": 388
+          }
+        },
+        "wisdom": {
+          "value": 281,
+          "mod": 368,
+          "breakdown": {
+            "base": 241,
+            "titleBonus": 0,
+            "blessingMultiplier": 1,
+            "blessingAdd": 0,
+            "calculated": 241,
+            "effectBonus": 40,
+            "equipmentBonusRaw": 0,
+            "perStatCap": 72,
+            "equipmentCapped": 0,
+            "final": 281,
+            "finalMod": 368
+          }
+        },
+        "perception": {
+          "value": 113,
+          "mod": 178,
+          "breakdown": {
+            "base": 93,
+            "titleBonus": 0,
+            "blessingMultiplier": 1,
+            "blessingAdd": 0,
+            "calculated": 93,
+            "effectBonus": 20,
+            "equipmentBonusRaw": 0,
+            "perStatCap": 27,
+            "equipmentCapped": 0,
+            "final": 113,
+            "finalMod": 178
+          }
+        }
+      },
+      "defense": {
+        "armor": 50,
+        "veil": 0,
+        "dr": 53,
+        "melee": {
+          "value": 183,
+          "pool": 0,
+          "poolMax": 366
+        },
+        "ranged": {
+          "value": 240,
+          "pool": 0,
+          "poolMax": 480
+        },
+        "mind": {
+          "value": 590,
+          "pool": 0,
+          "poolMax": 1180
+        },
+        "soul": {
+          "value": 533,
+          "pool": 0,
+          "poolMax": 1066
+        }
+      }
+    },
+    {
+      "id": "ojXZAvt1nh3erwic",
+      "name": "Olivia",
+      "folder": "Humans",
+      "health": {
+        "value": 198,
+        "max": 283
+      },
+      "mana": {
+        "value": 409,
+        "max": 449
+      },
+      "stamina": {
+        "value": 93,
+        "max": 144
+      },
+      "freePoints": 0,
+      "attributes": {
+        "race": {
+          "templateId": "Compendium.aspects-of-power.races.Item.hsK5h7UEYtJZy33g",
+          "name": "Human",
+          "level": 43,
+          "rank": "E"
+        },
+        "class": {
+          "templateId": "Compendium.aspects-of-power.classes.Item.v4S82q8WO7F0gzLH",
+          "name": "Ice Maiden",
+          "level": 57,
+          "rank": "E"
+        },
+        "profession": {
+          "templateId": "Compendium.aspects-of-power.professions.Item.Xo0px8VKJICU6mVa",
+          "name": "Witch-Wright of Iron and Ice",
+          "level": 30,
+          "rank": "E"
+        }
+      },
+      "abilities": {
+        "vitality": {
+          "value": 153,
+          "mod": 226,
+          "breakdown": {
+            "base": 143,
+            "titleBonus": 0,
+            "blessingMultiplier": 1,
+            "blessingAdd": 0,
+            "calculated": 143,
+            "effectBonus": 10,
+            "equipmentBonusRaw": 0,
+            "perStatCap": 42,
+            "equipmentCapped": 0,
+            "final": 153,
+            "finalMod": 226
+          }
+        },
+        "endurance": {
+          "value": 87,
+          "mod": 144,
+          "breakdown": {
+            "base": 77,
+            "titleBonus": 0,
+            "blessingMultiplier": 1,
+            "blessingAdd": 0,
+            "calculated": 77,
+            "effectBonus": 10,
+            "equipmentBonusRaw": 0,
+            "perStatCap": 23,
+            "equipmentCapped": 0,
+            "final": 87,
+            "finalMod": 144
+          }
+        },
+        "strength": {
+          "value": 77,
+          "mod": 131,
+          "breakdown": {
+            "base": 67,
+            "titleBonus": 0,
+            "blessingMultiplier": 1,
+            "blessingAdd": 0,
+            "calculated": 67,
+            "effectBonus": 10,
+            "equipmentBonusRaw": 0,
+            "perStatCap": 20,
+            "equipmentCapped": 0,
+            "final": 77,
+            "finalMod": 131
+          }
+        },
+        "dexterity": {
+          "value": 163,
+          "mod": 238,
+          "breakdown": {
+            "base": 153,
+            "titleBonus": 0,
+            "blessingMultiplier": 1,
+            "blessingAdd": 0,
+            "calculated": 153,
+            "effectBonus": 10,
+            "equipmentBonusRaw": 0,
+            "perStatCap": 45,
+            "equipmentCapped": 0,
+            "final": 163,
+            "finalMod": 238
+          }
+        },
+        "toughness": {
+          "value": 102,
+          "mod": 164,
+          "breakdown": {
+            "base": 92,
+            "titleBonus": 0,
+            "blessingMultiplier": 1,
+            "blessingAdd": 0,
+            "calculated": 92,
+            "effectBonus": 10,
+            "equipmentBonusRaw": 0,
+            "perStatCap": 27,
+            "equipmentCapped": 0,
+            "final": 102,
+            "finalMod": 164
+          }
+        },
+        "intelligence": {
+          "value": 480,
+          "mod": 565,
+          "breakdown": {
+            "base": 470,
+            "titleBonus": 0,
+            "blessingMultiplier": 1,
+            "blessingAdd": 0,
+            "calculated": 470,
+            "effectBonus": 10,
+            "equipmentBonusRaw": 0,
+            "perStatCap": 141,
+            "equipmentCapped": 0,
+            "final": 480,
+            "finalMod": 565
+          }
+        },
+        "willpower": {
+          "value": 360,
+          "mod": 449,
+          "breakdown": {
+            "base": 350,
+            "titleBonus": 0,
+            "blessingMultiplier": 1,
+            "blessingAdd": 0,
+            "calculated": 350,
+            "effectBonus": 10,
+            "equipmentBonusRaw": 0,
+            "perStatCap": 105,
+            "equipmentCapped": 0,
+            "final": 360,
+            "finalMod": 449
+          }
+        },
+        "wisdom": {
+          "value": 334,
+          "mod": 423,
+          "breakdown": {
+            "base": 324,
+            "titleBonus": 0,
+            "blessingMultiplier": 1,
+            "blessingAdd": 0,
+            "calculated": 324,
+            "effectBonus": 10,
+            "equipmentBonusRaw": 0,
+            "perStatCap": 97,
+            "equipmentCapped": 0,
+            "final": 334,
+            "finalMod": 423
+          }
+        },
+        "perception": {
+          "value": 149,
+          "mod": 222,
+          "breakdown": {
+            "base": 139,
+            "titleBonus": 0,
+            "blessingMultiplier": 1,
+            "blessingAdd": 0,
+            "calculated": 139,
+            "effectBonus": 10,
+            "equipmentBonusRaw": 0,
+            "perStatCap": 41,
+            "equipmentCapped": 0,
+            "final": 149,
+            "finalMod": 222
+          }
+        }
+      },
+      "defense": {
+        "armor": 0,
+        "veil": 0,
+        "dr": 82,
+        "melee": {
+          "value": 305,
+          "pool": 0,
+          "poolMax": 610
+        },
+        "ranged": {
+          "value": 323,
+          "pool": 0,
+          "poolMax": 646
+        },
+        "mind": {
+          "value": 761,
+          "pool": 0,
+          "poolMax": 1522
+        },
+        "soul": {
+          "value": 613,
+          "pool": 0,
+          "poolMax": 1226
+        }
+      }
+    },
+    {
+      "id": "q847BC3WHeyyuxmu",
+      "name": "Rosalie Flynn",
+      "folder": "Profession Group",
+      "health": {
+        "value": 62,
+        "max": 218
+      },
+      "mana": {
+        "value": 5,
+        "max": 370
+      },
+      "stamina": {
+        "value": 10,
+        "max": 128
+      },
+      "freePoints": 0,
+      "attributes": {
+        "race": {
+          "templateId": "Compendium.aspects-of-power.races.Item.hsK5h7UEYtJZy33g",
+          "name": "Human",
+          "level": 40,
+          "rank": "E"
+        },
+        "class": {
+          "templateId": "Compendium.aspects-of-power.classes.Item.H2B1c6DOf7R7aIzc",
+          "name": "Triage Healer",
+          "level": 26,
+          "rank": "E"
+        },
+        "profession": {
+          "templateId": "Compendium.aspects-of-power.professions.Item.CZRavN9ZrTY6wjwX",
+          "name": "Tailor of Ingenuity",
+          "level": 54,
+          "rank": "E"
+        }
+      },
+      "abilities": {
+        "vitality": {
+          "value": 110,
+          "mod": 174,
+          "breakdown": {
+            "base": 100,
+            "titleBonus": 0,
+            "blessingMultiplier": 1,
+            "blessingAdd": 0,
+            "calculated": 100,
+            "effectBonus": 10,
+            "equipmentBonusRaw": 0,
+            "perStatCap": 30,
+            "equipmentCapped": 0,
+            "final": 110,
+            "finalMod": 174
+          }
+        },
+        "endurance": {
+          "value": 75,
+          "mod": 128,
+          "breakdown": {
+            "base": 65,
+            "titleBonus": 0,
+            "blessingMultiplier": 1,
+            "blessingAdd": 0,
+            "calculated": 65,
+            "effectBonus": 10,
+            "equipmentBonusRaw": 0,
+            "perStatCap": 19,
+            "equipmentCapped": 0,
+            "final": 75,
+            "finalMod": 128
+          }
+        },
+        "strength": {
+          "value": 71,
+          "mod": 122,
+          "breakdown": {
+            "base": 61,
+            "titleBonus": 0,
+            "blessingMultiplier": 1,
+            "blessingAdd": 0,
+            "calculated": 61,
+            "effectBonus": 10,
+            "equipmentBonusRaw": 0,
+            "perStatCap": 18,
+            "equipmentCapped": 0,
+            "final": 71,
+            "finalMod": 122
+          }
+        },
+        "dexterity": {
+          "value": 376,
+          "mod": 465,
+          "breakdown": {
+            "base": 366,
+            "titleBonus": 0,
+            "blessingMultiplier": 1,
+            "blessingAdd": 0,
+            "calculated": 366,
+            "effectBonus": 10,
+            "equipmentBonusRaw": 0,
+            "perStatCap": 109,
+            "equipmentCapped": 0,
+            "final": 376,
+            "finalMod": 465
+          }
+        },
+        "toughness": {
+          "value": 71,
+          "mod": 122,
+          "breakdown": {
+            "base": 61,
+            "titleBonus": 0,
+            "blessingMultiplier": 1,
+            "blessingAdd": 0,
+            "calculated": 61,
+            "effectBonus": 10,
+            "equipmentBonusRaw": 0,
+            "perStatCap": 18,
+            "equipmentCapped": 0,
+            "final": 71,
+            "finalMod": 122
+          }
+        },
+        "intelligence": {
+          "value": 100,
+          "mod": 161,
+          "breakdown": {
+            "base": 90,
+            "titleBonus": 0,
+            "blessingMultiplier": 1,
+            "blessingAdd": 0,
+            "calculated": 90,
+            "effectBonus": 10,
+            "equipmentBonusRaw": 0,
+            "perStatCap": 27,
+            "equipmentCapped": 0,
+            "final": 100,
+            "finalMod": 161
+          }
+        },
+        "willpower": {
+          "value": 283,
+          "mod": 370,
+          "breakdown": {
+            "base": 273,
+            "titleBonus": 0,
+            "blessingMultiplier": 1,
+            "blessingAdd": 0,
+            "calculated": 273,
+            "effectBonus": 10,
+            "equipmentBonusRaw": 0,
+            "perStatCap": 81,
+            "equipmentCapped": 0,
+            "final": 283,
+            "finalMod": 370
+          }
+        },
+        "wisdom": {
+          "value": 327,
+          "mod": 416,
+          "breakdown": {
+            "base": 317,
+            "titleBonus": 0,
+            "blessingMultiplier": 1,
+            "blessingAdd": 0,
+            "calculated": 317,
+            "effectBonus": 10,
+            "equipmentBonusRaw": 0,
+            "perStatCap": 95,
+            "equipmentCapped": 0,
+            "final": 327,
+            "finalMod": 416
+          }
+        },
+        "perception": {
+          "value": 305,
+          "mod": 393,
+          "breakdown": {
+            "base": 295,
+            "titleBonus": 0,
+            "blessingMultiplier": 1,
+            "blessingAdd": 0,
+            "calculated": 295,
+            "effectBonus": 10,
+            "equipmentBonusRaw": 0,
+            "perStatCap": 88,
+            "equipmentCapped": 0,
+            "final": 305,
+            "finalMod": 393
+          }
+        }
+      },
+      "defense": {
+        "armor": 0,
+        "veil": 0,
+        "dr": 61,
+        "melee": {
+          "value": 552,
+          "pool": 0,
+          "poolMax": 1104
+        },
+        "ranged": {
+          "value": 586,
+          "pool": 0,
+          "poolMax": 1172
+        },
+        "mind": {
+          "value": 314,
+          "pool": 0,
+          "poolMax": 628
+        },
+        "soul": {
+          "value": 580,
+          "pool": 0,
+          "poolMax": 1160
+        }
+      }
+    },
+    {
+      "id": "RlVZ58eJ2zWBlXgL",
+      "name": "Sebastian",
+      "folder": "Humans",
+      "health": {
+        "value": 380,
+        "max": 366
+      },
+      "mana": {
+        "value": 382,
+        "max": 447
+      },
+      "stamina": {
+        "value": 292,
+        "max": 286
+      },
+      "freePoints": 0,
+      "attributes": {
+        "race": {
+          "templateId": "Compendium.aspects-of-power.races.Item.167mRCSNlUOVKA2i",
+          "name": "Demon",
+          "level": 0,
+          "rank": "G"
+        },
+        "class": {
+          "templateId": "Compendium.aspects-of-power.classes.Item.FBHBcXsaNlSYPdEg",
+          "name": "Sandman",
+          "level": 1,
+          "rank": "G"
+        },
+        "profession": {
+          "templateId": "Compendium.aspects-of-power.professions.Item.VyZSZ9IqinZluYu2",
+          "name": "Head Demonic Butler",
+          "level": 0,
+          "rank": "G"
+        }
+      },
+      "abilities": {
+        "vitality": {
+          "value": 211,
+          "mod": 293,
+          "breakdown": {
+            "base": 205,
+            "titleBonus": 0,
+            "blessingMultiplier": 1,
+            "blessingAdd": 0,
+            "calculated": 205,
+            "effectBonus": 6,
+            "equipmentBonusRaw": 0,
+            "perStatCap": 61,
+            "equipmentCapped": 0,
+            "final": 211,
+            "finalMod": 293
+          }
+        },
+        "endurance": {
+          "value": 205,
+          "mod": 286,
+          "breakdown": {
+            "base": 205,
+            "titleBonus": 0,
+            "blessingMultiplier": 1,
+            "blessingAdd": 0,
+            "calculated": 205,
+            "effectBonus": 0,
+            "equipmentBonusRaw": 0,
+            "perStatCap": 61,
+            "equipmentCapped": 0,
+            "final": 205,
+            "finalMod": 286
+          }
+        },
+        "strength": {
+          "value": 228,
+          "mod": 311,
+          "breakdown": {
+            "base": 228,
+            "titleBonus": 0,
+            "blessingMultiplier": 1,
+            "blessingAdd": 0,
+            "calculated": 228,
+            "effectBonus": 0,
+            "equipmentBonusRaw": 0,
+            "perStatCap": 68,
+            "equipmentCapped": 0,
+            "final": 228,
+            "finalMod": 311
+          }
+        },
+        "dexterity": {
+          "value": 459,
+          "mod": 545,
+          "breakdown": {
+            "base": 450,
+            "titleBonus": 0,
+            "blessingMultiplier": 1,
+            "blessingAdd": 0,
+            "calculated": 450,
+            "effectBonus": 9,
+            "equipmentBonusRaw": 0,
+            "perStatCap": 135,
+            "equipmentCapped": 0,
+            "final": 459,
+            "finalMod": 545
+          }
+        },
+        "toughness": {
+          "value": 156,
+          "mod": 230,
+          "breakdown": {
+            "base": 156,
+            "titleBonus": 0,
+            "blessingMultiplier": 1,
+            "blessingAdd": 0,
+            "calculated": 156,
+            "effectBonus": 0,
+            "equipmentBonusRaw": 0,
+            "perStatCap": 46,
+            "equipmentCapped": 0,
+            "final": 156,
+            "finalMod": 230
+          }
+        },
+        "intelligence": {
+          "value": 600,
+          "mod": 675,
+          "breakdown": {
+            "base": 600,
+            "titleBonus": 0,
+            "blessingMultiplier": 1,
+            "blessingAdd": 0,
+            "calculated": 600,
+            "effectBonus": 0,
+            "equipmentBonusRaw": 0,
+            "perStatCap": 180,
+            "equipmentCapped": 0,
+            "final": 600,
+            "finalMod": 675
+          }
+        },
+        "willpower": {
+          "value": 358,
+          "mod": 447,
+          "breakdown": {
+            "base": 358,
+            "titleBonus": 0,
+            "blessingMultiplier": 1,
+            "blessingAdd": 0,
+            "calculated": 358,
+            "effectBonus": 0,
+            "equipmentBonusRaw": 0,
+            "perStatCap": 107,
+            "equipmentCapped": 0,
+            "final": 358,
+            "finalMod": 447
+          }
+        },
+        "wisdom": {
+          "value": 170,
+          "mod": 246,
+          "breakdown": {
+            "base": 170,
+            "titleBonus": 0,
+            "blessingMultiplier": 1,
+            "blessingAdd": 0,
+            "calculated": 170,
+            "effectBonus": 0,
+            "equipmentBonusRaw": 0,
+            "perStatCap": 51,
+            "equipmentCapped": 0,
+            "final": 170,
+            "finalMod": 246
+          }
+        },
+        "perception": {
+          "value": 154,
+          "mod": 228,
+          "breakdown": {
+            "base": 146,
+            "titleBonus": 0,
+            "blessingMultiplier": 1,
+            "blessingAdd": 0,
+            "calculated": 146,
+            "effectBonus": 8,
+            "equipmentBonusRaw": 0,
+            "perStatCap": 43,
+            "equipmentCapped": 0,
+            "final": 154,
+            "finalMod": 228
+          }
+        }
+      },
+      "defense": {
+        "armor": 0,
+        "veil": 0,
+        "dr": 115,
+        "melee": {
+          "value": 702,
+          "pool": 1404,
+          "poolMax": 1404
+        },
+        "ranged": {
+          "value": 431,
+          "pool": 862,
+          "poolMax": 862
+        },
+        "mind": {
+          "value": 824,
+          "pool": 1648,
+          "poolMax": 1648
+        },
+        "soul": {
+          "value": 418,
+          "pool": 836,
+          "poolMax": 836
+        }
+      }
+    },
+    {
+      "id": "KCOx3o8dg6rJBPJV",
+      "name": "Valentine Fig",
+      "folder": "Profession Group",
+      "health": {
+        "value": 438,
+        "max": 409
+      },
+      "mana": {
+        "value": 482,
+        "max": 420
+      },
+      "stamina": {
+        "value": 108,
+        "max": 129
+      },
+      "freePoints": 0,
+      "attributes": {
+        "race": {
+          "templateId": "Compendium.aspects-of-power.races.Item.hsK5h7UEYtJZy33g",
+          "name": "Human",
+          "level": 38,
+          "rank": "E"
+        },
+        "class": {
+          "templateId": "Compendium.aspects-of-power.classes.Item.bA6McSlaoNj5iFS3",
+          "name": "Fireborne",
+          "level": 50,
+          "rank": "E"
+        },
+        "profession": {
+          "templateId": "Compendium.aspects-of-power.professions.Item.j4VkmcECBpNE6pfW",
+          "name": "Blazing Alchemist of Flame's Heart",
+          "level": 27,
+          "rank": "E"
+        }
+      },
+      "abilities": {
+        "vitality": {
+          "value": 242,
+          "mod": 327,
+          "breakdown": {
+            "base": 202,
+            "titleBonus": 0,
+            "blessingMultiplier": 1,
+            "blessingAdd": 0,
+            "calculated": 202,
+            "effectBonus": 40,
+            "equipmentBonusRaw": 0,
+            "perStatCap": 60,
+            "equipmentCapped": 0,
+            "final": 242,
+            "finalMod": 327
+          }
+        },
+        "endurance": {
+          "value": 76,
+          "mod": 129,
+          "breakdown": {
+            "base": 57,
+            "titleBonus": 0,
+            "blessingMultiplier": 1,
+            "blessingAdd": 0,
+            "calculated": 57,
+            "effectBonus": 19,
+            "equipmentBonusRaw": 0,
+            "perStatCap": 17,
+            "equipmentCapped": 0,
+            "final": 76,
+            "finalMod": 129
+          }
+        },
+        "strength": {
+          "value": 67,
+          "mod": 117,
+          "breakdown": {
+            "base": 57,
+            "titleBonus": 0,
+            "blessingMultiplier": 1,
+            "blessingAdd": 0,
+            "calculated": 57,
+            "effectBonus": 10,
+            "equipmentBonusRaw": 0,
+            "perStatCap": 17,
+            "equipmentCapped": 0,
+            "final": 67,
+            "finalMod": 117
+          }
+        },
+        "dexterity": {
+          "value": 85,
+          "mod": 141,
+          "breakdown": {
+            "base": 57,
+            "titleBonus": 0,
+            "blessingMultiplier": 1,
+            "blessingAdd": 0,
+            "calculated": 57,
+            "effectBonus": 28,
+            "equipmentBonusRaw": 0,
+            "perStatCap": 17,
+            "equipmentCapped": 0,
+            "final": 85,
+            "finalMod": 141
+          }
+        },
+        "toughness": {
+          "value": 145,
+          "mod": 217,
+          "breakdown": {
+            "base": 125,
+            "titleBonus": 0,
+            "blessingMultiplier": 1,
+            "blessingAdd": 0,
+            "calculated": 125,
+            "effectBonus": 20,
+            "equipmentBonusRaw": 0,
+            "perStatCap": 37,
+            "equipmentCapped": 0,
+            "final": 145,
+            "finalMod": 217
+          }
+        },
+        "intelligence": {
+          "value": 380,
+          "mod": 469,
+          "breakdown": {
+            "base": 360,
+            "titleBonus": 0,
+            "blessingMultiplier": 1,
+            "blessingAdd": 0,
+            "calculated": 360,
+            "effectBonus": 20,
+            "equipmentBonusRaw": 0,
+            "perStatCap": 108,
+            "equipmentCapped": 0,
+            "final": 380,
+            "finalMod": 469
+          }
+        },
+        "willpower": {
+          "value": 331,
+          "mod": 420,
+          "breakdown": {
+            "base": 291,
+            "titleBonus": 0,
+            "blessingMultiplier": 1,
+            "blessingAdd": 0,
+            "calculated": 291,
+            "effectBonus": 40,
+            "equipmentBonusRaw": 0,
+            "perStatCap": 87,
+            "equipmentCapped": 0,
+            "final": 331,
+            "finalMod": 420
+          }
+        },
+        "wisdom": {
+          "value": 189,
+          "mod": 268,
+          "breakdown": {
+            "base": 179,
+            "titleBonus": 0,
+            "blessingMultiplier": 1,
+            "blessingAdd": 0,
+            "calculated": 179,
+            "effectBonus": 10,
+            "equipmentBonusRaw": 0,
+            "perStatCap": 53,
+            "equipmentCapped": 0,
+            "final": 189,
+            "finalMod": 268
+          }
+        },
+        "perception": {
+          "value": 238,
+          "mod": 322,
+          "breakdown": {
+            "base": 200,
+            "titleBonus": 0,
+            "blessingMultiplier": 1,
+            "blessingAdd": 0,
+            "calculated": 200,
+            "effectBonus": 38,
+            "equipmentBonusRaw": 0,
+            "perStatCap": 60,
+            "equipmentCapped": 0,
+            "final": 238,
+            "finalMod": 322
+          }
+        }
+      },
+      "defense": {
+        "armor": 54,
+        "veil": 180,
+        "dr": 109,
+        "melee": {
+          "value": 194,
+          "pool": 0,
+          "poolMax": 388
+        },
+        "ranged": {
+          "value": 401,
+          "pool": 0,
+          "poolMax": 802
+        },
+        "mind": {
+          "value": 604,
+          "pool": 0,
+          "poolMax": 1208
+        },
+        "soul": {
+          "value": 433,
+          "pool": 0,
+          "poolMax": 866
+        }
+      }
+    },
+    {
+      "id": "3Il786qP8Pvd861e",
+      "name": "Woody Dalton",
+      "folder": "Profession Group",
+      "health": {
+        "value": 173,
+        "max": 179
+      },
+      "mana": {
+        "value": 274,
+        "max": 258
+      },
+      "stamina": {
+        "value": 224,
+        "max": 207
+      },
+      "freePoints": 0,
+      "attributes": {
+        "race": {
+          "templateId": "Compendium.aspects-of-power.races.Item.hsK5h7UEYtJZy33g",
+          "name": "Human",
+          "level": 38,
+          "rank": "E"
+        },
+        "class": {
+          "templateId": "Compendium.aspects-of-power.classes.Item.hb7iAJ7jFKaa12uj",
+          "name": "Overwatch",
+          "level": 41,
+          "rank": "E"
+        },
+        "profession": {
+          "templateId": "Compendium.aspects-of-power.professions.Item.zXPDQEzGL4bKAHm5",
+          "name": "Shaper of the Asrai",
+          "level": 35,
+          "rank": "E"
+        }
+      },
+      "abilities": {
+        "vitality": {
+          "value": 86,
+          "mod": 143,
+          "breakdown": {
+            "base": 86,
+            "titleBonus": 0,
+            "blessingMultiplier": 1,
+            "blessingAdd": 0,
+            "calculated": 86,
+            "effectBonus": 0,
+            "equipmentBonusRaw": 0,
+            "perStatCap": 25,
+            "equipmentCapped": 0,
+            "final": 86,
+            "finalMod": 143
+          }
+        },
+        "endurance": {
+          "value": 137,
+          "mod": 207,
+          "breakdown": {
+            "base": 137,
+            "titleBonus": 0,
+            "blessingMultiplier": 1,
+            "blessingAdd": 0,
+            "calculated": 137,
+            "effectBonus": 0,
+            "equipmentBonusRaw": 0,
+            "perStatCap": 41,
+            "equipmentCapped": 0,
+            "final": 137,
+            "finalMod": 207
+          }
+        },
+        "strength": {
+          "value": 110,
+          "mod": 174,
+          "breakdown": {
+            "base": 110,
+            "titleBonus": 0,
+            "blessingMultiplier": 1,
+            "blessingAdd": 0,
+            "calculated": 110,
+            "effectBonus": 0,
+            "equipmentBonusRaw": 0,
+            "perStatCap": 33,
+            "equipmentCapped": 0,
+            "final": 110,
+            "finalMod": 174
+          }
+        },
+        "dexterity": {
+          "value": 379,
+          "mod": 468,
+          "breakdown": {
+            "base": 379,
+            "titleBonus": 0,
+            "blessingMultiplier": 1,
+            "blessingAdd": 0,
+            "calculated": 379,
+            "effectBonus": 0,
+            "equipmentBonusRaw": 0,
+            "perStatCap": 113,
+            "equipmentCapped": 0,
+            "final": 379,
+            "finalMod": 468
+          }
+        },
+        "toughness": {
+          "value": 62,
+          "mod": 110,
+          "breakdown": {
+            "base": 62,
+            "titleBonus": 0,
+            "blessingMultiplier": 1,
+            "blessingAdd": 0,
+            "calculated": 62,
+            "effectBonus": 0,
+            "equipmentBonusRaw": 0,
+            "perStatCap": 18,
+            "equipmentCapped": 0,
+            "final": 62,
+            "finalMod": 110
+          }
+        },
+        "intelligence": {
+          "value": 57,
+          "mod": 103,
+          "breakdown": {
+            "base": 57,
+            "titleBonus": 0,
+            "blessingMultiplier": 1,
+            "blessingAdd": 0,
+            "calculated": 57,
+            "effectBonus": 0,
+            "equipmentBonusRaw": 0,
+            "perStatCap": 17,
+            "equipmentCapped": 0,
+            "final": 57,
+            "finalMod": 103
+          }
+        },
+        "willpower": {
+          "value": 180,
+          "mod": 258,
+          "breakdown": {
+            "base": 180,
+            "titleBonus": 0,
+            "blessingMultiplier": 1,
+            "blessingAdd": 0,
+            "calculated": 180,
+            "effectBonus": 0,
+            "equipmentBonusRaw": 0,
+            "perStatCap": 54,
+            "equipmentCapped": 0,
+            "final": 180,
+            "finalMod": 258
+          }
+        },
+        "wisdom": {
+          "value": 135,
+          "mod": 205,
+          "breakdown": {
+            "base": 135,
+            "titleBonus": 0,
+            "blessingMultiplier": 1,
+            "blessingAdd": 0,
+            "calculated": 135,
+            "effectBonus": 0,
+            "equipmentBonusRaw": 0,
+            "perStatCap": 40,
+            "equipmentCapped": 0,
+            "final": 135,
+            "finalMod": 205
+          }
+        },
+        "perception": {
+          "value": 476,
+          "mod": 561,
+          "breakdown": {
+            "base": 476,
+            "titleBonus": 0,
+            "blessingMultiplier": 1,
+            "blessingAdd": 0,
+            "calculated": 476,
+            "effectBonus": 0,
+            "equipmentBonusRaw": 0,
+            "perStatCap": 142,
+            "equipmentCapped": 0,
+            "final": 476,
+            "finalMod": 561
+          }
+        }
+      },
+      "defense": {
+        "armor": 0,
+        "veil": 0,
+        "dr": 55,
+        "melee": {
+          "value": 572,
+          "pool": 0,
+          "poolMax": 1144
+        },
+        "ranged": {
+          "value": 772,
+          "pool": 0,
+          "poolMax": 1544
+        },
+        "mind": {
+          "value": 181,
+          "pool": 0,
+          "poolMax": 362
+        },
+        "soul": {
+          "value": 311,
+          "pool": 0,
+          "poolMax": 622
+        }
+      }
+    }
+  ]
+}
