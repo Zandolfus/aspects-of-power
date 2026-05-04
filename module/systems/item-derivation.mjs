@@ -35,13 +35,33 @@ export function deriveItemStats(itemOrPatch) {
 
   // Resolve the most-specific craftItemType by tag overlap. This handles
   // weapons (sword vs greatsword) and shields (shield vs greatshield)
-  // without relying on the original craft-time typeKey.
+  // without relying on the original craft-time typeKey. Tag-resolution
+  // rule: prefer perfect matches (all typeKey tags present in item), and
+  // among perfect matches prefer the most specific (longest tag list).
+  // Fall back to best partial overlap only if no perfect match exists.
+  // Without this, e.g. an item tagged [weapon,1H,shield,X-affinity] would
+  // tie buckler and shield at overlap=3, and iteration order would pick
+  // buckler (lower armor value) over shield.
   const knownTypes = Object.entries(sc.craftItemTypes ?? {});
   let typeKey = null;
   let bestScore = 0;
+  let perfectMatch = false;
   for (const [k, def] of knownTypes) {
-    const overlap = (def.tags ?? []).filter(t => tags.includes(t)).length;
-    if (overlap > bestScore) { bestScore = overlap; typeKey = k; }
+    const tk = def.tags ?? [];
+    if (tk.length === 0) continue;
+    const overlap = tk.filter(t => tags.includes(t)).length;
+    const isPerfect = overlap === tk.length;
+    if (isPerfect) {
+      // Prefer perfect matches — among them, more tags = more specific.
+      if (!perfectMatch || tk.length > bestScore) {
+        perfectMatch = true;
+        bestScore = tk.length;
+        typeKey = k;
+      }
+    } else if (!perfectMatch && overlap > bestScore) {
+      bestScore = overlap;
+      typeKey = k;
+    }
   }
   const itemTypeDef = typeKey ? sc.craftItemTypes[typeKey] : null;
   const slotCategory = itemTypeDef?.category;
