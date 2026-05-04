@@ -46,6 +46,15 @@ export class CharacterData extends foundry.abstract.TypeDataModel {
           name:       new fields.StringField({ initial: 'Uninitiated' }),
           templateId: new fields.StringField({ initial: '' }),
           rank:       new fields.StringField({ initial: 'G' }),
+          // Transition log: each entry says "from this level onward, use this template".
+          // Lookup at level L = findLast(entry => entry.fromLevel <= L). Empty array
+          // means "no historical record" — engines should fall back to the current
+          // templateId for all levels (legacy actors). On level-up that crosses into
+          // a new template, append a new entry.
+          history: new fields.ArrayField(new fields.SchemaField({
+            fromLevel:  new fields.NumberField({ initial: 0, min: 0, integer: true }),
+            templateId: new fields.StringField({ initial: '' }),
+          }), { initial: [] }),
           cachedTags: new fields.ArrayField(new fields.SchemaField({
             id: new fields.StringField({ initial: '' }),
             value: new fields.NumberField({ initial: 0 }),
@@ -56,6 +65,10 @@ export class CharacterData extends foundry.abstract.TypeDataModel {
           name:       new fields.StringField({ initial: 'Human' }),
           templateId: new fields.StringField({ initial: '' }),
           rank:       new fields.StringField({ initial: 'G' }),
+          history: new fields.ArrayField(new fields.SchemaField({
+            fromLevel:  new fields.NumberField({ initial: 0, min: 0, integer: true }),
+            templateId: new fields.StringField({ initial: '' }),
+          }), { initial: [] }),
           cachedTags: new fields.ArrayField(new fields.SchemaField({
             id: new fields.StringField({ initial: '' }),
             value: new fields.NumberField({ initial: 0 }),
@@ -66,6 +79,10 @@ export class CharacterData extends foundry.abstract.TypeDataModel {
           name:       new fields.StringField({ initial: 'Uninitiated' }),
           templateId: new fields.StringField({ initial: '' }),
           rank:       new fields.StringField({ initial: 'G' }),
+          history: new fields.ArrayField(new fields.SchemaField({
+            fromLevel:  new fields.NumberField({ initial: 0, min: 0, integer: true }),
+            templateId: new fields.StringField({ initial: '' }),
+          }), { initial: [] }),
           cachedTags: new fields.ArrayField(new fields.SchemaField({
             id: new fields.StringField({ initial: '' }),
             value: new fields.NumberField({ initial: 0 }),

@@ -25,6 +25,132 @@ const ABILITY_KEYS = [
 const PATH_TAGS = ['onefold-path', 'twofold-path', 'threefold-path'];
 
 /**
+ * History-aware track walker. Reads `system.attributes[track].history` to
+ * determine which template covers each level being walked. History entries
+ * are `[{ fromLevel, templateId }]` — to find the template active at level L,
+ * pick the entry with the highest `fromLevel <= L`.
+ *
+ * Differences from `applyTrackLevels`:
+ *  - No rank-coverage halt: each level looks up its template independently.
+ *  - Multi-template walks just work (e.g., Light Warrior 1-24 → Rogue 25-50
+ *    is a single call, not two with manual template-swap between).
+ *  - Empty history → falls back to `applyTrackLevels` semantics with
+ *    the currently-assigned template (legacy compatibility).
+ *
+ * The caller is responsible for setting `history` BEFORE calling this; the
+ * walker doesn't write history. Use `applyTrackLevelsWithHistory` for the
+ * common pattern of "build history, then walk".
+ *
+ * @param {Actor} actor
+ * @param {'class'|'profession'|'race'} track
+ * @param {number} levelsToAdd
+ * @returns {Promise<{applied: number, halted: boolean, reason?: string, segments: Array<{template:string,levels:number}>}>}
+ */
+export async function applyTrackLevelsByHistory(actor, track, levelsToAdd) {
+  if (!actor || levelsToAdd <= 0) return { applied: 0, halted: false, segments: [] };
+  const sys = actor.system;
+  const attr = sys.attributes?.[track];
+  if (!attr) return { applied: 0, halted: true, reason: `no system.attributes.${track}`, segments: [] };
+  const history = (attr.history ?? []).slice().sort((a, b) => a.fromLevel - b.fromLevel);
+  // Empty history: fall back to legacy single-template walk.
+  if (history.length === 0) return applyTrackLevels(actor, track, levelsToAdd);
+
+  const startLevel = attr.level ?? 0;
+  const gainsAccum = Object.fromEntries(ABILITY_KEYS.map(k => [k, 0]));
+  let freePointsAccum = 0;
+  let appliedCount = 0;
+  let haltReason = null;
+  const segments = []; // [{ templateName, levels: count }] for return summary
+
+  // Cache resolved templates by id so we don't re-fetch every level.
+  const templateCache = new Map();
+  async function resolveTemplate(templateId) {
+    if (!templateId) return null;
+    if (templateCache.has(templateId)) return templateCache.get(templateId);
+    let t = null;
+    try { t = await fromUuid(templateId); } catch (e) { /* missing pack */ }
+    templateCache.set(templateId, t);
+    return t;
+  }
+
+  function findTemplateIdForLevel(level) {
+    let active = null;
+    for (const entry of history) {
+      if (entry.fromLevel <= level) active = entry;
+      else break;
+    }
+    return active?.templateId ?? null;
+  }
+
+  let currentSegmentTemplate = null;
+  let currentSegmentCount = 0;
+
+  for (let i = 0; i < levelsToAdd; i++) {
+    const nextLevel = startLevel + i + 1;
+    const tid = findTemplateIdForLevel(nextLevel);
+    if (!tid) {
+      haltReason = `no history entry covers level ${nextLevel}`;
+      break;
+    }
+    const templateItem = await resolveTemplate(tid);
+    if (!templateItem) {
+      haltReason = `template ${tid} could not be resolved (missing pack/world?)`;
+      break;
+    }
+    if (track === 'race') {
+      const nextRank = CONFIG.ASPECTSOFPOWER.getRankForLevel(nextLevel);
+      const rankGains = templateItem.system.rankGains?.[nextRank];
+      if (!rankGains) {
+        haltReason = `race template "${templateItem.name}" has no rankGains for rank ${nextRank} (level ${nextLevel})`;
+        break;
+      }
+      for (const k of ABILITY_KEYS) gainsAccum[k] += rankGains[k] ?? 0;
+      freePointsAccum += templateItem.system.freePointsPerLevel?.[nextRank] ?? 0;
+    } else {
+      const gains = templateItem.system.gains ?? {};
+      for (const k of ABILITY_KEYS) gainsAccum[k] += gains[k] ?? 0;
+      freePointsAccum += templateItem.system.freePointsPerLevel ?? 0;
+    }
+    appliedCount++;
+    if (currentSegmentTemplate === templateItem.name) {
+      currentSegmentCount++;
+    } else {
+      if (currentSegmentTemplate) segments.push({ template: currentSegmentTemplate, levels: currentSegmentCount });
+      currentSegmentTemplate = templateItem.name;
+      currentSegmentCount = 1;
+    }
+  }
+  if (currentSegmentTemplate) segments.push({ template: currentSegmentTemplate, levels: currentSegmentCount });
+
+  if (appliedCount > 0) {
+    // Identity template = the LAST history entry (what the actor is aiming for /
+    // their current arc). Stat gains during walk come from the level-active
+    // template; the actor's display identity stays on their highest-rank arc.
+    const finalLevel = startLevel + appliedCount;
+    const lastEntry = history[history.length - 1];
+    const identityTemplate = lastEntry ? await resolveTemplate(lastEntry.templateId) : null;
+    const updates = { [`system.attributes.${track}.level`]: finalLevel };
+    if (identityTemplate) {
+      updates[`system.attributes.${track}.templateId`] = lastEntry.templateId;
+      updates[`system.attributes.${track}.name`] = identityTemplate.name;
+      if (identityTemplate.system.rank) updates[`system.attributes.${track}.rank`] = identityTemplate.system.rank;
+    }
+    for (const k of ABILITY_KEYS) {
+      if (gainsAccum[k] !== 0) {
+        const cur = actor._source.system.abilities[k].value;
+        updates[`system.abilities.${k}.value`] = cur + gainsAccum[k];
+      }
+    }
+    if (freePointsAccum > 0) {
+      updates['system.freePoints'] = (sys.freePoints ?? 0) + freePointsAccum;
+    }
+    await actor.update(updates);
+  }
+
+  return { applied: appliedCount, halted: !!haltReason, reason: haltReason ?? undefined, segments };
+}
+
+/**
  * Apply N levels to one (actor, track), accumulating template gains and
  * crediting free points to the actor's pool. Halts at the first level that
  * crosses the assigned template's rank (class/profession) or that has no
