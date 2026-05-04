@@ -74,7 +74,11 @@ async () => {
         errors.push(`unknown ${kindKey}: "${seg[kindKey]}"`);
         continue;
       }
-      const fromLevel = (seg.from_level ?? 1) - 1; // CSV from_level=1 -> our 0
+      // CSV from_level=N means "from level N onwards" (so level N is the first
+       // level using this template). Our fromLevel uses the same semantic: an
+       // entry at fromLevel=N means findTemplateIdForLevel(N) picks it. So we
+       // pass through directly (NO -1, that was an earlier off-by-one bug).
+      const fromLevel = seg.from_level ?? 1;
       segments.push({ fromLevel, templateId: uuid });
     }
     return { segments, errors };
