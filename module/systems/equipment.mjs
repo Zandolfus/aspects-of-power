@@ -476,16 +476,26 @@ export class EquipmentSystem {
     const sys = updateData.system;
     if (!sys) return;
 
-    // Progress changed — derive durability.max from progress.
-    if (sys.progress !== undefined) {
+    // Each branch below decides whether it needs a re-sync of equipment AEs.
+    // We DON'T early-return between branches — multi-field updates (e.g. the
+    // item-rederive migration writes progress + statBonuses + armorBonus +
+    // veilBonus + durability.max in one call) need every relevant branch to
+    // run. Earlier code returned after the first match and lost downstream
+    // sync work, leaving stale armor/veil values on the actor.
+    let needsSync = false;
+
+    // Progress changed — derive durability.max from progress (only when the
+    // caller didn't supply one explicitly, e.g. the migration sets durability.max
+    // directly). Triggering a follow-up update here would re-fire this hook
+    // and risk loops on bulk updates, so we just leave that to the caller.
+    if (sys.progress !== undefined && sys.durability?.max === undefined) {
       const newMax = item.system.progress * 2;
       const updates = { 'system.durability.max': newMax };
-      // If current durability exceeds new max, clamp it.
       if (item.system.durability.value > newMax) {
         updates['system.durability.value'] = newMax;
       }
       item.update(updates);
-      return;
+      // No needsSync flip — the follow-up update will re-enter the hook.
     }
 
     // Equipped state changed — sync effects + grant/remove skills.
@@ -499,33 +509,28 @@ export class EquipmentSystem {
     // grantedSkills array edited on an equipped item — re-grant from scratch.
     if (sys.grantedSkills !== undefined && item.system.equipped) {
       this._removeGrantedSkills(item).then(() => this._grantSkills(item));
-      return;
     }
 
     // Durability changed — only act on threshold crossings (broke or repaired from broken).
     if (sys.durability?.value !== undefined && item.system.equipped) {
       const hasEffects = item.parent.effects.some(e => e.system?.itemSource === item.id);
       if (item.system.durability.value <= 0 && hasEffects) {
-        // Just broke — remove effects.
         this._removeItemEffects(item);
+        return; // gone — no sync needed
       } else if (item.system.durability.value > 0 && !hasEffects) {
-        // Restored from broken — re-sync effects.
-        this._syncEffects(item);
+        needsSync = true;
       }
-      return;
     }
 
-    // Augment slots changed on an equipped item — re-sync.
-    if (item.system.equipped && sys.augments) {
-      this._syncEffects(item);
-      return;
+    // Augment slots / stat / defense changes on an equipped item → sync.
+    if (item.system.equipped && (sys.augments
+                              || sys.statBonuses
+                              || sys.armorBonus !== undefined
+                              || sys.veilBonus !== undefined)) {
+      needsSync = true;
     }
 
-    // Stat/defense bonuses changed on an equipped item — re-sync.
-    if (item.system.equipped && (sys.statBonuses || sys.armorBonus !== undefined || sys.veilBonus !== undefined)) {
-      this._syncEffects(item);
-      return;
-    }
+    if (needsSync) this._syncEffects(item);
 
     // An augment item's bonuses changed — re-sync any equipped gear referencing it.
     if (item.type === 'augment' && (sys.statBonuses || sys.itemBonuses) && item.parent) {
