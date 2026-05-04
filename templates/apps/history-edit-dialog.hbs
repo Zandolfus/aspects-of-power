@@ -1,0 +1,52 @@
+<form class='history-edit-form'>
+  <header style='margin-bottom:8px;'>
+    <h2 style='margin:0 0 4px;'>{{actor.name}} — Edit {{trackLabel}} History</h2>
+    <p class='hint' style='font-size:11px;color:#888;margin:0;'>
+      Each entry says "from this level onward, use this template." Lookup at level L picks the entry with the highest fromLevel ≤ L. Entries are sorted by fromLevel on save. The last entry's template becomes the actor's displayed identity.
+    </p>
+    <p class='hint' style='font-size:11px;color:#888;margin:4px 0 0;'>
+      Current actor level: <strong>{{currentLevel}}</strong>
+    </p>
+  </header>
+
+  <table class='history-table' style='width:100%;border-collapse:collapse;font-size:12px;margin-top:8px;'>
+    <thead>
+      <tr style='border-bottom:1px solid #555;'>
+        <th style='text-align:left;padding:4px;width:80px;'>From Level</th>
+        <th style='text-align:left;padding:4px;'>Template</th>
+        <th style='text-align:right;padding:4px;width:30px;'></th>
+      </tr>
+    </thead>
+    <tbody>
+      {{#each entries as |e|}}
+        <tr>
+          <td style='padding:3px 4px;'>
+            <input type='number' class='entry-from' data-idx='{{e.idx}}' value='{{e.fromLevel}}' min='0' style='width:70px;text-align:right;' />
+          </td>
+          <td style='padding:3px 4px;'>
+            <select class='entry-tpl' data-idx='{{e.idx}}' style='width:100%;'>
+              <option value=''>-- pick template --</option>
+              {{#each ../templateOptions as |t|}}
+                <option value='{{t.uuid}}' {{#if (eq t.uuid e.templateId)}}selected{{/if}}>{{t.name}}</option>
+              {{/each}}
+            </select>
+          </td>
+          <td style='padding:3px 4px;text-align:right;'>
+            <button type='button' data-action='delRow' data-idx='{{e.idx}}' title='Delete row' style='padding:2px 6px;'><i class='fas fa-times'></i></button>
+          </td>
+        </tr>
+      {{/each}}
+      {{#unless entries.length}}
+        <tr><td colspan='3' style='padding:8px;text-align:center;color:#888;'><em>No history entries. Click "Add Entry" to start.</em></td></tr>
+      {{/unless}}
+    </tbody>
+  </table>
+
+  <footer style='display:flex;gap:8px;margin-top:12px;justify-content:space-between;align-items:center;'>
+    <button type='button' data-action='addRow'><i class='fas fa-plus'></i> Add Entry</button>
+    <div style='display:flex;gap:8px;'>
+      <button type='button' data-action='cancel'>Cancel</button>
+      <button type='button' data-action='apply'>Save</button>
+    </div>
+  </footer>
+</form>

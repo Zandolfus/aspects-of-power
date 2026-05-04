@@ -679,6 +679,17 @@ export class AspectsofPowerActorSheet extends foundry.applications.api.Handlebar
       });
     });
 
+    // Edit track history (open dialog with editable history segments).
+    this.element.querySelectorAll('.history-edit').forEach(el => {
+      el.addEventListener('click', async () => {
+        const track = el.dataset.track;
+        if (!['class', 'race', 'profession'].includes(track)) return;
+        const { HistoryEditDialog } = await import('../apps/history-edit-dialog.mjs');
+        const dlg = new HistoryEditDialog(this.actor, track);
+        dlg.render(true);
+      });
+    });
+
     // Drag events for macros
     if (this.actor.isOwner) {
       this.element.querySelectorAll('li.item').forEach(li => {
