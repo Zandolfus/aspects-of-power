@@ -686,6 +686,19 @@ Hooks.once('ready', async function () {
   // Socket listener: only the active GM executes mutations so that
   // players can buff/debuff/heal actors they don't own.
   game.socket.on('system.aspects-of-power', async (payload) => {
+    // --- Player-side: quick-actions prompt (after their queued action resolves) ---
+    if (payload.type === 'quickActionsPrompt' && payload.targetUserId === game.userId) {
+      try {
+        const actor = game.actors.get(payload.actorId);
+        if (!actor) return;
+        const { QuickActionsDialog } = await import('./apps/quick-actions-dialog.mjs');
+        new QuickActionsDialog(actor).render(true);
+      } catch (e) {
+        console.warn('Quick-actions prompt failed:', e);
+      }
+      return;
+    }
+
     // --- Player-side: defense prompt ---
     if (payload.type === 'defensePrompt' && payload.targetUserId === game.userId) {
       const buttons = [];

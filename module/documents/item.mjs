@@ -3797,16 +3797,33 @@ export class AspectsofPowerItem extends Item {
             content: `<p><em>Celerity:</em> wait <strong>${cel.wait}</strong> ticks → next action at tick <strong>${cel.scheduledTick}</strong>.</p>`,
           });
         }
-      } else if (this.actor?.isOwner) {
-        // Deferred action just resolved → actor needs to declare their
-        // next action. Pop the quick-actions dialog with their favorites
-        // for one-click follow-up. Only fires for owners (so co-owned
-        // actors don't double-pop), and silently no-ops if no favorites.
-        try {
-          const { QuickActionsDialog } = await import('../apps/quick-actions-dialog.mjs');
-          QuickActionsDialog.maybePopFor(this.actor);
-        } catch (e) {
-          console.warn('Quick-actions dialog failed to pop:', e);
+      } else {
+        // Deferred action just resolved → dispatch the quick-actions
+        // dialog to the actor's canonical player (mirrors the defense
+        // dialog routing pattern). PC actors with no linked player
+        // online fall back to the GM running solo. NPCs never trigger.
+        const actor = this.actor;
+        if (actor && actor.hasPlayerOwner) {
+          const hasFavorites = actor.items.some(i => i.type === 'skill' && i.system.favorite);
+          if (hasFavorites) {
+            const linkedPlayer = game.users.find(u =>
+              u.active && !u.isGM && u.character?.id === actor.id
+            );
+            if (linkedPlayer && linkedPlayer.id !== game.user.id) {
+              game.socket.emit('system.aspects-of-power', {
+                type: 'quickActionsPrompt',
+                targetUserId: linkedPlayer.id,
+                actorId: actor.id,
+              });
+            } else if (game.user.id === linkedPlayer?.id || game.user.isGM) {
+              try {
+                const { QuickActionsDialog } = await import('../apps/quick-actions-dialog.mjs');
+                new QuickActionsDialog(actor).render(true);
+              } catch (e) {
+                console.warn('Quick-actions dialog failed to pop:', e);
+              }
+            }
+          }
         }
       }
     };
