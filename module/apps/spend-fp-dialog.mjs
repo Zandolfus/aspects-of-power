@@ -58,12 +58,27 @@ export class SpendFreePointsDialog extends foundry.applications.api.HandlebarsAp
 
   _onRender(context, options) {
     super._onRender(context, options);
-    this.element.querySelectorAll('input[name^="alloc."]').forEach(el => {
-      el.addEventListener('input', async () => {
-        const key = el.name.slice('alloc.'.length);
-        const v = parseInt(el.value, 10);
-        this.allocation[key] = Number.isFinite(v) && v >= 0 ? v : 0;
-        await this.render();
+
+    this.element.querySelectorAll('.free-point-input').forEach(el => {
+      el.addEventListener('change', () => {
+        const key = el.dataset.ability;
+        this.allocation[key] = Math.max(0, Math.round(Number(el.value) || 0));
+        this.render();
+      });
+    });
+
+    this.element.querySelectorAll('.free-point-inc').forEach(el => {
+      el.addEventListener('click', () => {
+        const key = el.dataset.ability;
+        this.allocation[key] = (this.allocation[key] ?? 0) + 1;
+        this.render();
+      });
+    });
+    this.element.querySelectorAll('.free-point-dec').forEach(el => {
+      el.addEventListener('click', () => {
+        const key = el.dataset.ability;
+        this.allocation[key] = Math.max(0, (this.allocation[key] ?? 0) - 1);
+        this.render();
       });
     });
   }

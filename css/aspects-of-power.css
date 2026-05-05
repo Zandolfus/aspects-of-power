@@ -1814,39 +1814,48 @@
   border-radius: 4px;
   text-align: center;
 }
-.level-up-dialog .stat-gains-table {
+.level-up-dialog .stat-gains-table,
+.spend-fp-dialog .stat-gains-table {
   margin: 8px 0;
 }
-.level-up-dialog .gains-header {
+.level-up-dialog .gains-header,
+.spend-fp-dialog .gains-header {
   font-weight: bold;
   font-size: 12px;
   border-bottom: 1px solid #555;
   padding-bottom: 4px;
   margin-bottom: 4px;
 }
-.level-up-dialog .gains-row {
+.level-up-dialog .gains-row,
+.spend-fp-dialog .gains-row {
   padding: 2px 0;
   align-items: center;
 }
-.level-up-dialog .gains-col-name {
+.level-up-dialog .gains-col-name,
+.spend-fp-dialog .gains-col-name {
   flex: 2;
 }
-.level-up-dialog .gains-col {
+.level-up-dialog .gains-col,
+.spend-fp-dialog .gains-col {
   flex: 1;
   text-align: center;
 }
-.level-up-dialog .free-point-group {
+.level-up-dialog .free-point-group,
+.spend-fp-dialog .free-point-group {
   display: flex;
   align-items: center;
   justify-content: center;
   gap: 2px;
 }
-.level-up-dialog .free-point-group .free-point-input {
+.level-up-dialog .free-point-group .free-point-input,
+.spend-fp-dialog .free-point-group .free-point-input {
   width: 42px;
   text-align: center;
 }
 .level-up-dialog .free-point-dec,
-.level-up-dialog .free-point-inc {
+.level-up-dialog .free-point-inc,
+.spend-fp-dialog .free-point-dec,
+.spend-fp-dialog .free-point-inc {
   width: 22px;
   height: 22px;
   padding: 0;
@@ -1860,20 +1869,25 @@
   border-radius: 3px;
 }
 .level-up-dialog .free-point-dec:hover,
-.level-up-dialog .free-point-inc:hover {
+.level-up-dialog .free-point-inc:hover,
+.spend-fp-dialog .free-point-dec:hover,
+.spend-fp-dialog .free-point-inc:hover {
   background: #555;
   color: #fff;
 }
-.level-up-dialog .gains-total {
+.level-up-dialog .gains-total,
+.spend-fp-dialog .gains-total {
   font-weight: bold;
 }
-.level-up-dialog .free-points-summary {
+.level-up-dialog .free-points-summary,
+.spend-fp-dialog .free-points-summary {
   gap: 12px;
   margin: 8px 0;
   font-size: 13px;
   justify-content: center;
 }
-.level-up-dialog .level-up-actions {
+.level-up-dialog .level-up-actions,
+.spend-fp-dialog .level-up-actions {
   gap: 8px;
   margin-top: 8px;
   justify-content: flex-end;
