@@ -40,7 +40,10 @@
     const baseCost = Math.round(tierFactor * gradeFactor * costMult);
     const intMod = A.intelligence?.mod ?? 0;
     const wisMod = A.wisdom?.mod       ?? 0;
-    const safeInvest = sc.spellMaxInvestAboveBase?.[tier] ?? 0;
+    // safe_invest = wisMod × spellMaxInvestAboveBase[tier]. The config
+    // value is a FACTOR; multiply by Wis. Fixed 2026-05-04.
+    const aboveBaseFactor = sc.spellMaxInvestAboveBase?.[tier] ?? sc.spellMaxInvestAboveBase?.[''] ?? 0;
+    const safeInvest = Math.round(wisMod * aboveBaseFactor);
     const safeCost = baseCost + safeInvest;
     const dmgBase = Math.round(intMod * effMult * Math.pow(baseCost / Math.max(baseCost, 1), 0.2));
     const dmgSafe = Math.round(intMod * effMult * Math.pow(safeCost / Math.max(baseCost, 1), 0.2));
@@ -189,12 +192,55 @@
       values: { vitality: 200, endurance: 300, strength: 50, dexterity: 500,
                 toughness: 350, intelligence: 50, willpower: 19, wisdom: 50, perception: 650 },
     },
+    // ── CASTER: high-Int wand specialist (gunslinger style) ──
+    // Spam Basic-tier with wand for max cast frequency; high Wis for
+    // casting speed AND safe-invest headroom; modest Wil for sustained pool.
+    {
+      name: 'Wand Gunslinger', raceRank: 'E', pillar: 'spell',
+      spellTier: 'basic', rollType: 'magic_projectile', resource: 'mana',
+      rarity: 'common', skillName: 'Mana Bolt (Basic)', hasWand: true,
+      values: { vitality: 150, endurance: 100, strength: 10, dexterity: 10,
+                toughness: 200, intelligence: 700, willpower: 350, wisdom: 600, perception: 49 },
+    },
   ];
 
   // Compute mod from raw value per design-stat-curves: mod = round((v/1085)^0.8 × 1085 × 1.25^gradeIdx).
   const valueToMod = (v, raceRank) => {
     const idx = sc.statCurve?.gradeIndex?.[raceRank] ?? 0;
     return Math.round(Math.pow(v / 1085, 0.8) * 1085 * Math.pow(1.25, idx));
+  };
+
+  const synthSpellMath = (spec) => {
+    const A = Object.fromEntries(Object.entries(spec.values).map(([k, v]) => [k, { mod: valueToMod(v, spec.raceRank) }]));
+    const tier = spec.spellTier;
+    const tierFactor  = sc.spellTierFactors[tier]  ?? 1;
+    const gradeFactor = sc.spellGradeFactors[spec.raceRank] ?? 1;
+    const rarityDef = sc.skillRarities?.[spec.rarity];
+    const effMult = rarityDef?.mult ?? 0.6;
+    const baseCost = Math.round(tierFactor * gradeFactor);
+    const intMod = A.intelligence.mod;
+    const wisMod = A.wisdom.mod;
+    const aboveBaseFactor = sc.spellMaxInvestAboveBase?.[tier] ?? sc.spellMaxInvestAboveBase?.[''] ?? 0;
+    const safeInvest = Math.round(wisMod * aboveBaseFactor);
+    const safeCost = baseCost + safeInvest;
+    const dmgBase = Math.round(intMod * effMult * Math.pow(baseCost / Math.max(baseCost, 1), 0.2));
+    const dmgSafe = Math.round(intMod * effMult * Math.pow(safeCost / Math.max(baseCost, 1), 0.2));
+    const weight = sc.spellTierWeights?.[tier] ?? sc.celerity.BASELINE_WEIGHT;
+    const w = (sc.castingSpeedWeights ?? {})[tier] ?? { wis: 0.6, int: 0.4 };
+    const speed = Math.max(1, Math.round(w.wis * wisMod + w.int * intMod));
+    const SCALE = sc.celerity.SCALE ?? 1000;
+    let baseWait = Math.max(1, Math.round((weight * SCALE) / speed));
+    const wandActive = spec.hasWand && weight <= WAND_WEIGHT_GATE;
+    if (wandActive) baseWait = Math.max(1, Math.round(baseWait * WAND_REDUCTION));
+    const channelFactor = sc.celerity.CHANNEL_FACTOR ?? 1000;
+    const chanWaitBase = wisMod > 0 ? Math.round(baseCost * channelFactor / wisMod) : 0;
+    const chanWaitSafe = wisMod > 0 ? Math.round(safeCost * channelFactor / wisMod) : 0;
+    return {
+      A, statBlend: intMod, speed, effMult, weight, wandActive,
+      baseCost, safeInvest, safeCost, dmgBase, dmgSafe,
+      waitBase: Math.max(baseWait, chanWaitBase),
+      waitSafe: Math.max(baseWait, chanWaitSafe),
+    };
   };
 
   const synthWeaponMath = (spec) => {
@@ -309,7 +355,7 @@
 
   // ── Run synthetic PCs through the same continuous-time sim ──
   for (const spec of SYNTHETIC_PCS) {
-    const m = synthWeaponMath(spec);
+    const m = (spec.pillar === 'spell') ? synthSpellMath(spec) : synthWeaponMath(spec);
     const ROUND_K = sc.celerity.ROUND_K ?? 1000000;
     const refMod = Math.max(...Object.values(m.A).map(a => a.mod));
     const roundLen = Math.max(1, Math.round(ROUND_K / refMod));
@@ -348,9 +394,11 @@
       return { castsByCelerity, oorAt, totalDmg: totDmg, totalCasts: totCasts, rounds };
     };
     out.push({
-      pc: spec.name, skill: spec.skillName, rarity: spec.rarity, pillar: 'weapon (synthetic)',
+      pc: spec.name, skill: spec.skillName, rarity: spec.rarity,
+      pillar: (spec.pillar === 'spell' ? 'spell (synthetic)' : 'weapon (synthetic)'),
       type: spec.rollType, resource: spec.resource, poolMax: resMax, regenPerRound: regenAmt,
       effMult: m.effMult, statBlend: m.statBlend, weight: m.weight, speed: m.speed,
+      wandActive: !!m.wandActive,
       modsForReference: Object.fromEntries(Object.entries(m.A).map(([k, v]) => [k, v.mod])),
       roundLen,
       base: { cost: m.baseCost, dmg: m.dmgBase, wait: m.waitBase, ...sim(m.baseCost, m.dmgBase, m.waitBase) },
