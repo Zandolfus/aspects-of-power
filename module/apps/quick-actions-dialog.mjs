@@ -77,15 +77,18 @@ export class QuickActionsDialog extends foundry.applications.api.HandlebarsAppli
 
   /**
    * Convenience helper: pop the dialog if the actor has favorites and is
-   * owned by the current user. Players-only — GMs running NPCs get no
-   * popup (they have broader tools and managing a popup per NPC turn
-   * would be noisy). Safe to call from post-action hooks regardless of
-   * context.
+   * a player character. PCs only — NPCs never trigger the popup (would
+   * be noisy on the GM's screen during NPC turns). The GM IS allowed to
+   * trigger it: when running solo or when no player is online to receive
+   * the deferred-fire dispatch, the GM runs PC actions locally and
+   * benefits from the same quick-action UX.
+   *
+   * Safe to call from post-action hooks regardless of context.
    */
   static maybePopFor(actor) {
     if (!actor) return;
-    if (game.user.isGM) return;          // GM doesn't get the popup
-    if (!actor.isOwner) return;          // Must own the actor
+    if (!actor.hasPlayerOwner) return;   // PC only — NPC actions stay quiet
+    if (!actor.isOwner) return;          // Must own (filters co-observers)
     const hasFavorites = actor.items.some(i => i.type === 'skill' && i.system.favorite);
     if (!hasFavorites) return;
     new QuickActionsDialog(actor).render(true);
