@@ -3438,15 +3438,14 @@ export class AspectsofPowerItem extends Item {
       const intMod      = this.actor.system.abilities?.intelligence?.mod ?? 0;
       // Multiplier resolution: prefer hand-tuned `diceBonus` (designer-set,
       // non-default value) so existing spells don't drift before migration.
-      // Otherwise fall back to the rarity-based effective mult; legacy
-      // `spellTierMultipliers` retained as a final fallback for skills that
-      // have neither been migrated nor hand-tuned.
-      const tierMult    = sc.spellTierMultipliers[spellTier];
+      // Otherwise use the rarity-based effective mult — same ladder as
+      // weapons (common = 0.60). The old per-tier fallback created an
+      // unintentional cliff where common-rarity spells (the schema default)
+      // dropped to tierMult (Basic 0.20 = 1/3 of weapon parity); removed
+      // 2026-05-04. spellTierMultipliers config is now UI-only.
       const dbVal       = this.system.roll?.diceBonus ?? 1;
       const { effectiveMult } = this._resolveRarityMods();
-      const multiplier  = (dbVal && dbVal !== 1) ? dbVal
-                        : (this.system.rarity && this.system.rarity !== 'common') ? effectiveMult
-                        : (tierMult ?? effectiveMult);
+      const multiplier  = (dbVal && dbVal !== 1) ? dbVal : effectiveMult;
 
       if (livePool < baseManaAt5ft) {
         ChatMessage.create({
