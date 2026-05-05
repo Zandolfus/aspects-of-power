@@ -454,6 +454,17 @@ export class AspectsofPowerActorSheet extends foundry.applications.api.Handlebar
       });
     });
 
+    // Skill favorite toggle — flips system.favorite on the skill.
+    this.element.querySelectorAll('.item-fav-toggle').forEach(el => {
+      el.addEventListener('click', async ev => {
+        ev.stopPropagation();
+        const li = ev.currentTarget.closest('.item');
+        const item = this.actor.items.get(li.dataset.itemId);
+        if (!item || item.type !== 'skill') return;
+        await item.update({ 'system.favorite': !item.system.favorite });
+      });
+    });
+
     // Trade / Give item button.
     this.element.querySelectorAll('.item-trade').forEach(el => {
       el.addEventListener('click', async ev => {

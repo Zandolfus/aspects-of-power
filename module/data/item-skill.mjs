@@ -100,6 +100,10 @@ export class SkillData extends foundry.abstract.TypeDataModel {
         zoneEffect:       new fields.StringField({ initial: 'none' }),
       }),
 
+      // Player-marked "favorite" skill — surfaced in the post-action
+      // quick-actions dialog during celerity combat for one-click cast.
+      favorite: new fields.BooleanField({ initial: false }),
+
       // Skill component flags — determine which debuffs block this skill.
       requiresSight:   new fields.BooleanField({ initial: false }),
       vocalComponent:  new fields.BooleanField({ initial: false }),

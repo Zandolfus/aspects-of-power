@@ -1,0 +1,29 @@
+<div class='quick-actions-dialog flexcol'>
+  <header style='margin-bottom:8px;'>
+    <h2 style='margin:0 0 4px;'>{{actor.name}} — Next Action</h2>
+    <p class='hint' style='font-size:11px;color:#888;margin:0;'>
+      Click a favorite to declare it. Skip to pick from the full skill list.
+    </p>
+  </header>
+
+  {{#if hasFavorites}}
+    <ol class='quick-actions-list'>
+      {{#each favorites as |s|}}
+        <li class='quick-action' data-skill-id='{{s.id}}'
+            title='{{s.rarityLabel}} ({{s.skillType}})'>
+          <img src='{{s.img}}' alt='{{s.name}}' width='28' height='28' />
+          <span class='quick-action-name' style='color:{{s.rarityColor}};'>{{s.name}}</span>
+          {{#if s.cost}}
+            <span class='quick-action-cost'>{{s.cost}} {{s.resource}}</span>
+          {{/if}}
+        </li>
+      {{/each}}
+    </ol>
+  {{else}}
+    <p class='hint'>No favorites marked. Toggle the star icon next to any skill to favorite it.</p>
+  {{/if}}
+
+  <footer class='quick-actions-footer'>
+    <button type='button' class='quick-action-skip'>Skip — pick from full list</button>
+  </footer>
+</div>

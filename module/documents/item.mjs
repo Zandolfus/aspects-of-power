@@ -3797,6 +3797,17 @@ export class AspectsofPowerItem extends Item {
             content: `<p><em>Celerity:</em> wait <strong>${cel.wait}</strong> ticks → next action at tick <strong>${cel.scheduledTick}</strong>.</p>`,
           });
         }
+      } else if (this.actor?.isOwner) {
+        // Deferred action just resolved → actor needs to declare their
+        // next action. Pop the quick-actions dialog with their favorites
+        // for one-click follow-up. Only fires for owners (so co-owned
+        // actors don't double-pop), and silently no-ops if no favorites.
+        try {
+          const { QuickActionsDialog } = await import('../apps/quick-actions-dialog.mjs');
+          QuickActionsDialog.maybePopFor(this.actor);
+        } catch (e) {
+          console.warn('Quick-actions dialog failed to pop:', e);
+        }
       }
     };
 

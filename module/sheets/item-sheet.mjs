@@ -406,6 +406,12 @@ export class AspectsofPowerItemSheet extends foundry.applications.api.Handlebars
       return;
     }
 
+    // Favorite checkbox — update boolean directly.
+    if (this.item.type === 'skill' && event.target?.name === 'system.favorite') {
+      await this.document.update({ 'system.favorite': event.target.checked });
+      return;
+    }
+
     // Skill category change: update category and clear tags (available tags differ per category).
     if (this.item.type === 'skill' && event.target?.name === 'system.skillCategory') {
       await this.document.update({

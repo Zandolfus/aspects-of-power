@@ -4,6 +4,11 @@
     <div class='header-fields'>
       <h1 class='charname'>
         <input name='name' type='text' value='{{item.name}}' placeholder='Name' />
+        {{! Favorite toggle — surfaces in the combat quick-actions dialog. }}
+        <label class='skill-favorite-toggle' title='Mark as favorite (shows in combat quick-actions dialog).'>
+          <input type='checkbox' name='system.favorite' {{#if system.favorite}}checked{{/if}} />
+          <i class='fa-star {{#if system.favorite}}fas{{else}}far{{/if}}'></i>
+        </label>
         {{! Rarity chip — sits inline next to the name (matches the tag-chip pattern below). Drives the universal damage multiplier. }}
         <select name='system.rarity' class='skill-rarity-chip'
                 title='{{localize "ASPECTSOFPOWER.SkillRarity.label"}}'

@@ -720,6 +720,7 @@
                   <h4 style="color: {{item.rarityColor}}">{{item.name}}</h4>
                 </div>
                 <div class='item-controls'>
+                  <a class='item-control item-fav-toggle' title='Toggle favorite (combat quick-actions)'><i class='fa-star {{#if item.system.favorite}}fas{{else}}far{{/if}}' style='color:#ffca28;{{#unless item.system.favorite}}opacity:0.4;{{/unless}}'></i></a>
                   <a class='item-control item-edit' title='Edit'><i class='fas fa-edit'></i></a>
                   <a class='item-control item-delete' title='Delete'><i class='fas fa-trash'></i></a>
                 </div>
@@ -738,6 +739,7 @@
                     <h4 style="color: {{item.rarityColor}}"><i class='fas fa-bolt' style='font-size:10px;opacity:0.6;margin-right:4px;'></i>{{item.name}}</h4>
                   </div>
                   <div class='item-controls'>
+                    <a class='item-control item-fav-toggle' title='Toggle favorite (combat quick-actions)'><i class='fa-star {{#if item.system.favorite}}fas{{else}}far{{/if}}' style='color:#ffca28;{{#unless item.system.favorite}}opacity:0.4;{{/unless}}'></i></a>
                     <a class='item-control item-edit' title='Edit'><i class='fas fa-edit'></i></a>
                     <a class='item-control item-delete' title='Delete'><i class='fas fa-trash'></i></a>
                   </div>
