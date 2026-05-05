@@ -3482,15 +3482,20 @@ export class AspectsofPowerItem extends Item {
           };
         }
         // Per-skill AOE base size — sizes at-or-below this are free; above
-        // incurs 2^n cost growth. Default 5 preserves prior behavior.
+        // incurs 2^n cost growth where the doubling step is the baseSize
+        // itself, not a hardcoded 5ft. So a Fireball (baseSize 20) doubles
+        // when scaled to 40ft, quadruples at 60ft. Default 5 preserves
+        // prior behavior (5ft doublings for default skills).
         const aoeBaseSize = this.system.aoe?.baseSize ?? 5;
-        const maxAffordableSize = Math.max(aoeBaseSize, aoeBaseSize + 5 * Math.floor(Math.log2(Math.max(1, livePool / Math.max(1, baseManaAt5ft)))));
-        const placementMaxSize = Math.min(maxAffordableSize, Math.max(25, aoeBaseSize));
+        // Solving cost = baseMana × 2^((N - baseSize) / baseSize) for N
+        // given the player's pool gives N = baseSize × (1 + log2(pool/baseMana)).
+        const maxAffordableSize = Math.max(aoeBaseSize, Math.round(aoeBaseSize * (1 + Math.floor(Math.log2(Math.max(1, livePool / Math.max(1, baseManaAt5ft)))))));
+        const placementMaxSize = Math.min(maxAffordableSize, Math.max(25, aoeBaseSize * 5));
         preplacedTemplateDoc = await this._placeAoeTemplate(casterToken, preplacedAoeOverride, placementMaxSize);
         if (!preplacedTemplateDoc) return; // cancelled
         preplacedAoeShape = preplacedTemplateDoc.shapes?.[0];
-        // Derive sized base from the actual placed diameter, using
-        // the per-skill base size as the cost reference.
+        // Derive sized base from the actual placed diameter, using the
+        // per-skill base size as the cost reference AND the doubling step.
         if (preplacedAoeShape) {
           const pxPerFt = canvas.grid.size / canvas.grid.distance;
           let placedDiameter = aoeBaseSize;
@@ -3498,7 +3503,7 @@ export class AspectsofPowerItem extends Item {
           else if (preplacedAoeShape.type === 'cone') placedDiameter = preplacedAoeShape.radius / pxPerFt;
           else if (preplacedAoeShape.type === 'line') placedDiameter = preplacedAoeShape.length / pxPerFt;
           else if (preplacedAoeShape.type === 'rectangle') placedDiameter = preplacedAoeShape.width / pxPerFt;
-          baseMana = Math.max(baseManaAt5ft, Math.round(baseManaAt5ft * Math.pow(2, Math.max(0, placedDiameter - aoeBaseSize) / 5)));
+          baseMana = Math.max(baseManaAt5ft, Math.round(baseManaAt5ft * Math.pow(2, Math.max(0, placedDiameter - aoeBaseSize) / aoeBaseSize)));
         }
       }
 

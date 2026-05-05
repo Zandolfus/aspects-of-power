@@ -170,16 +170,24 @@ export class AspectsofPowerItemSheet extends foundry.applications.api.Handlebars
           spellBaseManaScaled: context.spellBaseMana != null
             ? Math.round(context.spellBaseMana * mods.costMultiplier)
             : null,
-          // AOE 2^n preview when the aoe alteration is present. Cost
-          // references the per-skill `aoe.baseSize` (default 5) so sizes
-          // at-or-below base are free; above incurs 2^n growth.
+          // AOE preview when the aoe alteration is present. Cost references
+          // the per-skill `aoe.baseSize` (default 5) — sizes at-or-below
+          // base are free; above incurs 2^n growth where the doubling step
+          // is the baseSize itself (so cost doubles when diameter doubles).
           aoeBaseSize: this.item.system.aoe?.baseSize ?? 5,
           aoeCostScale: alterations.some(a => a.id === 'aoe')
             ? (() => {
                 const baseSize = this.item.system.aoe?.baseSize ?? 5;
-                const sizes = Array.from(new Set([baseSize, baseSize + 5, baseSize + 10, baseSize + 15, baseSize + 20])).sort((a, b) => a - b);
+                // Show the doubling ladder: base, 1.5×base, 2×base, 3×base, 4×base.
+                const sizes = Array.from(new Set([
+                  baseSize,
+                  Math.round(baseSize * 1.5),
+                  baseSize * 2,
+                  baseSize * 3,
+                  baseSize * 4,
+                ])).sort((a, b) => a - b);
                 return sizes.map(d => {
-                  const exp = Math.max(0, (d - baseSize) / 5);
+                  const exp = Math.max(0, (d - baseSize) / baseSize);
                   const mult = Math.pow(2, exp);
                   return {
                     ft: d,
