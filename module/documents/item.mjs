@@ -3799,11 +3799,12 @@ export class AspectsofPowerItem extends Item {
         }
       } else {
         // Deferred action just resolved → dispatch the quick-actions
-        // dialog to the actor's canonical player (mirrors the defense
-        // dialog routing pattern). PC actors with no linked player
-        // online fall back to the GM running solo. NPCs never trigger.
+        // dialog (mirrors the defense dialog routing pattern). Fires for
+        // any actor with favorites — PC or NPC — to keep combat moving.
+        // PC with linked player online → socket dispatch.
+        // PC without / NPC → local render (typically GM running it).
         const actor = this.actor;
-        if (actor && actor.hasPlayerOwner) {
+        if (actor) {
           const hasFavorites = actor.items.some(i => i.type === 'skill' && i.system.favorite);
           if (hasFavorites) {
             const linkedPlayer = game.users.find(u =>
@@ -3815,7 +3816,7 @@ export class AspectsofPowerItem extends Item {
                 targetUserId: linkedPlayer.id,
                 actorId: actor.id,
               });
-            } else if (game.user.id === linkedPlayer?.id || game.user.isGM) {
+            } else {
               try {
                 const { QuickActionsDialog } = await import('../apps/quick-actions-dialog.mjs');
                 new QuickActionsDialog(actor).render(true);

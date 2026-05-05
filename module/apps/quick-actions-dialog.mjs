@@ -76,19 +76,17 @@ export class QuickActionsDialog extends foundry.applications.api.HandlebarsAppli
   }
 
   /**
-   * Convenience helper: pop the dialog if the actor has favorites and is
-   * a player character. PCs only — NPCs never trigger the popup (would
-   * be noisy on the GM's screen during NPC turns). The GM IS allowed to
-   * trigger it: when running solo or when no player is online to receive
-   * the deferred-fire dispatch, the GM runs PC actions locally and
-   * benefits from the same quick-action UX.
-   *
-   * Safe to call from post-action hooks regardless of context.
+   * Convenience helper: pop the dialog if the actor has favorites and
+   * the current user owns it. Works for PCs and NPCs both — the goal is
+   * keeping combat speed up, so any actor with favorites set gets the
+   * one-click UX. Safe to call from post-action hooks regardless of
+   * context. The runtime trigger in item.mjs uses an explicit socket
+   * dispatch path that mirrors the defense-dialog pattern; this helper
+   * remains for ad-hoc invocation.
    */
   static maybePopFor(actor) {
     if (!actor) return;
-    if (!actor.hasPlayerOwner) return;   // PC only — NPC actions stay quiet
-    if (!actor.isOwner) return;          // Must own (filters co-observers)
+    if (!actor.isOwner) return;
     const hasFavorites = actor.items.some(i => i.type === 'skill' && i.system.favorite);
     if (!hasFavorites) return;
     new QuickActionsDialog(actor).render(true);
