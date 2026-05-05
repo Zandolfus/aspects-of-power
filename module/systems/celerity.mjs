@@ -26,6 +26,11 @@ const _MAGIC_TYPES_FOR_SPEED = new Set(['magic', 'magic_melee', 'magic_projectil
  * For magic skills, the Wis/Int hybrid weighting scales by spell tier — big
  * spells lean more toward Wis ("mastery shows on bigger workings"). See
  * CONFIG.ASPECTSOFPOWER.castingSpeedWeights.
+ *
+ * For phys_ranged, speed mirrors the damage stat blend (Dex/Per by weapon
+ * weight) so heavy ranged users investing in Per get speed credit too —
+ * matches melee's "speed = your primary damage stat" pattern. Falls back
+ * to Dex.mod when no weapon is wielded (legacy path / unarmed).
  */
 function _actorSpeedFor(actor, skill) {
   const a = actor.system.abilities ?? {};
@@ -42,7 +47,15 @@ function _actorSpeedFor(actor, skill) {
   switch (type) {
     case 'str_weapon':       return a.strength?.mod  ?? 0;
     case 'dex_weapon':       return a.dexterity?.mod ?? 0;
-    case 'phys_ranged':      return a.dexterity?.mod ?? 0;
+    case 'phys_ranged': {
+      const weapon = skill?._resolveWeaponForSkill?.();
+      const weight = weapon ? AspectsofPowerItem.resolveWeaponWeight(weapon) : 0;
+      if (weight <= 0) return a.dexterity?.mod ?? 0;
+      const cfg = CONFIG.ASPECTSOFPOWER.rangedBlend;
+      const norm = Math.max(0, Math.min(1, (weight - cfg.weightOffset) / cfg.weightSpan));
+      const perW = cfg.perFloor + cfg.slope * norm;
+      return Math.round((a.dexterity?.mod ?? 0) * (1 - perW) + (a.perception?.mod ?? 0) * perW);
+    }
     case 'wisdom_dexterity': return Math.round(HYBRID_60_40_WIS_DEX(a));
     default:                 return a[ability]?.mod ?? a.dexterity?.mod ?? 1;
   }
