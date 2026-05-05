@@ -9,6 +9,20 @@
         </button>
       </h1>
 
+      {{! Rarity selector — surfaced in header so it's the first thing players see (drives the universal damage multiplier). }}
+      <div class='skill-rarity-header' style='display:flex;align-items:center;gap:6px;margin-bottom:4px;'>
+        <label class='resource-label' style='margin:0;'>{{localize "ASPECTSOFPOWER.SkillRarity.label"}}</label>
+        <select name='system.rarity' class='rarity-select'
+                style="color: {{lookup (lookup config.skillRarities system.rarity) 'color'}}; font-weight:bold;">
+          {{#each config.skillRarities as |rarDef rarKey|}}
+            <option value='{{rarKey}}' {{#if (eq rarKey @root.system.rarity)}}selected{{/if}}
+                    style="color: {{rarDef.color}}">
+              {{localize rarDef.label}} ({{rarDef.mult}})
+            </option>
+          {{/each}}
+        </select>
+      </div>
+
       {{! Tag chips + autocomplete (always visible) }}
       <div class='skill-tags'>
         <label class='resource-label'>{{localize "ASPECTSOFPOWER.Tag.label"}}</label>
@@ -636,19 +650,6 @@
                  {{#if system.requiresHearing}}checked{{/if}} />
           {{localize "ASPECTSOFPOWER.SkillComponent.requiresHearing"}}
         </label>
-      </div>
-
-      <div class='resource'>
-        <label class='resource-label'>{{localize "ASPECTSOFPOWER.SkillRarity.label"}}</label>
-        <select name='system.rarity' class='rarity-select'
-                style="color: {{lookup (lookup config.skillRarities system.rarity) 'color'}}">
-          {{#each config.skillRarities as |rarDef rarKey|}}
-            <option value='{{rarKey}}' {{#if (eq rarKey @root.system.rarity)}}selected{{/if}}
-                    style="color: {{rarDef.color}}">
-              {{localize rarDef.label}} ({{rarDef.mult}})
-            </option>
-          {{/each}}
-        </select>
       </div>
 
     </div>
