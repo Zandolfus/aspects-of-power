@@ -170,15 +170,26 @@ export class AspectsofPowerItemSheet extends foundry.applications.api.Handlebars
           spellBaseManaScaled: context.spellBaseMana != null
             ? Math.round(context.spellBaseMana * mods.costMultiplier)
             : null,
-          // AOE 2^n preview when the aoe alteration is present.
+          // AOE 2^n preview when the aoe alteration is present. Cost
+          // references the per-skill `aoe.baseSize` (default 5) so sizes
+          // at-or-below base are free; above incurs 2^n growth.
+          aoeBaseSize: this.item.system.aoe?.baseSize ?? 5,
           aoeCostScale: alterations.some(a => a.id === 'aoe')
-            ? [5, 10, 15, 20, 25].map(d => ({
-                ft: d,
-                mult: Math.pow(2, (d - 5) / 5),
-                cost: context.spellBaseMana != null
-                  ? Math.round(context.spellBaseMana * mods.costMultiplier * Math.pow(2, (d - 5) / 5))
-                  : null,
-              }))
+            ? (() => {
+                const baseSize = this.item.system.aoe?.baseSize ?? 5;
+                const sizes = Array.from(new Set([baseSize, baseSize + 5, baseSize + 10, baseSize + 15, baseSize + 20])).sort((a, b) => a - b);
+                return sizes.map(d => {
+                  const exp = Math.max(0, (d - baseSize) / 5);
+                  const mult = Math.pow(2, exp);
+                  return {
+                    ft: d,
+                    mult,
+                    cost: context.spellBaseMana != null
+                      ? Math.round(context.spellBaseMana * mods.costMultiplier * mult)
+                      : null,
+                  };
+                });
+              })()
             : null,
         };
       }

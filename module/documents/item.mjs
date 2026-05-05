@@ -3481,20 +3481,24 @@ export class AspectsofPowerItem extends Item {
             targetingMode: this.system.aoe?.targetingMode ?? 'enemies',
           };
         }
-        const maxAffordableSize = Math.max(5, 5 + 5 * Math.floor(Math.log2(Math.max(1, livePool / Math.max(1, baseManaAt5ft)))));
-        const placementMaxSize = Math.min(maxAffordableSize, 25);
+        // Per-skill AOE base size — sizes at-or-below this are free; above
+        // incurs 2^n cost growth. Default 5 preserves prior behavior.
+        const aoeBaseSize = this.system.aoe?.baseSize ?? 5;
+        const maxAffordableSize = Math.max(aoeBaseSize, aoeBaseSize + 5 * Math.floor(Math.log2(Math.max(1, livePool / Math.max(1, baseManaAt5ft)))));
+        const placementMaxSize = Math.min(maxAffordableSize, Math.max(25, aoeBaseSize));
         preplacedTemplateDoc = await this._placeAoeTemplate(casterToken, preplacedAoeOverride, placementMaxSize);
         if (!preplacedTemplateDoc) return; // cancelled
         preplacedAoeShape = preplacedTemplateDoc.shapes?.[0];
-        // Derive sized base from the actual placed diameter.
+        // Derive sized base from the actual placed diameter, using
+        // the per-skill base size as the cost reference.
         if (preplacedAoeShape) {
           const pxPerFt = canvas.grid.size / canvas.grid.distance;
-          let placedDiameter = 5;
+          let placedDiameter = aoeBaseSize;
           if (preplacedAoeShape.type === 'circle') placedDiameter = (preplacedAoeShape.radius * 2) / pxPerFt;
           else if (preplacedAoeShape.type === 'cone') placedDiameter = preplacedAoeShape.radius / pxPerFt;
           else if (preplacedAoeShape.type === 'line') placedDiameter = preplacedAoeShape.length / pxPerFt;
           else if (preplacedAoeShape.type === 'rectangle') placedDiameter = preplacedAoeShape.width / pxPerFt;
-          baseMana = Math.max(baseManaAt5ft, Math.round(baseManaAt5ft * Math.pow(2, (placedDiameter - 5) / 5)));
+          baseMana = Math.max(baseManaAt5ft, Math.round(baseManaAt5ft * Math.pow(2, Math.max(0, placedDiameter - aoeBaseSize) / 5)));
         }
       }
 

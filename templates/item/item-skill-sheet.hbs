@@ -156,6 +156,11 @@
                  value='{{system.aoe.diameter}}' min='5' step='5' />
         {{/if}}
 
+        {{! Per-skill base size — sizes ≤ this cost the unmodified base mana; sizes above incur 2^n growth. Default 5 = no free area. }}
+        <label class='resource-label' title='Sizes at-or-below this cost no extra mana; sizes above incur 2^n cost growth.'>Base Size (free) (ft)</label>
+        <input type='number' name='system.aoe.baseSize'
+               value='{{system.aoe.baseSize}}' min='5' step='5' />
+
         <label class='resource-label'>{{localize "ASPECTSOFPOWER.AOE.targetingMode"}}</label>
         <select name='system.aoe.targetingMode'>
           {{#each config.aoeTargetingModes as |label key|}}

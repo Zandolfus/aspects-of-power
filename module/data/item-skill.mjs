@@ -83,10 +83,16 @@ export class SkillData extends foundry.abstract.TypeDataModel {
       }), { initial: [] }),
 
       // AOE modifier — applies to all active tags when enabled.
+      // `baseSize` is the spell's natural footprint: sizes at-or-below it
+      // cost the unmodified baseMana; sizes above it incur 2^n cost growth
+      // (per design — Fireball-style spells have a free natural size).
+      // Defaults to 5 (the historical universal floor) so existing skills
+      // keep current behavior; designers opt in by raising it per-skill.
       aoe: new fields.SchemaField({
         enabled:          new fields.BooleanField({ initial: false }),
         shape:            new fields.StringField({ initial: 'circle' }),
         diameter:         new fields.NumberField({ initial: 10, min: 5, integer: true }),
+        baseSize:         new fields.NumberField({ initial: 5, min: 5, integer: true }),
         width:            new fields.NumberField({ initial: 5, min: 5, integer: true }),
         angle:            new fields.NumberField({ initial: 53, min: 1, max: 360 }),
         targetingMode:    new fields.StringField({ initial: 'all' }),
