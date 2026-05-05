@@ -176,14 +176,12 @@
             <button type="button" class="level-up-btn">
               <i class="fas fa-arrow-up"></i> {{localize "ASPECTSOFPOWER.Level.levelUp"}}
             </button>
-            <button type="button" class="relevel-btn" title="Reset and re-level the character with template prompts at each rank boundary">
-              <i class="fas fa-recycle"></i> Re-Level
-            </button>
-            {{#if (gt freePoints 0)}}
-              <button type="button" class="free-points-badge spend-fp-btn" title="Click to spend free points">
-                {{localize "ASPECTSOFPOWER.Level.freePoints"}}: {{freePoints}}
-              </button>
-            {{/if}}
+            {{!-- Re-Level and Spend-FP buttons removed 2026-05-05: bulk
+                  re-leveling is complete and free points are spent at
+                  level-up time. Underlying dialogs (PlayerRelevelDialog,
+                  SpendFreePointsDialog) and their handlers in actor-sheet.mjs
+                  are intentionally retained — restore the buttons here if
+                  the standalone tools are needed again. --}}
           </div>
         </div>
       </div>
