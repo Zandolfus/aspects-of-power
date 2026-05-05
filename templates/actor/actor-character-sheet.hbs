@@ -704,8 +704,7 @@
     {{!-- Owned Skills Tab --}}
     <div class="tab skills" data-group="primary" data-tab="skills">
       {{#each skillGroups as |group groupKey|}}
-        {{#if (or group.active.length group.reactions.length)}}
-        <details class="skill-group" open>
+        <details class="skill-group" {{#if (or group.active.length group.reactions.length)}}open{{/if}}>
           <summary class="skill-group-header">
             <span class="skill-group-label">{{group.label}}</span>
             <span class="skill-group-count">({{math group.active.length '+' group.reactions.length}})</span>
@@ -749,7 +748,6 @@
             {{/if}}
           </ol>
         </details>
-        {{/if}}
       {{/each}}
     </div>
 
