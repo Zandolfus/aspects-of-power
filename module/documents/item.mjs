@@ -3562,8 +3562,16 @@ export class AspectsofPowerItem extends Item {
       // on every variant.
       const weapon = this._resolveWeaponForSkill();
       const weaponWeight = AspectsofPowerItem.resolveWeaponWeight(weapon);
-      // No weapon weight → fall back to legacy formula path (skill not yet migrated).
-      // The else branch below intentionally does nothing; legacy dmgFormula stays.
+      // No weapon weight → fall back to legacy formula path. Warn the player
+      // so they know the new pillar isn't being applied (Ability/Dice/Cost
+      // from the schema are driving damage, not weapon weight + rarity).
+      if (weaponWeight <= 0) {
+        ChatMessage.create({
+          speaker, rollMode, ...(whisperGM ? { whisper: whisperGM } : {}),
+          flavor: label,
+          content: `<p><em>⚠️ No wielded weapon — using legacy formula. Equip a weapon to use the melee/ranged pillar (rarity-driven multiplier × stamina invest).</em></p>`,
+        });
+      }
       if (weaponWeight > 0) {
         const isRanged = rollData.roll.type === 'phys_ranged';
         const A = this.actor.system.abilities;

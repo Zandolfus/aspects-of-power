@@ -179,9 +179,15 @@
       </div>
       {{/if}}
 
-      {{! ── Shared Roll Config (always visible) ── }}
+      {{! ── Shared Roll Config — Ability/Dice/Cost are hidden for weapon-pillar types (str_weapon/dex_weapon/phys_ranged) since stat_blend × rarity × stamina-invest take over at roll time. Schema retains them for legacy fallback when no weapon is wielded. ── }}
       <div class='resource'>
-        <div class='grid grid-5col'>
+        {{#if isWeaponPillarType}}
+          <p class='hint' style='font-size:11px;color:#888;margin:0 0 6px;'>
+            <em>Damage handled by the weapon/ranged pillar — stat blend from wielded weapon × rarity multiplier × stamina invest. Ability/Dice/Cost from the schema are only used as a legacy fallback when no weapon is wielded.</em>
+          </p>
+        {{/if}}
+        <div class='grid {{#if isWeaponPillarType}}grid-2col{{else}}grid-5col{{/if}}'>
+          {{#unless isWeaponPillarType}}
           <div class='grid-span-1'>
             <label class='resource-label'>{{#if (eq system.roll.statType "hybrid")}}Primary Ability{{else}}Ability{{/if}}</label>
             <select name='system.roll.abilities' data-dtype='String'>
@@ -200,6 +206,7 @@
             <label class='resource-label'>Dice</label>
             <input type='text' name='system.roll.dice' value='{{system.roll.dice}}' data-dtype='String' />
           </div>
+          {{/unless}}
           <div class='grid-span-1'>
             <label class='resource-label'>Resource</label>
             <select name='system.roll.resource'>
@@ -214,10 +221,12 @@
               {{/if}}
             </select>
           </div>
+          {{#unless isWeaponPillarType}}
           <div class='grid-span-1'>
             <label class='resource-label'>Cost</label>
             <input type='number' name='system.roll.cost' value='{{system.roll.cost}}' min='0' step='1' />
           </div>
+          {{/unless}}
           <div class='grid-span-1'>
             <label class='resource-label'>Skill Type</label>
             <select name='system.roll.type' data-dtype='String'>

@@ -111,6 +111,12 @@ export class AspectsofPowerItemSheet extends foundry.applications.api.Handlebars
       const skillTags = this.item.system.tags ?? [];
       context.hasDebuffSubtype = skillTags.some(t => debuffSubtypes[t]);
 
+      // Weapon-pillar types own the damage/cost/ability fields — they're
+      // overridden at roll time by stat_blend × rarity_mult × stamina_invest.
+      // The schema fields stay for the legacy fallback path; UI hides them.
+      const weaponPillarTypes = new Set(['str_weapon', 'dex_weapon', 'phys_ranged']);
+      context.isWeaponPillarType = weaponPillarTypes.has(this.item.system.roll?.type);
+
       // Spell tier/grade derived values. Grade auto-resolves from the
       // owning actor's race rank when present (matches the runtime path
       // in item.mjs); falls back to the skill's stored grade for
