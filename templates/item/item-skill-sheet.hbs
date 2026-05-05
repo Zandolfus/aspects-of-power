@@ -4,16 +4,10 @@
     <div class='header-fields'>
       <h1 class='charname'>
         <input name='name' type='text' value='{{item.name}}' placeholder='Name' />
-        <button type='button' class='skill-upgrade-btn' title='Create a new linked higher-rarity version on the owning actor.' style='font-size:11px;padding:2px 8px;margin-left:6px;'>
-          ⬆ Upgrade
-        </button>
-      </h1>
-
-      {{! Rarity selector — surfaced in header so it's the first thing players see (drives the universal damage multiplier). }}
-      <div class='skill-rarity-header' style='display:flex;align-items:center;gap:6px;margin-bottom:4px;'>
-        <label class='resource-label' style='margin:0;'>{{localize "ASPECTSOFPOWER.SkillRarity.label"}}</label>
-        <select name='system.rarity' class='rarity-select'
-                style="color: {{lookup (lookup config.skillRarities system.rarity) 'color'}}; font-weight:bold;">
+        {{! Rarity chip — sits inline next to the name (matches the tag-chip pattern below). Drives the universal damage multiplier. }}
+        <select name='system.rarity' class='skill-rarity-chip'
+                title='{{localize "ASPECTSOFPOWER.SkillRarity.label"}}'
+                style="color: {{lookup (lookup config.skillRarities system.rarity) 'color'}}; border-color: {{lookup (lookup config.skillRarities system.rarity) 'color'}};">
           {{#each config.skillRarities as |rarDef rarKey|}}
             <option value='{{rarKey}}' {{#if (eq rarKey @root.system.rarity)}}selected{{/if}}
                     style="color: {{rarDef.color}}">
@@ -21,7 +15,10 @@
             </option>
           {{/each}}
         </select>
-      </div>
+        <button type='button' class='skill-upgrade-btn' title='Create a new linked higher-rarity version on the owning actor.' style='font-size:11px;padding:2px 8px;margin-left:6px;'>
+          ⬆ Upgrade
+        </button>
+      </h1>
 
       {{! Tag chips + autocomplete (always visible) }}
       <div class='skill-tags'>
