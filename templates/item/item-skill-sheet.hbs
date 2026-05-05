@@ -40,15 +40,7 @@
 
     {{! Description Tab }}
     <div class='tab' data-group='primary' data-tab='description'>
-      <prose-mirror name="system.description" value="{{system.description}}" compact>
-        {{{enrichedDescription}}}
-      </prose-mirror>
-    </div>
-
-    {{! Damage Tab }}
-    <div class='tab effects' data-group='primary' data-tab='effects'>
-
-      {{! ── Derived Stats Readout — live "show me the math" panel ── }}
+      {{! ── Derived Stats Readout — live "show me the math" panel. Surfaced on Description so it's the first thing visible on open. ── }}
       {{#if derivedStats}}
       <div class='derived-stats' style='background:#1a1a1a;border:1px solid #444;border-radius:4px;padding:8px;margin-bottom:10px;font-size:11px;'>
         <div style='display:flex;flex-wrap:wrap;gap:12px;align-items:baseline;'>
@@ -86,6 +78,14 @@
         {{/if}}
       </div>
       {{/if}}
+
+      <prose-mirror name="system.description" value="{{system.description}}" compact>
+        {{{enrichedDescription}}}
+      </prose-mirror>
+    </div>
+
+    {{! Damage Tab }}
+    <div class='tab effects' data-group='primary' data-tab='effects'>
 
       {{! ── Skill Category ── }}
       <div class='skill-category'>
@@ -619,14 +619,6 @@
         </select>
       </div>
       {{/if}}
-      <div class='resource'>
-        <label class='resource-label'>Magic Type</label>
-        <select name='system.magicType'>
-          <option value='non-magical' {{#if (eq system.magicType "non-magical")}}selected{{/if}}>Non-Magical</option>
-          <option value='magical' {{#if (eq system.magicType "magical")}}selected{{/if}}>Magical</option>
-        </select>
-      </div>
-
       {{! ── Skill Component Flags ── }}
       <div class='skill-components'>
         <label class='resource-label dot-toggle'>
@@ -659,15 +651,6 @@
         </select>
       </div>
 
-      <div class='resource'>
-        <label class='resource-label'>{{localize "ASPECTSOFPOWER.EffectType.label"}}</label>
-        <select name='system.effectType'>
-          <option value='damage'  {{#if (eq system.effectType "damage")}}selected{{/if}}>{{localize "ASPECTSOFPOWER.EffectType.damage"}}</option>
-          <option value='heal'    {{#if (eq system.effectType "heal")}}selected{{/if}}>{{localize "ASPECTSOFPOWER.EffectType.heal"}}</option>
-          <option value='debuff'  {{#if (eq system.effectType "debuff")}}selected{{/if}}>{{localize "ASPECTSOFPOWER.EffectType.debuff"}}</option>
-          <option value='utility' {{#if (eq system.effectType "utility")}}selected{{/if}}>{{localize "ASPECTSOFPOWER.EffectType.utility"}}</option>
-        </select>
-      </div>
     </div>
 
     {{! ── Alterations editor ── }}
