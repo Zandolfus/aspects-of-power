@@ -235,6 +235,9 @@ export async function declareAction(actor, skill, options = {}) {
   }
 
   const investAmount = options.investAmount ?? null;
+  // Infused-melee dual invest: secondary mana cost captured at declare time
+  // so the deferred fire can re-spend it without re-prompting the player.
+  const manaInvestAmount = options.manaInvestAmount ?? null;
   const wait = computeActionWait(actor, skill, null, investAmount);
   const clockTick = getClockTick(combatant.combat);
   const scheduledTick = clockTick + wait;
@@ -247,6 +250,7 @@ export async function declareAction(actor, skill, options = {}) {
       scheduledTick,
       declaredAtTick: clockTick,
       investAmount,
+      manaInvestAmount,
     },
     'flags.aspectsofpower.nextActionTick': scheduledTick,
     'flags.aspectsofpower.lastActionWait': wait,
@@ -254,12 +258,13 @@ export async function declareAction(actor, skill, options = {}) {
   });
 
   const investNote = investAmount ? ` — invest ${investAmount}` : '';
+  const infusedNote = manaInvestAmount ? ` (+${manaInvestAmount} mana infusion)` : '';
   ChatMessage.create({
     speaker: ChatMessage.getSpeaker({ actor }),
-    content: `<p><strong>${actor.name}</strong> declares <strong>${skill.name}</strong>${investNote} — scheduled for tick <strong>${scheduledTick}</strong> (wait ${wait}).</p>`,
+    content: `<p><strong>${actor.name}</strong> declares <strong>${skill.name}</strong>${investNote}${infusedNote} — scheduled for tick <strong>${scheduledTick}</strong> (wait ${wait}).</p>`,
   });
 
-  return { wait, scheduledTick, investAmount };
+  return { wait, scheduledTick, investAmount, manaInvestAmount };
 }
 
 /**

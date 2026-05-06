@@ -578,7 +578,7 @@ Hooks.once('ready', async function () {
       console.warn('[celerity] executeQueuedAction: item not found', data);
       return;
     }
-    item.roll({ executeDeferred: true, preInvestAmount: data.preInvestAmount ?? null });
+    item.roll({ executeDeferred: true, preInvestAmount: data.preInvestAmount ?? null, preManaInvestAmount: data.preManaInvestAmount ?? null });
   });
 
   // ── One-time migrations ──

@@ -3815,6 +3815,11 @@ export class AspectsofPowerItem extends Item {
         let manaInvested = 0;
         if (options.preInvestAmount != null) {
           invested = Math.min(options.preInvestAmount, maxPool);
+          // Deferred-fire: re-spend the mana invest captured at declare time
+          // so the infusion damage/cost matches what the player committed to.
+          if (useInfused && options.preManaInvestAmount != null) {
+            manaInvested = Math.min(options.preManaInvestAmount, infusedManaPool);
+          }
         } else if (useInfused) {
           const result = await this._promptDualResourceInvest({
             stamina: { baseCost: baseStamina, safeInvest, maxPool, potency: statBlend },
@@ -3877,7 +3882,10 @@ export class AspectsofPowerItem extends Item {
     // once the clock reaches the scheduled tick. The captured investedAmount
     // (above) feeds Wis-controlled channel time in the celerity wait calc.
     if (!options.executeDeferred && this.actor && isInActiveCombat(this.actor)) {
-      const declared = await declareAction(this.actor, this, { investAmount: investedAmount });
+      const declared = await declareAction(this.actor, this, {
+        investAmount: investedAmount,
+        manaInvestAmount: infusedManaCost > 0 ? infusedManaCost : null,
+      });
       return declared;
     }
 
