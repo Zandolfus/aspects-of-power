@@ -334,6 +334,7 @@ ASPECTSOFPOWER.skillTags = {
   vocal:       'ASPECTSOFPOWER.Tag.vocal',
   ranged:      'ASPECTSOFPOWER.Tag.ranged',
   melee:       'ASPECTSOFPOWER.Tag.melee',
+  infused:     'ASPECTSOFPOWER.Tag.infused',
   // Affinity tags (set skill damage affinity).
   fire:          'ASPECTSOFPOWER.Tag.fire',
   heat:          'ASPECTSOFPOWER.Tag.heat',

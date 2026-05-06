@@ -523,6 +523,130 @@ export class AspectsofPowerItem extends Item {
     return promise;
   }
 
+  /**
+   * Dual-resource invest dialog for the `infused` melee tag.
+   *
+   * Two stacked sliders — mana on top (no self-damage), stamina below
+   * (full safe-ceiling/excess/self-damage logic). Live readout shows
+   * Strike + Infusion as separate lines plus the sum.
+   *
+   * Damage:
+   *   strike   = statBlend × multiplier × (stamina_invest / baseStamina)^0.2
+   *   infusion = intMod × (mana_invest / baseMana)^0.2
+   *
+   * @returns {Promise<{stamina:number, mana:number}|null>}
+   */
+  async _promptDualResourceInvest({ stamina, mana, multiplier, label, potencyLabel }) {
+    const safeCeiling = stamina.baseCost + stamina.safeInvest;
+    const startStam = stamina.baseCost;
+    const startMana = mana.baseCost;
+
+    const computeStrike = (sv) => Math.round(stamina.potency * multiplier * Math.pow(Math.max(sv, 1) / Math.max(stamina.baseCost, 1), 0.2));
+    const computeInfusion = (mv) => Math.round(mana.potency * Math.pow(Math.max(mv, 1) / Math.max(mana.baseCost, 1), 0.2));
+    const computeSelfDmg = (sv) => {
+      const excess = Math.max(0, sv - safeCeiling);
+      if (excess <= 0 || stamina.safeInvest <= 0) return 0;
+      return Math.round(stamina.potency * (excess / stamina.safeInvest));
+    };
+
+    const content = `
+      <div class="resource-invest dual-resource">
+        <div class="invest-meta" style="display:grid;grid-template-columns:1fr 1fr;gap:4px;margin-bottom:8px;font-size:12px;">
+          <div>Strike base (stamina): <strong>${stamina.baseCost}</strong></div>
+          <div>Infusion base (mana): <strong>${mana.baseCost}</strong></div>
+          <div>${potencyLabel} × Mult: <strong>${stamina.potency} × ${multiplier}</strong></div>
+          <div>Int mod: <strong>${mana.potency}</strong></div>
+        </div>
+
+        <div class="form-group" style="margin-top:6px;">
+          <label>Mana invest: <span class="mana-display">${startMana}</span> / pool ${mana.maxPool}</label>
+          <input type="range" name="mana" min="${mana.baseCost}" max="${mana.maxPool}" value="${startMana}" step="1" style="width:100%;" />
+          <div style="font-size:11px;color:#9cf;">Infusion damage: <strong class="infusion-display">${computeInfusion(startMana)}</strong></div>
+        </div>
+
+        <div class="form-group" style="margin-top:10px;">
+          <label>Stamina invest: <span class="stamina-display">${startStam}</span> / pool ${stamina.maxPool}</label>
+          <input type="range" name="stamina" min="${stamina.baseCost}" max="${stamina.maxPool}" value="${startStam}" step="1" style="width:100%;" />
+          <div style="font-size:11px;color:#9cf;">Strike damage: <strong class="strike-display">${computeStrike(startStam)}</strong></div>
+          <div class="self-dmg-row" style="font-size:11px;color:#888;">Self-damage: <strong class="self-dmg-display">${computeSelfDmg(startStam)}</strong> <span style="font-size:11px;color:#888;">(over-invest past safe ceiling ${safeCeiling})</span></div>
+        </div>
+
+        <div class="invest-readouts" style="display:grid;grid-template-columns:1fr;gap:4px;margin-top:10px;border-top:1px solid #444;padding-top:6px;">
+          <div style="font-size:14px;">Total damage: <strong class="total-display">${computeStrike(startStam) + computeInfusion(startMana)}</strong></div>
+        </div>
+
+        <p class="hint" style="font-size:11px;margin-top:8px;">Strike = ${potencyLabel} × multiplier × (stamina/base)^0.2. Infusion = Int × (mana/base)^0.2. Stamina excess past safe ceiling deals self-damage; mana has no self-damage.</p>
+      </div>`;
+
+    let resolveFn;
+    const promise = new Promise(res => { resolveFn = res; });
+    let resolved = false;
+    const safeResolve = (v) => { if (!resolved) { resolved = true; resolveFn(v); } };
+
+    const dlg = new foundry.applications.api.DialogV2({
+      window: { title: `${label} — Infused (Mana + Stamina)` },
+      content,
+      buttons: [
+        {
+          action: 'confirm',
+          label: 'Use',
+          default: true,
+          callback: (event, button) => {
+            const sv = parseInt(button.form.elements.stamina?.value, 10);
+            const mv = parseInt(button.form.elements.mana?.value, 10);
+            const sClamped = Math.min(Math.max(stamina.baseCost, sv || stamina.baseCost), stamina.maxPool);
+            const mClamped = Math.min(Math.max(mana.baseCost,    mv || mana.baseCost),    mana.maxPool);
+            safeResolve({ stamina: sClamped, mana: mClamped });
+          },
+        },
+        { action: 'cancel', label: 'Cancel', callback: () => safeResolve(null) },
+      ],
+      close: () => safeResolve(null),
+    });
+    await dlg.render(true);
+
+    const root = dlg.element;
+    const manaSlider   = root.querySelector('input[name="mana"]');
+    const stamSlider   = root.querySelector('input[name="stamina"]');
+    const manaDisplay  = root.querySelector('.mana-display');
+    const stamDisplay  = root.querySelector('.stamina-display');
+    const strikeDisplay   = root.querySelector('.strike-display');
+    const infusionDisplay = root.querySelector('.infusion-display');
+    const totalDisplay    = root.querySelector('.total-display');
+    const selfDmgDisplay  = root.querySelector('.self-dmg-display');
+    const selfDmgRowEl    = root.querySelector('.self-dmg-row');
+
+    const refreshTotal = () => {
+      const sv = parseInt(stamSlider?.value, 10) || stamina.baseCost;
+      const mv = parseInt(manaSlider?.value, 10) || mana.baseCost;
+      totalDisplay.textContent = computeStrike(sv) + computeInfusion(mv);
+    };
+    if (manaSlider) {
+      manaSlider.addEventListener('input', () => {
+        const v = parseInt(manaSlider.value, 10);
+        manaDisplay.textContent = v;
+        infusionDisplay.textContent = computeInfusion(v);
+        refreshTotal();
+      });
+    }
+    if (stamSlider) {
+      stamSlider.addEventListener('input', () => {
+        const v = parseInt(stamSlider.value, 10);
+        stamDisplay.textContent = v;
+        strikeDisplay.textContent = computeStrike(v);
+        if (selfDmgDisplay && selfDmgRowEl) {
+          const selfDmg = computeSelfDmg(v);
+          selfDmgDisplay.textContent = selfDmg;
+          selfDmgRowEl.style.color = selfDmg > 0 ? '#c33' : '#888';
+          selfDmgRowEl.style.fontWeight = selfDmg > 0 ? 'bold' : '';
+        }
+        refreshTotal();
+      });
+    }
+
+    return promise;
+  }
+
   _buildRollFormulas(rollData) {
     const A   = this.actor.system.abilities;
     // Pure (default): use primary ability mod at full weight.
@@ -3390,6 +3514,12 @@ export class AspectsofPowerItem extends Item {
     let investSelfDamage = 0;
     let investSelfDamageFlavor = ''; // "over-channeling" / "over-exerting"
     let investedAmount = null;       // captured for declareAction
+    // Infused-melee: extra mana spend on top of stamina invest. _commitCastCost
+    // deducts this from the actor's mana pool independently of the primary
+    // resource cost. Stays 0 unless the skill carries the `infused` tag and
+    // the actor has enough mana to meet the spell-tier baseMana floor.
+    let infusedManaCost = 0;
+    let infusedInfusionDmg = 0;     // for chat breakdown
     // Per-cast AOE context for spells with the `aoe` alteration. Captured at
     // invest-commit time, consumed after AOE template placement to recompute
     // damage based on the actually-placed size. Null when not in play.
@@ -3653,20 +3783,65 @@ export class AspectsofPowerItem extends Item {
           return;
         }
 
-        // Same pre-capture pattern as the spell path.
-        const invested = (options.preInvestAmount != null)
-          ? Math.min(options.preInvestAmount, maxPool)
-          : await this._promptResourceInvest({
-              baseCost: baseStamina, safeInvest, maxPool,
-              potency: statBlend, multiplier,
-              resourceLabel: 'stamina', potencyLabel, label,
+        // Infused tag: melee strike that also consumes mana for an Int-scaled
+        // damage adder. Detected here so the dual-resource dialog replaces the
+        // single-slider one. Falls back to the regular strike (with a chat
+        // warning) when mana, spell tier, or spell grade are missing.
+        const isInfused = tags.includes('infused');
+        let infusedBaseMana = 0;
+        let infusedManaPool = 0;
+        let intMod = 0;
+        let useInfused = false;
+        if (isInfused) {
+          const tierFactor  = sc.spellTierFactors?.[spellTier];
+          const gradeFactor = sc.spellGradeFactors?.[spellGrade];
+          if (tierFactor && gradeFactor) {
+            infusedBaseMana = Math.round(tierFactor * gradeFactor);
+            intMod = this.actor.system.abilities?.intelligence?.mod ?? 0;
+            infusedManaPool = Math.round(this.actor.system.mana?.value ?? 0);
+            useInfused = infusedManaPool >= infusedBaseMana && infusedBaseMana > 0;
+          }
+          if (!useInfused) {
+            ChatMessage.create({
+              speaker, rollMode, ...(whisperGM ? { whisper: whisperGM } : {}),
+              flavor: label,
+              content: `<p><em>⚠️ Infused skill missing prerequisites (need spell tier/grade and ${infusedBaseMana || '?'} mana). Striking without infusion.</em></p>`,
             });
+          }
+        }
+
+        // Same pre-capture pattern as the spell path.
+        let invested = null;
+        let manaInvested = 0;
+        if (options.preInvestAmount != null) {
+          invested = Math.min(options.preInvestAmount, maxPool);
+        } else if (useInfused) {
+          const result = await this._promptDualResourceInvest({
+            stamina: { baseCost: baseStamina, safeInvest, maxPool, potency: statBlend },
+            mana:    { baseCost: infusedBaseMana, maxPool: infusedManaPool, potency: intMod },
+            multiplier, label, potencyLabel,
+          });
+          if (result === null) return; // cancelled
+          invested = result.stamina;
+          manaInvested = result.mana;
+        } else {
+          invested = await this._promptResourceInvest({
+            baseCost: baseStamina, safeInvest, maxPool,
+            potency: statBlend, multiplier,
+            resourceLabel: 'stamina', potencyLabel, label,
+          });
+        }
         if (invested === null) return; // cancelled
 
         investedAmount = invested;
         rollData.roll.cost = invested;
         rollData.roll.variableWeaponInvest = invested;
-        dmgFormula = String(Math.round(statBlend * multiplier * Math.pow(Math.max(invested, 1) / Math.max(baseStamina, 1), 0.2)));
+        const strikeDmg = Math.round(statBlend * multiplier * Math.pow(Math.max(invested, 1) / Math.max(baseStamina, 1), 0.2));
+        if (useInfused && manaInvested > 0) {
+          infusedManaCost = manaInvested;
+          infusedInfusionDmg = Math.round(intMod * Math.pow(Math.max(manaInvested, 1) / Math.max(infusedBaseMana, 1), 0.2));
+        }
+        dmgFormula = String(strikeDmg + infusedInfusionDmg);
 
         const excess = Math.max(0, invested - (baseStamina + safeInvest));
         if (excess > 0 && safeInvest > 0) {
@@ -3776,12 +3951,25 @@ export class AspectsofPowerItem extends Item {
         const curHp = this.actor.system.health?.value ?? 0;
         updates['system.health.value'] = Math.max(0, curHp - investSelfDamage);
       }
+      // Infused-melee secondary cost: deduct mana on top of stamina. Skipped
+      // when the primary resource IS mana (avoid double-deducting).
+      if (infusedManaCost > 0 && resource !== 'mana') {
+        const liveMana = this.actor.system.mana?.value ?? 0;
+        updates['system.mana.value'] = Math.max(0, Math.round(liveMana - infusedManaCost));
+      }
       await this.actor.update(updates);
       if (investSelfDamage > 0) {
         ChatMessage.create({
           speaker, rollMode, ...(whisperGM ? { whisper: whisperGM } : {}),
           flavor: label,
           content: `<p><strong>${this.actor.name}</strong> takes <strong>${investSelfDamage}</strong> self-damage from ${investSelfDamageFlavor}.</p>`,
+        });
+      }
+      if (infusedManaCost > 0 && infusedInfusionDmg > 0) {
+        ChatMessage.create({
+          speaker, rollMode, ...(whisperGM ? { whisper: whisperGM } : {}),
+          flavor: label,
+          content: `<p><em>Infusion:</em> spent <strong>${infusedManaCost}</strong> mana for <strong>+${infusedInfusionDmg}</strong> damage.</p>`,
         });
       }
       // Celerity recording: in deferred-fire mode the tracker has already
