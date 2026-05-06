@@ -1148,6 +1148,53 @@ export class AspectsofPowerItem extends Item {
   }
 
   /**
+   * Request the GM to create an AOE Region on the current user's behalf.
+   *
+   * V14.360 enforces OWNER-on-parent for embedded-region creation; players
+   * have neither OWNER nor a way to bypass it client-side. So the player
+   * sends regionData over a socket, the active GM creates the region, and
+   * emits a response with the new region's UUID. The player resolves a
+   * promise with the resulting RegionDocument (or null on timeout/error).
+   *
+   * GM users skip the round-trip and create directly.
+   */
+  async _gmCreateRegion(scene, regionData) {
+    if (game.user.isGM) {
+      const [region] = await scene.createEmbeddedDocuments('Region', [regionData]);
+      return region;
+    }
+    const requestId = foundry.utils.randomID();
+    return new Promise((resolve) => {
+      const cleanup = () => game.socket.off('system.aspects-of-power', handler);
+      const timeout = setTimeout(() => {
+        cleanup();
+        ui.notifications.error('AOE region creation timed out — is a GM online?');
+        resolve(null);
+      }, 10000);
+      const handler = (msg) => {
+        if (msg?.type !== 'aoeRegionCreated' || msg.requestId !== requestId) return;
+        clearTimeout(timeout);
+        cleanup();
+        if (msg.error) {
+          ui.notifications.error(`AOE region creation failed: ${msg.error}`);
+          resolve(null);
+          return;
+        }
+        const region = msg.regionUuid ? fromUuidSync(msg.regionUuid) : null;
+        resolve(region);
+      };
+      game.socket.on('system.aspects-of-power', handler);
+      game.socket.emit('system.aspects-of-power', {
+        type: 'gmCreateAoeRegion',
+        requestId,
+        sceneId: scene.id,
+        regionData,
+        requesterId: game.user.id,
+      });
+    });
+  }
+
+  /**
    * Route a payload to the GM for execution. If the current user IS the GM,
    * execute directly; otherwise send via socket.
    */
@@ -1170,6 +1217,30 @@ export class AspectsofPowerItem extends Item {
   static async executeGmAction(payload) {
     const msgWhisper = payload.whisperGM ? { whisper: payload.whisperGM } : {};
     switch (payload.type) {
+
+      case 'gmCreateAoeRegion': {
+        // Companion to the player-side _gmCreateRegion helper. Creates the
+        // requested Region on the named scene and emits the new region's UUID
+        // back via the same socket so the requester can resolve their promise.
+        const respond = (regionUuid, error = null) => {
+          game.socket.emit('system.aspects-of-power', {
+            type: 'aoeRegionCreated',
+            requestId: payload.requestId,
+            regionUuid,
+            error,
+          });
+        };
+        const scene = game.scenes.get(payload.sceneId);
+        if (!scene) { respond(null, 'Scene not found'); return; }
+        try {
+          const [region] = await scene.createEmbeddedDocuments('Region', [payload.regionData]);
+          respond(region?.uuid ?? null);
+        } catch (e) {
+          console.error('[gmCreateAoeRegion] failed:', e);
+          respond(null, String(e?.message ?? e));
+        }
+        return;
+      }
 
       case 'gmApplyRestoration': {
         const target = await fromUuid(payload.targetActorUuid);
@@ -3080,7 +3151,11 @@ export class AspectsofPowerItem extends Item {
           },
         };
 
-        const [created] = await canvas.scene.createEmbeddedDocuments('Region', [regionData]);
+        // V14.360 enforces OWNER-on-parent for embedded-region creation, which
+        // players don't have. Route through GM-side dispatch so the player can
+        // place AOEs on any scene without scene-ownership privilege.
+        const created = await this._gmCreateRegion(canvas.scene, regionData);
+        if (!created) { resolve(null); return; }
         await new Promise(r => setTimeout(r, 50));
         resolve(created);
       };
