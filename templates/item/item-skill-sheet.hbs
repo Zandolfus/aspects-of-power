@@ -339,6 +339,14 @@
           <option value="mind" {{#if (eq system.roll.targetDefense "mind")}}selected{{/if}}>Mind</option>
           <option value="soul" {{#if (eq system.roll.targetDefense "soul")}}selected{{/if}}>Soul</option>
         </select>
+        <label class='resource-label' title="Optional second defense for 'single blow, two defenses' skills. Damage splits 50/50 across the two halves; toughness applies once.">Secondary Defense</label>
+        <select name='system.roll.secondaryTargetDefense' data-dtype='String'>
+          <option value="" {{#if (eq system.roll.secondaryTargetDefense "")}}selected{{/if}}>(none — single defense)</option>
+          <option value="melee" {{#if (eq system.roll.secondaryTargetDefense "melee")}}selected{{/if}}>Melee</option>
+          <option value="ranged" {{#if (eq system.roll.secondaryTargetDefense "ranged")}}selected{{/if}}>Ranged</option>
+          <option value="mind" {{#if (eq system.roll.secondaryTargetDefense "mind")}}selected{{/if}}>Mind</option>
+          <option value="soul" {{#if (eq system.roll.secondaryTargetDefense "soul")}}selected{{/if}}>Soul</option>
+        </select>
         <label class='resource-label'>Damage Type</label>
         <select name='system.roll.damageType' data-dtype='String'>
           <option value="physical" {{#if (eq system.roll.damageType "physical")}}selected{{/if}}>Physical (Armor)</option>

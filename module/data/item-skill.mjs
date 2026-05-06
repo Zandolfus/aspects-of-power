@@ -39,6 +39,16 @@ export class SkillData extends foundry.abstract.TypeDataModel {
         diceBonus:    new fields.NumberField({ initial: 1 }),
         // Which of the four defenses this skill tests against (melee/ranged/mind/soul).
         targetDefense: new fields.StringField({ initial: '' }),
+        // Optional second defense for "single blow, two defenses" skills (e.g.
+        // Earth's Rise: ground bursts up = melee defense, lightning descends =
+        // ranged defense). When set, hit rolls against BOTH defenses, damage
+        // splits 50/50 between the two halves; defense pipeline still runs
+        // ONCE on the combined damage. Empty disables the secondary check.
+        secondaryTargetDefense: new fields.StringField({ initial: '' }),
+        // Optional affinity tag for the secondary half — lets the second-half
+        // damage be flavored differently from the primary affinity for
+        // affinity-DR purposes. Falls back to the primary affinity when empty.
+        secondaryAffinity: new fields.StringField({ initial: '' }),
         // Whether this skill deals physical damage (armor) or non-physical (veil).
         damageType:   new fields.StringField({ initial: 'physical' }),
         // Pure vs Hybrid stat usage. Pure = primary at 100%; Hybrid blends two abilities at weights.

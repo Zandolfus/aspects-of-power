@@ -733,6 +733,103 @@ export class AspectsofPowerItem extends Item {
   /* ------------------------------------------------------------------ */
 
   /**
+   * Resolve a single defense check (pool + reaction prompt) for one defKey
+   * against one target. Extracted so dual-defense skills can run it twice.
+   *
+   * Returns: { isHit, damageMultiplier, defenseLine, reactionLine }
+   *   - isHit: true unless the defense fully dodged or a reaction nullified
+   *   - damageMultiplier: 1.0 = full damage, <1.0 = partial defense reduction
+   *   - defenseLine, reactionLine: HTML fragments for the chat result block
+   */
+  async _resolveDefenseCheck(item, targetActor, defKey, hitTotal) {
+    const pool    = targetActor.system.defense[defKey]?.pool ?? 0;
+    const poolMax = targetActor.system.defense[defKey]?.poolMax ?? 0;
+    const defLabel = defKey.charAt(0).toUpperCase() + defKey.slice(1);
+
+    const skillTags = item.system?.tags ?? [];
+    const shrapnelMult = skillTags.includes('shrapnel')
+      ? (item.system?.tagConfig?.shrapnelMultiplier ?? 1.5)
+      : 1;
+    const effectiveHit = Math.round(hitTotal * shrapnelMult);
+
+    const defenseResult = await this._promptDefensePool(targetActor, defKey, hitTotal, item.name);
+
+    let isHit = true;
+    let damageMultiplier = 1;
+    let defenseLine = '';
+    let reactionLine = '';
+
+    if (defenseResult.defend && pool > 0) {
+      if (pool >= effectiveHit) {
+        isHit = false;
+        const newPool = pool - effectiveHit;
+        await this._gmAction({ type: 'gmUpdateDefensePool', targetActorUuid: targetActor.uuid, defKey, newPool });
+        defenseLine = `<p>${defLabel} defense: full dodge (pool ${pool} → ${newPool} / ${poolMax})</p>`;
+      } else {
+        damageMultiplier = 1 - (pool / effectiveHit);
+        await this._gmAction({ type: 'gmUpdateDefensePool', targetActorUuid: targetActor.uuid, defKey, newPool: 0 });
+        defenseLine = `<p>${defLabel} defense: partial (${Math.round((1 - damageMultiplier) * 100)}% reduced, pool ${pool} → 0 / ${poolMax})</p>`;
+      }
+    } else if (pool > 0) {
+      defenseLine = `<p>${defLabel} defense: declined (pool ${pool} / ${poolMax})</p>`;
+    } else {
+      defenseLine = `<p>${defLabel} defense: no pool remaining (0 / ${poolMax})</p>`;
+    }
+
+    if (defenseResult.defend && pool > 0) {
+      const pct = pool >= effectiveHit ? 100 : Math.round((pool / effectiveHit) * 100);
+      ChatMessage.create({
+        speaker: ChatMessage.getSpeaker({ actor: targetActor }),
+        content: pool >= effectiveHit
+          ? `<p><strong>${targetActor.name}</strong> fully dodges the ${defLabel.toLowerCase()} attack!</p>`
+          : `<p><strong>${targetActor.name}</strong> partially blocks the ${defLabel.toLowerCase()} attack (${pct}% reduced).</p>`,
+      });
+    }
+
+    if (defenseResult.reactionSkillId) {
+      const reactionSkill = targetActor.items.get(defenseResult.reactionSkillId);
+      if (reactionSkill) {
+        const rType = reactionSkill.system.reactionType ?? 'dodge';
+        await this._gmAction({ type: 'gmConsumeReaction', targetActorUuid: targetActor.uuid });
+        const reactionSpeaker = ChatMessage.getSpeaker({ actor: targetActor });
+
+        if (rType === 'dodge') {
+          isHit = false;
+          reactionLine = `<p><em>${targetActor.name} dodges with <strong>${reactionSkill.name}</strong>!</em></p>`;
+          ChatMessage.create({ speaker: reactionSpeaker,
+            content: `<p><strong>${targetActor.name}</strong> deftly dodges the attack with <strong>${reactionSkill.name}</strong>!</p>`,
+          });
+        } else if (rType === 'parry') {
+          const parryRoll = await reactionSkill.roll({ parryOnly: true });
+          const parryTotal = parryRoll ? Math.round(parryRoll.total) : 0;
+          if (parryTotal >= hitTotal) {
+            isHit = false;
+            reactionLine = `<p><em>${targetActor.name} parries with <strong>${reactionSkill.name}</strong>! `
+                         + `(${parryTotal} vs ${hitTotal})</em></p>`;
+            ChatMessage.create({ speaker: reactionSpeaker,
+              content: `<p><strong>${targetActor.name}</strong> parries the blow with <strong>${reactionSkill.name}</strong>! (${parryTotal} vs ${hitTotal})</p>`,
+            });
+          } else {
+            reactionLine = `<p><em>${targetActor.name} fails to parry with <strong>${reactionSkill.name}</strong> `
+                         + `(${parryTotal} vs ${hitTotal})</em></p>`;
+            ChatMessage.create({ speaker: reactionSpeaker,
+              content: `<p><strong>${targetActor.name}</strong> attempts to parry with <strong>${reactionSkill.name}</strong> but fails! (${parryTotal} vs ${hitTotal})</p>`,
+            });
+          }
+        } else if (rType === 'barrier') {
+          await reactionSkill.roll();
+          reactionLine = `<p><em>${targetActor.name} reacts with <strong>${reactionSkill.name}</strong> (Barrier)!</em></p>`;
+          ChatMessage.create({ speaker: reactionSpeaker,
+            content: `<p><strong>${targetActor.name}</strong> raises a barrier with <strong>${reactionSkill.name}</strong>!</p>`,
+          });
+        }
+      }
+    }
+
+    return { isHit, damageMultiplier, defenseLine, reactionLine };
+  }
+
+  /**
    * Attack tag: resolve hit vs target defense pool, calculate mitigated damage,
    * and post a GM-whispered combat result with an Apply Damage button.
    *
@@ -740,6 +837,13 @@ export class AspectsofPowerItem extends Item {
    *   pool >= toHit  → full dodge, pool -= toHit
    *   0 < pool < toHit → partial, damage *= (1 - pool/toHit), pool = 0
    *   pool == 0       → full hit
+   *
+   * Dual defense ("single blow, two defenses" — e.g. Earth's Rise):
+   *   When `roll.secondaryTargetDefense` is set, the hit rolls against BOTH
+   *   defenses. Damage splits 50/50 across the two halves; each half is gated
+   *   by its own defense check independently. Defense pipeline (barrier,
+   *   armor/veil, toughness) runs ONCE on the combined post-defense damage —
+   *   so the target isn't double-tapped by toughness across the two halves.
    */
   async _handleAttackTag(item, rollData, hitRoll, dmgRoll, speaker, rollMode, label, targetTokenOverride = null) {
     const whisperGM = !_isPlayerCharacter(this.actor) ? ChatMessage.getWhisperRecipients('GM') : undefined;
@@ -747,7 +851,10 @@ export class AspectsofPowerItem extends Item {
     const targetActor  = targetToken?.actor ?? null;
     if (!targetActor) return;
 
-    const targetDefKey = rollData.roll.targetDefense;
+    const targetDefKey    = rollData.roll.targetDefense;
+    const secondaryDefKey = rollData.roll.secondaryTargetDefense ?? '';
+    const hasDualDefense  = !!secondaryDefKey && secondaryDefKey !== targetDefKey;
+
     const hitTotal     = hitRoll ? Math.round(hitRoll.total) : 0;
     const isPhysical   = rollData.roll.damageType === 'physical';
     const mitigation   = isPhysical
@@ -759,119 +866,38 @@ export class AspectsofPowerItem extends Item {
     const effectiveToughness = Math.max(0, baseDR - affinityDR);
     const mitigLabel         = isPhysical ? 'Armor' : 'Veil';
 
-    // ── Defense pool + reaction resolution ─────────────────────────────
-    let isHit = true;
-    let damageMultiplier = 1;
-    let defenseLine = '';
-    let reactionLine = '';
+    // ── Defense check(s): one per defense, sequentially. Dual-defense skills
+    // run two prompts; the defender chooses pool/reaction independently for
+    // each. Damage is split 50/50 across the halves.
+    let primaryResult   = { isHit: true, damageMultiplier: 1, defenseLine: '', reactionLine: '' };
+    let secondaryResult = null;
 
     if (hitRoll && targetDefKey) {
-      const pool    = targetActor.system.defense[targetDefKey]?.pool ?? 0;
-      const poolMax = targetActor.system.defense[targetDefKey]?.poolMax ?? 0;
-      const defLabel = targetDefKey.charAt(0).toUpperCase() + targetDefKey.slice(1);
-
-      // Shrapnel: inflates the effective hit cost to deplete defense pool faster.
-      const skillTags = item.system?.tags ?? [];
-      const shrapnelMult = skillTags.includes('shrapnel')
-        ? (item.system?.tagConfig?.shrapnelMultiplier ?? 1.5)
-        : 1;
-      const effectiveHit = Math.round(hitTotal * shrapnelMult);
-
-      // Prompt the defender (shows defense pool and/or available reactions).
-      const defenseResult = await this._promptDefensePool(
-        targetActor, targetDefKey, hitTotal, item.name
-      );
-
-      // Handle defense pool usage.
-      if (defenseResult.defend && pool > 0) {
-        if (pool >= effectiveHit) {
-          isHit = false;
-          const newPool = pool - effectiveHit;
-          await this._gmAction({
-            type: 'gmUpdateDefensePool',
-            targetActorUuid: targetActor.uuid,
-            defKey: targetDefKey,
-            newPool,
-          });
-          defenseLine = `<p>${defLabel} defense: full dodge (pool ${pool} → ${newPool} / ${poolMax})</p>`;
-        } else {
-          damageMultiplier = 1 - (pool / effectiveHit);
-          await this._gmAction({
-            type: 'gmUpdateDefensePool',
-            targetActorUuid: targetActor.uuid,
-            defKey: targetDefKey,
-            newPool: 0,
-          });
-          defenseLine = `<p>${defLabel} defense: partial (${Math.round((1 - damageMultiplier) * 100)}% reduced, pool ${pool} → 0 / ${poolMax})</p>`;
-        }
-      } else if (pool > 0) {
-        defenseLine = `<p>${defLabel} defense: declined (pool ${pool} / ${poolMax})</p>`;
-      } else {
-        defenseLine = `<p>${defLabel} defense: no pool remaining (0 / ${poolMax})</p>`;
-      }
-
-      // Post public defense message so players see what happened.
-      if (defenseResult.defend && pool > 0) {
-        const pct = pool >= effectiveHit ? 100 : Math.round((pool / effectiveHit) * 100);
-        ChatMessage.create({
-          speaker: ChatMessage.getSpeaker({ actor: targetActor }),
-          content: pool >= effectiveHit
-            ? `<p><strong>${targetActor.name}</strong> fully dodges the attack!</p>`
-            : `<p><strong>${targetActor.name}</strong> partially blocks the attack (${pct}% reduced).</p>`,
-        });
-      }
-
-      // Handle reaction skill usage.
-      if (defenseResult.reactionSkillId) {
-        const reactionSkill = targetActor.items.get(defenseResult.reactionSkillId);
-        if (reactionSkill) {
-          const rType = reactionSkill.system.reactionType ?? 'dodge';
-
-          // Consume a reaction via GM action.
-          await this._gmAction({
-            type: 'gmConsumeReaction',
-            targetActorUuid: targetActor.uuid,
-          });
-
-          const reactionSpeaker = ChatMessage.getSpeaker({ actor: targetActor });
-
-          if (rType === 'dodge') {
-            isHit = false;
-            reactionLine = `<p><em>${targetActor.name} dodges with <strong>${reactionSkill.name}</strong>!</em></p>`;
-            ChatMessage.create({ speaker: reactionSpeaker,
-              content: `<p><strong>${targetActor.name}</strong> deftly dodges the attack with <strong>${reactionSkill.name}</strong>!</p>`,
-            });
-          } else if (rType === 'parry') {
-            const parryRoll = await reactionSkill.roll({ parryOnly: true });
-            const parryTotal = parryRoll ? Math.round(parryRoll.total) : 0;
-            if (parryTotal >= hitTotal) {
-              isHit = false;
-              reactionLine = `<p><em>${targetActor.name} parries with <strong>${reactionSkill.name}</strong>! `
-                           + `(${parryTotal} vs ${hitTotal})</em></p>`;
-              ChatMessage.create({ speaker: reactionSpeaker,
-                content: `<p><strong>${targetActor.name}</strong> parries the blow with <strong>${reactionSkill.name}</strong>! (${parryTotal} vs ${hitTotal})</p>`,
-              });
-            } else {
-              reactionLine = `<p><em>${targetActor.name} fails to parry with <strong>${reactionSkill.name}</strong> `
-                           + `(${parryTotal} vs ${hitTotal})</em></p>`;
-              ChatMessage.create({ speaker: reactionSpeaker,
-                content: `<p><strong>${targetActor.name}</strong> attempts to parry with <strong>${reactionSkill.name}</strong> but fails! (${parryTotal} vs ${hitTotal})</p>`,
-              });
-            }
-          } else if (rType === 'barrier') {
-            await reactionSkill.roll();
-            reactionLine = `<p><em>${targetActor.name} reacts with <strong>${reactionSkill.name}</strong> (Barrier)!</em></p>`;
-            ChatMessage.create({ speaker: reactionSpeaker,
-              content: `<p><strong>${targetActor.name}</strong> raises a barrier with <strong>${reactionSkill.name}</strong>!</p>`,
-            });
-          }
-        }
-      }
+      primaryResult = await this._resolveDefenseCheck(item, targetActor, targetDefKey, hitTotal);
+    }
+    if (hasDualDefense && hitRoll) {
+      secondaryResult = await this._resolveDefenseCheck(item, targetActor, secondaryDefKey, hitTotal);
     }
 
-    // Damage pipeline: raw → defense pool % → barrier (pre-armor) → armor/veil → toughness.
+    const halfFactor = hasDualDefense ? 0.5 : 1.0;
+    const isHit = primaryResult.isHit || (secondaryResult?.isHit ?? false);
+
+    // For chat output and the combat-result return value (legacy callers).
+    const damageMultiplier = primaryResult.damageMultiplier;
+    const defenseLine      = (primaryResult.defenseLine ?? '')
+                           + (secondaryResult ? secondaryResult.defenseLine : '');
+    const reactionLine     = (primaryResult.reactionLine ?? '')
+                           + (secondaryResult ? secondaryResult.reactionLine : '');
+
+    // Damage pipeline: raw → per-half defense pool % → barrier (pre-armor) → armor/veil → toughness.
     const rawDmg          = Math.round(dmgRoll.total);
-    const afterDefense    = isHit ? Math.max(0, Math.round(rawDmg * damageMultiplier)) : 0;
+    const primaryContrib   = primaryResult.isHit
+      ? Math.max(0, Math.round(rawDmg * halfFactor * primaryResult.damageMultiplier))
+      : 0;
+    const secondaryContrib = (secondaryResult?.isHit)
+      ? Math.max(0, Math.round(rawDmg * halfFactor * secondaryResult.damageMultiplier))
+      : 0;
+    const afterDefense    = primaryContrib + secondaryContrib;
 
     // Barrier absorbs before armor/veil — it takes raw (post-defense-pool) damage.
     const barrierValue = targetActor.system.barrier?.value ?? 0;
@@ -889,12 +915,30 @@ export class AspectsofPowerItem extends Item {
     const finalDamage     = isHit ? Math.max(0, preToughnessDmg - effectiveToughness) : 0;
     const displayDamage   = finalDamage;
 
-    const resultBadge = isHit
-      ? `<strong style="color:green;">HIT</strong>`
-      : `<strong style="color:red;">MISS</strong>`;
+    // Dual-defense status badge: full HIT only if both halves landed; PARTIAL
+    // if exactly one landed; MISS if neither did. Single-defense uses the
+    // existing HIT / MISS dichotomy.
+    const resultBadge = (() => {
+      if (!hasDualDefense) return isHit
+        ? `<strong style="color:green;">HIT</strong>`
+        : `<strong style="color:red;">MISS</strong>`;
+      const both = primaryResult.isHit && secondaryResult.isHit;
+      const one  = primaryResult.isHit !== secondaryResult.isHit;
+      if (both) return `<strong style="color:green;">HIT</strong>`;
+      if (one)  return `<strong style="color:#f80;">PARTIAL</strong>`;
+      return `<strong style="color:red;">MISS</strong>`;
+    })();
 
     const hitLine = hitRoll && targetDefKey
-      ? `<p>Attack: ${hitTotal} vs ${targetActor.name}</p>`
+      ? (hasDualDefense
+          ? `<p>Attack: ${hitTotal} vs ${targetActor.name} — split between ${targetDefKey} + ${secondaryDefKey} defenses</p>`
+          : `<p>Attack: ${hitTotal} vs ${targetActor.name}</p>`)
+      : '';
+
+    // For dual defense, show each half's contribution to make the
+    // "single blow with one toughness application" intent explicit.
+    const halvesLine = hasDualDefense
+      ? `<p>Halves: ${primaryResult.isHit ? primaryContrib : 0} (${targetDefKey}) + ${secondaryResult.isHit ? secondaryContrib : 0} (${secondaryDefKey}) = <strong>${afterDefense}</strong></p>`
       : '';
 
     const toughnessLine = preToughnessDmg > 0
@@ -913,6 +957,12 @@ export class AspectsofPowerItem extends Item {
       ? ` data-forced-dir="${fmDir}" data-forced-dist="${fmDist}" data-attacker-token-id="${attackerToken?.id ?? ''}" data-hit-total="${hitTotal}"`
       : '';
 
+    // Defense-reduction line: hidden for dual defense (the per-half halvesLine
+    // already conveys partial reductions); shown for single defense as before.
+    const defenseReductionLine = (!hasDualDefense && damageMultiplier < 1)
+      ? `<p>Defense reduction: −${Math.round((1 - damageMultiplier) * 100)}%</p>`
+      : '';
+
     const gmContent = isHit
       ? `<div class="combat-result">
            <h3>${item.name} — ${resultBadge}</h3>
@@ -920,9 +970,10 @@ export class AspectsofPowerItem extends Item {
            ${defenseLine}
            ${reactionLine}
            <hr>
-           <p>Raw damage: ${rawDmg}</p>
+           <p>Raw damage: ${rawDmg}${hasDualDefense ? ' (split 50/50 across halves)' : ''}</p>
+           ${halvesLine}
            <p>${mitigLabel}: −${mitigation}</p>
-           ${damageMultiplier < 1 ? `<p>Defense reduction: −${Math.round((1 - damageMultiplier) * 100)}%</p>` : ''}
+           ${defenseReductionLine}
            ${barrierLine}
            ${toughnessLine}
            <p><strong>Final damage: ${displayDamage}</strong></p>
