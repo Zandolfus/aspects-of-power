@@ -100,7 +100,7 @@ function _resolveCelerityWeight(skill, weapon = null) {
  * @param {Item|null} weapon         Optional weapon override
  * @param {number|null} investAmount Optional pre-captured invest (mana for spells)
  */
-export function computeActionWait(actor, skill, weapon = null, investAmount = null) {
+export function computeActionWait(actor, skill, weapon = null, investAmount = null, manaInvestAmount = null) {
   const sc = CONFIG.ASPECTSOFPOWER.celerity;
   const speed = Math.max(1, _actorSpeedFor(actor, skill));
   const weight = _resolveCelerityWeight(skill, weapon);
@@ -114,10 +114,17 @@ export function computeActionWait(actor, skill, weapon = null, investAmount = nu
   const baseWait = Math.max(1, Math.round((weight * multiplier * sc.SCALE) / speed));
 
   const isMagic = _MAGIC_TYPES.has(skill?.system?.roll?.type ?? '');
-  if (isMagic && investAmount !== null && investAmount > 0) {
+  // Channel wait sources: (a) magic spell with mana invest (investAmount IS
+  // mana), or (b) infused melee with a separate manaInvestAmount on top of
+  // the stamina invest. Wisdom controls channel rate the same way for both.
+  const isInfused = (skill?.system?.tags ?? []).includes('infused');
+  const channelMana = isMagic
+    ? (investAmount ?? 0)
+    : (isInfused ? (manaInvestAmount ?? 0) : 0);
+  if (channelMana > 0) {
     const wisMod = Math.max(1, actor.system.abilities?.wisdom?.mod ?? 0);
     const factor = sc.CHANNEL_FACTOR ?? 1000;
-    const channelWait = Math.round(investAmount * factor / wisMod);
+    const channelWait = Math.round(channelMana * factor / wisMod);
     return Math.max(baseWait, channelWait);
   }
   return baseWait;
@@ -238,7 +245,7 @@ export async function declareAction(actor, skill, options = {}) {
   // Infused-melee dual invest: secondary mana cost captured at declare time
   // so the deferred fire can re-spend it without re-prompting the player.
   const manaInvestAmount = options.manaInvestAmount ?? null;
-  const wait = computeActionWait(actor, skill, null, investAmount);
+  const wait = computeActionWait(actor, skill, null, investAmount, manaInvestAmount);
   const clockTick = getClockTick(combatant.combat);
   const scheduledTick = clockTick + wait;
 

@@ -536,7 +536,7 @@ export class AspectsofPowerItem extends Item {
    *
    * @returns {Promise<{stamina:number, mana:number}|null>}
    */
-  async _promptDualResourceInvest({ stamina, mana, multiplier, label, potencyLabel }) {
+  async _promptDualResourceInvest({ stamina, mana, multiplier, label, potencyLabel, channelStat = null, channelFactor = null }) {
     const safeCeiling = stamina.baseCost + stamina.safeInvest;
     const startStam = stamina.baseCost;
     const startMana = mana.baseCost;
@@ -548,6 +548,12 @@ export class AspectsofPowerItem extends Item {
       if (excess <= 0 || stamina.safeInvest <= 0) return 0;
       return Math.round(stamina.potency * (excess / stamina.safeInvest));
     };
+    // Channel time on the mana side — Wis controls rate, mirrors the spell
+    // path so heavy infusion adds the same celerity wait penalty as channeling
+    // a spell of equivalent mana cost.
+    const computeChannel = (channelStat && channelFactor)
+      ? (mv) => Math.round(mv * channelFactor / Math.max(1, channelStat))
+      : null;
 
     const content = `
       <div class="resource-invest dual-resource">
@@ -562,6 +568,7 @@ export class AspectsofPowerItem extends Item {
           <label>Mana invest: <span class="mana-display">${startMana}</span> / pool ${mana.maxPool}</label>
           <input type="range" name="mana" min="${mana.baseCost}" max="${mana.maxPool}" value="${startMana}" step="1" style="width:100%;" />
           <div style="font-size:11px;color:#9cf;">Infusion damage: <strong class="infusion-display">${computeInfusion(startMana)}</strong></div>
+          ${computeChannel ? `<div class="channel-row" style="font-size:11px;color:#9cf;">Channel time: <strong class="channel-display">${computeChannel(startMana)}</strong> ticks <span style="font-size:11px;color:#888;">(added to celerity wait if it exceeds base wait)</span></div>` : ''}
         </div>
 
         <div class="form-group" style="margin-top:10px;">
@@ -621,11 +628,13 @@ export class AspectsofPowerItem extends Item {
       const mv = parseInt(manaSlider?.value, 10) || mana.baseCost;
       totalDisplay.textContent = computeStrike(sv) + computeInfusion(mv);
     };
+    const channelDisplay = root.querySelector('.channel-display');
     if (manaSlider) {
       manaSlider.addEventListener('input', () => {
         const v = parseInt(manaSlider.value, 10);
         manaDisplay.textContent = v;
         infusionDisplay.textContent = computeInfusion(v);
+        if (channelDisplay && computeChannel) channelDisplay.textContent = computeChannel(v);
         refreshTotal();
       });
     }
@@ -3821,10 +3830,13 @@ export class AspectsofPowerItem extends Item {
             manaInvested = Math.min(options.preManaInvestAmount, infusedManaPool);
           }
         } else if (useInfused) {
+          const wisMod = this.actor.system.abilities?.wisdom?.mod ?? 0;
           const result = await this._promptDualResourceInvest({
             stamina: { baseCost: baseStamina, safeInvest, maxPool, potency: statBlend },
             mana:    { baseCost: infusedBaseMana, maxPool: infusedManaPool, potency: intMod },
             multiplier, label, potencyLabel,
+            channelStat: wisMod,
+            channelFactor: sc.celerity?.CHANNEL_FACTOR ?? null,
           });
           if (result === null) return; // cancelled
           invested = result.stamina;
