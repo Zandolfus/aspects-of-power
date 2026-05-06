@@ -79,6 +79,7 @@ async function _onCelAdvance(event, target) {
   // a co-owner (e.g., another PC who happens to have OWNER permission).
   const investAmount = declared.investAmount ?? null;
   const manaInvestAmount = declared.manaInvestAmount ?? null;
+  const aoeRegionId = declared.aoeRegionId ?? null;
   const linkedPlayer = game.users.find(u => !u.isGM && u.active && u.character?.id === c.actor?.id);
   if (linkedPlayer) {
     game.socket.emit('system.aspects-of-power', {
@@ -88,10 +89,11 @@ async function _onCelAdvance(event, target) {
       targetUserId: linkedPlayer.id,
       preInvestAmount: investAmount,
       preManaInvestAmount: manaInvestAmount,
+      preAoeRegionId: aoeRegionId,
     });
   } else {
     // No linked player online — GM (or whoever clicked Advance) runs it.
-    await item.roll({ executeDeferred: true, preInvestAmount: investAmount, preManaInvestAmount: manaInvestAmount });
+    await item.roll({ executeDeferred: true, preInvestAmount: investAmount, preManaInvestAmount: manaInvestAmount, preAoeRegionId: aoeRegionId });
   }
 
   // Sync Foundry's combat.turn pointer to the new celerity-next-up combatant

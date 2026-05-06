@@ -245,6 +245,11 @@ export async function declareAction(actor, skill, options = {}) {
   // Infused-melee dual invest: secondary mana cost captured at declare time
   // so the deferred fire can re-spend it without re-prompting the player.
   const manaInvestAmount = options.manaInvestAmount ?? null;
+  // Static AOE: the region the player placed at declare time persists on the
+  // scene during the wait. Stored here so the fire-time path can look it up
+  // and skip re-prompting for placement (per design — AOE is a strategic
+  // commit at declare time, not a re-decision at fire time).
+  const aoeRegionId = options.aoeRegionId ?? null;
   const wait = computeActionWait(actor, skill, null, investAmount, manaInvestAmount);
   const clockTick = getClockTick(combatant.combat);
   const scheduledTick = clockTick + wait;
@@ -258,6 +263,7 @@ export async function declareAction(actor, skill, options = {}) {
       declaredAtTick: clockTick,
       investAmount,
       manaInvestAmount,
+      aoeRegionId,
     },
     'flags.aspectsofpower.nextActionTick': scheduledTick,
     'flags.aspectsofpower.lastActionWait': wait,
@@ -266,12 +272,13 @@ export async function declareAction(actor, skill, options = {}) {
 
   const investNote = investAmount ? ` — invest ${investAmount}` : '';
   const infusedNote = manaInvestAmount ? ` (+${manaInvestAmount} mana infusion)` : '';
+  const aoeNote = aoeRegionId ? ' [AOE placed]' : '';
   ChatMessage.create({
     speaker: ChatMessage.getSpeaker({ actor }),
-    content: `<p><strong>${actor.name}</strong> declares <strong>${skill.name}</strong>${investNote}${infusedNote} — scheduled for tick <strong>${scheduledTick}</strong> (wait ${wait}).</p>`,
+    content: `<p><strong>${actor.name}</strong> declares <strong>${skill.name}</strong>${investNote}${infusedNote}${aoeNote} — scheduled for tick <strong>${scheduledTick}</strong> (wait ${wait}).</p>`,
   });
 
-  return { wait, scheduledTick, investAmount, manaInvestAmount };
+  return { wait, scheduledTick, investAmount, manaInvestAmount, aoeRegionId };
 }
 
 /**

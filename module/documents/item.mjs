@@ -1148,6 +1148,26 @@ export class AspectsofPowerItem extends Item {
   }
 
   /**
+   * Companion to `_gmCreateRegion`. Players can't delete regions they don't
+   * OWN — so the rollback path on cast cancellation has to route through the
+   * GM the same way creation does. Fire-and-forget; we don't wait for a
+   * response since the player has nothing to do with the result.
+   */
+  _gmDeleteRegion(scene, regionId) {
+    if (game.user.isGM) {
+      const region = scene.regions.get(regionId);
+      if (region) return scene.deleteEmbeddedDocuments('Region', [regionId]);
+      return Promise.resolve();
+    }
+    game.socket.emit('system.aspects-of-power', {
+      type: 'gmDeleteAoeRegion',
+      sceneId: scene.id,
+      regionId,
+    });
+    return Promise.resolve();
+  }
+
+  /**
    * Request the GM to create an AOE Region on the current user's behalf.
    *
    * V14.360 enforces OWNER-on-parent for embedded-region creation; players
@@ -1238,6 +1258,19 @@ export class AspectsofPowerItem extends Item {
         } catch (e) {
           console.error('[gmCreateAoeRegion] failed:', e);
           respond(null, String(e?.message ?? e));
+        }
+        return;
+      }
+
+      case 'gmDeleteAoeRegion': {
+        // Cast-cancellation cleanup. Player can't delete regions they don't
+        // own; GM does it on their behalf. Fire-and-forget — no response.
+        const scene = game.scenes.get(payload.sceneId);
+        if (!scene) return;
+        try {
+          await scene.deleteEmbeddedDocuments('Region', [payload.regionId]);
+        } catch (e) {
+          console.warn('[gmDeleteAoeRegion] failed:', e);
         }
         return;
       }
@@ -3680,16 +3713,18 @@ export class AspectsofPowerItem extends Item {
       // ── AOE pre-placement: pick size first, then derive sized base ──
       // Cap the scroll-wheel size at what current mana can afford.
       // Captured here for the AOE block downstream so we don't re-place.
+      //
+      // Static declaration: the player places the AOE at declare time, the
+      // region persists on the scene during the celerity wait, and at fire
+      // time we look up the SAME region (by ID, threaded through declareAction
+      // → combatant flag → socket → preAoeRegionId) instead of re-prompting.
+      // This is the user's "AOE is a strategic choice; you commit when you
+      // declare" design intent.
       let preplacedTemplateDoc = null;
       let preplacedAoeShape = null;
       let preplacedAoeOverride = null;
       if (hasAoeAlteration) {
-        const casterToken = this.actor.getActiveTokens()?.[0];
-        if (!casterToken) {
-          ChatMessage.create({ speaker, rollMode, ...(whisperGM ? { whisper: whisperGM } : {}), content: '<p><em>No token found on canvas for AOE placement.</em></p>' });
-          return;
-        }
-        // Compute Cleave override here too, so the placement uses the right shape.
+        // Compute Cleave override regardless of declare-vs-fire path.
         if (hasCleave) {
           const wpn = this._resolveWeaponForSkill?.();
           const reach = wpn?.system?.reach ?? 5;
@@ -3702,21 +3737,44 @@ export class AspectsofPowerItem extends Item {
             targetingMode: this.system.aoe?.targetingMode ?? 'enemies',
           };
         }
-        // Per-skill AOE base size — sizes at-or-below this are free; above
-        // incurs 2^n cost growth where the doubling step is the baseSize
-        // itself, not a hardcoded 5ft. So a Fireball (baseSize 20) doubles
-        // when scaled to 40ft, quadruples at 60ft. Default 5 preserves
-        // prior behavior (5ft doublings for default skills).
         const aoeBaseSize = this.system.aoe?.baseSize ?? 5;
-        // Solving cost = baseMana × 2^((N - baseSize) / baseSize) for N
-        // given the player's pool gives N = baseSize × (1 + log2(pool/baseMana)).
-        const maxAffordableSize = Math.max(aoeBaseSize, Math.round(aoeBaseSize * (1 + Math.floor(Math.log2(Math.max(1, livePool / Math.max(1, baseManaAt5ft)))))));
-        const placementMaxSize = Math.min(maxAffordableSize, Math.max(25, aoeBaseSize * 5));
-        preplacedTemplateDoc = await this._placeAoeTemplate(casterToken, preplacedAoeOverride, placementMaxSize);
-        if (!preplacedTemplateDoc) return; // cancelled
-        preplacedAoeShape = preplacedTemplateDoc.shapes?.[0];
+
+        if (options.preAoeRegionId) {
+          // Fire-time path: reuse the region the player placed at declare time.
+          preplacedTemplateDoc = canvas.scene?.regions?.get(options.preAoeRegionId) ?? null;
+          if (!preplacedTemplateDoc) {
+            ChatMessage.create({
+              speaker, rollMode, ...(whisperGM ? { whisper: whisperGM } : {}),
+              flavor: label,
+              content: '<p><em>⚠️ Declared AOE region no longer exists (was the area deleted between declare and fire?). Cast aborted.</em></p>',
+            });
+            return;
+          }
+          preplacedAoeShape = preplacedTemplateDoc.shapes?.[0];
+        } else {
+          // Declare-time path: interactive placement.
+          const casterToken = this.actor.getActiveTokens()?.[0];
+          if (!casterToken) {
+            ChatMessage.create({ speaker, rollMode, ...(whisperGM ? { whisper: whisperGM } : {}), content: '<p><em>No token found on canvas for AOE placement.</em></p>' });
+            return;
+          }
+          // Per-skill AOE base size — sizes at-or-below this are free; above
+          // incurs 2^n cost growth where the doubling step is the baseSize
+          // itself, not a hardcoded 5ft. So a Fireball (baseSize 20) doubles
+          // when scaled to 40ft, quadruples at 60ft. Default 5 preserves
+          // prior behavior (5ft doublings for default skills).
+          // Solving cost = baseMana × 2^((N - baseSize) / baseSize) for N
+          // given the player's pool gives N = baseSize × (1 + log2(pool/baseMana)).
+          const maxAffordableSize = Math.max(aoeBaseSize, Math.round(aoeBaseSize * (1 + Math.floor(Math.log2(Math.max(1, livePool / Math.max(1, baseManaAt5ft)))))));
+          const placementMaxSize = Math.min(maxAffordableSize, Math.max(25, aoeBaseSize * 5));
+          preplacedTemplateDoc = await this._placeAoeTemplate(casterToken, preplacedAoeOverride, placementMaxSize);
+          if (!preplacedTemplateDoc) return; // cancelled
+          preplacedAoeShape = preplacedTemplateDoc.shapes?.[0];
+        }
         // Derive sized base from the actual placed diameter, using the
         // per-skill base size as the cost reference AND the doubling step.
+        // Same math regardless of declare-vs-fire — the placed region is the
+        // source of truth.
         if (preplacedAoeShape) {
           const pxPerFt = canvas.grid.size / canvas.grid.distance;
           let placedDiameter = aoeBaseSize;
@@ -3745,7 +3803,7 @@ export class AspectsofPowerItem extends Item {
           flavor: label,
           content: `<p>Not enough mana to cast at this AOE size (need ${baseMana}, have ${livePool}).</p>`,
         });
-        if (preplacedTemplateDoc) await preplacedTemplateDoc.delete();
+        if (preplacedTemplateDoc) await this._gmDeleteRegion(canvas.scene, preplacedTemplateDoc.id);
         return;
       }
 
@@ -3762,7 +3820,7 @@ export class AspectsofPowerItem extends Item {
             hardCap: true,                              // hide safe-ceiling/self-damage rows
           });
       if (invested === null) {
-        if (preplacedTemplateDoc) await preplacedTemplateDoc.delete();
+        if (preplacedTemplateDoc) await this._gmDeleteRegion(canvas.scene, preplacedTemplateDoc.id);
         return;
       }
 
@@ -3984,6 +4042,7 @@ export class AspectsofPowerItem extends Item {
       const declared = await declareAction(this.actor, this, {
         investAmount: investedAmount,
         manaInvestAmount: infusedManaCost > 0 ? infusedManaCost : null,
+        aoeRegionId: aoePerCastContext?.preplacedTemplateDoc?.id ?? null,
       });
       return declared;
     }
