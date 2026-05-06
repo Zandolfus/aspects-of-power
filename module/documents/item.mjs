@@ -1,6 +1,6 @@
 import { EquipmentSystem } from '../systems/equipment.mjs';
 import { getPositionalTags } from '../helpers/positioning.mjs';
-import { recordActionFired, declareAction, isInActiveCombat } from '../systems/celerity.mjs';
+import { recordActionFired, declareAction, isInActiveCombat, computeActionWait } from '../systems/celerity.mjs';
 
 /**
  * Check if an actor is an assigned player character (not just owned).
@@ -536,7 +536,7 @@ export class AspectsofPowerItem extends Item {
    *
    * @returns {Promise<{stamina:number, mana:number}|null>}
    */
-  async _promptDualResourceInvest({ stamina, mana, multiplier, label, potencyLabel, channelStat = null, channelFactor = null }) {
+  async _promptDualResourceInvest({ stamina, mana, multiplier, label, potencyLabel, channelStat = null, channelFactor = null, baseWait = 0 }) {
     const safeCeiling = stamina.baseCost + stamina.safeInvest;
     const startStam = stamina.baseCost;
     const startMana = mana.baseCost;
@@ -568,7 +568,7 @@ export class AspectsofPowerItem extends Item {
           <label>Mana invest: <span class="mana-display">${startMana}</span> / pool ${mana.maxPool}</label>
           <input type="range" name="mana" min="${mana.baseCost}" max="${mana.maxPool}" value="${startMana}" step="1" style="width:100%;" />
           <div style="font-size:11px;color:#9cf;">Infusion damage: <strong class="infusion-display">${computeInfusion(startMana)}</strong></div>
-          ${computeChannel ? `<div class="channel-row" style="font-size:11px;color:#9cf;">Channel time: <strong class="channel-display">${computeChannel(startMana)}</strong> ticks <span style="font-size:11px;color:#888;">(added to celerity wait if it exceeds base wait)</span></div>` : ''}
+          ${computeChannel ? `<div class="channel-row" style="font-size:11px;color:#fc6;display:${computeChannel(startMana) > baseWait ? 'block' : 'none'};">Channel time: <strong class="channel-display">${computeChannel(startMana)}</strong> ticks <span style="font-size:11px;color:#888;">(exceeds base wait ${baseWait} — celerity wait increases)</span></div>` : ''}
         </div>
 
         <div class="form-group" style="margin-top:10px;">
@@ -629,12 +629,19 @@ export class AspectsofPowerItem extends Item {
       totalDisplay.textContent = computeStrike(sv) + computeInfusion(mv);
     };
     const channelDisplay = root.querySelector('.channel-display');
+    const channelRowEl = root.querySelector('.channel-row');
     if (manaSlider) {
       manaSlider.addEventListener('input', () => {
         const v = parseInt(manaSlider.value, 10);
         manaDisplay.textContent = v;
         infusionDisplay.textContent = computeInfusion(v);
-        if (channelDisplay && computeChannel) channelDisplay.textContent = computeChannel(v);
+        if (channelDisplay && computeChannel) {
+          const ch = computeChannel(v);
+          channelDisplay.textContent = ch;
+          // Only surface the channel-time row when it would actually push the
+          // celerity wait past the strike's base wait — otherwise it's noise.
+          if (channelRowEl) channelRowEl.style.display = (ch > baseWait) ? 'block' : 'none';
+        }
         refreshTotal();
       });
     }
@@ -3831,12 +3838,17 @@ export class AspectsofPowerItem extends Item {
           }
         } else if (useInfused) {
           const wisMod = this.actor.system.abilities?.wisdom?.mod ?? 0;
+          // Pre-compute the strike's base wait (no invest, no infusion) so the
+          // dialog can hide the channel-time readout when the chosen mana
+          // amount wouldn't actually slow the cast.
+          const baseWait = computeActionWait(this.actor, this, weapon, null, null);
           const result = await this._promptDualResourceInvest({
             stamina: { baseCost: baseStamina, safeInvest, maxPool, potency: statBlend },
             mana:    { baseCost: infusedBaseMana, maxPool: infusedManaPool, potency: intMod },
             multiplier, label, potencyLabel,
             channelStat: wisMod,
             channelFactor: sc.celerity?.CHANNEL_FACTOR ?? null,
+            baseWait,
           });
           if (result === null) return; // cancelled
           invested = result.stamina;
