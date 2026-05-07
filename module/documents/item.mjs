@@ -3768,6 +3768,11 @@ export class AspectsofPowerItem extends Item {
     // resource cost. Stays 0 unless the skill carries the `infused` tag and
     // the actor has enough mana to meet the spell-tier baseMana floor.
     let infusedManaCost = 0;
+    // Orb implement state captured for _commitCastCost. orbBanked: weight to add
+    // on a normal qualifying cast. orbDischargedThisCast: true when the cast
+    // consumed accumulated charge (resets to 0 after commit).
+    let orbBanked = 0;
+    let orbDischargedThisCast = false;
     let infusedInfusionDmg = 0;     // for chat breakdown
     // Per-cast AOE context for spells with the `aoe` alteration. Captured at
     // invest-commit time, consumed after AOE template placement to recompute
@@ -3932,26 +3937,54 @@ export class AspectsofPowerItem extends Item {
         return;
       }
 
-      const invested = (options.preInvestAmount != null)
-        ? Math.min(options.preInvestAmount, maxInvest)  // clamp pre-capture too
-        : await this._promptResourceInvest({
-            baseCost: baseMana,
-            safeInvest: 0,                              // hard cap = no soft zone
-            maxPool: maxInvest,
-            potency: intMod, multiplier,
-            resourceLabel: 'mana', potencyLabel: 'Int', label,
-            channelStat: wisMod,
-            channelFactor: sc.celerity?.CHANNEL_FACTOR ?? null,
-            hardCap: true,                              // hide safe-ceiling/self-damage rows
-          });
-      if (invested === null) {
-        if (preplacedTemplateDoc) await this._gmDeleteRegion(canvas.scene, preplacedTemplateDoc.id);
-        return;
+      // Orb implement: when banked spell-charge meets the threshold, the
+      // next qualifying (non-Basic) cast is a "discharge" — free mana + fast
+      // (BASELINE_WEIGHT) wait. The wait is overridden in computeActionWait;
+      // here we skip the invest dialog and force cost to 0. Damage uses
+      // base invest (= baseMana). After the cast commits, charge resets in
+      // _commitCastCost.
+      const orbCharge = this.actor?.flags?.aspectsofpower?.spellCharge ?? 0;
+      const isOrbQualifying = spellTier && spellTier !== 'basic';
+      const orbDischarging = isOrbQualifying
+        && this.actor?.getEquippedImplements?.().has('orb')
+        && orbCharge >= (sc.celerity?.ORB_DISCHARGE_THRESHOLD ?? 400);
+
+      let invested;
+      if (orbDischarging) {
+        // Discharge path: no dialog, base damage, zero cost.
+        invested = baseMana;
+      } else {
+        invested = (options.preInvestAmount != null)
+          ? Math.min(options.preInvestAmount, maxInvest)  // clamp pre-capture too
+          : await this._promptResourceInvest({
+              baseCost: baseMana,
+              safeInvest: 0,                              // hard cap = no soft zone
+              maxPool: maxInvest,
+              potency: intMod, multiplier,
+              resourceLabel: 'mana', potencyLabel: 'Int', label,
+              channelStat: wisMod,
+              channelFactor: sc.celerity?.CHANNEL_FACTOR ?? null,
+              hardCap: true,                              // hide safe-ceiling/self-damage rows
+            });
+        if (invested === null) {
+          if (preplacedTemplateDoc) await this._gmDeleteRegion(canvas.scene, preplacedTemplateDoc.id);
+          return;
+        }
       }
 
       investedAmount = invested;
-      rollData.roll.cost = invested;
+      rollData.roll.cost = orbDischarging ? 0 : invested;
       rollData.roll.variableSpellInvest = invested;
+      // Persist Orb state for _commitCastCost: discharge resets, normal
+      // qualifying cast banks the spell's tier weight (banking weight, not
+      // wait, per the threshold-400 design — see celerity.mjs ORB_DISCHARGE_THRESHOLD).
+      if (isOrbQualifying && this.actor?.getEquippedImplements?.().has('orb')) {
+        if (orbDischarging) {
+          orbDischargedThisCast = true;
+        } else {
+          orbBanked = sc.spellTierWeights?.[spellTier] ?? 0;
+        }
+      }
       // Staff implement: +baseMana effective mana free for damage scaling.
       // The original pre-celerity design statement: "When casting a spell
       // using half or more than half your AP, increase the spell damage/
@@ -3973,7 +4006,10 @@ export class AspectsofPowerItem extends Item {
       const roundLen = referenceRoundLength(rl);
       const castWaitWithInvest = computeActionWait(this.actor, this, null, invested);
       const apThresholdTicks = Math.ceil(roundLen * 0.5);
-      const hasStaff = this.actor?.getEquippedImplements?.().has('staff')
+      // Staff bonus is mutually exclusive with Orb discharge — a discharged
+      // cast is already free + fast, no need to stack +baseMana on top.
+      const hasStaff = !orbDischarging
+        && this.actor?.getEquippedImplements?.().has('staff')
         && roundLen > 0
         && castWaitWithInvest >= apThresholdTicks;
       const effectiveInvested = hasStaff ? invested + baseMana : invested;
@@ -4273,12 +4309,36 @@ export class AspectsofPowerItem extends Item {
         const liveMana = this.actor.system.mana?.value ?? 0;
         updates['system.mana.value'] = Math.max(0, Math.round(liveMana - infusedManaCost));
       }
+      // Orb charge: discharge resets charge to 0; normal qualifying cast
+      // banks the spell's tier weight onto the existing charge.
+      if (orbDischargedThisCast) {
+        updates['flags.aspectsofpower.spellCharge'] = 0;
+      } else if (orbBanked > 0) {
+        const curCharge = this.actor.flags?.aspectsofpower?.spellCharge ?? 0;
+        updates['flags.aspectsofpower.spellCharge'] = curCharge + orbBanked;
+      }
       await this.actor.update(updates);
       if (investSelfDamage > 0) {
         ChatMessage.create({
           speaker, rollMode, ...(whisperGM ? { whisper: whisperGM } : {}),
           flavor: label,
           content: `<p><strong>${this.actor.name}</strong> takes <strong>${investSelfDamage}</strong> self-damage from ${investSelfDamageFlavor}.</p>`,
+        });
+      }
+      if (orbDischargedThisCast) {
+        ChatMessage.create({
+          speaker, rollMode, ...(whisperGM ? { whisper: whisperGM } : {}),
+          flavor: label,
+          content: `<p><em>Orb discharge:</em> <strong>${this.actor.name}</strong>'s orb releases its accumulated charge — cast for free at minimum wait.</p>`,
+        });
+      } else if (orbBanked > 0) {
+        const newCharge = (this.actor.flags?.aspectsofpower?.spellCharge ?? 0); // already updated above
+        const threshold = sc.celerity?.ORB_DISCHARGE_THRESHOLD ?? 400;
+        const ready = newCharge >= threshold ? ' <strong>(ready to discharge!)</strong>' : '';
+        ChatMessage.create({
+          speaker, rollMode, ...(whisperGM ? { whisper: whisperGM } : {}),
+          flavor: label,
+          content: `<p><em>Orb charge:</em> ${newCharge} / ${threshold}${ready}</p>`,
         });
       }
       if (infusedManaCost > 0 && infusedInfusionDmg > 0) {

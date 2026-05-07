@@ -114,6 +114,8 @@ export function computeActionWait(actor, skill, weapon = null, investAmount = nu
   const baseWait = Math.max(1, Math.round((weight * multiplier * sc.SCALE) / speed));
 
   const isMagic = _MAGIC_TYPES.has(skill?.system?.roll?.type ?? '');
+  const tier = skill?.system?.roll?.tier ?? '';
+  const equippedImplements = actor?.getEquippedImplements?.() ?? new Set();
 
   // Wand implement: −23% wait on Basic-tier spells. Tier-only check (no weight
   // gate) per design discussion 2026-05-06 — heavily-altered Basic spells
@@ -122,9 +124,23 @@ export function computeActionWait(actor, skill, weapon = null, investAmount = nu
   // Basic spells benefit moderately. Applied to baseWait BEFORE the channel-
   // wait MAX so a Wand-equipped caster paying low mana sees the speed-up.
   let adjustedBaseWait = baseWait;
-  if (isMagic && skill?.system?.roll?.tier === 'basic'
-      && actor?.getEquippedImplements?.().has('wand')) {
+  if (isMagic && tier === 'basic' && equippedImplements.has('wand')) {
     adjustedBaseWait = Math.max(1, Math.round(baseWait * 0.77));
+  }
+
+  // Orb implement: when the orb has banked ≥ ORB_DISCHARGE_THRESHOLD weight
+  // from prior qualifying (non-Basic) casts, the next qualifying cast becomes
+  // a discharge — wait recomputed with BASELINE_WEIGHT instead of the spell's
+  // tier weight (a "1 AP" minimum cast), and mana cost is zeroed in the
+  // spell-branch consumer. Per pre-celerity design statement (clarified
+  // 2026-05-06): "many moderate-to-large casts, periodic free quick casts."
+  const orbCharge = actor?.flags?.aspectsofpower?.spellCharge ?? 0;
+  const isOrbQualifying = isMagic && tier && tier !== 'basic';
+  const orbDischarging = isOrbQualifying
+    && equippedImplements.has('orb')
+    && orbCharge >= (sc.ORB_DISCHARGE_THRESHOLD ?? 400);
+  if (orbDischarging) {
+    adjustedBaseWait = Math.max(1, Math.round((sc.BASELINE_WEIGHT * multiplier * sc.SCALE) / speed));
   }
 
   // Channel wait sources: (a) magic spell with mana invest (investAmount IS

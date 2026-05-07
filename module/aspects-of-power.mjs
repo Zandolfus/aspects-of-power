@@ -565,6 +565,19 @@ Hooks.once('ready', async function () {
   // Register celerity tracker auto-refresh hooks (idempotent).
   registerCelerityTrackerHooks();
 
+  // Orb spell-charge: reset every combatant's accumulated charge at the
+  // start of a fight so stale charge from a prior encounter doesn't leak
+  // into a new one. Per-actor flag at flags.aspectsofpower.spellCharge.
+  Hooks.on('combatStart', async (combat, _options) => {
+    if (game.users.activeGM !== game.user) return; // GM-only
+    for (const c of combat.combatants) {
+      const actor = c.actor;
+      if (!actor) continue;
+      const cur = actor.flags?.aspectsofpower?.spellCharge ?? 0;
+      if (cur > 0) await actor.update({ 'flags.aspectsofpower.spellCharge': 0 });
+    }
+  });
+
   // Socket: when the celerity tracker advances on the GM's client and the
   // next-up actor is owned by an online player, the GM dispatches an
   // executeQueuedAction message → the player's client runs item.roll({
