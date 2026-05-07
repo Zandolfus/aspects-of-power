@@ -291,6 +291,7 @@ ASPECTSOFPOWER.weaponWeights = {
   sword:     100,
   axe:       120,
   hammer:    130,
+  quarterstaff: 140,
   polearm:   180,
   greatsword: 200,
   greataxe:  220,
@@ -302,6 +303,10 @@ ASPECTSOFPOWER.weaponWeights = {
   shotgun:   180,
   longbow:   200,
   rifle:     240,
+  // Magic implements (used as melee fallback when struck — primary purpose
+  // is the implement bonus, but each is still a real weapon).
+  wand:       50,
+  staff:     100,
 };
 
 /**
@@ -318,10 +323,14 @@ ASPECTSOFPOWER.weaponReach = {
   sword:      5,
   axe:        5,
   hammer:     5,
+  quarterstaff: 5,
   spear:     10,
   polearm:   10,
   greatsword: 10,
   greataxe:  10,
+  // Magic implements: striking with one is a melee jab — 5ft.
+  wand:       5,
+  staff:      5,
 };
 
 /**
@@ -678,7 +687,9 @@ ASPECTSOFPOWER.craftItemTypes = {
   greatsword:   { category: 'armaments', tags: ['weapon', '2H', 'greatsword'],                  slot: 'weaponry' },
   greataxe:     { category: 'armaments', tags: ['weapon', '2H', 'greataxe'],                    slot: 'weaponry' },
   polearm:      { category: 'armaments', tags: ['weapon', '2H', 'polearm'],                     slot: 'weaponry' },
+  quarterstaff: { category: 'armaments', tags: ['weapon', '2H', 'quarterstaff'],                slot: 'weaponry' },
   staff:        { category: 'armaments', tags: ['weapon', '2H', 'staff'],                       slot: 'weaponry' },
+  wand:         { category: 'armaments', tags: ['weapon', '1H', 'wand'],                        slot: 'weaponry' },
   bow:          { category: 'armaments', tags: ['weapon', '2H', 'bow'],                         slot: 'weaponry' },
   buckler:      { category: 'armaments', tags: ['weapon', '1H', 'shield', 'buckler'],           slot: 'weaponry' },
   shield:       { category: 'armaments', tags: ['weapon', '1H', 'shield'],                      slot: 'weaponry' },

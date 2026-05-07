@@ -505,7 +505,7 @@ export class AspectsofPowerActor extends Actor {
    * @returns {Set<string>}  Implement tags found ('wand', 'stave', 'orb', etc.)
    */
   getEquippedImplements() {
-    const known = new Set(['wand', 'stave', 'staff', 'orb', 'tome', 'weave', 'doll']);
+    const known = new Set(['wand', 'staff', 'orb', 'tome', 'weave', 'doll']);
     const found = new Set();
     for (const item of this.items) {
       if (item.type !== 'item') continue;
