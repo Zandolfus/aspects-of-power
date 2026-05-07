@@ -3938,13 +3938,13 @@ export class AspectsofPowerItem extends Item {
       }
 
       // Orb implement: when banked spell-charge meets the threshold, the
-      // next qualifying (non-Basic) cast is a "discharge" — free mana + fast
-      // (BASELINE_WEIGHT) wait. The wait is overridden in computeActionWait;
-      // here we skip the invest dialog and force cost to 0. Damage uses
-      // base invest (= baseMana). After the cast commits, charge resets in
-      // _commitCastCost.
+      // next spell cast is a "discharge" — free mana + fast (BASELINE_WEIGHT)
+      // wait. The wait is overridden in computeActionWait; here we skip the
+      // invest dialog and force cost to 0. Damage uses base invest (=
+      // baseMana). After the cast commits, charge resets in _commitCastCost.
+      // Universal across tiers per design 2026-05-06.
       const orbCharge = this.actor?.flags?.aspectsofpower?.spellCharge ?? 0;
-      const isOrbQualifying = spellTier && spellTier !== 'basic';
+      const isOrbQualifying = !!spellTier;
       const orbDischarging = isOrbQualifying
         && this.actor?.getEquippedImplements?.().has('orb')
         && orbCharge >= (sc.celerity?.ORB_DISCHARGE_THRESHOLD ?? 400);

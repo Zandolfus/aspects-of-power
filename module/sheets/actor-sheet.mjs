@@ -298,10 +298,11 @@ export class AspectsofPowerActorSheet extends foundry.applications.api.Handlebar
       }
     }
 
-    // Orb discharge readiness — flag any non-Basic spell skill when the actor
+    // Orb discharge readiness — flag any tiered spell skill when the actor
     // has an orb equipped and accumulated charge has met the threshold. The
     // sheet template uses this to render a glow on the eligible skill rows
     // so the player can see at a glance which casts will discharge.
+    // Universal across tiers per design 2026-05-06 (Basic included).
     {
       const equippedImplements = this.actor.getEquippedImplements?.() ?? new Set();
       const hasOrb = equippedImplements.has('orb');
@@ -310,8 +311,7 @@ export class AspectsofPowerActorSheet extends foundry.applications.api.Handlebar
       const orbReady = hasOrb && orbCharge >= orbThreshold;
       if (orbReady) {
         const tagSkill = (s) => {
-          const tier = s.system?.roll?.tier;
-          if (tier && tier !== 'basic') s.dischargeReady = true;
+          if (s.system?.roll?.tier) s.dischargeReady = true;
         };
         for (const list of Object.values(skillGroups)) {
           list.active.forEach(tagSkill);

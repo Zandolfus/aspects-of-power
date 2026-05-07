@@ -129,13 +129,15 @@ export function computeActionWait(actor, skill, weapon = null, investAmount = nu
   }
 
   // Orb implement: when the orb has banked ≥ ORB_DISCHARGE_THRESHOLD weight
-  // from prior qualifying (non-Basic) casts, the next qualifying cast becomes
-  // a discharge — wait recomputed with BASELINE_WEIGHT instead of the spell's
-  // tier weight (a "1 AP" minimum cast), and mana cost is zeroed in the
-  // spell-branch consumer. Per pre-celerity design statement (clarified
-  // 2026-05-06): "many moderate-to-large casts, periodic free quick casts."
+  // from prior spell casts, the next spell cast becomes a discharge — wait
+  // recomputed with BASELINE_WEIGHT instead of the spell's tier weight (a
+  // "1 AP" minimum cast), and mana cost is zeroed in the spell-branch
+  // consumer. Universal across tiers (per design 2026-05-06): Basic banks
+  // and discharges too, but Wand stays strictly faster on Basic — Orb's
+  // identity on Basic is mana economy (1 free per cycle) vs Wand's flat
+  // speed bonus.
   const orbCharge = actor?.flags?.aspectsofpower?.spellCharge ?? 0;
-  const isOrbQualifying = isMagic && tier && tier !== 'basic';
+  const isOrbQualifying = isMagic && !!tier;
   const orbDischarging = isOrbQualifying
     && equippedImplements.has('orb')
     && orbCharge >= (sc.ORB_DISCHARGE_THRESHOLD ?? 400);

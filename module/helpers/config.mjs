@@ -211,9 +211,13 @@ ASPECTSOFPOWER.celerity = {
   BASELINE_WEIGHT:    100,    // sword reference
   ACTIONS_PER_ROUND:  3,      // by-construction target swings/round
   // Orb implement: cumulative spell weight required to discharge the next
-  // qualifying cast as free + fast. Set at Major-tier weight (400) so a
-  // moderate caster builds up over ~3 High casts (each banking 150) or
-  // 2 Greater casts (200 each), and a Major/Grand cast triggers immediately.
+  // spell cast as free + fast. Set at Major-tier weight (400) so:
+  //   Basic spam (banks 130/cast):  every 4th cast discharges
+  //   High spam (banks 150/cast):   every 4th cast discharges
+  //   Greater spam (banks 200/cast): every 3rd cast discharges
+  //   Major/Grand: every cast discharges (each banks ≥ threshold)
+  // Universal across tiers per design 2026-05-06 — Wand stays the speed
+  // king on Basic; Orb is the mana-economy alternative.
   ORB_DISCHARGE_THRESHOLD: 400,
   // Placeholder per design-celerity.md open item #4 — exact movement weights
   // for step/walk/sprint/dash still TBD. For now: linear cost per 5ft moved,
