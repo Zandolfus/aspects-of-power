@@ -1148,6 +1148,73 @@ export class AspectsofPowerItem extends Item {
   }
 
   /**
+   * Resolve the effective reach of a melee skill in feet.
+   *
+   *   skill.system.reach > 0  →  use that (skill explicitly overrides weapon)
+   *   else                    →  use the wielded weapon's reach
+   *   else                    →  5 (default melee reach)
+   *
+   * @param {Item|null} weapon  Optional pre-resolved weapon (avoids re-lookup).
+   * @returns {number}  Reach in feet.
+   */
+  _resolveSkillReach(weapon = null) {
+    const skillReach = this.system?.reach ?? 0;
+    if (skillReach > 0) return skillReach;
+    const w = weapon ?? this._resolveWeaponForSkill?.();
+    return w?.system?.reach ?? 5;
+  }
+
+  /**
+   * Range-gate a melee strike at declare time. Returns true if all targets
+   * are within the effective reach; false (with chat warning) if any target
+   * is out of range. No-op for non-melee skills, for AOE/Cleave skills (which
+   * use cone shape instead of target distance), and for skills with no token
+   * targets selected (untargeted casts proceed under existing rules).
+   *
+   * Distance: edge-to-edge (subtracts caster + target token radii) so
+   * adjacent tokens count as touching at 0ft, matching tabletop intuition.
+   */
+  _checkMeleeReach() {
+    const meleeTypes = new Set(['str_weapon', 'dex_weapon', 'magic_melee']);
+    if (!meleeTypes.has(this.system?.roll?.type)) return true;
+    const hasCleave = (this.system?.alterations ?? []).some(a => a.id === 'cleave');
+    if (hasCleave) return true; // Cleave gates by cone shape, not target distance.
+
+    const targets = [...game.user.targets];
+    if (targets.length === 0) return true;
+
+    const casterToken = this.actor?.getActiveTokens?.()?.[0];
+    if (!casterToken) return true;
+
+    const reach = this._resolveSkillReach();
+    const pxPerFt = canvas.grid.size / canvas.grid.distance;
+    const reachPx = reach * pxPerFt;
+
+    for (const tgt of targets) {
+      // Token center-to-center distance, then subtract approximate radii so
+      // a Medium creature 5ft away (one square over) reads as ~0ft edge dist.
+      const cx = casterToken.center?.x ?? casterToken.x;
+      const cy = casterToken.center?.y ?? casterToken.y;
+      const tx = tgt.center?.x ?? tgt.x;
+      const ty = tgt.center?.y ?? tgt.y;
+      const dist = Math.hypot(tx - cx, ty - cy);
+      const casterRadius = (casterToken.w ?? canvas.grid.size) / 2;
+      const tgtRadius    = (tgt.w ?? canvas.grid.size) / 2;
+      const edgeDist     = Math.max(0, dist - casterRadius - tgtRadius);
+      if (edgeDist > reachPx) {
+        const edgeFt = Math.round(edgeDist / pxPerFt);
+        ChatMessage.create({
+          speaker: ChatMessage.getSpeaker({ actor: this.actor }),
+          flavor: this.name,
+          content: `<p><em>⚠️ ${tgt.document?.name ?? tgt.name ?? 'Target'} is ${edgeFt} ft away (reach ${reach} ft). Out of range — strike fails to land.</em></p>`,
+        });
+        return false;
+      }
+    }
+    return true;
+  }
+
+  /**
    * Compute total toughness DR reduction from debuffs on the target that
    * share an affinity or magic type with this skill.
    *
@@ -3668,6 +3735,13 @@ export class AspectsofPowerItem extends Item {
     const TokenClass = CONFIG.Token.documentClass;
     if (TokenClass?.flushStamina) await TokenClass.flushStamina();
 
+    // Melee reach gate: skip the cast if any selected target is beyond reach.
+    // Skipped at fire time (preInvestAmount supplied) since the player already
+    // committed at declare time and the target may have moved harmlessly since.
+    if (!options.executeDeferred && options.preInvestAmount == null && !this._checkMeleeReach()) {
+      return;
+    }
+
     // Build formulas (also populates rollData.roll.abilitymod and resourcevalue).
     // Done BEFORE the celerity defer gate so the variable-invest dialog (which
     // needs formula context) can capture the invest amount at declaration time.
@@ -3778,7 +3852,7 @@ export class AspectsofPowerItem extends Item {
         // Compute Cleave override regardless of declare-vs-fire path.
         if (hasCleave) {
           const wpn = this._resolveWeaponForSkill?.();
-          const reach = wpn?.system?.reach ?? 5;
+          const reach = this._resolveSkillReach(wpn);
           preplacedAoeOverride = {
             ...(this.system.aoe ?? {}),
             enabled: true,
@@ -3950,7 +4024,7 @@ export class AspectsofPowerItem extends Item {
         // dagger (5) = 1×, polearm (10) = 2×, etc.
         const meleeHasCleave = (this.system.alterations ?? []).some(a => a.id === 'cleave');
         if (meleeHasCleave && weapon) {
-          const reach = weapon.system?.reach ?? 5;
+          const reach = this._resolveSkillReach(weapon);
           const cleaveMult = Math.pow(2, Math.max(0, (reach - 5) / 5));
           baseStamina = Math.max(1, Math.round(baseStamina * cleaveMult));
         }
@@ -4253,7 +4327,7 @@ export class AspectsofPowerItem extends Item {
     let aoeOverride = aoePerCastContext?.preplacedAoeOverride ?? null;
     if (!aoeOverride && hasCleave) {
       const wpn = this._resolveWeaponForSkill?.();
-      const reach = wpn?.system?.reach ?? 5;
+      const reach = this._resolveSkillReach(wpn);
       aoeOverride = {
         ...(this.system.aoe ?? {}),
         enabled: true,

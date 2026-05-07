@@ -45,6 +45,11 @@ export class SkillData extends foundry.abstract.TypeDataModel {
         // splits 50/50 between the two halves; defense pipeline still runs
         // ONCE on the combined damage. Empty disables the secondary check.
         secondaryTargetDefense: new fields.StringField({ initial: '' }),
+        // Melee reach in feet. 0 = inherit from the wielded weapon's reach
+        // (default 5ft). Set explicitly when a skill has special reach
+        // semantics (e.g. Lunge with extended reach). Used to range-gate the
+        // strike at declare time and to size Cleave cones.
+        reach: new fields.NumberField({ initial: 0, min: 0, integer: true }),
         // Optional affinity tag for the secondary half — lets the second-half
         // damage be flavored differently from the primary affinity for
         // affinity-DR purposes. Falls back to the primary affinity when empty.

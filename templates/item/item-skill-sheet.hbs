@@ -347,6 +347,8 @@
           <option value="mind" {{#if (eq system.roll.secondaryTargetDefense "mind")}}selected{{/if}}>Mind</option>
           <option value="soul" {{#if (eq system.roll.secondaryTargetDefense "soul")}}selected{{/if}}>Soul</option>
         </select>
+        <label class='resource-label' title="Melee reach in feet. 0 = inherit from the wielded weapon (default 5ft). Set explicitly only when this skill has special reach (e.g. Lunge with extended reach).">Reach (0 = inherit weapon)</label>
+        <input type='number' name='system.roll.reach' value='{{system.roll.reach}}' min='0' step='1' data-dtype='Number'>
         <label class='resource-label'>Damage Type</label>
         <select name='system.roll.damageType' data-dtype='String'>
           <option value="physical" {{#if (eq system.roll.damageType "physical")}}selected{{/if}}>Physical (Armor)</option>
