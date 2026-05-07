@@ -305,6 +305,26 @@ ASPECTSOFPOWER.weaponWeights = {
 };
 
 /**
+ * Default reach in feet by weapon type-tag. Drives item-derivation and the
+ * skill-cast range gate. Greatsword/greataxe/polearm are giant weapons in
+ * this system → 10ft. Spear is a 1H reach weapon → 10ft. Everything else is
+ * standard 5ft melee. The "Thrust" ability (pending) extends reach by +5
+ * temporarily on the wielder's next strike.
+ */
+ASPECTSOFPOWER.weaponReach = {
+  unarmed:    5,
+  dagger:     5,
+  rapier:     5,
+  sword:      5,
+  axe:        5,
+  hammer:     5,
+  spear:     10,
+  polearm:   10,
+  greatsword: 10,
+  greataxe:  10,
+};
+
+/**
  * Skill categories — top-level grouping that determines available tags.
  */
 ASPECTSOFPOWER.skillCategories = {

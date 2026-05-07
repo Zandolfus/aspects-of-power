@@ -435,6 +435,7 @@ Hooks.once('init', function () {
     if (!locked.has('armorBonus')    && cs.armorBonus === undefined)    cs.armorBonus = derived.armorBonus;
     if (!locked.has('veilBonus')     && cs.veilBonus === undefined)     cs.veilBonus = derived.veilBonus;
     if (!locked.has('augmentSlots')  && cs.augmentSlots === undefined)  cs.augmentSlots = derived.augmentSlots;
+    if (!locked.has('reach')         && cs.reach === undefined)         cs.reach = derived.reach;
     if (!locked.has('durabilityMax')) {
       cs.durability = cs.durability ?? {};
       if (cs.durability.max === undefined) cs.durability.max = derived.durabilityMax;

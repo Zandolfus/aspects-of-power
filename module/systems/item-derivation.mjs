@@ -114,14 +114,20 @@ export function deriveItemStats(itemOrPatch) {
   const rarityDef = sc.rarities?.[rarity];
   const augmentSlots = rarityDef?.augments ?? 0;
 
+  // Melee reach by weapon type-tag. Default 5ft if the type isn't a melee
+  // weapon (ranged weapons, shields, jewelry, etc. — reach is meaningless
+  // there but we set 5 as a benign default rather than leaving it unset).
+  const reach = sc.weaponReach?.[typeKey] ?? 5;
+
   return {
     statBonuses,
     armorBonus,
     veilBonus,
     augmentSlots,
     durabilityMax: progress * 2,
+    reach,
   };
 }
 
 /** Fields the derivation can touch (what the lock UI shows toggles for). */
-export const DERIVABLE_FIELDS = ['statBonuses', 'armorBonus', 'veilBonus', 'augmentSlots', 'durabilityMax'];
+export const DERIVABLE_FIELDS = ['statBonuses', 'armorBonus', 'veilBonus', 'augmentSlots', 'durabilityMax', 'reach'];
