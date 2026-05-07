@@ -123,7 +123,7 @@ export class AspectsofPowerItem extends Item {
     const matRarity = materialItem
       ? (materialItem.system.rarity || 'common')
       : (reworkTarget?.system.rarity || 'common');
-    const rarityRange = CONFIG.ASPECTSOFPOWER.craftRarityRanges?.[matRarity] ?? { floor: 1, ceiling: 100 };
+    const rarityRange = CONFIG.ASPECTSOFPOWER.craftRarityRanges?.[matRarity] ?? { floor: 0, ceiling: 100 };
     const avgD100 = Math.min(50.5 + rarityRange.floor + rarityFloorBonus + d100Bonus, rarityRange.ceiling);
     const avgD100Pct = avgD100 / 100;
     const avgCrafterRoll = Math.round((avgSkillRoll + skillModBonus) * avgD100Pct);
@@ -2328,7 +2328,7 @@ export class AspectsofPowerItem extends Item {
     // a flat boost, ceiling caps the result. Failure check below still
     // uses the raw roll, so a natural 1 still ruins the attempt regardless.
     const gatherRarityRange = CONFIG.ASPECTSOFPOWER.craftRarityRanges?.[selectedRarity]
-                           ?? { floor: 1, ceiling: 100 };
+                           ?? { floor: 0, ceiling: 100 };
     const effectiveD100 = Math.min(
       d100Roll.total + gatherRarityRange.floor + gatherD100Bonus,
       gatherRarityRange.ceiling,
@@ -2681,7 +2681,7 @@ export class AspectsofPowerItem extends Item {
       ? (materialItem.system.rarity || 'common')
       : (reworkTarget?.system.rarity || 'common');
     const rarityRange = CONFIG.ASPECTSOFPOWER.craftRarityRanges?.[matRarity]
-                     ?? { floor: 1, ceiling: 100 };
+                     ?? { floor: 0, ceiling: 100 };
     const effectiveD100 = Math.min(d100Roll.total + rarityRange.floor + rarityFloorBonus + d100Bonus, rarityRange.ceiling);
     const d100Pct = effectiveD100 / 100;
 

@@ -723,8 +723,8 @@ ASPECTSOFPOWER.craftCategories = {
  * Material rarity → d100 roll floor/ceiling for crafting.
  */
 ASPECTSOFPOWER.craftRarityRanges = {
-  inferior:  { floor: 1,  ceiling: 25 },
-  common:    { floor: 1,  ceiling: 50 },
+  inferior:  { floor: 0,  ceiling: 25 },
+  common:    { floor: 0,  ceiling: 50 },
   uncommon:  { floor: 10, ceiling: 60 },
   rare:      { floor: 20, ceiling: 100 },
   epic:      { floor: 30, ceiling: 120 },
