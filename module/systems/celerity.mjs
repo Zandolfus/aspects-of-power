@@ -114,6 +114,19 @@ export function computeActionWait(actor, skill, weapon = null, investAmount = nu
   const baseWait = Math.max(1, Math.round((weight * multiplier * sc.SCALE) / speed));
 
   const isMagic = _MAGIC_TYPES.has(skill?.system?.roll?.type ?? '');
+
+  // Wand implement: −23% wait on Basic-tier spells. Tier-only check (no weight
+  // gate) per design discussion 2026-05-06 — heavily-altered Basic spells
+  // self-balance because their higher base weight already slows them; Wand's
+  // proportional reduction lets vanilla Basic hit ~3 casts/round while complex
+  // Basic spells benefit moderately. Applied to baseWait BEFORE the channel-
+  // wait MAX so a Wand-equipped caster paying low mana sees the speed-up.
+  let adjustedBaseWait = baseWait;
+  if (isMagic && skill?.system?.roll?.tier === 'basic'
+      && actor?.getEquippedImplements?.().has('wand')) {
+    adjustedBaseWait = Math.max(1, Math.round(baseWait * 0.77));
+  }
+
   // Channel wait sources: (a) magic spell with mana invest (investAmount IS
   // mana), or (b) infused melee with a separate manaInvestAmount on top of
   // the stamina invest. Wisdom controls channel rate the same way for both.
@@ -125,9 +138,9 @@ export function computeActionWait(actor, skill, weapon = null, investAmount = nu
     const wisMod = Math.max(1, actor.system.abilities?.wisdom?.mod ?? 0);
     const factor = sc.CHANNEL_FACTOR ?? 1000;
     const channelWait = Math.round(channelMana * factor / wisMod);
-    return Math.max(baseWait, channelWait);
+    return Math.max(adjustedBaseWait, channelWait);
   }
-  return baseWait;
+  return adjustedBaseWait;
 }
 
 /**

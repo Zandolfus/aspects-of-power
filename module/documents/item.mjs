@@ -3952,9 +3952,18 @@ export class AspectsofPowerItem extends Item {
       investedAmount = invested;
       rollData.roll.cost = invested;
       rollData.roll.variableSpellInvest = invested;
+      // Stave implement: +1 effective mana free for damage scaling on
+      // Greater+ spells (tier !== 'basic'). The actor pays the original
+      // `invested` cost; damage is computed as if invested were +1 higher.
+      // Tier-only check (matches Wand's tier-only path) — heavy alterations
+      // don't gate the bonus, the spell's natural baseMana growth already
+      // makes high-tier casts feel commensurate.
+      const hasStave = spellTier && spellTier !== 'basic'
+        && this.actor?.getEquippedImplements?.().has('stave');
+      const effectiveInvested = hasStave ? invested + 1 : invested;
       // Damage uses sized base for AOE (so over-invest above sized base
       // boosts damage), original base for non-AOE.
-      dmgFormula = String(Math.round(intMod * multiplier * Math.pow(Math.max(invested, 1) / Math.max(baseMana, 1), 0.2)));
+      dmgFormula = String(Math.round(intMod * multiplier * Math.pow(Math.max(effectiveInvested, 1) / Math.max(baseMana, 1), 0.2)));
 
       // Hand off to the AOE block below: store the pre-placed template +
       // override so the placement step there can skip re-prompting.

@@ -498,6 +498,25 @@ export class AspectsofPowerActor extends Actor {
   }
 
   /**
+   * Set of magic-implement tags carried by any currently-equipped weaponry-slot
+   * item. Used by the spell pillar (Stave +1 effective base mana on Greater+)
+   * and celerity (Wand −23% wait on Basic). Empty set if no implement equipped.
+   *
+   * @returns {Set<string>}  Implement tags found ('wand', 'stave', 'orb', etc.)
+   */
+  getEquippedImplements() {
+    const known = new Set(['wand', 'stave', 'staff', 'orb', 'tome', 'weave', 'doll']);
+    const found = new Set();
+    for (const item of this.items) {
+      if (item.type !== 'item') continue;
+      if (!item.system?.equipped) continue;
+      const tags = item.system?.tags ?? [];
+      for (const t of tags) if (known.has(t)) found.add(t);
+    }
+    return found;
+  }
+
+  /**
    * Sum craft bonuses from augments slotted in equipped profession gear.
    * @param {string} [element]  Material/output element. Bonuses with a matching
    *                            affinity (or no affinity) are included.
