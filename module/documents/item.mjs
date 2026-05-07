@@ -3952,15 +3952,22 @@ export class AspectsofPowerItem extends Item {
       investedAmount = invested;
       rollData.roll.cost = invested;
       rollData.roll.variableSpellInvest = invested;
-      // Staff implement: +1 effective mana free for damage scaling on
-      // Greater+ spells (tier !== 'basic'). The actor pays the original
-      // `invested` cost; damage is computed as if invested were +1 higher.
+      // Staff implement: +baseMana effective mana free for damage scaling
+      // on Greater+ spells (tier !== 'basic'). The actor pays the original
+      // `invested` cost; damage is computed as if invested were doubled by
+      // the spell's baseMana — i.e., the Staff "comps" one base cast.
       // Tier-only check (matches Wand's tier-only path) — heavy alterations
       // don't gate the bonus, the spell's natural baseMana growth already
       // makes high-tier casts feel commensurate.
+      //
+      // Math: bonus_factor = ((invested + baseMana) / baseMana)^0.2 over
+      // (invested / baseMana)^0.2 = (1 + baseMana/invested)^0.2.
+      // At base-only invest (invested = baseMana) → ×1.149 damage (~15%).
+      // At invested = 4×baseMana                   → ×1.046 damage (~5%).
+      // So Staff rewards efficient casting harder than over-investment.
       const hasStaff = spellTier && spellTier !== 'basic'
         && this.actor?.getEquippedImplements?.().has('staff');
-      const effectiveInvested = hasStaff ? invested + 1 : invested;
+      const effectiveInvested = hasStaff ? invested + baseMana : invested;
       // Damage uses sized base for AOE (so over-invest above sized base
       // boosts damage), original base for non-AOE.
       dmgFormula = String(Math.round(intMod * multiplier * Math.pow(Math.max(effectiveInvested, 1) / Math.max(baseMana, 1), 0.2)));
