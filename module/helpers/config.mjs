@@ -303,10 +303,12 @@ ASPECTSOFPOWER.weaponWeights = {
   shotgun:   180,
   longbow:   200,
   rifle:     240,
-  // Magic implements (used as melee fallback when struck — primary purpose
-  // is the implement bonus, but each is still a real weapon).
-  wand:       50,
-  staff:     100,
+  // Magic implements — for the rare case someone melee-bonks with one.
+  // Wand = fists (no real striking surface), staff = quarterstaff (2H stick).
+  // For the primary use case (casting spells through the implement), this
+  // weight is ignored — spell wait derives from spellTierWeights[tier].
+  wand:       40,
+  staff:     140,
 };
 
 /**
