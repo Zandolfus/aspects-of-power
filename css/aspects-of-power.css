@@ -2045,3 +2045,37 @@
 .aspects-of-power .free-points-display {
   margin: 8px 0;
 }
+
+/* Orb discharge-ready glow — pulsing arcane shimmer on skill rows whose
+   next cast will discharge accumulated orb charge for free + fast. */
+.aspects-of-power .item.orb-discharge-ready {
+  position: relative;
+  animation: aop-orb-glow 2s ease-in-out infinite;
+  border-radius: 3px;
+}
+.aspects-of-power .item.orb-discharge-ready::before {
+  content: '';
+  position: absolute;
+  inset: -1px;
+  border: 1px solid #6cf;
+  border-radius: 4px;
+  pointer-events: none;
+  box-shadow:
+    0 0 6px rgba(102, 204, 255, 0.6),
+    inset 0 0 6px rgba(102, 204, 255, 0.3);
+  animation: aop-orb-glow 2s ease-in-out infinite;
+}
+@keyframes aop-orb-glow {
+  0%, 100% {
+    box-shadow:
+      0 0 4px rgba(102, 204, 255, 0.4),
+      inset 0 0 4px rgba(102, 204, 255, 0.2);
+    opacity: 0.85;
+  }
+  50% {
+    box-shadow:
+      0 0 10px rgba(102, 204, 255, 0.85),
+      inset 0 0 8px rgba(102, 204, 255, 0.45);
+    opacity: 1.0;
+  }
+}

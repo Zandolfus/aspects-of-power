@@ -229,7 +229,7 @@
               </summary>
               <ol class='items-list'>
                 {{#each group.active as |item|}}
-                  <li class='item flexrow' data-item-id='{{item._id}}'>
+                  <li class='item flexrow{{#if item.dischargeReady}} orb-discharge-ready{{/if}}' data-item-id='{{item._id}}'>
                     <div class='item-name flexrow'>
                       <div class='item-image'>
                         <a class='rollable' data-roll-type='item'><img src='{{item.img}}' title='{{item.name}}' width='20' height='20' /></a>
@@ -247,7 +247,7 @@
                     <div class='item-name'><i class='fas fa-bolt'></i> Reactions</div>
                   </li>
                   {{#each group.reactions as |item|}}
-                    <li class='item flexrow skill-reaction' data-item-id='{{item._id}}'>
+                    <li class='item flexrow skill-reaction{{#if item.dischargeReady}} orb-discharge-ready{{/if}}' data-item-id='{{item._id}}'>
                       <div class='item-name flexrow'>
                         <div class='item-image'>
                           <a class='rollable' data-roll-type='item'><img src='{{item.img}}' title='{{item.name}}' width='20' height='20' /></a>
@@ -712,7 +712,7 @@
           </summary>
           <ol class='items-list'>
             {{#each group.active as |item|}}
-              <li class='item flexrow' data-item-id='{{item._id}}'>
+              <li class='item flexrow{{#if item.dischargeReady}} orb-discharge-ready{{/if}}' data-item-id='{{item._id}}'>
                 <div class='item-name flexrow'>
                   <div class='item-image'>
                     <a class='rollable' data-roll-type='item'><img src='{{item.img}}' title='{{item.name}}' width='20' height='20' /></a>
@@ -731,7 +731,7 @@
                 <div class='item-name'><i class='fas fa-bolt'></i> Reactions</div>
               </li>
               {{#each group.reactions as |item|}}
-                <li class='item flexrow skill-reaction' data-item-id='{{item._id}}'>
+                <li class='item flexrow skill-reaction{{#if item.dischargeReady}} orb-discharge-ready{{/if}}' data-item-id='{{item._id}}'>
                   <div class='item-name flexrow'>
                     <div class='item-image'>
                       <a class='rollable' data-roll-type='item'><img src='{{item.img}}' title='{{item.name}}' width='20' height='20' /></a>
