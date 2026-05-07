@@ -1,6 +1,6 @@
 import { EquipmentSystem } from '../systems/equipment.mjs';
 import { getPositionalTags } from '../helpers/positioning.mjs';
-import { recordActionFired, declareAction, isInActiveCombat, computeActionWait } from '../systems/celerity.mjs';
+import { recordActionFired, declareAction, isInActiveCombat, computeActionWait, referenceRoundLength } from '../systems/celerity.mjs';
 
 /**
  * Check if an actor is an assigned player character (not just owned).
@@ -3952,21 +3952,30 @@ export class AspectsofPowerItem extends Item {
       investedAmount = invested;
       rollData.roll.cost = invested;
       rollData.roll.variableSpellInvest = invested;
-      // Staff implement: +baseMana effective mana free for damage scaling
-      // on Greater+ spells (tier !== 'basic'). The actor pays the original
-      // `invested` cost; damage is computed as if invested were doubled by
-      // the spell's baseMana — i.e., the Staff "comps" one base cast.
-      // Tier-only check (matches Wand's tier-only path) — heavy alterations
-      // don't gate the bonus, the spell's natural baseMana growth already
-      // makes high-tier casts feel commensurate.
+      // Staff implement: +baseMana effective mana free for damage scaling.
+      // The original pre-celerity design statement: "When casting a spell
+      // using half or more than half your AP, increase the spell damage/
+      // size by one base cost for free." AP is a measurement of time, so
+      // the celerity-era equivalent is: the cast's wait (including any
+      // mana-channel time from heavy invest) must be ≥ 50% of the actor's
+      // reference round length. Big slow casts qualify; small quick ones
+      // don't, regardless of tier.
       //
-      // Math: bonus_factor = ((invested + baseMana) / baseMana)^0.2 over
-      // (invested / baseMana)^0.2 = (1 + baseMana/invested)^0.2.
-      // At base-only invest (invested = baseMana) → ×1.149 damage (~15%).
-      // At invested = 4×baseMana                   → ×1.046 damage (~5%).
-      // So Staff rewards efficient casting harder than over-investment.
-      const hasStaff = spellTier && spellTier !== 'basic'
-        && this.actor?.getEquippedImplements?.().has('staff');
+      // The actor pays the original `invested` cost; damage is computed
+      // as if they spent one base cost on top, comping a free base cast.
+      // High-tier scaling is implicit — Major/Grand baseMana is huge, so
+      // +baseMana on a qualifying Grand cast is a massive damage swing.
+      //
+      // (AOE-size variant — "one base cost free = +1 size step" — is a
+      // separate follow-up; placement-time UX needs to allow scrolling one
+      // step beyond the affordable max when the threshold will be met.)
+      const rl = this.actor?.system?.attributes?.race?.level ?? 1;
+      const roundLen = referenceRoundLength(rl);
+      const castWaitWithInvest = computeActionWait(this.actor, this, null, invested);
+      const apThresholdTicks = Math.ceil(roundLen * 0.5);
+      const hasStaff = this.actor?.getEquippedImplements?.().has('staff')
+        && roundLen > 0
+        && castWaitWithInvest >= apThresholdTicks;
       const effectiveInvested = hasStaff ? invested + baseMana : invested;
       // Damage uses sized base for AOE (so over-invest above sized base
       // boosts damage), original base for non-AOE.
