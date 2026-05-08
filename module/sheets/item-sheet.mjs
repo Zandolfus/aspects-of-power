@@ -888,12 +888,21 @@ export class AspectsofPowerItemSheet extends foundry.applications.api.Handlebars
     // Single sheet-wide listener. _onDrop routes by dropped item type:
     //   skill → grantedSkills  (anywhere on the sheet)
     //   augment → augment slot (uses event.target to find the closest slot)
-    if (this.item.type === 'item') {
+    //
+    // ApplicationV2 reuses `this.element` across re-renders (only inner
+    // content is replaced), so a fresh addEventListener on every render
+    // would stack handlers — one drop event would fire _onDrop N times.
+    // Guard with a sentinel dataset attribute so the binding happens once
+    // per element instance.
+    if (this.item.type === 'item' && !this.element.dataset.aopDropBound) {
       this.element.addEventListener('dragover', ev => {
         ev.preventDefault();
         ev.dataTransfer.dropEffect = 'copy';
       });
       this.element.addEventListener('drop', this._onDrop.bind(this));
+      this.element.dataset.aopDropBound = '1';
+    }
+    if (this.item.type === 'item') {
 
       this.element.querySelectorAll('.granted-skill-remove').forEach(el => {
         el.addEventListener('click', async (ev) => {
