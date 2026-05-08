@@ -515,14 +515,19 @@ Hooks.once('init', function () {
     }
 
     cs.tags = tags;
-    // Foundry merges flag objects deeply during update — keys in the update
-    // payload are added/overwritten but missing keys are NOT deleted. To
-    // force the stored `augmentGrantedTags` map to match `newOrigin` exactly
-    // (including dropping removed-augment entries), delete the whole field
-    // first via the `-=` path operator, then assign the new value. Both
-    // happen in the same update tick.
-    foundry.utils.setProperty(changes, 'flags.aspectsofpower.-=augmentGrantedTags', null);
-    foundry.utils.setProperty(changes, 'flags.aspectsofpower.augmentGrantedTags', newOrigin);
+    // Per-key flag patch via top-level path strings with `-=` for deletes.
+    // Foundry's update processor recognizes `-=` ONLY in top-level path
+    // segments (not in keys nested inside an object literal), so we have to
+    // express each removal as its own dotted path. Removed augment ids get
+    // a `-=ID` path; added/changed ids get a normal path assignment.
+    for (const removedId of removedIds) {
+      changes[`flags.aspectsofpower.augmentGrantedTags.-=${removedId}`] = null;
+    }
+    for (const addedId of addedIds) {
+      if (newOrigin[addedId] !== undefined) {
+        changes[`flags.aspectsofpower.augmentGrantedTags.${addedId}`] = newOrigin[addedId];
+      }
+    }
   });
 
   // ── Skill rarity demotion on character grade-up ──
