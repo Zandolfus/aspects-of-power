@@ -515,18 +515,14 @@ Hooks.once('init', function () {
     }
 
     cs.tags = tags;
-    // Per-key flag patch: set new entries, delete removed ones via the `-=`
-    // prefix Foundry uses for key deletion in updates. mergeObject would
-    // leave stale entries from removed augments because deep-merge preserves
-    // existing keys; explicit per-key ops are the only way to remove them.
-    changes.flags ??= {};
-    changes.flags.aspectsofpower ??= {};
-    const flagPatch = changes.flags.aspectsofpower.augmentGrantedTags ?? {};
-    for (const removedId of removedIds) flagPatch[`-=${removedId}`] = null;
-    for (const addedId of addedIds) {
-      if (newOrigin[addedId] !== undefined) flagPatch[addedId] = newOrigin[addedId];
-    }
-    changes.flags.aspectsofpower.augmentGrantedTags = flagPatch;
+    // Foundry merges flag objects deeply during update — keys in the update
+    // payload are added/overwritten but missing keys are NOT deleted. To
+    // force the stored `augmentGrantedTags` map to match `newOrigin` exactly
+    // (including dropping removed-augment entries), delete the whole field
+    // first via the `-=` path operator, then assign the new value. Both
+    // happen in the same update tick.
+    foundry.utils.setProperty(changes, 'flags.aspectsofpower.-=augmentGrantedTags', null);
+    foundry.utils.setProperty(changes, 'flags.aspectsofpower.augmentGrantedTags', newOrigin);
   });
 
   // ── Skill rarity demotion on character grade-up ──
