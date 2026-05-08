@@ -653,6 +653,13 @@ export class AspectsofPowerItemSheet extends foundry.applications.api.Handlebars
         await this.document.update({ 'system.isProfessionAugment': event.target.checked });
         return;
       }
+      if (event.target?.name === 'system.slotCost') {
+        // Min 1, integer. Direct update so the full-form processor doesn't
+        // choke on grantsTags being a string-vs-array.
+        const v = Math.max(1, Math.round(Number(event.target.value) || 1));
+        await this.document.update({ 'system.slotCost': v });
+        return;
+      }
     }
 
     // Chain config: collect chain entries when any chain select changes.
