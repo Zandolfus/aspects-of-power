@@ -33,6 +33,13 @@ export class AugmentData extends foundry.abstract.TypeDataModel {
         value:    new fields.NumberField({ initial: 0 }),
         affinity: new fields.StringField({ initial: '' }),
       }), { initial: [] }),
+
+      // Tags this augment grants to the host item when slotted. The reconcile
+      // hook in aspects-of-power.mjs appends these to item.system.tags on
+      // slot, strips them on unslot (tracking origin in
+      // flags.aspectsofpower.augmentGrantedTags so manual additions of the
+      // same tag survive). Per design-augment-tag-grants.md.
+      grantsTags: new fields.ArrayField(new fields.StringField(), { initial: [] }),
     };
   }
 }

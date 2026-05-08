@@ -396,6 +396,16 @@ export class AspectsofPowerItemSheet extends foundry.applications.api.Handlebars
       return;
     }
 
+    // Augment grantsTags — comma-separated text input → array of strings.
+    if (this.item.type === 'augment' && event.target?.name === 'system.grantsTags') {
+      const tags = (event.target.value ?? '')
+        .split(',')
+        .map(s => s.trim())
+        .filter(Boolean);
+      await this.document.update({ 'system.grantsTags': tags });
+      return;
+    }
+
     // Simple system fields (e.g. skillType, description): update directly
     // so the full-form processor doesn't choke on complex skill fields.
     if (this.item.type === 'skill' && (

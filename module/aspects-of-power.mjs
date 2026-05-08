@@ -447,6 +447,75 @@ Hooks.once('init', function () {
     }
   });
 
+  // ── Augment-granted tag reconcile ──
+  // Per design-augment-tag-grants.md: when an augment is slotted/unslotted
+  // on a host item, its `system.grantsTags` are appended/stripped from the
+  // host's `system.tags`. Origin is tracked in
+  // flags.aspectsofpower.augmentGrantedTags[augmentId] = [tags actually added]
+  // so unslot only removes what THIS augment added (preserves manual tags
+  // that happened to overlap with what an augment grants).
+  Hooks.on('preUpdateItem', (item, changes, options, _userId) => {
+    if (item.type !== 'item') return;
+    if (options.skipAugmentTagReconcile) return;
+    const cs = changes.system;
+    if (!cs) return;
+    const augFieldChanged = cs.augments !== undefined || cs.profAugments !== undefined;
+    if (!augFieldChanged) return;
+    if (!item.actor) return; // augment grants only apply when on an actor
+
+    const futureAugs    = (cs.augments ?? item.system.augments ?? [])
+      .filter(e => e.augmentId);
+    const futureProfAugs = (cs.profAugments ?? item.system.profAugments ?? [])
+      .filter(e => e.augmentId);
+    const futureIds = new Set([...futureAugs, ...futureProfAugs].map(e => e.augmentId));
+
+    const priorOrigin = item.flags?.aspectsofpower?.augmentGrantedTags ?? {};
+    const priorIds   = new Set(Object.keys(priorOrigin));
+
+    const removedIds = [...priorIds].filter(id => !futureIds.has(id));
+    const addedIds   = [...futureIds].filter(id => !priorIds.has(id));
+    if (removedIds.length === 0 && addedIds.length === 0) return;
+
+    // Start from the current tags (post any user edits in this same update).
+    let tags = [...(cs.tags ?? item.system.tags ?? [])];
+    const newOrigin = { ...priorOrigin };
+
+    // Strip tags ONLY if this augment was the one that added them (per origin).
+    // If the same tag appears in another augment's origin record, leave it.
+    for (const removedId of removedIds) {
+      const wasAdded = priorOrigin[removedId] ?? [];
+      delete newOrigin[removedId];
+      for (const tag of wasAdded) {
+        const stillAddedByOther = Object.values(newOrigin).some(g => g.includes(tag));
+        if (!stillAddedByOther) {
+          tags = tags.filter(t => t !== tag);
+        }
+      }
+    }
+
+    // For added augments: only record the tags this augment ACTUALLY added
+    // (i.e., that weren't already on the item). That way unslot only strips
+    // what slot added — manual additions of the same tag survive.
+    for (const addedId of addedIds) {
+      const aug = item.actor.items.get(addedId);
+      if (!aug || aug.type !== 'augment') continue;
+      const grants = aug.system?.grantsTags ?? [];
+      const actuallyAdded = [];
+      for (const tag of grants) {
+        if (!tags.includes(tag)) {
+          tags.push(tag);
+          actuallyAdded.push(tag);
+        }
+      }
+      newOrigin[addedId] = actuallyAdded;
+    }
+
+    cs.tags = tags;
+    changes.flags = foundry.utils.mergeObject(changes.flags ?? {}, {
+      aspectsofpower: { augmentGrantedTags: newOrigin },
+    });
+  });
+
   // ── Skill rarity demotion on character grade-up ──
   // Per design-skill-rarity-system.md: each grade-up at or after E→D
   // demotes every stored skill version one rarity tier (floor at the
@@ -492,6 +561,10 @@ Handlebars.registerHelper('toLowerCase', function (str) {
   return str.toLowerCase();
 });
 
+Handlebars.registerHelper('join', function (array, sep) {
+  if (!Array.isArray(array)) return '';
+  return array.join(typeof sep === 'string' ? sep : ', ');
+});
 Handlebars.registerHelper('includes', function (array, value) {
   return Array.isArray(array) && array.includes(value);
 });

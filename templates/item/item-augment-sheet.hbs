@@ -83,6 +83,14 @@
 
       <div class="equip-section">
         <div class="equip-section-header flexrow">
+          <h4>Granted Tags</h4>
+        </div>
+        <p class="hint" style="font-size:11px;color:#888;margin:2px 0 6px 0;">Comma-separated. Tags appended to the host item when this augment is slotted (e.g. <code>wand</code> turns the wielded weapon into a wand for implement bonuses).</p>
+        <input type="text" name="system.grantsTags" value="{{join system.grantsTags ', '}}" data-dtype="StringArray" placeholder="wand, fire-affinity" />
+      </div>
+
+      <div class="equip-section">
+        <div class="equip-section-header flexrow">
           <h4>{{localize "ASPECTSOFPOWER.Augment.itemBonuses"}}</h4>
           <a class="item-bonus-add" title="Add Item Bonus"><i class="fas fa-plus"></i></a>
         </div>
