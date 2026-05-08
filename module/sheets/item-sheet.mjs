@@ -219,32 +219,53 @@ export class AspectsofPowerItemSheet extends foundry.applications.api.Handlebars
       const slots = this.item.system.augmentSlots ?? 0;
       const existing = this.item.system.augments ?? [];
       context.augmentSlots = [];
+      const seenAug = new Set();
       for (let i = 0; i < slots; i++) {
         const entry = existing[i];
         const augmentId = entry?.augmentId ?? '';
-        let slotData = { filled: false, augmentId: '', name: '', img: '', bonusSummary: '' };
+        let slotData = { filled: false, augmentId: '', name: '', img: '', bonusSummary: '', isPrimary: false, isContinuation: false };
         if (augmentId && this.item.actor) {
           const augItem = this.item.actor.items.get(augmentId);
           if (augItem && augItem.type === 'augment') {
-            const statParts = (augItem.system.statBonuses ?? [])
-              .filter(b => b.ability && b.value)
-              .map(b => `${game.i18n.localize(CONFIG.ASPECTSOFPOWER.abilities[b.ability])} +${b.value}`);
-            const itemParts = (augItem.system.itemBonuses ?? [])
-              .filter(b => b.field && b.value)
-              .map(b => {
-                const label = b.field === 'armorBonus' ? game.i18n.localize('ASPECTSOFPOWER.Augment.fieldArmor')
-                            : game.i18n.localize('ASPECTSOFPOWER.Augment.fieldVeil');
-                const suffix = b.mode === 'percentage' ? '%' : '';
-                return `${label} +${b.value}${suffix}`;
-              });
-            const bonuses = [...statParts, ...itemParts].join(', ');
-            slotData = {
-              filled: true,
-              augmentId: augItem.id,
-              name: augItem.name,
-              img: augItem.img,
-              bonusSummary: bonuses || '—',
-            };
+            const isPrimary = !seenAug.has(augmentId);
+            seenAug.add(augmentId);
+            const cost = Math.max(1, augItem.system?.slotCost ?? 1);
+            if (isPrimary) {
+              const statParts = (augItem.system.statBonuses ?? [])
+                .filter(b => b.ability && b.value)
+                .map(b => `${game.i18n.localize(CONFIG.ASPECTSOFPOWER.abilities[b.ability])} +${b.value}`);
+              const itemParts = (augItem.system.itemBonuses ?? [])
+                .filter(b => b.field && b.value)
+                .map(b => {
+                  const label = b.field === 'armorBonus' ? game.i18n.localize('ASPECTSOFPOWER.Augment.fieldArmor')
+                              : game.i18n.localize('ASPECTSOFPOWER.Augment.fieldVeil');
+                  const suffix = b.mode === 'percentage' ? '%' : '';
+                  return `${label} +${b.value}${suffix}`;
+                });
+              const bonuses = [...statParts, ...itemParts].join(', ');
+              const slotNote = cost > 1 ? ` (${cost} slots)` : '';
+              slotData = {
+                filled: true,
+                augmentId: augItem.id,
+                name: augItem.name + slotNote,
+                img: augItem.img,
+                bonusSummary: bonuses || '—',
+                isPrimary: true,
+                isContinuation: false,
+              };
+            } else {
+              // Continuation slot — same augment as the primary, render as
+              // a visual bridge so the player sees the multi-slot occupancy.
+              slotData = {
+                filled: true,
+                augmentId: augItem.id,
+                name: '↳ ' + augItem.name,
+                img: augItem.img,
+                bonusSummary: '(continued)',
+                isPrimary: false,
+                isContinuation: true,
+              };
+            }
           }
         }
         context.augmentSlots.push(slotData);
@@ -254,24 +275,43 @@ export class AspectsofPowerItemSheet extends foundry.applications.api.Handlebars
       const profSlots = this.item.system.profAugmentSlots ?? 0;
       const profExisting = this.item.system.profAugments ?? [];
       context.profAugmentSlots = [];
+      const seenProfAug = new Set();
       for (let i = 0; i < profSlots; i++) {
         const entry = profExisting[i];
         const augmentId = entry?.augmentId ?? '';
-        let slotData = { filled: false, augmentId: '', name: '', img: '', bonusSummary: '' };
+        let slotData = { filled: false, augmentId: '', name: '', img: '', bonusSummary: '', isPrimary: false, isContinuation: false };
         if (augmentId && this.item.actor) {
           const augItem = this.item.actor.items.get(augmentId);
           if (augItem && augItem.type === 'augment') {
-            const craftParts = (augItem.system.craftBonuses ?? [])
-              .filter(b => b.type && b.value)
-              .map(b => `${b.type} ${b.value > 0 ? '+' : ''}${b.value}`);
-            const bonuses = craftParts.join(', ');
-            slotData = {
-              filled: true,
-              augmentId: augItem.id,
-              name: augItem.name,
-              img: augItem.img,
-              bonusSummary: bonuses || '—',
-            };
+            const isPrimary = !seenProfAug.has(augmentId);
+            seenProfAug.add(augmentId);
+            const cost = Math.max(1, augItem.system?.slotCost ?? 1);
+            if (isPrimary) {
+              const craftParts = (augItem.system.craftBonuses ?? [])
+                .filter(b => b.type && b.value)
+                .map(b => `${b.type} ${b.value > 0 ? '+' : ''}${b.value}`);
+              const bonuses = craftParts.join(', ');
+              const slotNote = cost > 1 ? ` (${cost} slots)` : '';
+              slotData = {
+                filled: true,
+                augmentId: augItem.id,
+                name: augItem.name + slotNote,
+                img: augItem.img,
+                bonusSummary: bonuses || '—',
+                isPrimary: true,
+                isContinuation: false,
+              };
+            } else {
+              slotData = {
+                filled: true,
+                augmentId: augItem.id,
+                name: '↳ ' + augItem.name,
+                img: augItem.img,
+                bonusSummary: '(continued)',
+                isPrimary: false,
+                isContinuation: true,
+              };
+            }
           }
         }
         context.profAugmentSlots.push(slotData);
@@ -869,20 +909,23 @@ export class AspectsofPowerItemSheet extends foundry.applications.api.Handlebars
         el.addEventListener('click', async (ev) => {
           const idx = Number(ev.currentTarget.dataset.index);
           const augments = [...(this.item.system.augments ?? [])];
-          if (idx >= 0 && idx < augments.length) {
-            augments[idx] = { augmentId: '' };
-            await this.item.update({ 'system.augments': augments });
-          }
+          if (idx < 0 || idx >= augments.length) return;
+          const targetId = augments[idx]?.augmentId;
+          if (!targetId) return;
+          // Multi-slot: clear EVERY slot occupied by this augment id.
+          const newAugs = augments.map(a => a?.augmentId === targetId ? { augmentId: '' } : a);
+          await this.item.update({ 'system.augments': newAugs });
         });
       });
       this.element.querySelectorAll('.prof-augment-remove').forEach(el => {
         el.addEventListener('click', async (ev) => {
           const idx = Number(ev.currentTarget.dataset.profIndex);
           const augments = [...(this.item.system.profAugments ?? [])];
-          if (idx >= 0 && idx < augments.length) {
-            augments[idx] = { augmentId: '' };
-            await this.item.update({ 'system.profAugments': augments });
-          }
+          if (idx < 0 || idx >= augments.length) return;
+          const targetId = augments[idx]?.augmentId;
+          if (!targetId) return;
+          const newAugs = augments.map(a => a?.augmentId === targetId ? { augmentId: '' } : a);
+          await this.item.update({ 'system.profAugments': newAugs });
         });
       });
     }
@@ -1013,25 +1056,50 @@ export class AspectsofPowerItemSheet extends foundry.applications.api.Handlebars
 
     const slots = this.item.system[slotsField] ?? 0;
     const existing = this.item.system[augField] ?? [];
+    const slotCost = Math.max(1, Math.round(augmentItem.system?.slotCost ?? 1));
+
+    // Helper: find a contiguous run of `count` empty slots, optionally
+    // starting at a specific index. Returns -1 if no fit.
+    const findContiguousEmpty = (startAt) => {
+      const isEmpty = (i) => !existing[i]?.augmentId;
+      if (startAt >= 0) {
+        if (startAt + slotCost > slots) return -1;
+        for (let j = 0; j < slotCost; j++) if (!isEmpty(startAt + j)) return -1;
+        return startAt;
+      }
+      for (let i = 0; i <= slots - slotCost; i++) {
+        let ok = true;
+        for (let j = 0; j < slotCost; j++) {
+          if (!isEmpty(i + j)) { ok = false; break; }
+        }
+        if (ok) return i;
+      }
+      return -1;
+    };
 
     // Determine target slot index from drop target element.
     const slotEl = event.target.closest(slotClass);
-    let targetIdx = slotEl ? Number(slotEl.dataset[indexAttr]) : -1;
+    const requestedIdx = slotEl ? Number(slotEl.dataset[indexAttr]) : -1;
 
-    // If no specific slot targeted, find the first empty slot.
-    if (targetIdx < 0 || targetIdx >= slots) {
-      targetIdx = -1;
-      for (let i = 0; i < slots; i++) {
-        if (!existing[i]?.augmentId) { targetIdx = i; break; }
+    let targetIdx;
+    if (requestedIdx >= 0 && requestedIdx < slots) {
+      // User dropped on a specific slot — try to start the run there.
+      targetIdx = findContiguousEmpty(requestedIdx);
+      if (targetIdx < 0) {
+        ui.notifications.warn(slotCost > 1
+          ? `Need ${slotCost} contiguous empty slots starting at this position.`
+          : 'This augment slot is already filled. Remove the existing augment first.');
+        return;
       }
-    } else if (existing[targetIdx]?.augmentId) {
-      ui.notifications.warn('This augment slot is already filled. Remove the existing augment first.');
-      return;
-    }
-
-    if (targetIdx < 0) {
-      ui.notifications.warn('No empty augment slots available.');
-      return;
+    } else {
+      // No specific slot — find the first contiguous empty run.
+      targetIdx = findContiguousEmpty(-1);
+      if (targetIdx < 0) {
+        ui.notifications.warn(slotCost > 1
+          ? `No contiguous run of ${slotCost} empty slots available.`
+          : 'No empty augment slots available.');
+        return;
+      }
     }
 
     // If the augment is not already owned by this actor, create a copy.
@@ -1053,10 +1121,12 @@ export class AspectsofPowerItemSheet extends foundry.applications.api.Handlebars
       }
     }
 
-    // Build updated augments array.
+    // Build updated augments array. Multi-slot augments occupy `slotCost`
+    // consecutive entries with the same augmentId; consumers dedupe by id
+    // so bonuses apply once regardless of slotCost.
     const newAugments = [];
     for (let i = 0; i < slots; i++) {
-      if (i === targetIdx) {
+      if (i >= targetIdx && i < targetIdx + slotCost) {
         newAugments.push({ augmentId: ownedAugment.id });
       } else {
         newAugments.push(existing[i] ?? { augmentId: '' });
@@ -1064,7 +1134,8 @@ export class AspectsofPowerItemSheet extends foundry.applications.api.Handlebars
     }
 
     await this.item.update({ [`system.${augField}`]: newAugments });
-    ui.notifications.info(`Slotted ${ownedAugment.name} into ${this.item.name}.`);
+    const slotNote = slotCost > 1 ? ` (${slotCost} slots)` : '';
+    ui.notifications.info(`Slotted ${ownedAugment.name}${slotNote} into ${this.item.name}.`);
   }
 
   /**

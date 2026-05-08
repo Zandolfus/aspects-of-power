@@ -40,6 +40,13 @@ export class AugmentData extends foundry.abstract.TypeDataModel {
       // flags.aspectsofpower.augmentGrantedTags so manual additions of the
       // same tag survive). Per design-augment-tag-grants.md.
       grantsTags: new fields.ArrayField(new fields.StringField(), { initial: [] }),
+
+      // Number of contiguous augment slots this augment occupies on the host
+      // item. Default 1 (one slot per augment, current behavior). Larger
+      // values mean the augment needs N consecutive free slots when slotted,
+      // and removing it clears all N. Bonuses still apply ONCE regardless of
+      // slotCost (iteration code dedupes by augment id).
+      slotCost: new fields.NumberField({ initial: 1, min: 1, integer: true }),
     };
   }
 }

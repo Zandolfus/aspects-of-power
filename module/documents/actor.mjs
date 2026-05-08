@@ -532,7 +532,11 @@ export class AspectsofPowerActor extends Actor {
       // Item must be slottable in a profession slot (primary or additional).
       const allSlots = [item.system.slot, ...(item.system.additionalSlots ?? [])].filter(Boolean);
       if (!allSlots.some(s => s.startsWith('prof'))) continue;
-      const profAugIds = (item.system.profAugments ?? []).map(a => a.augmentId).filter(Boolean);
+      // Dedupe by augment id — multi-slot augments occupy multiple entries
+      // with the same id, but bonuses should apply once per augment.
+      const profAugIds = [...new Set(
+        (item.system.profAugments ?? []).map(a => a.augmentId).filter(Boolean)
+      )];
       for (const augId of profAugIds) {
         const augment = this.items.get(augId);
         if (!augment || augment.type !== 'augment') continue;

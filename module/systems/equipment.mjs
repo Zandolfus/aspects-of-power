@@ -129,8 +129,13 @@ export class EquipmentSystem {
     let augArmorFlat = 0, augArmorPct = 0;
     let augVeilFlat = 0, augVeilPct = 0;
 
+    // Dedupe by augment id — multi-slot augments occupy multiple entries
+    // with the same id, but bonuses should apply once per augment.
+    const seenAugIds = new Set();
     for (const augEntry of (item.system.augments ?? [])) {
       if (!augEntry.augmentId) continue;
+      if (seenAugIds.has(augEntry.augmentId)) continue;
+      seenAugIds.add(augEntry.augmentId);
       const augItem = actor.items.get(augEntry.augmentId);
       if (!augItem || augItem.type !== 'augment') continue;
 

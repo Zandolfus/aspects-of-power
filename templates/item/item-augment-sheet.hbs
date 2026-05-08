@@ -30,6 +30,11 @@
           <input type="checkbox" name="system.isProfessionAugment" {{checked system.isProfessionAugment}} />
           Profession Augment (only fits in profession augment slots)
         </label>
+        <label style="display:flex;align-items:center;gap:6px;margin-top:6px;">
+          <span>Slot Cost:</span>
+          <input type="number" name="system.slotCost" value="{{system.slotCost}}" min="1" step="1" data-dtype="Number" style="width:60px;" />
+          <span class="hint" style="font-size:11px;color:#888;">Consumes N consecutive augment slots on the host item.</span>
+        </label>
       </div>
 
       {{#if system.isProfessionAugment}}
