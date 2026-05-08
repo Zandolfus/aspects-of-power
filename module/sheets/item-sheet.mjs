@@ -18,7 +18,14 @@ export class AspectsofPowerItemSheet extends foundry.applications.api.Handlebars
     window: { resizable: true },
     form: { submitOnChange: true },
     tabs: [{ navSelector: '.sheet-tabs', contentSelector: '.sheet-body', initial: 'description' }],
+    // Single sheet-wide drop target. _onDrop routes by dropped item type
+    // (skill → grantedSkills, augment → augment slot). dropSelector: null
+    // means accept drops anywhere on the sheet.
+    dragDrop: [{ dragSelector: null, dropSelector: null }],
   };
+
+  /** Allow drops when the sheet is editable. */
+  _canDragDrop(_selector) { return this.isEditable; }
 
   // Each item type maps to its own template file.
   static PARTS = {
@@ -885,23 +892,15 @@ export class AspectsofPowerItemSheet extends foundry.applications.api.Handlebars
     // Craft bonus is now single-row (no add/delete) — saved via _saveCraftBonuses on form change.
 
     // --- Drop handling for equipment items ---
-    // Single sheet-wide listener. _onDrop routes by dropped item type:
+    // _onDrop routes by dropped item type:
     //   skill → grantedSkills  (anywhere on the sheet)
     //   augment → augment slot (uses event.target to find the closest slot)
     //
-    // ApplicationV2 reuses `this.element` across re-renders (only inner
-    // content is replaced), so a fresh addEventListener on every render
-    // would stack handlers — one drop event would fire _onDrop N times.
-    // Guard with a sentinel dataset attribute so the binding happens once
-    // per element instance.
-    if (this.item.type === 'item' && !this.element.dataset.aopDropBound) {
-      this.element.addEventListener('dragover', ev => {
-        ev.preventDefault();
-        ev.dataTransfer.dropEffect = 'copy';
-      });
-      this.element.addEventListener('drop', this._onDrop.bind(this));
-      this.element.dataset.aopDropBound = '1';
-    }
+    // ApplicationV2's built-in DragDrop machinery (configured via
+    // DEFAULT_OPTIONS.dragDrop) calls _onDrop automatically — adding a
+    // second manual addEventListener stacks handlers on top of the
+    // framework's call, making drops fire 2× per event. Single listener
+    // via the framework is the right path.
     if (this.item.type === 'item') {
 
       this.element.querySelectorAll('.granted-skill-remove').forEach(el => {
