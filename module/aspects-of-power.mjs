@@ -515,13 +515,13 @@ Hooks.once('init', function () {
     }
 
     cs.tags = tags;
-    // Per-key flag patch via top-level path strings with `-=` for deletes.
-    // Foundry's update processor recognizes `-=` ONLY in top-level path
-    // segments (not in keys nested inside an object literal), so we have to
-    // express each removal as its own dotted path. Removed augment ids get
-    // a `-=ID` path; added/changed ids get a normal path assignment.
+    // Per-key flag patch using the V14.360+ ForcedDeletion sentinel for
+    // removals (the legacy `-=ID` prefix still works but emits a deprecation
+    // warning). Removed augment ids assign ForcedDeletion to that key;
+    // added/changed ids assign their tag list.
+    const ForcedDeletion = foundry.data?.operators?.ForcedDeletion;
     for (const removedId of removedIds) {
-      changes[`flags.aspectsofpower.augmentGrantedTags.-=${removedId}`] = null;
+      changes[`flags.aspectsofpower.augmentGrantedTags.${removedId}`] = ForcedDeletion;
     }
     for (const addedId of addedIds) {
       if (newOrigin[addedId] !== undefined) {
