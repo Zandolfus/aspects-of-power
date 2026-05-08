@@ -478,6 +478,10 @@ Hooks.once('init', function () {
 
     // Start from the current tags (post any user edits in this same update).
     let tags = [...(cs.tags ?? item.system.tags ?? [])];
+    // Build a working copy of origin to figure out what's still granted by
+    // remaining augments. The actual flag write uses per-key set/delete
+    // operators so removed augments are wiped from the stored map (otherwise
+    // Foundry's flag-merge keeps the stale entry).
     const newOrigin = { ...priorOrigin };
 
     // Strip tags ONLY if this augment was the one that added them (per origin).
@@ -511,9 +515,18 @@ Hooks.once('init', function () {
     }
 
     cs.tags = tags;
-    changes.flags = foundry.utils.mergeObject(changes.flags ?? {}, {
-      aspectsofpower: { augmentGrantedTags: newOrigin },
-    });
+    // Per-key flag patch: set new entries, delete removed ones via the `-=`
+    // prefix Foundry uses for key deletion in updates. mergeObject would
+    // leave stale entries from removed augments because deep-merge preserves
+    // existing keys; explicit per-key ops are the only way to remove them.
+    changes.flags ??= {};
+    changes.flags.aspectsofpower ??= {};
+    const flagPatch = changes.flags.aspectsofpower.augmentGrantedTags ?? {};
+    for (const removedId of removedIds) flagPatch[`-=${removedId}`] = null;
+    for (const addedId of addedIds) {
+      if (newOrigin[addedId] !== undefined) flagPatch[addedId] = newOrigin[addedId];
+    }
+    changes.flags.aspectsofpower.augmentGrantedTags = flagPatch;
   });
 
   // ── Skill rarity demotion on character grade-up ──
