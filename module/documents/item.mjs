@@ -1310,7 +1310,11 @@ export class AspectsofPowerItem extends Item {
         resolve(null);
       }, 10000);
       const handler = (msg) => {
-        if (msg?.type !== 'aoeRegionCreated' || msg.requestId !== requestId) return;
+        if (msg?.type !== 'aoeRegionCreated') return;
+        // Skip events not addressed to us — saves attach/detach work on
+        // other player clients receiving the broadcast.
+        if (msg.targetUserId && msg.targetUserId !== game.user.id) return;
+        if (msg.requestId !== requestId) return;
         clearTimeout(timeout);
         cleanup();
         if (msg.error) {
@@ -1360,10 +1364,13 @@ export class AspectsofPowerItem extends Item {
         // Companion to the player-side _gmCreateRegion helper. Creates the
         // requested Region on the named scene and emits the new region's UUID
         // back via the same socket so the requester can resolve their promise.
+        // The response includes targetUserId so non-requesting clients can
+        // skip handler attach/detach work for an event that doesn't concern them.
         const respond = (regionUuid, error = null) => {
           game.socket.emit('system.aspects-of-power', {
             type: 'aoeRegionCreated',
             requestId: payload.requestId,
+            targetUserId: payload.requesterId ?? null,
             regionUuid,
             error,
           });
