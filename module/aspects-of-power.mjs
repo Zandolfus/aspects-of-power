@@ -661,6 +661,37 @@ Hooks.once('ready', async function () {
   // Register celerity tracker auto-refresh hooks (idempotent).
   registerCelerityTrackerHooks();
 
+  // ── Orphaned AOE region cleanup ──
+  // When a combatant's declaredAction is cleared (cancel button, advance-
+  // fire, reset, movement charging it away, etc.) AND the prior declared
+  // action had a placed AOE region, the region would otherwise persist on
+  // canvas indefinitely. Detect the pre→post transition here and delete.
+  // GM-only path (direct delete) when running on the GM client; socket
+  // dispatch otherwise to land at the gmDeleteAoeRegion handler.
+  Hooks.on('preUpdateCombatant', (combatant, changes, _options, _userId) => {
+    const newDeclared = foundry.utils.getProperty(changes, 'flags.aspectsofpower.declaredAction');
+    if (newDeclared === undefined) return;
+    const priorRegionId = combatant.flags?.aspectsofpower?.declaredAction?.aoeRegionId;
+    const newRegionId = newDeclared?.aoeRegionId ?? null;
+    if (!priorRegionId || priorRegionId === newRegionId) return;
+    // Region orphaned — try canvas scene first, fall back to the combat's
+    // configured scene if different.
+    const candidates = [canvas?.scene, combatant.combat?.scene].filter(Boolean);
+    for (const scene of candidates) {
+      if (!scene.regions?.get(priorRegionId)) continue;
+      if (game.user.isGM) {
+        scene.deleteEmbeddedDocuments('Region', [priorRegionId]).catch(e => console.warn('[orphan-aoe-cleanup]', e));
+      } else {
+        game.socket.emit('system.aspects-of-power', {
+          type: 'gmDeleteAoeRegion',
+          sceneId: scene.id,
+          regionId: priorRegionId,
+        });
+      }
+      return;
+    }
+  });
+
   // Orb spell-charge: reset every combatant's accumulated charge at the
   // start of a fight so stale charge from a prior encounter doesn't leak
   // into a new one. Per-actor flag at flags.aspectsofpower.spellCharge.

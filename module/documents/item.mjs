@@ -4545,9 +4545,11 @@ export class AspectsofPowerItem extends Item {
       // Barrier skills defer cost deduction to executeGmAction (after target accepts).
       await _commitCastCost();
 
-      // Remove instantaneous AOE regions (duration = 0).
+      // Remove instantaneous AOE regions (duration = 0). Routes through GM
+      // dispatch since players don't have OWNER on the scene; a direct
+      // delete here would silently fail and orphan the region on canvas.
       if ((this.system.aoe.templateDuration ?? 0) === 0) {
-        await canvas.scene.deleteEmbeddedDocuments('Region', [templateDoc.id]);
+        await this._gmDeleteRegion(canvas.scene, templateDoc.id);
       }
 
       await this._applySustainEffect(speaker);
