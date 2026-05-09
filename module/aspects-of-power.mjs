@@ -406,48 +406,8 @@ Hooks.once('init', function () {
     }
   });
 
-  // ── Item auto-derive on input changes ──
-  // When a craftable item's progress / slot / material / rarity / tags
-  // changes, re-derive its statBonuses / armorBonus / veilBonus /
-  // augmentSlots / durability.max from the new state. Per-field locks
-  // in `system.lockedFields` skip individual outputs so manual overrides
-  // are preserved across input edits.
-  Hooks.on('preUpdateItem', (item, changes, options, _userId) => {
-    if (item.type !== 'item') return;
-    if (options.skipAutoDerive) return; // escape hatch
-    const cs = changes.system;
-    if (!cs) return;
-    const TRIGGERS = ['progress', 'slot', 'material', 'rarity', 'tags'];
-    if (!TRIGGERS.some(t => cs[t] !== undefined)) return;
-
-    // Build the post-update view of the item to derive against.
-    const futureSys = foundry.utils.mergeObject(
-      foundry.utils.deepClone(item.system),
-      cs,
-      { inplace: false },
-    );
-    const derived = deriveItemStats({ system: futureSys });
-    const locked = new Set(item.system.lockedFields ?? []);
-
-    // Patch only unlocked fields the caller hasn't already explicitly set
-    // in this update (so an explicit user edit always wins over derivation).
-    if (!locked.has('statBonuses')   && cs.statBonuses === undefined)   cs.statBonuses = derived.statBonuses;
-    if (!locked.has('armorBonus')    && cs.armorBonus === undefined)    cs.armorBonus = derived.armorBonus;
-    if (!locked.has('veilBonus')     && cs.veilBonus === undefined)     cs.veilBonus = derived.veilBonus;
-    if (!locked.has('augmentSlots')  && cs.augmentSlots === undefined)  cs.augmentSlots = derived.augmentSlots;
-    if (!locked.has('reach')         && cs.reach === undefined)         cs.reach = derived.reach;
-    if (!locked.has('durabilityMax')) {
-      cs.durability = cs.durability ?? {};
-      if (cs.durability.max === undefined) cs.durability.max = derived.durabilityMax;
-      // Cap value at the new max if unspecified.
-      const curValue = cs.durability.value ?? item.system.durability?.value ?? 0;
-      if (curValue > derived.durabilityMax && cs.durability.value === undefined) {
-        cs.durability.value = derived.durabilityMax;
-      }
-    }
-  });
-
-  // ── Augment-granted tag reconcile ──
+  // ── Augment-granted tag reconcile ── (registered FIRST so the auto-derive
+  // hook below sees augment-added tags in cs.tags when it runs.)
   // Per design-augment-tag-grants.md: when an augment is slotted/unslotted
   // on a host item, its `system.grantsTags` are appended/stripped from the
   // host's `system.tags`. Origin is tracked in
@@ -514,7 +474,13 @@ Hooks.once('init', function () {
       newOrigin[addedId] = actuallyAdded;
     }
 
-    cs.tags = tags;
+    // Only write cs.tags if it actually differs — otherwise we'd spuriously
+    // trigger the auto-derive hook (which fires on cs.tags presence) for
+    // every augment swap that doesn't change the host's effective tags.
+    const priorTags = cs.tags ?? item.system.tags ?? [];
+    const tagsChanged = tags.length !== priorTags.length
+      || tags.some((t, i) => t !== priorTags[i]);
+    if (tagsChanged) cs.tags = tags;
     // Per-key flag patch using the V14.360+ ForcedDeletion sentinel for
     // removals (the legacy `-=ID` prefix still works but emits a deprecation
     // warning). Removed augment ids assign ForcedDeletion to that key;
@@ -526,6 +492,49 @@ Hooks.once('init', function () {
     for (const addedId of addedIds) {
       if (newOrigin[addedId] !== undefined) {
         changes[`flags.aspectsofpower.augmentGrantedTags.${addedId}`] = newOrigin[addedId];
+      }
+    }
+  });
+
+  // ── Item auto-derive on input changes ──
+  // When a craftable item's progress / slot / material / rarity / tags
+  // changes, re-derive its statBonuses / armorBonus / veilBonus /
+  // augmentSlots / durability.max from the new state. Per-field locks
+  // in `system.lockedFields` skip individual outputs so manual overrides
+  // are preserved across input edits. Registered AFTER the augment-tag-
+  // grant reconcile so cs.tags already reflects augment-added tags by
+  // the time deriveItemStats runs against it.
+  Hooks.on('preUpdateItem', (item, changes, options, _userId) => {
+    if (item.type !== 'item') return;
+    if (options.skipAutoDerive) return; // escape hatch
+    const cs = changes.system;
+    if (!cs) return;
+    const TRIGGERS = ['progress', 'slot', 'material', 'rarity', 'tags'];
+    if (!TRIGGERS.some(t => cs[t] !== undefined)) return;
+
+    // Build the post-update view of the item to derive against.
+    const futureSys = foundry.utils.mergeObject(
+      foundry.utils.deepClone(item.system),
+      cs,
+      { inplace: false },
+    );
+    const derived = deriveItemStats({ system: futureSys });
+    const locked = new Set(item.system.lockedFields ?? []);
+
+    // Patch only unlocked fields the caller hasn't already explicitly set
+    // in this update (so an explicit user edit always wins over derivation).
+    if (!locked.has('statBonuses')   && cs.statBonuses === undefined)   cs.statBonuses = derived.statBonuses;
+    if (!locked.has('armorBonus')    && cs.armorBonus === undefined)    cs.armorBonus = derived.armorBonus;
+    if (!locked.has('veilBonus')     && cs.veilBonus === undefined)     cs.veilBonus = derived.veilBonus;
+    if (!locked.has('augmentSlots')  && cs.augmentSlots === undefined)  cs.augmentSlots = derived.augmentSlots;
+    if (!locked.has('reach')         && cs.reach === undefined)         cs.reach = derived.reach;
+    if (!locked.has('durabilityMax')) {
+      cs.durability = cs.durability ?? {};
+      if (cs.durability.max === undefined) cs.durability.max = derived.durabilityMax;
+      // Cap value at the new max if unspecified.
+      const curValue = cs.durability.value ?? item.system.durability?.value ?? 0;
+      if (curValue > derived.durabilityMax && cs.durability.value === undefined) {
+        cs.durability.value = derived.durabilityMax;
       }
     }
   });
