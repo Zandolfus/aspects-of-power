@@ -24,8 +24,13 @@ export class AspectsofPowerItemSheet extends foundry.applications.api.Handlebars
     dragDrop: [{ dragSelector: null, dropSelector: null }],
   };
 
-  /** Allow drops when the sheet is editable. */
-  _canDragDrop(_selector) { return this.isEditable; }
+  /**
+   * Allow drops only on equipment-item sheets (the drop router only handles
+   * 'item'-type hosts). Race/class/profession/etc. sheets share this base
+   * class but have no drop semantics; gating here prevents stray drops from
+   * leaking into them if the router ever expands.
+   */
+  _canDragDrop(_selector) { return this.isEditable && this.item.type === 'item'; }
 
   // Each item type maps to its own template file.
   static PARTS = {

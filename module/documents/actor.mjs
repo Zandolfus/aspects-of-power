@@ -499,10 +499,16 @@ export class AspectsofPowerActor extends Actor {
 
   /**
    * Set of magic-implement tags carried by any currently-equipped weaponry-slot
-   * item. Used by the spell pillar (Stave +1 effective base mana on Greater+)
-   * and celerity (Wand −23% wait on Basic). Empty set if no implement equipped.
+   * item. Used by the spell pillar (Staff +baseMana free invest on big casts)
+   * and celerity (Wand −23% wait on Basic, Orb spell-charge). Empty set if no
+   * implement equipped.
    *
-   * @returns {Set<string>}  Implement tags found ('wand', 'stave', 'orb', etc.)
+   * Restricted to the weaponry slot — a ring or other gear tagged with an
+   * implement tag (e.g. via an Augment that grants 'wand') would NOT light up
+   * the implement bonus unless equipped on weaponry. This matches the design
+   * intent that implements are wielded weapons, not arbitrary worn items.
+   *
+   * @returns {Set<string>}  Implement tags found ('wand', 'staff', 'orb', etc.)
    */
   getEquippedImplements() {
     const known = new Set(['wand', 'staff', 'orb', 'tome', 'weave', 'doll']);
@@ -510,6 +516,7 @@ export class AspectsofPowerActor extends Actor {
     for (const item of this.items) {
       if (item.type !== 'item') continue;
       if (!item.system?.equipped) continue;
+      if ((item.system?.slot ?? '') !== 'weaponry') continue;
       const tags = item.system?.tags ?? [];
       for (const t of tags) if (known.has(t)) found.add(t);
     }
