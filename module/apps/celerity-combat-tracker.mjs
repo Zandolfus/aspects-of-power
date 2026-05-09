@@ -80,6 +80,7 @@ async function _onCelAdvance(event, target) {
   const investAmount = declared.investAmount ?? null;
   const manaInvestAmount = declared.manaInvestAmount ?? null;
   const aoeRegionId = declared.aoeRegionId ?? null;
+  const orbDischarging = declared.orbDischarging ?? false;
   const linkedPlayer = game.users.find(u => !u.isGM && u.active && u.character?.id === c.actor?.id);
   if (linkedPlayer) {
     game.socket.emit('system.aspects-of-power', {
@@ -90,10 +91,11 @@ async function _onCelAdvance(event, target) {
       preInvestAmount: investAmount,
       preManaInvestAmount: manaInvestAmount,
       preAoeRegionId: aoeRegionId,
+      preOrbDischarging: orbDischarging,
     });
   } else {
     // No linked player online — GM (or whoever clicked Advance) runs it.
-    await item.roll({ executeDeferred: true, preInvestAmount: investAmount, preManaInvestAmount: manaInvestAmount, preAoeRegionId: aoeRegionId });
+    await item.roll({ executeDeferred: true, preInvestAmount: investAmount, preManaInvestAmount: manaInvestAmount, preAoeRegionId: aoeRegionId, preOrbDischarging: orbDischarging });
   }
 
   // Sync Foundry's combat.turn pointer to the new celerity-next-up combatant

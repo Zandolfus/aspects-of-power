@@ -3943,11 +3943,17 @@ export class AspectsofPowerItem extends Item {
       // invest dialog and force cost to 0. Damage uses base invest (=
       // baseMana). After the cast commits, charge resets in _commitCastCost.
       // Universal across tiers per design 2026-05-06.
+      //
+      // At deferred-fire time, honor the discharge decision captured at
+      // declare time — the actor's live spellCharge may have changed
+      // between declare and fire (other spells banked or discharged), but
+      // the player committed to the discharge when they queued the action.
       const orbCharge = this.actor?.flags?.aspectsofpower?.spellCharge ?? 0;
       const isOrbQualifying = !!spellTier;
-      const orbDischarging = isOrbQualifying
-        && this.actor?.getEquippedImplements?.().has('orb')
-        && orbCharge >= (sc.celerity?.ORB_DISCHARGE_THRESHOLD ?? 400);
+      const hasOrbEquipped = this.actor?.getEquippedImplements?.().has('orb');
+      const orbDischarging = options.preOrbDischarging
+        ?? (isOrbQualifying && hasOrbEquipped
+            && orbCharge >= (sc.celerity?.ORB_DISCHARGE_THRESHOLD ?? 400));
 
       let invested;
       if (orbDischarging) {
@@ -4229,6 +4235,9 @@ export class AspectsofPowerItem extends Item {
         investAmount: investedAmount,
         manaInvestAmount: infusedManaCost > 0 ? infusedManaCost : null,
         aoeRegionId: aoePerCastContext?.preplacedTemplateDoc?.id ?? null,
+        // Persist the orb-discharge decision so the deferred fire honors it
+        // even if the actor's spellCharge changes between declare and fire.
+        orbDischarging: orbDischargedThisCast,
       });
       return declared;
     }

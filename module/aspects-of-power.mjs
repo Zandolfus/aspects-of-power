@@ -693,6 +693,7 @@ Hooks.once('ready', async function () {
       preInvestAmount: data.preInvestAmount ?? null,
       preManaInvestAmount: data.preManaInvestAmount ?? null,
       preAoeRegionId: data.preAoeRegionId ?? null,
+      preOrbDischarging: data.preOrbDischarging ?? false,
     });
   });
 
