@@ -584,6 +584,7 @@ export class AspectsofPowerItemSheet extends foundry.applications.api.Handlebars
           || name === 'system.durability.value'
           || name === 'system.progress'
           || name === 'system.quantity' || name === 'system.weight'
+          || name === 'system.reach'
           || name === 'system.isMaterial' || name === 'system.materialElement') {
         let value;
         if (event.target.type === 'checkbox') value = event.target.checked;
@@ -685,23 +686,34 @@ export class AspectsofPowerItemSheet extends foundry.applications.api.Handlebars
 
     if (this.item.type === 'skill' && event.target?.name?.startsWith('system.roll.')) {
       const form = this.element.querySelector('form');
+      // For each field that may be hidden/conditionally rendered, preserve
+      // the existing value when its DOM input is absent. Fields without a
+      // ?? fallback to existing-value would silently revert to the literal
+      // default when their input isn't currently shown.
+      const r = this.item.system.roll ?? {};
       const rollData = {
-        dice:             form.querySelector('[name="system.roll.dice"]')?.value ?? '',
-        abilities:        form.querySelector('[name="system.roll.abilities"]')?.value ?? '',
-        resource:         form.querySelector('[name="system.roll.resource"]')?.value ?? '',
-        cost:             Number(form.querySelector('[name="system.roll.cost"]')?.value) || 0,
-        type:             form.querySelector('[name="system.roll.type"]')?.value ?? '',
-        diceBonus:        Number(form.querySelector('[name="system.roll.diceBonus"]')?.value) || 1,
-        targetDefense:    form.querySelector('[name="system.roll.targetDefense"]')?.value ?? '',
-        damageType:       form.querySelector('[name="system.roll.damageType"]')?.value ?? 'physical',
-        statType:         form.querySelector('[name="system.roll.statType"]')?.value ?? 'pure',
-        secondaryAbility: form.querySelector('[name="system.roll.secondaryAbility"]')?.value ?? '',
-        primaryWeight:    Number(form.querySelector('[name="system.roll.primaryWeight"]')?.value) || 1.0,
-        secondaryWeight:  Number(form.querySelector('[name="system.roll.secondaryWeight"]')?.value) || 0,
+        dice:             form.querySelector('[name="system.roll.dice"]')?.value ?? r.dice ?? '',
+        abilities:        form.querySelector('[name="system.roll.abilities"]')?.value ?? r.abilities ?? '',
+        resource:         form.querySelector('[name="system.roll.resource"]')?.value ?? r.resource ?? '',
+        cost:             Number(form.querySelector('[name="system.roll.cost"]')?.value ?? r.cost) || 0,
+        type:             form.querySelector('[name="system.roll.type"]')?.value ?? r.type ?? '',
+        diceBonus:        Number(form.querySelector('[name="system.roll.diceBonus"]')?.value ?? r.diceBonus) || 1,
+        targetDefense:    form.querySelector('[name="system.roll.targetDefense"]')?.value ?? r.targetDefense ?? '',
+        // Recent additions — must be included or full-form rebuild wipes
+        // them to defaults whenever any roll.* field changes.
+        secondaryTargetDefense: form.querySelector('[name="system.roll.secondaryTargetDefense"]')?.value ?? r.secondaryTargetDefense ?? '',
+        secondaryAffinity:      form.querySelector('[name="system.roll.secondaryAffinity"]')?.value ?? r.secondaryAffinity ?? '',
+        reach:                  Number(form.querySelector('[name="system.roll.reach"]')?.value ?? r.reach) || 0,
+        damageType:       form.querySelector('[name="system.roll.damageType"]')?.value ?? r.damageType ?? 'physical',
+        statType:         form.querySelector('[name="system.roll.statType"]')?.value ?? r.statType ?? 'pure',
+        secondaryAbility: form.querySelector('[name="system.roll.secondaryAbility"]')?.value ?? r.secondaryAbility ?? '',
+        primaryWeight:    Number(form.querySelector('[name="system.roll.primaryWeight"]')?.value ?? r.primaryWeight) || 1.0,
+        secondaryWeight:  Number(form.querySelector('[name="system.roll.secondaryWeight"]')?.value ?? r.secondaryWeight) || 0,
+        actionWeightMultiplier: Number(form.querySelector('[name="system.roll.actionWeightMultiplier"]')?.value ?? r.actionWeightMultiplier) || 1,
         // Preserve previously-set tier/grade when their inputs aren't in the DOM
         // (e.g. resource ≠ mana hides the spell-cost block).
-        tier:             form.querySelector('[name="system.roll.tier"]')?.value ?? this.item.system.roll?.tier ?? '',
-        grade:            form.querySelector('[name="system.roll.grade"]')?.value ?? this.item.system.roll?.grade ?? '',
+        tier:             form.querySelector('[name="system.roll.tier"]')?.value ?? r.tier ?? '',
+        grade:            form.querySelector('[name="system.roll.grade"]')?.value ?? r.grade ?? '',
       };
       await this.document.update({ 'system.roll': rollData });
       return;
