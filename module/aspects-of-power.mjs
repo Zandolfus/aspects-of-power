@@ -5,6 +5,7 @@ import { AspectsofPowerToken } from './documents/token.mjs';
 import { AspectsofPowerTokenObject } from './canvas/token.mjs';
 import { AspectsofPowerTokenRuler } from './canvas/token-ruler.mjs';
 import { attachOverlayLayer, detachOverlayLayer, refreshOverlay } from './canvas/movement-overlay.mjs';
+import { resetFirstContactSeen } from './systems/engagement-halts.mjs';
 // Import sheet classes.
 import { AspectsofPowerActorSheet } from './sheets/actor-sheet.mjs';
 import { AspectsofPowerItemSheet } from './sheets/item-sheet.mjs';
@@ -1281,6 +1282,12 @@ Hooks.on('updateCombat', (combat, change) => {
   refreshOverlay();
 });
 Hooks.on('deleteCombat', () => refreshOverlay());
+
+// Reset first-contact-seen tracking on combat start so each new encounter
+// starts with no stale "already seen" memory carrying over. Per design
+// 2026-05-10: first-contact LOS halts trigger only on truly new enemies
+// per encounter.
+Hooks.on('combatStart', combat => resetFirstContactSeen(combat));
 
 /* -------------------------------------------- */
 /*  Stamina-based Movement Cost & Limits        */

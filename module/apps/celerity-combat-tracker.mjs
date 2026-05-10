@@ -9,6 +9,7 @@
  */
 
 import { getClockTick, referenceRoundLength, runRoundEnd, MOVEMENT_ITEM_ID, interpolateMovementPosition } from '../systems/celerity.mjs';
+import { checkEngagementHalts } from '../systems/engagement-halts.mjs';
 
 const MAX_ROUND_BOUNDARIES_PER_ADVANCE = 5; // safety cap on multi-round catches
 
@@ -33,8 +34,8 @@ async function _onCelAdvance(event, target) {
     ui.notifications.info('No queued actions to advance to.');
     return;
   }
-  const { c, declared } = queued[0];
-  const newClock = declared.scheduledTick;
+  let { c, declared } = queued[0];
+  let newClock = declared.scheduledTick;
 
   // Round-end mechanics: fire onStartTurn + DoTs for any actor whose personal
   // round boundary was crossed by this clock advance. Per design-celerity.md
@@ -55,6 +56,26 @@ async function _onCelAdvance(event, target) {
     await member.update({
       [`flags.${FLAG_NS}.lastRoundEndAt`]: lastEnd + crossings * roundLen,
     });
+  }
+
+  // Engagement halts: before animating, check if any in-flight movement
+  // should be truncated due to melee engagement (entering enemy reach with
+  // LOS) or first-contact LOS (newly spotting / being spotted by an enemy).
+  // Truncates declaredAction in-place; the next animation pass slides to
+  // the new (shorter) endPos. Per design 2026-05-10.
+  await checkEngagementHalts(combat, newClock);
+
+  // Re-pick the firer in case halt-check truncated something to an earlier
+  // tick than originally targeted. Re-read declaredAction from the latest
+  // combatant flag so wait/scheduledTick reflect post-truncation values.
+  const requeued = [...combat.combatants]
+    .map(cm => ({ cm, declared: cm.flags?.[FLAG_NS]?.declaredAction ?? null }))
+    .filter(e => e.declared && typeof e.declared.scheduledTick === 'number')
+    .sort((a, b) => a.declared.scheduledTick - b.declared.scheduledTick);
+  if (requeued.length > 0 && requeued[0].declared.scheduledTick <= newClock) {
+    c = requeued[0].cm;
+    declared = requeued[0].declared;
+    newClock = declared.scheduledTick;
   }
 
   // Animate every in-flight movement to its interpolated position at the
