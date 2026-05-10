@@ -6,6 +6,7 @@ import { AspectsofPowerTokenObject } from './canvas/token.mjs';
 import { AspectsofPowerTokenRuler } from './canvas/token-ruler.mjs';
 import { attachOverlayLayer, detachOverlayLayer, refreshOverlay } from './canvas/movement-overlay.mjs';
 import { resetFirstContactSeen } from './systems/engagement-halts.mjs';
+import { onMoveKey, onCommitKey, onCancelKey, clearAllBuffers, getBuffer } from './canvas/movement-buffer.mjs';
 // Import sheet classes.
 import { AspectsofPowerActorSheet } from './sheets/actor-sheet.mjs';
 import { AspectsofPowerItemSheet } from './sheets/item-sheet.mjs';
@@ -135,6 +136,58 @@ Hooks.once('init', function () {
     type: Number,
     default: 30,
     range: { min: 0, max: 100, step: 5 },
+  });
+
+  // ── Movement Buffer Keybindings ──
+  // Higher-precedence (PRIORITY=0) handlers on WASD intercept core's
+  // single-step movement and accumulate into a buffer. Drag-to-move is
+  // unaffected — only keypress-driven moves go through the buffer. Per
+  // design 2026-05-10, multiple keystrokes consolidate into one celerity
+  // declaration.
+  const PRIORITY = CONST.KEYBINDING_PRECEDENCE.PRIORITY;
+  const _moveBinding = (id, name, key, dx, dy) => {
+    game.keybindings.register('aspects-of-power', id, {
+      name,
+      uneditable: [{ key }],
+      onDown: () => onMoveKey(dx, dy),
+      precedence: PRIORITY,
+      repeat: true,
+      reservedModifiers: ['Shift'],
+    });
+  };
+  _moveBinding('bufferedMoveUp',    'Buffered Move (Up)',    'KeyW',  0, -1);
+  _moveBinding('bufferedMoveDown',  'Buffered Move (Down)',  'KeyS',  0,  1);
+  _moveBinding('bufferedMoveLeft',  'Buffered Move (Left)',  'KeyA', -1,  0);
+  _moveBinding('bufferedMoveRight', 'Buffered Move (Right)', 'KeyD',  1,  0);
+
+  game.keybindings.register('aspects-of-power', 'commitBufferedMove', {
+    name: 'Commit Buffered Movement',
+    hint: 'Declare the accumulated WASD movement as a single celerity action.',
+    editable: [{ key: 'Enter' }],
+    // onDown can return a boolean OR a Promise — but the keybinding system
+    // wants a synchronous boolean for consume. Fire-and-forget the commit;
+    // return true to consume only when there's actually a buffer.
+    onDown: () => {
+      // Synchronous probe for any buffered combatant before consuming.
+      const combat = game.combat;
+      if (!combat?.started) return false;
+      const controlled = canvas?.tokens?.controlled ?? [];
+      const hasBuffered = controlled.some(t => {
+        const cm = combat.combatants.find(c => c.tokenId === t.id);
+        return cm && getBuffer(cm.id) !== null;
+      });
+      if (!hasBuffered) return false;
+      onCommitKey(); // async, but we already know there's something to commit
+      return true;
+    },
+    precedence: PRIORITY,
+  });
+  game.keybindings.register('aspects-of-power', 'cancelBufferedMove', {
+    name: 'Cancel Buffered Movement',
+    hint: 'Discard the staged WASD movement; token stays put.',
+    editable: [{ key: 'Escape' }],
+    onDown: () => onCancelKey(), // returns true only if a buffer was actually cancelled
+    precedence: PRIORITY,
   });
 
   // Add custom constants for configuration.
@@ -1288,6 +1341,15 @@ Hooks.on('deleteCombat', () => refreshOverlay());
 // 2026-05-10: first-contact LOS halts trigger only on truly new enemies
 // per encounter.
 Hooks.on('combatStart', combat => resetFirstContactSeen(combat));
+
+// Clear any staged movement buffers when combat ends or the scene tears
+// down — buffers are transient client-side state.
+Hooks.on('deleteCombat', () => clearAllBuffers());
+Hooks.on('canvasTearDown', () => clearAllBuffers());
+
+// Re-render the path overlay on buffer change so the staged destination
+// shows up live as the player taps WASD.
+Hooks.on('aopMovementBufferChanged', () => refreshOverlay());
 
 /* -------------------------------------------- */
 /*  Stamina-based Movement Cost & Limits        */

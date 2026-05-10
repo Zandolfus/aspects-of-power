@@ -13,6 +13,7 @@
  */
 
 import { MOVEMENT_ITEM_ID, interpolateMovementPosition, getClockTick } from '../systems/celerity.mjs';
+import { getAllBuffers } from './movement-buffer.mjs';
 
 const FLAG_NS = 'aspectsofpower';
 
@@ -67,6 +68,7 @@ export function refreshOverlay() {
   const sceneId = canvas.scene?.id;
   const clockTick = getClockTick(combat);
 
+  // Committed declared movements (solid).
   for (const member of combat.combatants) {
     const mv = member.flags?.[FLAG_NS]?.declaredAction;
     if (!mv || mv.itemId !== MOVEMENT_ITEM_ID) continue;
@@ -77,6 +79,60 @@ export function refreshOverlay() {
     const gfx = _buildPathGraphic(tokenDoc, mv, clockTick);
     if (gfx) _overlayContainer.addChild(gfx);
   }
+
+  // Staged WASD buffers (dashed yellow — pre-commit preview).
+  for (const buf of getAllBuffers()) {
+    const member = combat.combatants.get(buf.combatantId);
+    if (!member || !_isVisibleToCurrentUser(member)) continue;
+    const tokenDoc = member.token;
+    if (!tokenDoc || tokenDoc.parent?.id !== sceneId) continue;
+
+    const gfx = _buildBufferGraphic(tokenDoc, buf);
+    if (gfx) _overlayContainer.addChild(gfx);
+  }
+}
+
+/** Buffered (pre-commit) staging line in yellow. Dashed line + open circle
+ *  at destination + ft label. Distinct from the blue/red declared lines. */
+function _buildBufferGraphic(tokenDoc, buf) {
+  const gfx = new PIXI.Graphics();
+  gfx.eventMode = 'none';
+  const w = (tokenDoc.width ?? 1) * canvas.grid.size;
+  const h = (tokenDoc.height ?? 1) * canvas.grid.size;
+  const cx = w / 2, cy = h / 2;
+  const sx = buf.startPos.x + cx;
+  const sy = buf.startPos.y + cy;
+  const ex = buf.destPos.x + cx;
+  const ey = buf.destPos.y + cy;
+  const dx = ex - sx, dy = ey - sy;
+  const len = Math.hypot(dx, dy);
+  if (len <= 1) return null;
+  const color = 0xffcc33; // yellow — pre-commit
+  const alpha = 0.95;
+  _drawDashedLine(gfx, sx, sy, ex, ey, color, alpha);
+  // Open circle at destination (filled white center, yellow border).
+  if (typeof gfx.drawCircle === 'function') {
+    gfx.beginFill(0xffffff, 0.6);
+    gfx.lineStyle(2, color, 1.0);
+    gfx.drawCircle(ex, ey, 7);
+    gfx.endFill();
+  } else {
+    gfx.circle(ex, ey, 7);
+    gfx.fill({ color: 0xffffff, alpha: 0.6 });
+    gfx.stroke({ color, alpha: 1.0, width: 2 });
+  }
+  // Distance label as a PIXI Text near the destination.
+  const label = new PIXI.Text(`${buf.totalDistFt}ft (Enter to commit)`, {
+    fontSize: 12,
+    fill: 0xffcc33,
+    stroke: 0x000000,
+    strokeThickness: 3,
+    fontWeight: 'bold',
+  });
+  label.x = ex + 12;
+  label.y = ey - 8;
+  gfx.addChild(label);
+  return gfx;
 }
 
 /**
