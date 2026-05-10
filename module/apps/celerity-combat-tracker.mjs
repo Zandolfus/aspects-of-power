@@ -65,6 +65,13 @@ async function _onCelAdvance(event, target) {
   // the new (shorter) endPos. Per design 2026-05-10.
   await checkEngagementHalts(combat, newClock);
 
+  // Persistent AOE re-tick scan. Tokens standing inside a persistent AOE
+  // get re-ticked when (newClock - lastTickedAt) >= the AOE's caster
+  // reticPeriod (caster reference round / 4 per design). Foundry's region
+  // events handle entry / path-crossing fires; this scan handles the
+  // "still standing in" case which has no movement event to drive it.
+  await _scanPersistentAoeReticks(combat, newClock);
+
   // Re-pick the firer in case halt-check truncated something to an earlier
   // tick than originally targeted. Re-read declaredAction from the latest
   // combatant flag so wait/scheduledTick reflect post-truncation values.
@@ -214,6 +221,47 @@ async function _onCelCancel(event, target) {
   });
   const noun = declared?.itemId === MOVEMENT_ITEM_ID ? 'movement' : 'action';
   ui.notifications.info(`${c.name} — ${noun} cancelled.`);
+}
+
+/**
+ * For each persistent AOE region on the active scene, find tokens still
+ * inside (last-known position) and re-tick those whose (newClock - lastTickedAt)
+ * has crossed the region's casterReticPeriod. Region behaviors handle
+ * entry + path-crossing; this handles the "standing-in" cadence.
+ */
+async function _scanPersistentAoeReticks(combat, newClock) {
+  if (!game.user.isGM) return;
+  const scene = combat.scene ?? canvas.scene;
+  if (!scene) return;
+  const regions = scene.regions ?? [];
+  for (const region of regions) {
+    const flags = region.flags?.['aspects-of-power'];
+    if (!flags?.persistent || !flags.persistentData) continue;
+    const pd = flags.persistentData;
+    const period = pd.casterReticPeriod ?? 1175;
+    const affectedMap = pd.affectedTokens ?? {};
+    // Iterate combatants on this scene whose token is currently inside.
+    for (const member of combat.combatants) {
+      const tokenDoc = member.token;
+      if (!tokenDoc || tokenDoc.parent?.id !== scene.id) continue;
+      // Compute token center from its current document position.
+      const w = (tokenDoc.width ?? 1) * canvas.grid.size;
+      const h = (tokenDoc.height ?? 1) * canvas.grid.size;
+      const center = { x: tokenDoc.x + w / 2, y: tokenDoc.y + h / 2, elevation: tokenDoc.elevation ?? 0 };
+      if (!region.testPoint(center)) continue;
+      const lastTick = affectedMap[tokenDoc.id];
+      // Never-ticked here → entry-tick will be handled by the behavior's
+      // tokenEnter. Skip in this scan.
+      if (lastTick == null) continue;
+      if ((newClock - lastTick) < period) continue;
+      // Eligible for re-tick. Trigger via the system API; affectedTokens
+      // map will be updated to newClock by _triggerPersistentAoe.
+      const trigger = game.aspectsofpower?._triggerPersistentAoe;
+      if (typeof trigger === 'function') {
+        await trigger(tokenDoc, false);
+      }
+    }
+  }
 }
 
 async function _onCelReset(event, target) {

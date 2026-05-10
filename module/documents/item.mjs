@@ -3315,6 +3315,22 @@ export class AspectsofPowerItem extends Item {
                 targetingMode: aoe.targetingMode ?? 'all',
                 zoneEffect: aoe.zoneEffect ?? 'none',
                 casterDisposition: this.actor.getActiveTokens()?.[0]?.document?.disposition ?? CONST.TOKEN_DISPOSITIONS.NEUTRAL,
+                // Cadence period in ticks: caster's reference round / 4.
+                // Per design 2026-05-10: an AOE ticks on entry, then every
+                // quarter-round of the CASTER's reference frame thereafter
+                // for any token still inside. Faster casters (higher RL)
+                // produce AOEs that tick faster.
+                casterReticPeriod: (() => {
+                  try {
+                    const rl = this.actor.system?.attributes?.race?.level ?? 1;
+                    const refRound = game.aspectsofpower?.celerity?.referenceRoundLength?.(rl) ?? 4702;
+                    return Math.max(1, Math.round(refRound / 4));
+                  } catch (e) { return 1175; }
+                })(),
+                // affectedTokens: tokenId → clockTick of last tick.
+                // Replaces the legacy round-number tracking; per-actor
+                // re-tick eligibility is currentClockTick - lastTick >=
+                // casterReticPeriod.
                 affectedTokens: {},
               } : null,
             },

@@ -198,6 +198,9 @@ Hooks.once('init', function () {
   // now caught by Foundry's segmented region events.
   registerAoeBehavior();
   setAoeTrigger((tokenDoc, force) => _triggerPersistentAoe(tokenDoc, force));
+  // Expose on the game API so the celerity advance handler can call it
+  // for the periodic re-tick scan (still-standing-in cadence).
+  game.aspectsofpower._triggerPersistentAoe = _triggerPersistentAoe;
 
   // Add custom constants for configuration.
   CONFIG.ASPECTSOFPOWER = ASPECTSOFPOWER;
@@ -1392,11 +1395,15 @@ async function _triggerPersistentAoe(tokenDoc, force = false) {
 
     const pd = flags.persistentData;
 
-    // Check if already affected this round. affectedTokens is now {tokenId: round}.
+    // Cadence: tick on entry (force=true bypasses the period check),
+    // otherwise re-tick if currentClockTick - lastTickedAt >=
+    // casterReticPeriod (caster's reference round / 4 per design 2026-05-10).
+    // affectedTokens is {tokenId: lastTickedAtClockTick}.
     const affectedMap = pd.affectedTokens ?? {};
-    const lastAffectedRound = affectedMap[tokenDoc.id] ?? -1;
-    const currentRound = game.combat?.round ?? 0;
-    if (lastAffectedRound >= currentRound) continue;
+    const lastTickAt = affectedMap[tokenDoc.id] ?? null;
+    const currentTick = game.combat?.flags?.aspectsofpower?.clockTick ?? 0;
+    const period = pd.casterReticPeriod ?? 1175;
+    if (lastTickAt !== null && !force && (currentTick - lastTickAt) < period) continue;
 
     // Check containment.
     const obj = doc;
@@ -1414,8 +1421,8 @@ async function _triggerPersistentAoe(tokenDoc, force = false) {
       if (tokenDisp !== casterDisp) continue;
     }
 
-    // Mark as affected this round.
-    const updatedMap = { ...(pd.affectedTokens ?? {}), [tokenDoc.id]: currentRound };
+    // Record last-ticked clockTick for this token.
+    const updatedMap = { ...(pd.affectedTokens ?? {}), [tokenDoc.id]: currentTick };
     await doc.update({ 'flags.aspects-of-power.persistentData.affectedTokens': updatedMap });
 
     // Apply effects.
