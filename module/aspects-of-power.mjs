@@ -4,6 +4,7 @@ import { AspectsofPowerItem } from './documents/item.mjs';
 import { AspectsofPowerToken } from './documents/token.mjs';
 import { AspectsofPowerTokenObject } from './canvas/token.mjs';
 import { AspectsofPowerTokenRuler } from './canvas/token-ruler.mjs';
+import { attachOverlayLayer, detachOverlayLayer, refreshOverlay } from './canvas/movement-overlay.mjs';
 // Import sheet classes.
 import { AspectsofPowerActorSheet } from './sheets/actor-sheet.mjs';
 import { AspectsofPowerItemSheet } from './sheets/item-sheet.mjs';
@@ -1259,6 +1260,27 @@ Hooks.on('renderTokenHUD', (hud, html, data) => {
  */
 Hooks.on('combatTurnChange', () => AspectsofPowerToken.clearTrackers());
 Hooks.on('deleteCombat', () => AspectsofPowerToken.clearTrackers());
+
+/* -------------------------------------------- */
+/*  Movement Path Overlay                       */
+/* -------------------------------------------- */
+
+// Attach + detach the path-overlay container with the canvas lifecycle.
+Hooks.on('canvasReady', () => attachOverlayLayer());
+Hooks.on('canvasTearDown', () => detachOverlayLayer());
+
+// Re-render overlay when any combatant's flags change (declare / cancel /
+// movement completion clears the flag) or the combat clock advances (so
+// the current-position dot moves along the path).
+Hooks.on('updateCombatant', (combatant, change) => {
+  if (change?.flags?.aspectsofpower?.declaredAction !== undefined) refreshOverlay();
+});
+Hooks.on('updateCombat', (combat, change) => {
+  // Clock-tick changes don't always pass through `change` if we're updating
+  // it directly via combat.update — easier to refresh on any combat update.
+  refreshOverlay();
+});
+Hooks.on('deleteCombat', () => refreshOverlay());
 
 /* -------------------------------------------- */
 /*  Stamina-based Movement Cost & Limits        */
