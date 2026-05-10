@@ -7,6 +7,7 @@ import { AspectsofPowerTokenRuler } from './canvas/token-ruler.mjs';
 import { attachOverlayLayer, detachOverlayLayer, refreshOverlay } from './canvas/movement-overlay.mjs';
 import { resetFirstContactSeen } from './systems/engagement-halts.mjs';
 import { onMoveKey, onCommitKey, onCancelKey, clearAllBuffers, getBuffer } from './canvas/movement-buffer.mjs';
+import { registerAoeBehavior, setAoeTrigger } from './canvas/aoe-region-behavior.mjs';
 // Import sheet classes.
 import { AspectsofPowerActorSheet } from './sheets/actor-sheet.mjs';
 import { AspectsofPowerItemSheet } from './sheets/item-sheet.mjs';
@@ -189,6 +190,14 @@ Hooks.once('init', function () {
     onDown: () => onCancelKey(), // returns true only if a buffer was actually cancelled
     precedence: PRIORITY,
   });
+
+  // ── Persistent AOE Region Behavior ──
+  // Replaces the legacy updateToken endpoint check with native Foundry
+  // RegionBehavior path-segmentation. Brief pass-throughs (token enters
+  // and exits a persistent AOE between two parallel-animate ticks) are
+  // now caught by Foundry's segmented region events.
+  registerAoeBehavior();
+  setAoeTrigger((tokenDoc, force) => _triggerPersistentAoe(tokenDoc, force));
 
   // Add custom constants for configuration.
   CONFIG.ASPECTSOFPOWER = ASPECTSOFPOWER;

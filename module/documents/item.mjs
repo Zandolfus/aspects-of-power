@@ -3279,6 +3279,18 @@ export class AspectsofPowerItem extends Item {
             system: { difficulties: { walk: 2, crawl: 2, swim: 2, climb: 2 } },
           });
         }
+        // Persistent AOEs get our custom RegionBehavior that fires the
+        // damage/buff/debuff dispatch on tokenEnter / tokenMoveIn /
+        // tokenRoundStart events. Foundry segmentizes movement paths
+        // between updates so brief pass-throughs are caught natively
+        // (the old updateToken endpoint check missed those).
+        if ((aoe.templateDuration ?? 0) > 0) {
+          behaviors.push({
+            type: 'aspects-of-power.persistentAoe',
+            name: 'Persistent AOE Trigger',
+            system: {},
+          });
+        }
 
         const regionData = {
           name: `${this.name} AOE`,
