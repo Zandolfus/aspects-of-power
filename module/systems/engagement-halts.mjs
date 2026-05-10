@@ -2,21 +2,27 @@
  * Engagement halts — at every celerity-advance pause, check if any in-flight
  * movement should be truncated due to:
  *
- *   1. MELEE engagement: mover enters a hostile token's melee reach radius
- *      with line-of-sight. Halt at the reach boundary along the path.
+ *   1. MELEE engagement: a moving actor's path will come within
+ *      max(reachA, reachB) of an opposing actor. Solved ANALYTICALLY by
+ *      finding the first tick `t*` where the two actors' positions are at
+ *      engagement distance, then halting BOTH at `t*`. Per-side independent
+ *      lerp-based halts (the prior approach) gave wrong distances when both
+ *      parties were moving — each halt was computed against a stale
+ *      snapshot of the other's pre-halt lerp position.
  *
  *   2. FIRST-CONTACT LOS: mover (or hostile target) gains line-of-sight on
- *      a previously-unseen enemy at their new lerp position. Halt at the
- *      lerp position. Both establish "seen" so future LOS doesn't re-halt.
+ *      a previously-unseen enemy at their lerp position at the current
+ *      pause. Halt at lerp(newClock). Both establish "seen" so future LOS
+ *      doesn't re-halt during the same combat.
  *
- * Same-disposition and neutral (0) tokens never trigger halts. Only
- * opposite-disposition pairs (-1 hostile vs +1 friendly) engage.
+ * Same-disposition and neutral (0) tokens never trigger halts.
  *
- * Friendly-on-friendly halts are pointless per design 2026-05-10 — allies
- * pass through formation, no auto-stop.
+ * Engagement distance = max(reach_A, reach_B) per design 2026-05-10.
+ * Long-reach weapons control the engagement: Phil's greatsword (10ft) halts
+ * a Skink at 10ft, even though the Skink's claws reach only 5ft. The Skink
+ * would need to close another 5ft to retaliate.
  *
- * Stealth is OUT of scope here — see pending-stealth-mechanics.md for the
- * future LOS-override that lets stealthed movers bypass first-contact.
+ * Stealth is OUT of scope — see pending-stealth-mechanics.md.
  */
 
 import { MOVEMENT_ITEM_ID, interpolateMovementPosition } from './celerity.mjs';
@@ -24,9 +30,8 @@ import { MOVEMENT_ITEM_ID, interpolateMovementPosition } from './celerity.mjs';
 const FLAG_NS = 'aspectsofpower';
 
 /**
- * Run engagement-halt checks for every in-flight movement at the given
- * clock tick. Mutates combatant flags in-place to truncate halted movements
- * and posts chat notifications.
+ * Run engagement-halt checks at the given clock tick. Mutates combatant
+ * flags in-place to truncate halted movements and posts chat notifications.
  *
  * Call this in `_onCelAdvance` BEFORE the parallel-animation step so the
  * tokens animate to their (possibly truncated) positions.
@@ -37,135 +42,41 @@ const FLAG_NS = 'aspectsofpower';
 export async function checkEngagementHalts(combat, newClock) {
   if (!combat?.started) return;
 
-  const halts = [];
-  for (const mover of combat.combatants) {
-    const mv = mover.flags?.[FLAG_NS]?.declaredAction;
-    if (!mv || mv.itemId !== MOVEMENT_ITEM_ID) continue;
-    const moverTok = mover.token;
-    if (!moverTok) continue;
+  // Build the set of all in-flight movements.
+  const inFlight = combat.combatants.contents
+    .map(c => ({ cm: c, mv: c.flags?.[FLAG_NS]?.declaredAction }))
+    .filter(e => e.mv?.itemId === MOVEMENT_ITEM_ID && e.cm.token);
 
-    const halt = _evaluateHaltsForMover(combat, mover, moverTok, mv, newClock);
-    if (halt) halts.push(halt);
-  }
+  // Per-combatant earliest halt across all engagements they're part of.
+  // combatantId → { type, cause, haltPos, scheduledTick, wait }
+  const haltsByCombatantId = new Map();
 
-  // Apply updates after evaluation pass — keeps the read state consistent
-  // for all movers (neither sees the other's mid-pass mutation).
-  for (const halt of halts) {
-    await _applyHalt(combat, halt);
-  }
-}
+  // Iterate every (mover, opponent) pair (opposing disposition only).
+  // Opponent might or might not be in flight themselves.
+  for (const moverEntry of inFlight) {
+    const moverDisp = moverEntry.cm.token.disposition;
+    for (const opponent of combat.combatants) {
+      if (opponent.id === moverEntry.cm.id) continue;
+      if (!opponent.token) continue;
+      if (!_isOppositeDisposition(moverDisp, opponent.token.disposition)) continue;
 
-/**
- * Evaluate both halt triggers for one mover. Returns the EARLIEST halt
- * (smallest scheduledTick) found, or null if no halt fires.
- */
-function _evaluateHaltsForMover(combat, mover, moverTok, mv, newClock) {
-  const newPos = interpolateMovementPosition(mv, newClock);
-  const moverDisp = moverTok.disposition;
-  const moverSeen = new Set(mover.flags?.[FLAG_NS]?.firstContactSeen ?? []);
+      const evalResult = _evaluatePair(moverEntry, opponent, newClock);
+      if (!evalResult) continue;
 
-  let best = null;
-  for (const enemy of combat.combatants) {
-    if (enemy === mover) continue;
-    const enemyTok = enemy.token;
-    if (!enemyTok) continue;
-    if (!_isOppositeDisposition(moverDisp, enemyTok.disposition)) continue;
-
-    // Enemy's current position — lerp if also moving, else doc x/y.
-    const enemyMv = enemy.flags?.[FLAG_NS]?.declaredAction;
-    const enemyPos = (enemyMv?.itemId === MOVEMENT_ITEM_ID)
-      ? interpolateMovementPosition(enemyMv, newClock)
-      : { x: enemyTok.x, y: enemyTok.y };
-
-    // Center coordinates for distance and LOS math.
-    const moverCenter = _addCenter(newPos, moverTok);
-    const enemyCenter = _addCenter(enemyPos, enemyTok);
-
-    // ── Melee engagement halt ────────────────────────────────────────────
-    // Always run path-vs-circle intersection — checking only the new lerp
-    // position misses paths that ENTER and EXIT the reach circle within a
-    // single pause window (Phil + Skink charging through each other). LOS
-    // is verified AT the halt point, not at the final position, since the
-    // mover would be there when engagement establishes.
-    const reachPx = _computeThreatRadiusPx(enemyTok);
-    const haltPos = _findReachBoundary(mv.startPos, newPos, enemyPos, reachPx, moverTok, enemyTok);
-    if (haltPos) {
-      const haltCenter = _addCenter(haltPos, moverTok);
-      if (_hasLOS(enemyCenter, haltCenter)) {
-        const trunc = _truncateMovement(mv, haltPos);
-        if (!best || trunc.scheduledTick < best.scheduledTick) {
-          best = {
-            type: 'melee',
-            mover, enemy,
-            haltPos: trunc.haltPos,
-            wait: trunc.wait,
-            scheduledTick: trunc.scheduledTick,
-            distFt: trunc.distFt,
-          };
-        }
+      // Update each side's earliest halt.
+      if (evalResult.moverHalt) {
+        _setEarliestHalt(haltsByCombatantId, moverEntry.cm.id, evalResult.moverHalt);
       }
-    }
-
-    // ── First-contact LOS halt ───────────────────────────────────────────
-    const enemySeenSet = new Set(enemy.flags?.[FLAG_NS]?.firstContactSeen ?? []);
-    const alreadySeen = moverSeen.has(enemy.id) || enemySeenSet.has(mover.id);
-    if (!alreadySeen && _hasLOS(moverCenter, enemyCenter)) {
-      const trunc = _truncateMovement(mv, newPos);
-      if (!best || trunc.scheduledTick < best.scheduledTick) {
-        best = {
-          type: 'sight',
-          mover, enemy,
-          haltPos: trunc.haltPos,
-          wait: trunc.wait,
-          scheduledTick: trunc.scheduledTick,
-          distFt: trunc.distFt,
-        };
+      if (evalResult.opponentHalt) {
+        _setEarliestHalt(haltsByCombatantId, opponent.id, evalResult.opponentHalt);
       }
     }
   }
-  return best;
-}
 
-/**
- * Apply a halt: truncate the mover's declaredAction, mark first-contact
- * (if sight halt), post chat message.
- */
-async function _applyHalt(combat, halt) {
-  const { mover, enemy, type, haltPos, wait, scheduledTick, distFt } = halt;
-  const mv = mover.flags[FLAG_NS].declaredAction;
-  const labelSuffix = type === 'melee' ? ` (engaged ${enemy.name})` : ` (spotted ${enemy.name})`;
-  const newDeclared = {
-    ...mv,
-    endPos: haltPos,
-    wait,
-    scheduledTick,
-    distanceFt: Math.round(distFt),
-    label: mv.label.replace(/ \(engaged .+\)| \(spotted .+\)/, '') + labelSuffix,
-  };
-  const update = {
-    [`flags.${FLAG_NS}.declaredAction`]: newDeclared,
-    [`flags.${FLAG_NS}.nextActionTick`]: scheduledTick,
-  };
-
-  if (type === 'sight') {
-    const moverSeen = new Set(mover.flags?.[FLAG_NS]?.firstContactSeen ?? []);
-    moverSeen.add(enemy.id);
-    update[`flags.${FLAG_NS}.firstContactSeen`] = [...moverSeen];
-    // Also mark the enemy as having seen the mover (mutual establishment).
-    const enemySeen = new Set(enemy.flags?.[FLAG_NS]?.firstContactSeen ?? []);
-    enemySeen.add(mover.id);
-    await enemy.update({ [`flags.${FLAG_NS}.firstContactSeen`]: [...enemySeen] });
+  // Apply halts. Each combatant gets its single earliest halt.
+  for (const [cmId, haltInfo] of haltsByCombatantId) {
+    await _applyHalt(combat, cmId, haltInfo);
   }
-
-  await mover.update(update);
-
-  const causeText = type === 'melee'
-    ? `entered melee reach of <strong>${enemy.name}</strong>`
-    : `spotted <strong>${enemy.name}</strong> for the first time`;
-  ChatMessage.create({
-    speaker: ChatMessage.getSpeaker({ actor: mover.actor }),
-    content: `<p><em>${mover.name} ${causeText} — movement halted at ${Math.round(distFt)}ft, arriving tick ${scheduledTick}.</em></p>`,
-  });
 }
 
 /**
@@ -182,25 +93,248 @@ export async function resetFirstContactSeen(combat) {
 }
 
 /* ------------------------------------------------------------------ */
+/*  Pair evaluation (analytical first-touch + LOS first-contact)       */
+/* ------------------------------------------------------------------ */
+
+/**
+ * Evaluate one (mover, opponent) pair. Returns the halt info for each side
+ * (moverHalt, opponentHalt). opponentHalt is null when the opponent is
+ * stationary.
+ *
+ * Considers BOTH triggers:
+ *   - Melee: analytical first-touch at distance max(reachA, reachB)
+ *   - First-contact LOS: snap check at newClock (mover lerp vs opp lerp)
+ * Returns the earlier of the two for each side.
+ */
+function _evaluatePair(moverEntry, opponentCm, newClock) {
+  const mover = moverEntry.cm;
+  const moverMv = moverEntry.mv;
+  const moverTok = mover.token;
+  const oppTok = opponentCm.token;
+
+  const moverReachPx = _computeThreatRadiusPx(moverTok);
+  const oppReachPx = _computeThreatRadiusPx(oppTok);
+  const engageDistPx = Math.max(moverReachPx, oppReachPx);
+
+  const moverStartC = _addCenter(moverMv.startPos, moverTok);
+  const moverEndC = _addCenter(moverMv.endPos, moverTok);
+
+  const oppMv = (opponentCm.flags?.[FLAG_NS]?.declaredAction?.itemId === MOVEMENT_ITEM_ID)
+    ? opponentCm.flags[FLAG_NS].declaredAction
+    : null;
+  const oppStartC = oppMv ? _addCenter(oppMv.startPos, oppTok) : { x: oppTok.x + (oppTok.width ?? 1) * canvas.grid.size / 2, y: oppTok.y + (oppTok.height ?? 1) * canvas.grid.size / 2 };
+  const oppEndC = oppMv ? _addCenter(oppMv.endPos, oppTok) : oppStartC;
+
+  // ── Melee engagement: analytical first-touch ─────────────────────────
+  const meleeTouch = _solveFirstTouch(
+    moverStartC, moverEndC, moverMv.declaredAtTick, moverMv.scheduledTick,
+    oppStartC, oppEndC,
+    oppMv ? oppMv.declaredAtTick : 0,
+    oppMv ? oppMv.scheduledTick : Infinity,
+    engageDistPx
+  );
+
+  let moverHalt = null;
+  let opponentHalt = null;
+
+  if (meleeTouch && _hasLOS(meleeTouch.aPos, meleeTouch.bPos)) {
+    moverHalt = {
+      type: 'melee',
+      cause: opponentCm,
+      haltPos: _topLeftFromCenter(meleeTouch.aPos, moverTok),
+      scheduledTick: meleeTouch.tickT,
+      wait: Math.max(1, meleeTouch.tickT - moverMv.declaredAtTick),
+    };
+    if (oppMv) {
+      opponentHalt = {
+        type: 'melee',
+        cause: mover,
+        haltPos: _topLeftFromCenter(meleeTouch.bPos, oppTok),
+        scheduledTick: meleeTouch.tickT,
+        wait: Math.max(1, meleeTouch.tickT - oppMv.declaredAtTick),
+      };
+    }
+  }
+
+  // ── First-contact LOS halt: snap check at newClock ───────────────────
+  // (Less precise than analytical first-touch — fires when at newClock the
+  // mover is now seeing or being seen by an unseen enemy. Halt at lerp pos.)
+  const moverSeen = new Set(mover.flags?.[FLAG_NS]?.firstContactSeen ?? []);
+  const oppSeen = new Set(opponentCm.flags?.[FLAG_NS]?.firstContactSeen ?? []);
+  const alreadySeen = moverSeen.has(opponentCm.id) || oppSeen.has(mover.id);
+
+  if (!alreadySeen) {
+    const moverLerpC = _addCenter(interpolateMovementPosition(moverMv, newClock), moverTok);
+    const oppLerpC = oppMv
+      ? _addCenter(interpolateMovementPosition(oppMv, newClock), oppTok)
+      : oppStartC;
+    if (_hasLOS(moverLerpC, oppLerpC)) {
+      const sightTick = newClock;
+      const moverSightHalt = {
+        type: 'sight',
+        cause: opponentCm,
+        haltPos: _topLeftFromCenter(moverLerpC, moverTok),
+        scheduledTick: sightTick,
+        wait: Math.max(1, sightTick - moverMv.declaredAtTick),
+      };
+      // If sight halt is earlier than melee halt for the mover, prefer it.
+      if (!moverHalt || moverSightHalt.scheduledTick < moverHalt.scheduledTick) {
+        moverHalt = moverSightHalt;
+      }
+      // Sight halts don't truncate the opponent (sight is one-sided
+      // mechanically — the mover halts to assess; the opponent's intent is
+      // unchanged). Mutual `seen` tracking happens in _applyHalt.
+    }
+  }
+
+  if (!moverHalt && !opponentHalt) return null;
+  return { moverHalt, opponentHalt };
+}
+
+/**
+ * Solve the analytical first-touch problem for two actors with linear
+ * motion. Returns the earliest tick `t` in the valid overlap window
+ * where the actors are at `distPx` apart, plus their positions at that t.
+ *
+ * Math: |P_A(t) - P_B(t)|² = distPx²
+ *   P_A(t) = aStart + v_a · (t - aDecl)
+ *   v_a = (aEnd - aStart) / (aArrive - aDecl)
+ * Reduces to a quadratic in t; pick smallest valid root in
+ *   [max(aDecl, bDecl), min(aArrive, bArrive)].
+ *
+ * Stationary actor: aDecl = 0, aArrive = Infinity, v_a = 0. Reduces to
+ * line-circle intersection on the moving actor's path.
+ */
+function _solveFirstTouch(aStart, aEnd, aDecl, aArrive, bStart, bEnd, bDecl, bArrive, distPx) {
+  const aWait = aArrive - aDecl;
+  const bWait = bArrive - bDecl;
+  const va = (aWait > 0 && Number.isFinite(aWait))
+    ? { x: (aEnd.x - aStart.x) / aWait, y: (aEnd.y - aStart.y) / aWait }
+    : { x: 0, y: 0 };
+  const vb = (bWait > 0 && Number.isFinite(bWait))
+    ? { x: (bEnd.x - bStart.x) / bWait, y: (bEnd.y - bStart.y) / bWait }
+    : { x: 0, y: 0 };
+
+  // R0 = (A_start - v_a·aDecl) - (B_start - v_b·bDecl)
+  const R0 = {
+    x: (aStart.x - va.x * aDecl) - (bStart.x - vb.x * bDecl),
+    y: (aStart.y - va.y * aDecl) - (bStart.y - vb.y * bDecl),
+  };
+  const V = { x: va.x - vb.x, y: va.y - vb.y };
+  const V2 = V.x * V.x + V.y * V.y;
+  const R0V = R0.x * V.x + R0.y * V.y;
+  const R02 = R0.x * R0.x + R0.y * R0.y;
+  const d2 = distPx * distPx;
+
+  const tMin = Math.max(aDecl, bDecl);
+  const tMax = Math.min(aArrive, bArrive);
+  if (tMin >= tMax) return null;
+
+  let t = null;
+  if (V2 < 1e-9) {
+    // No relative motion — distance is constant.
+    if (R02 + 2 * tMin * R0V + tMin * tMin * V2 <= d2 + 1e-6) {
+      t = tMin;
+    }
+  } else {
+    const disc = R0V * R0V - V2 * (R02 - d2);
+    if (disc < 0) return null;
+    const sqd = Math.sqrt(disc);
+    const t1 = (-R0V - sqd) / V2;
+    const t2 = (-R0V + sqd) / V2;
+    // Smallest t in window. t1 ≤ t2.
+    if (t1 >= tMin && t1 <= tMax) t = t1;
+    else if (t2 >= tMin && t2 <= tMax) t = t2;
+    else if (t1 < tMin && t2 >= tMin) t = tMin; // already engaged at window start
+  }
+  if (t === null) return null;
+
+  const aPos = { x: aStart.x + va.x * (t - aDecl), y: aStart.y + va.y * (t - aDecl) };
+  const bPos = { x: bStart.x + vb.x * (t - bDecl), y: bStart.y + vb.y * (t - bDecl) };
+  return { tickT: Math.round(t), aPos, bPos };
+}
+
+/* ------------------------------------------------------------------ */
+/*  Halt application                                                   */
+/* ------------------------------------------------------------------ */
+
+function _setEarliestHalt(map, cmId, haltInfo) {
+  const existing = map.get(cmId);
+  if (!existing || haltInfo.scheduledTick < existing.scheduledTick) {
+    map.set(cmId, haltInfo);
+  }
+}
+
+async function _applyHalt(combat, cmId, haltInfo) {
+  const cm = combat.combatants.get(cmId);
+  if (!cm) return;
+  const mv = cm.flags?.[FLAG_NS]?.declaredAction;
+  if (!mv || mv.itemId !== MOVEMENT_ITEM_ID) return;
+
+  const labelSuffix = haltInfo.type === 'melee'
+    ? ` (engaged ${haltInfo.cause.name})`
+    : ` (spotted ${haltInfo.cause.name})`;
+  const totalDist = Math.hypot(mv.endPos.x - mv.startPos.x, mv.endPos.y - mv.startPos.y);
+  const haltDist = Math.hypot(haltInfo.haltPos.x - mv.startPos.x, haltInfo.haltPos.y - mv.startPos.y);
+  const ratio = totalDist > 0 ? Math.min(1, haltDist / totalDist) : 0;
+  const distFt = Math.round((mv.distanceFt ?? 0) * ratio);
+
+  const newDeclared = {
+    ...mv,
+    endPos: haltInfo.haltPos,
+    wait: Math.max(1, haltInfo.wait),
+    scheduledTick: haltInfo.scheduledTick,
+    distanceFt: distFt,
+    label: mv.label.replace(/ \(engaged .+\)| \(spotted .+\)/, '') + labelSuffix,
+  };
+  const update = {
+    [`flags.${FLAG_NS}.declaredAction`]: newDeclared,
+    [`flags.${FLAG_NS}.nextActionTick`]: haltInfo.scheduledTick,
+  };
+
+  if (haltInfo.type === 'sight') {
+    const moverSeen = new Set(cm.flags?.[FLAG_NS]?.firstContactSeen ?? []);
+    moverSeen.add(haltInfo.cause.id);
+    update[`flags.${FLAG_NS}.firstContactSeen`] = [...moverSeen];
+    const cause = combat.combatants.get(haltInfo.cause.id);
+    if (cause) {
+      const causeSeen = new Set(cause.flags?.[FLAG_NS]?.firstContactSeen ?? []);
+      causeSeen.add(cm.id);
+      await cause.update({ [`flags.${FLAG_NS}.firstContactSeen`]: [...causeSeen] });
+    }
+  }
+
+  await cm.update(update);
+
+  const causeText = haltInfo.type === 'melee'
+    ? `entered melee range of <strong>${haltInfo.cause.name}</strong>`
+    : `spotted <strong>${haltInfo.cause.name}</strong> for the first time`;
+  ChatMessage.create({
+    speaker: ChatMessage.getSpeaker({ actor: cm.actor }),
+    content: `<p><em>${cm.name} ${causeText} — movement halted at ${distFt}ft, arriving tick ${haltInfo.scheduledTick}.</em></p>`,
+  });
+}
+
+/* ------------------------------------------------------------------ */
 /*  Helpers                                                            */
 /* ------------------------------------------------------------------ */
 
-/** Same disposition or one of them is neutral → no halt. Only -1↔+1 triggers. */
 function _isOppositeDisposition(a, b) {
   return (a === 1 && b === -1) || (a === -1 && b === 1);
 }
 
-/** Add token-center offset to a top-left position. */
 function _addCenter(pos, tokenDoc) {
   const w = (tokenDoc.width ?? 1) * canvas.grid.size;
   const h = (tokenDoc.height ?? 1) * canvas.grid.size;
   return { x: pos.x + w / 2, y: pos.y + h / 2 };
 }
 
-/**
- * Threat radius for a token: their equipped weapon's reach in pixels,
- * defaulting to 5ft (one grid square at standard scale) for unarmed.
- */
+function _topLeftFromCenter(centerPos, tokenDoc) {
+  const w = (tokenDoc.width ?? 1) * canvas.grid.size;
+  const h = (tokenDoc.height ?? 1) * canvas.grid.size;
+  return { x: Math.round(centerPos.x - w / 2), y: Math.round(centerPos.y - h / 2) };
+}
+
 function _computeThreatRadiusPx(tokenDoc) {
   const actor = tokenDoc.actor;
   let reachFt = 5;
@@ -214,10 +348,6 @@ function _computeThreatRadiusPx(tokenDoc) {
   return reachFt * pxPerFt;
 }
 
-/**
- * LOS via wall-collision raycast. Returns true if NO sight-blocking wall
- * lies between the two canvas-coordinate points.
- */
 function _hasLOS(p1, p2) {
   try {
     const collides = foundry.canvas.geometry.ClockwiseSweepPolygon.testCollision(
@@ -225,69 +355,6 @@ function _hasLOS(p1, p2) {
     );
     return !collides;
   } catch (e) {
-    // If the raycast API fails (no scene walls, weird scene), default to LOS=true.
     return true;
   }
-}
-
-/**
- * Find the first point along path (start → end) where the path enters
- * a circle of `radiusPx` around `enemyPos` (centers added). Returns the
- * top-left position for the mover at that point, or null if no intersection.
- *
- * Math: parametric line from mover-center to mover-center-at-end, solve
- * quadratic for t where |P(t) - enemyCenter| = radiusPx.
- */
-function _findReachBoundary(startPos, endPos, enemyPos, radiusPx, moverTok, enemyTok) {
-  const moverCx = (moverTok.width ?? 1) * canvas.grid.size / 2;
-  const moverCy = (moverTok.height ?? 1) * canvas.grid.size / 2;
-  const enemyCx = (enemyTok.width ?? 1) * canvas.grid.size / 2;
-  const enemyCy = (enemyTok.height ?? 1) * canvas.grid.size / 2;
-
-  const sx = startPos.x + moverCx, sy = startPos.y + moverCy;
-  const ex = endPos.x   + moverCx, ey = endPos.y   + moverCy;
-  const enx = enemyPos.x + enemyCx, eny = enemyPos.y + enemyCy;
-
-  const dx = ex - sx, dy = ey - sy;
-  const fx = sx - enx, fy = sy - eny;
-  const a = dx*dx + dy*dy;
-  if (a < 0.001) return null; // zero-length path
-  const b = 2 * (fx*dx + fy*dy);
-  const c = fx*fx + fy*fy - radiusPx*radiusPx;
-  const disc = b*b - 4*a*c;
-  if (disc < 0) return null;
-
-  const sqd = Math.sqrt(disc);
-  const t1 = (-b - sqd) / (2*a);
-  const t2 = (-b + sqd) / (2*a);
-  let t = null;
-  if (t1 >= 0 && t1 <= 1) t = t1;
-  else if (t2 >= 0 && t2 <= 1) t = t2;
-  if (t === null) return null;
-
-  return {
-    x: Math.round(startPos.x + t * (endPos.x - startPos.x)),
-    y: Math.round(startPos.y + t * (endPos.y - startPos.y)),
-  };
-}
-
-/**
- * Recompute wait/scheduledTick for a movement truncated to `haltPos`.
- * Wait is prorated by (haltDist / totalDist); minimum 1 tick.
- */
-function _truncateMovement(mv, haltPos) {
-  const totalDx = mv.endPos.x - mv.startPos.x;
-  const totalDy = mv.endPos.y - mv.startPos.y;
-  const totalDist = Math.hypot(totalDx, totalDy);
-  const haltDx = haltPos.x - mv.startPos.x;
-  const haltDy = haltPos.y - mv.startPos.y;
-  const haltDist = Math.hypot(haltDx, haltDy);
-  const ratio = totalDist > 0 ? Math.min(1, haltDist / totalDist) : 0;
-  const wait = Math.max(1, Math.round(mv.wait * ratio));
-  const scheduledTick = (mv.declaredAtTick ?? 0) + wait;
-  // Distance in feet (for chat / label) — scale by per-foot ratio derived
-  // from the original declared distance.
-  const fullDistFt = mv.distanceFt ?? 0;
-  const distFt = fullDistFt * ratio;
-  return { haltPos, wait, scheduledTick, distFt };
 }
