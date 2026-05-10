@@ -82,11 +82,16 @@ function _evaluateHaltsForMover(combat, mover, moverTok, mv, newClock) {
     const enemyCenter = _addCenter(enemyPos, enemyTok);
 
     // ── Melee engagement halt ────────────────────────────────────────────
+    // Always run path-vs-circle intersection — checking only the new lerp
+    // position misses paths that ENTER and EXIT the reach circle within a
+    // single pause window (Phil + Skink charging through each other). LOS
+    // is verified AT the halt point, not at the final position, since the
+    // mover would be there when engagement establishes.
     const reachPx = _computeThreatRadiusPx(enemyTok);
-    const distPx = Math.hypot(enemyCenter.x - moverCenter.x, enemyCenter.y - moverCenter.y);
-    if (distPx <= reachPx && _hasLOS(enemyCenter, moverCenter)) {
-      const haltPos = _findReachBoundary(mv.startPos, newPos, enemyPos, reachPx, moverTok, enemyTok);
-      if (haltPos) {
+    const haltPos = _findReachBoundary(mv.startPos, newPos, enemyPos, reachPx, moverTok, enemyTok);
+    if (haltPos) {
+      const haltCenter = _addCenter(haltPos, moverTok);
+      if (_hasLOS(enemyCenter, haltCenter)) {
         const trunc = _truncateMovement(mv, haltPos);
         if (!best || trunc.scheduledTick < best.scheduledTick) {
           best = {
