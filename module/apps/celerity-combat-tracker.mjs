@@ -8,7 +8,7 @@
  * Wired by setting `CONFIG.ui.combat = CelerityCombatTracker` at init.
  */
 
-import { getClockTick, referenceRoundLength, runRoundEnd } from '../systems/celerity.mjs';
+import { getClockTick, referenceRoundLength, runRoundEnd, MOVEMENT_ITEM_ID, interpolateMovementPosition } from '../systems/celerity.mjs';
 
 const MAX_ROUND_BOUNDARIES_PER_ADVANCE = 5; // safety cap on multi-round catches
 
@@ -57,14 +57,74 @@ async function _onCelAdvance(event, target) {
     });
   }
 
-  // Advance clock + clear that combatant's celerity flags BEFORE firing —
-  // so the roll can re-queue if the actor declares a follow-up immediately.
+  // Animate every in-flight movement to its interpolated position at the
+  // new clock tick BEFORE the action resolves. Per design discussion
+  // 2026-05-10: at every pause, all moving tokens slide in parallel to
+  // wherever the lerp says they should be — each token only progresses up
+  // to its own scheduled-tick (ratio = (newClock - declaredAt) / wait).
+  // Tokens whose scheduled tick is reached commit to endPos and clear their
+  // declaredAction flag. `Promise.all` runs the slides concurrently so the
+  // visual rhythm is "tick beats" rather than serial per-token.
+  const movementUpdates = [];
+  const completedMovementCombatantIds = [];
+  for (const member of combat.combatants) {
+    const mv = member.flags?.[FLAG_NS]?.declaredAction;
+    if (!mv || mv.itemId !== MOVEMENT_ITEM_ID) continue;
+    const token = member.token;
+    if (!token) continue;
+    const target = interpolateMovementPosition(mv, newClock);
+    // Token.update with x/y triggers Foundry's animation by default.
+    // `_celerityCommit` flag tells our _preUpdateMovement override to
+    // bypass declare-and-cancel for this update (avoids infinite recursion).
+    movementUpdates.push(token.update(
+      { x: target.x, y: target.y },
+      { animation: { duration: 400 }, _celerityCommit: true }
+    ).catch(err => console.error(`movement animate failed for ${member.name}:`, err)));
+    if (newClock >= mv.scheduledTick) {
+      completedMovementCombatantIds.push({ id: member.id, mv });
+    }
+  }
+  await Promise.all(movementUpdates);
+
+  // Commit completion: clear flags + debit stamina for any movement that
+  // just landed. This includes the "fired" combatant if it was a movement.
+  for (const { id, mv } of completedMovementCombatantIds) {
+    const member = combat.combatants.get(id);
+    const updates = {
+      [`flags.${FLAG_NS}.declaredAction`]: null,
+      [`flags.${FLAG_NS}.nextActionTick`]: null,
+      [`flags.${FLAG_NS}.lastActionName`]: mv.label,
+      [`flags.${FLAG_NS}.lastActionWait`]: mv.wait,
+      [`flags.${FLAG_NS}.lastActionAt`]: newClock,
+    };
+    await member.update(updates);
+    if (mv.staminaCost && member.actor) {
+      const cur = member.actor.system.stamina?.value ?? 0;
+      await member.actor.update({
+        'system.stamina.value': Math.max(0, cur - mv.staminaCost),
+      });
+    }
+  }
+
+  // Advance clock. (Movement-completion combatants are already cleared
+  // above; for skill-action firings we still need to clear the firer's
+  // flags before dispatching so a follow-up can re-queue.)
   await combat.update({ [`flags.${FLAG_NS}.clockTick`]: newClock });
+
+  // Movement-completion branch: the action that drove this advance was a
+  // movement, so there's no skill roll to dispatch. The position update +
+  // flag clear above is the entire "fire" step.
+  if (declared.itemId === MOVEMENT_ITEM_ID) {
+    ui.notifications.info(`Clock → ${declared.scheduledTick}. ${c.name} arrives (${declared.label}).`);
+    return;
+  }
+
+  // Skill-action branch (existing flow): clear the firer's flags + dispatch
+  // the queued item to its canonical player (or run locally on GM).
   await c.update({
     [`flags.${FLAG_NS}.declaredAction`]: null,
     [`flags.${FLAG_NS}.nextActionTick`]: null,
   });
-  // Resolve the queued item and fire it via the deferred-execute path.
   const item = c.actor?.items?.get(declared.itemId);
   if (!item) {
     ui.notifications.warn(`${c.name}: queued item not found (id=${declared.itemId}); action skipped.`);
@@ -123,11 +183,16 @@ async function _onCelCancel(event, target) {
   const combat = this.viewed;
   const c = combat?.combatants.get(combatantId);
   if (!c) return;
+  const declared = c.flags?.[FLAG_NS]?.declaredAction;
+  // For a cancelled movement: token stays at its current position (which is
+  // the lerp position from the most recent pause). No stamina debit — sunk
+  // cost is the celerity-time spent, not the resource. Per design.
   await c.update({
     [`flags.${FLAG_NS}.nextActionTick`]: null,
     [`flags.${FLAG_NS}.declaredAction`]: null,
   });
-  ui.notifications.info(`${c.name} — action cancelled.`);
+  const noun = declared?.itemId === MOVEMENT_ITEM_ID ? 'movement' : 'action';
+  ui.notifications.info(`${c.name} — ${noun} cancelled.`);
 }
 
 async function _onCelReset(event, target) {

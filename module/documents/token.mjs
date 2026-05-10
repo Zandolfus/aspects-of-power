@@ -1,4 +1,4 @@
-import { chargeMovementCelerity } from '../systems/celerity.mjs';
+import { declareMovement } from '../systems/celerity.mjs';
 
 /**
  * Extended TokenDocument for Aspects of Power.
@@ -72,15 +72,30 @@ export class AspectsofPowerToken extends foundry.documents.TokenDocument {
 
   /**
    * v14 movement hook: called before a movement is committed.
-   * Return false to cancel the movement.
+   *
+   * In active combat this hook DECLARES the movement onto the celerity stack
+   * and CANCELS the immediate position update — the sprite stays put until
+   * the celerity advance handler reaches the move's scheduled tick (with
+   * intermediate animate-on-pause for parallel motion across actors).
+   *
+   * Outside combat, returns undefined → Foundry commits the move normally.
+   *
+   * Return false → cancel the move. Return undefined → let Foundry commit.
    */
   _preUpdateMovement(movement, operation) {
-    // Only enforce during active combat.
+    // Bypass for celerity-driven commits (the advance handler animating
+    // tokens to interpolated positions). Without this flag, our own
+    // token.update({x, y}) would recurse back through this hook and try to
+    // re-declare the same movement.
+    if (operation?._celerityCommit) return;
+
+    // Only intercept during active combat.
     const combat = game.combat;
     if (!combat?.started) return;
 
-    // Only validate once per movement (first segment).
-    // Sub-segments (chain > 0) are part of the same move — let them through.
+    // Only intervene on the first segment. Sub-segments are part of the same
+    // physical drag; cancelling the first prevents any sub-segment from
+    // committing.
     if (movement.chain?.length > 0) return;
 
     const actor = this.actor;
@@ -91,7 +106,7 @@ export class AspectsofPowerToken extends foundry.documents.TokenDocument {
     );
     if (!combatant) return;
 
-    // Block movement for debuffs.
+    // Block movement for debuffs (root, immobilized, frozen, sleep, stun, paralysis).
     const moveBlocker = this._getMovementBlocker(actor);
     if (moveBlocker) {
       const typeName = game.i18n.localize(
@@ -101,86 +116,59 @@ export class AspectsofPowerToken extends foundry.documents.TokenDocument {
       return false;
     }
 
-    // The cost function returns stamina cost and Infinity when all 3 actions are exhausted.
-    const staminaCost = (movement.passed?.cost ?? 0) + (movement.pending?.cost ?? 0);
-    if (!isFinite(staminaCost)) {
-      ui.notifications.warn('No more actions available this turn! (3/3 used)');
-      return false;
-    }
-    if (staminaCost <= 0) return;
-
-    // Check stamina.
-    const stamina = actor.system.stamina;
-    if (staminaCost > stamina.value) {
-      ui.notifications.warn('Insufficient stamina to move!');
+    // Refuse if the actor already has any declared action queued (movement or
+    // skill). Player must cancel the existing one first — celerity allows
+    // exactly one declaration at a time per actor.
+    const existing = combatant.flags?.aspectsofpower?.declaredAction;
+    if (existing && existing.itemId) {
+      ui.notifications.warn(`${actor.name} already has "${existing.label}" queued. Cancel it first before declaring movement.`);
       return false;
     }
 
-    // Calculate how many actions this move consumes by checking how many
-    // sprint-range boundaries are crossed.
-    const { walkRange, sprintRange } = this._getMovementRanges(actor);
-    const segmentSoFar = AspectsofPowerToken._segmentMovement.get(combatant.id) ?? 0;
+    // Stamina cost from Foundry's movement-cost calculator.
+    const staminaCost = Math.round((movement.passed?.cost ?? 0) + (movement.pending?.cost ?? 0));
+    if (staminaCost > actor.system.stamina.value) {
+      ui.notifications.warn(`${actor.name}: insufficient stamina (${actor.system.stamina.value}/${staminaCost} needed).`);
+      return false;
+    }
+
+    // Distance traveled (snapped to grid) drives celerity wait.
     const moveDist = (movement.passed?.distance ?? 0) + (movement.pending?.distance ?? 0);
     const moveSnapped = Math.round(moveDist / 5) * 5;
-    const totalDist = segmentSoFar + moveSnapped;
+    if (moveSnapped <= 0) return; // zero-distance update (e.g., elevation only) — let through
 
-    // Count how many full sprint ranges this move covers (each = 1 action).
-    const actionsFromMovement = Math.floor(totalDist / sprintRange);
-    const newSegmentTotal = totalDist % sprintRange || (totalDist > 0 && totalDist === sprintRange * actionsFromMovement ? 0 : totalDist % sprintRange);
+    // Resolve start + end canvas coordinates. Start = current document
+    // position (token hasn't moved yet); end = movement.destination if
+    // present, else inferred from the pending segment.
+    const startPos = { x: this.x, y: this.y };
+    const endPos = {
+      x: movement.destination?.x ?? movement.pending?.x ?? this.x,
+      y: movement.destination?.y ?? movement.pending?.y ?? this.y,
+    };
 
-    // Store for _onUpdateMovement.
-    this._pendingMovement = { combatantId: combatant.id, moveSnapped, newSegmentTotal, staminaCost, sprintRange, actionsFromMovement };
+    // Declare on the celerity stack. The `await` runs async after we return
+    // false; that's fine — the cancellation is synchronous, the declaration
+    // can settle on its own.
+    declareMovement(actor, startPos, endPos, moveSnapped, staminaCost).catch(err => {
+      console.error('declareMovement failed:', err);
+    });
+
+    // Cancel the immediate position commit. The celerity advance handler
+    // will animate + persist the position when the scheduled tick fires.
+    return false;
   }
 
   /**
    * v14 movement hook: called after a movement commits.
-   * Mutates stamina in-memory for instant feedback, no database write.
-   * Actual persist happens on skill use or turn change via flushStamina().
+   *
+   * In combat we cancel commits via `_preUpdateMovement` so this only fires
+   * for out-of-combat moves and for the celerity-driven commits we issue
+   * ourselves at execute time. Both cases need no special handling here —
+   * the position is already the canonical state.
    */
-  _onUpdateMovement(movement, operation, user) {
-    if (!this._pendingMovement) return;
-    if (game.user.id !== user.id) return;
-
-    const { combatantId, moveSnapped, newSegmentTotal, staminaCost, sprintRange, actionsFromMovement } = this._pendingMovement;
-    delete this._pendingMovement;
-
-    const actor = this.actor;
-    if (!actor) return;
-
-    // Update segment tracker (reset to position within current segment).
-    AspectsofPowerToken._segmentMovement.set(combatantId, newSegmentTotal);
-
-    // Consume actions for each sprint-range boundary crossed.
-    if (actionsFromMovement > 0) {
-      const currentActions = AspectsofPowerToken._moveActionTracker.get(combatantId) ?? 0;
-      const newActions = currentActions + actionsFromMovement;
-      AspectsofPowerToken._moveActionTracker.set(combatantId, newActions);
-
-      const _isPC = game.users.some(u => !u.isGM && u.active && u.character?.id === actor.id);
-      const whisper = _isPC ? {} : { whisper: ChatMessage.getWhisperRecipients('GM') };
-      ChatMessage.create({
-        speaker: ChatMessage.getSpeaker({ actor }),
-        ...whisper,
-        content: `<p><em>${actor.name} used ${actionsFromMovement} movement action${actionsFromMovement > 1 ? 's' : ''} (${newActions}/3 actions used).</em></p>`,
-      });
-    }
-
-    // Mutate stamina in-memory — no actor.update(), no prepareData().
-    actor._source.system.stamina.value -= staminaCost;
-    actor.system.stamina.value -= staminaCost;
-
-    // Track total pending cost for flushStamina() to persist later.
-    const existing = AspectsofPowerToken._pendingStaminaCost.get(actor.id) ?? 0;
-    AspectsofPowerToken._pendingStaminaCost.set(actor.id, existing + staminaCost);
-
-    // Lightweight sheet refresh (no full re-render).
-    if (actor.sheet?.rendered) actor.sheet.render(false);
-
-    // Charge celerity cost for the movement. Cancels any queued action
-    // (movement supersedes per design). No-op outside combat.
-    if (moveSnapped > 0) {
-      chargeMovementCelerity(actor, moveSnapped);
-    }
+  _onUpdateMovement(_movement, _operation, _user) {
+    // No-op in the new movement-as-action model. Stamina debit and tracker
+    // updates happen in the celerity advance handler at execute time.
   }
 
   /* -------------------------------------------- */

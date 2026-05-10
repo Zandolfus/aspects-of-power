@@ -385,11 +385,103 @@ export async function runRoundEnd(combat, combatant) {
   }
 }
 
+/** Sentinel itemId stored on `declaredAction` to mark a movement entry. */
+export const MOVEMENT_ITEM_ID = '__movement__';
+
 /**
- * Charge celerity cost for a movement that just happened on the canvas.
- * Sets the actor's combatant `nextActionTick = clockTick + cost`. If the
- * actor had a `declaredAction` queued, it's cancelled — movement supersedes
- * (sunk-cost; per design "only your own pending actions can be cancelled").
+ * Compute movement wait in ticks for `distanceFt` traveled by `actor`.
+ *   wait = (distanceFt / 5) × MOVEMENT_BASE_WEIGHT_PER_5FT × SCALE / dex.mod
+ *
+ * @param {Actor}  actor
+ * @param {number} distanceFt
+ * @returns {number} wait in ticks (min 1)
+ */
+export function computeMovementWait(actor, distanceFt) {
+  const sc = CONFIG.ASPECTSOFPOWER.celerity;
+  const moveBaseWeight = sc.MOVEMENT_BASE_WEIGHT_PER_5FT ?? 10;
+  const dexMod = Math.max(1, actor.system.abilities?.dexterity?.mod ?? 0);
+  return Math.max(1, Math.round((distanceFt / 5) * moveBaseWeight * sc.SCALE / dexMod));
+}
+
+/**
+ * Linear-interpolate position at the given clockTick along an active
+ * movement. If currentTick >= t_arrival, returns endPos. If <= t_decl,
+ * returns startPos.
+ *
+ * @param {{startPos:{x,y}, endPos:{x,y}, declaredAtTick:number, scheduledTick:number}} mv
+ * @param {number} currentTick
+ * @returns {{x:number, y:number}}
+ */
+export function interpolateMovementPosition(mv, currentTick) {
+  const t0 = mv.declaredAtTick ?? 0;
+  const t1 = mv.scheduledTick ?? t0;
+  if (currentTick >= t1) return { x: mv.endPos.x, y: mv.endPos.y };
+  if (currentTick <= t0 || t1 === t0) return { x: mv.startPos.x, y: mv.startPos.y };
+  const frac = (currentTick - t0) / (t1 - t0);
+  return {
+    x: Math.round(mv.startPos.x + frac * (mv.endPos.x - mv.startPos.x)),
+    y: Math.round(mv.startPos.y + frac * (mv.endPos.y - mv.startPos.y)),
+  };
+}
+
+/**
+ * Declare a movement on the celerity stack — does NOT commit the position.
+ * The token sprite stays where it is until the celerity advance handler
+ * reaches the movement's scheduledTick (or partway, for animate-on-pause).
+ *
+ * The movement is stored on `combatant.flags.aspectsofpower.declaredAction`
+ * with `itemId = MOVEMENT_ITEM_ID` (a sentinel — not a real Item id). The
+ * tracker recognizes this sentinel and runs movement-execute logic instead
+ * of dispatching a skill roll.
+ *
+ * Replaces the legacy `chargeMovementCelerity` immediate-charge path —
+ * movement is now a queued action like any other.
+ *
+ * @param {Actor}  actor
+ * @param {{x:number, y:number}} startPos   Token's current canvas position
+ * @param {{x:number, y:number}} endPos     Intended destination
+ * @param {number} distanceFt               Distance for cost / wait math
+ * @param {number} staminaCost              Stamina to debit at execute time
+ * @returns {Promise<{wait, scheduledTick}|null>}
+ */
+export async function declareMovement(actor, startPos, endPos, distanceFt, staminaCost) {
+  const combatant = findCombatantForActor(actor);
+  if (!combatant) return null;
+  if (distanceFt <= 0) return null;
+
+  const wait = computeMovementWait(actor, distanceFt);
+  const clockTick = getClockTick(combatant.combat);
+  const scheduledTick = clockTick + wait;
+  const label = `Move ${distanceFt}ft`;
+
+  await combatant.update({
+    'flags.aspectsofpower.declaredAction': {
+      itemId: MOVEMENT_ITEM_ID,
+      label,
+      wait,
+      scheduledTick,
+      declaredAtTick: clockTick,
+      startPos,
+      endPos,
+      staminaCost,
+      distanceFt,
+    },
+    'flags.aspectsofpower.nextActionTick': scheduledTick,
+    'flags.aspectsofpower.lastActionWait': wait,
+    'flags.aspectsofpower.lastActionName': `${label} (queued)`,
+  });
+
+  ChatMessage.create({
+    speaker: ChatMessage.getSpeaker({ actor }),
+    content: `<p><em>${actor.name} declares <strong>${label}</strong> — wait ${wait} ticks, arrives at tick ${scheduledTick}${staminaCost ? `, stamina cost ${staminaCost}` : ''}.</em></p>`,
+  });
+
+  return { wait, scheduledTick };
+}
+
+/**
+ * LEGACY — immediate-charge movement path. Kept for any caller that still
+ * uses the pre-declare-and-execute flow. New code should use declareMovement.
  *
  * Cost formula (placeholder, design open item #4):
  *   wait = (distanceFt / 5) × MOVEMENT_BASE_WEIGHT_PER_5FT × SCALE / dex.mod
@@ -403,10 +495,7 @@ export async function chargeMovementCelerity(actor, distanceFt) {
   if (!combatant) return null;
   if (distanceFt <= 0) return null;
 
-  const sc = CONFIG.ASPECTSOFPOWER.celerity;
-  const moveBaseWeight = sc.MOVEMENT_BASE_WEIGHT_PER_5FT ?? 10;
-  const dexMod = Math.max(1, actor.system.abilities?.dexterity?.mod ?? 0);
-  const wait = Math.max(1, Math.round((distanceFt / 5) * moveBaseWeight * sc.SCALE / dexMod));
+  const wait = computeMovementWait(actor, distanceFt);
   const clockTick = getClockTick(combatant.combat);
   const scheduledTick = clockTick + wait;
 
