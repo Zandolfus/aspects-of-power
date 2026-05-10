@@ -2079,3 +2079,34 @@
     opacity: 1.0;
   }
 }
+
+/* ─── Celerity combat tracker layout ───────────────────────────────────
+   The custom tracker template wraps the combatant list in
+   <section class="celerity-tracker-root">. Without explicit flex sizing
+   the list grows unbounded and pushes Foundry's footer (Start Combat /
+   advance / end-encounter) out of the visible sidebar area. Fix: make
+   the section a flex column that fills the tracker part, with the
+   clock row pinned and the <ol> scrolling internally. */
+[data-application-part="tracker"] {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: hidden;
+}
+.celerity-tracker-root {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: hidden;
+}
+.celerity-tracker-root .cel-clock-row {
+  flex-shrink: 0;
+}
+.celerity-tracker-root .celerity-tracker-list {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  margin: 0;
+}
