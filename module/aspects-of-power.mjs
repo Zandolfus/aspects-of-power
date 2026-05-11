@@ -1433,11 +1433,13 @@ Hooks.on('renderTokenHUD', (hud, html, data) => {
     ev.preventDefault();
     const map = game.user.getFlag('aspects-of-power', 'showRangeFor') ?? {};
     if (map[tokenDoc.id]) {
-      // Toggle off — use the `-=key` deletion prefix. setFlag merges by
-      // default, so a JS `delete` on the local copy + setFlag would just
-      // restore the key on the next merge. We need an explicit unset.
+      // Toggle off — setFlag merges by default, so a JS `delete` + setFlag
+      // would just restore the key on next merge. Use the V14.360+
+      // ForcedDeletion sentinel for the unset (the legacy `-=key` prefix
+      // still works but logs a deprecation warning).
+      const ForcedDeletion = foundry.data?.operators?.ForcedDeletion;
       await game.user.update({
-        [`flags.aspects-of-power.showRangeFor.-=${tokenDoc.id}`]: null,
+        [`flags.aspects-of-power.showRangeFor.${tokenDoc.id}`]: ForcedDeletion,
       });
     } else {
       // Toggle on — merge a single new entry; merge semantics are fine here.
