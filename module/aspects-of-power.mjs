@@ -1362,7 +1362,11 @@ Hooks.on('combatStart', combat => resetFirstContactSeen(combat));
 // no immediate damage, etc.) until the target moved or the next round-tick.
 //
 // Run on GM only (matches the trigger function's isGM guard). Iterate
-// scene tokens, fire trigger with force=true for any inside the region.
+// scene tokens, fire trigger with force=false so the cadence check in
+// _triggerPersistentAoe naturally dedupes against multi-client fires
+// (createRegion fires on every connected client; first GM to fire sets
+// lastTickAt = currentClock, subsequent fires see it set and skip via
+// the `(currentTick - lastTickAt) < period` gate).
 Hooks.on('createRegion', async (region, options, userId) => {
   if (!game.user.isGM) return;
   const flags = region.flags?.['aspects-of-power'];
@@ -1376,7 +1380,7 @@ Hooks.on('createRegion', async (region, options, userId) => {
     if (!tok) continue;
     const center = tok.center;
     if (!region.testPoint({ x: center.x, y: center.y, elevation: tokenDoc.elevation ?? 0 })) continue;
-    await trigger(tokenDoc, true); // force=true — entry tick always fires
+    await trigger(tokenDoc, false); // force=false — cadence gate dedupes multi-fires
   }
 });
 
