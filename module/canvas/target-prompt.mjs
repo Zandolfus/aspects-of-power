@@ -32,9 +32,10 @@ export function selectTargetOnCanvas(opts = {}) {
     const validate = opts.validate ?? (() => true);
 
     // Stash and switch tool. Foundry's `target` tool routes any token
-    // click into setTarget — what we want.
-    const prevControl = ui.controls?.activeControl ?? 'tokens';
-    const prevTool    = ui.controls?.activeTool    ?? 'select';
+    // click into setTarget — what we want. v14 deprecated activeControl /
+    // activeTool in favor of control.name / tool.name; use the new API.
+    const prevControl = ui.controls?.control?.name ?? 'tokens';
+    const prevTool    = ui.controls?.tool?.name    ?? 'select';
     ui.controls?.activate?.({ control: 'tokens', tool: 'target' });
 
     // Clear any prior targets so the next pick is unambiguous.
