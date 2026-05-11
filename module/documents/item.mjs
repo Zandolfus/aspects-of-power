@@ -4296,6 +4296,24 @@ export class AspectsofPowerItem extends Item {
       rollData.roll.variableManaCost = chosenMana;
     }
 
+    // ── Static AOE pre-placement (non-variable-spell AOEs) ──
+    // Variable-spell AOEs (fireball etc) already pre-placed earlier as part
+    // of the invest dialog. Non-attack AOEs (Vine Trap, Spore Heal field,
+    // etc.) skip that branch — without this block they'd defer to fire
+    // time and prompt placement when the player clicks Advance. Bad UX.
+    // Place at declare time so the player commits the location now.
+    if (!options.executeDeferred
+        && (this.system.aoe?.enabled === true || (this.system.alterations ?? []).some(a => (a.id ?? a) === 'aoe'))
+        && !aoePerCastContext?.preplacedTemplateDoc
+        && this.actor && isInActiveCombat(this.actor)) {
+      const casterToken = this.actor.getActiveTokens()?.[0];
+      if (casterToken) {
+        const placedRegion = await this._placeAoeTemplate(casterToken, null, null);
+        if (!placedRegion) return; // cancelled
+        aoePerCastContext = { preplacedTemplateDoc: placedRegion };
+      }
+    }
+
     // ── Celerity declaration gate ─────────────────────────────────────
     // In an active combat, queue this skill on the combatant's
     // declaredAction flag and bail. The tracker's "Advance to next" fires
