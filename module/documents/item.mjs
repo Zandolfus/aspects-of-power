@@ -5022,8 +5022,8 @@ export class AspectsofPowerItem extends Item {
         if (cHitRoll) await cHitRoll.toMessage({ speaker, rollMode, ...(whisperGM ? { whisper: whisperGM } : {}), flavor: `${chainLabel} — To Hit` });
         await cDmgRoll.toMessage({ speaker, rollMode, ...(whisperGM ? { whisper: whisperGM } : {}), flavor: `${chainLabel} — Roll` });
 
-        // Dispatch each of the chained skill's own tags.
-        const chainTags = chainedItem.system.tags ?? [];
+        // Dispatch each of the chained skill's own tags. (chainTags
+        // already declared above for the pierce / fully-blocked gate.)
         for (const tag of chainTags) {
           switch (tag) {
             case 'attack':
