@@ -104,10 +104,11 @@ export function selectTargetOnCanvas(opts = {}) {
 export function skillNeedsTargetPrompt(item) {
   if (!item || item.type !== 'skill') return false;
   if (item.system.skillType === 'Passive') return false;
-  // Profession skills (craft, gather, refine, prep) operate on materials /
-  // workstations, never on canvas tokens. Skip the prompt entirely.
-  if (item.system.skillCategory === 'profession') return false;
   const tags = item.system.tags ?? [];
+  // Profession skills (craft, gather, refine, prep) operate on materials /
+  // workstations, never on canvas tokens. Skip the prompt — EXCEPT repair,
+  // which DOES need a target (the equipment / object being repaired).
+  if (item.system.skillCategory === 'profession' && !tags.includes('repair')) return false;
   // AOE has its own placement; skip the single-target prompt.
   if ((item.system.aoe?.enabled === true) || tags.includes('aoe') || (item.system.alterations ?? []).some(a => (a.id ?? a) === 'aoe')) return false;
   // Sustain toggles on self — no target.
