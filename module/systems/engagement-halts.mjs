@@ -357,7 +357,12 @@ function _topLeftFromCenter(centerPos, tokenDoc) {
   return { x: Math.round(centerPos.x - w / 2), y: Math.round(centerPos.y - h / 2) };
 }
 
-function _computeThreatRadiusPx(tokenDoc) {
+/**
+ * Threat radius in feet for a token's equipped weapon (default 5 if no
+ * weapon or no explicit reach). Public — also used by the threat-range
+ * aura on the canvas layer.
+ */
+export function getThreatRadiusFt(tokenDoc) {
   const actor = tokenDoc.actor;
   let reachFt = 5;
   if (actor?.items) {
@@ -366,8 +371,12 @@ function _computeThreatRadiusPx(tokenDoc) {
     );
     if (equipped?.system?.reach) reachFt = Math.max(5, equipped.system.reach);
   }
+  return reachFt;
+}
+
+function _computeThreatRadiusPx(tokenDoc) {
   const pxPerFt = canvas.grid.size / canvas.grid.distance;
-  return reachFt * pxPerFt;
+  return getThreatRadiusFt(tokenDoc) * pxPerFt;
 }
 
 function _hasLOS(p1, p2) {

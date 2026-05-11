@@ -5,7 +5,7 @@ import { AspectsofPowerToken } from './documents/token.mjs';
 import { AspectsofPowerTokenObject } from './canvas/token.mjs';
 import { AspectsofPowerTokenRuler } from './canvas/token-ruler.mjs';
 import { attachOverlayLayer, detachOverlayLayer, refreshOverlay } from './canvas/movement-overlay.mjs';
-import { resetFirstContactSeen } from './systems/engagement-halts.mjs';
+import { resetFirstContactSeen, getThreatRadiusFt } from './systems/engagement-halts.mjs';
 import { onMoveKey, onCommitKey, onCancelKey, clearAllBuffers, getBuffer } from './canvas/movement-buffer.mjs';
 import { registerAoeBehavior, setAoeTrigger } from './canvas/aoe-region-behavior.mjs';
 // Import sheet classes.
@@ -1284,6 +1284,47 @@ Hooks.on('refreshToken', (token) => {
   // Add on top of the token's children so the circle is visible.
   token.addChild(gfx);
   token._castingRangeAura = gfx;
+
+  // ── Threat-range aura (auto-shown on selected token) ───────────────────────
+  // Mirrors casting aura but uses melee reach + appears automatically on
+  // controlled tokens. No HUD toggle — always on for the selected actor so
+  // the player can see who they threaten without extra clicks.
+  if (token._threatRangeAura) {
+    token._threatRangeAura.destroy();
+    token._threatRangeAura = null;
+  }
+  if (token.controlled && token.actor) {
+    const reachFt = getThreatRadiusFt(token.document);
+    const tokenRadiusFt = (Math.max(token.document.width ?? 1, token.document.height ?? 1) * canvas.grid.distance) / 2;
+    // Edge-to-edge reach: add the token's own radius so the visualised circle
+    // covers everything the wielder can melee, not just the wielder's center
+    // + reach. Two adjacent 1x1 tokens have centers 5ft apart; a 5-ft reach
+    // weapon should visibly include the next square.
+    const totalReachFt = reachFt + tokenRadiusFt;
+    const pxPerFt = canvas.grid.size / canvas.grid.distance;
+    const radiusPx = totalReachFt * pxPerFt;
+    const cxLocal = (token.document.width * canvas.grid.size) / 2;
+    const cyLocal = (token.document.height * canvas.grid.size) / 2;
+    const tg = new PIXI.Graphics();
+    if (typeof tg.drawCircle === 'function') {
+      tg.beginFill(0xff4444, 0.05);
+      tg.lineStyle(2, 0xff4444, 0.45);
+      tg.drawCircle(cxLocal, cyLocal, radiusPx);
+      tg.endFill();
+    } else {
+      tg.circle(cxLocal, cyLocal, radiusPx);
+      tg.fill({ color: 0xff4444, alpha: 0.05 });
+      tg.stroke({ color: 0xff4444, alpha: 0.45, width: 2 });
+    }
+    token.addChild(tg);
+    token._threatRangeAura = tg;
+  }
+});
+
+// Selection change — force a refresh so the threat-range aura appears /
+// disappears immediately rather than waiting for some other refresh trigger.
+Hooks.on('controlToken', (token, _controlled) => {
+  if (token?.refresh) token.refresh();
 });
 
 /* -------------------------------------------- */

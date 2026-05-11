@@ -358,12 +358,25 @@ export class CelerityCombatTracker extends ParentTracker {
     const f = combatant.flags?.[FLAG_NS] ?? {};
     const clockTick = getClockTick(combat);
     const next = f.nextActionTick ?? null;
+
+    // Next reference round = lastRoundEndAt + roundLen. Players need to
+    // see this so they can plan around debuff break rolls, regen, sustain
+    // upkeep, and the celerity duration semantics ("3 of source's rounds").
+    const rl = combatant.actor?.system?.attributes?.race?.level ?? 1;
+    const roundLen = referenceRoundLength(rl);
+    const lastEnd = f.lastRoundEndAt ?? 0;
+    const nextRoundTick = lastEnd + roundLen;
+    const ticksUntilRound = Math.max(0, nextRoundTick - clockTick);
+
     turn.celerity = {
       nextActionTick: next,
       lastActionName: f.lastActionName ?? null,
       lastActionWait: f.lastActionWait ?? null,
       ticksUntil:     next === null ? null : Math.max(0, next - clockTick),
       ready:          next === null || next <= clockTick,
+      nextRoundTick,
+      ticksUntilRound,
+      roundLen,
     };
     return turn;
   }
