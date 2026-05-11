@@ -2030,7 +2030,9 @@ Hooks.on('updateActor', async (actor, changes, _options, userId) => {
   const healthChange = changes.system?.health;
   if (healthChange?.value === undefined) return;
 
-  // Actor death — clear all active sustains.
+  // Actor death — clear active sustains, then auto-fire on_death-tagged passives.
+  // Hook fires on the HP-zero crossing; if HP later climbs above 0 and crosses
+  // again, this fires again (each death is its own event).
   if (actor.system.health.value <= 0) {
     const deathSustains = actor.effects.filter(e =>
       !e.disabled && e.system?.effectType === 'sustain'
@@ -2040,6 +2042,23 @@ Hooks.on('updateActor', async (actor, changes, _options, userId) => {
       ChatMessage.create({
         content: `<p><strong>${actor.name}</strong>'s sustained skills end — ${deathSustains.map(e => e.name).join(', ')}.</p>`,
       });
+    }
+
+    // on_death-tagged passive AOE skills auto-fire from each active token.
+    const deathSkills = actor.items.filter(i =>
+      i.type === 'skill' && (i.system?.tags ?? []).includes('on_death')
+    );
+    if (deathSkills.length > 0) {
+      const tokens = actor.getActiveTokens();
+      for (const tok of tokens) {
+        for (const skill of deathSkills) {
+          try {
+            await skill._fireOnDeath(tok);
+          } catch (e) {
+            console.error(`[on_death] auto-fire failed for ${actor.name} / ${skill.name}:`, e);
+          }
+        }
+      }
     }
   }
 

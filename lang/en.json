@@ -38,6 +38,7 @@
       "aoe": "AOE",
       "sustain": "Sustain",
       "shrapnel": "Shrapnel",
+      "on_death": "On Death",
       "craft": "Craft",
       "gather": "Gather",
       "refine": "Refine",

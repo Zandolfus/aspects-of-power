@@ -3449,6 +3449,137 @@ export class AspectsofPowerItem extends Item {
     await casterToken.document.update({ rotation: angle });
   }
 
+  /**
+   * Auto-fire an on_death-tagged passive AOE skill from a dying actor's
+   * location. Bypasses the normal Passive short-circuit, target prompt,
+   * celerity defer, and resource cost (the actor has nothing left to spend).
+   *
+   * Death Bloom-style: builds an AOE region centered on the corpse, runs the
+   * skill's tag dispatch (attack / debuff / restoration / buff) against
+   * tokens in the region, then removes the region (instantaneous burst).
+   *
+   * Caller is the death hook in aspects-of-power.mjs (GM-only). Hook fires
+   * before any token deletion, so the dying actor's stats and active token
+   * are still reachable.
+   *
+   * @param {Token|TokenDocument} deadToken  Where to center the burst.
+   */
+  async _fireOnDeath(deadToken) {
+    if (!this.actor) return;
+    const aoe = this.system.aoe;
+    if (!aoe?.enabled) return; // on_death only meaningful for AOE skills today
+
+    const tokenObj = deadToken.object ?? deadToken;
+    const tokenDoc = deadToken.document ?? deadToken;
+    const cc = tokenObj.center ?? {
+      x: tokenDoc.x + (tokenDoc.width * canvas.grid.size) / 2,
+      y: tokenDoc.y + (tokenDoc.height * canvas.grid.size) / 2,
+    };
+
+    const item     = this;
+    const rollData = this.getRollData();
+    const speaker  = ChatMessage.getSpeaker({ actor: this.actor, token: tokenDoc });
+    const rollMode = game.settings.get('core', 'messageMode');
+    const label    = `[${item.type}] ${item.name}`;
+    const tags     = this.system.tags ?? [];
+
+    // ── Build synthetic AOE region centered on the corpse ────────────────
+    const pxPerFt = canvas.grid.size / canvas.grid.distance;
+    const placedDiameterPx = aoe.diameter * pxPerFt;
+    const fillColor = this._getAoeColor();
+    const shape = aoe.shape ?? 'circle';
+    let shapeData;
+    if (shape === 'circle') {
+      shapeData = { type: 'circle', x: cc.x, y: cc.y, radius: placedDiameterPx / 2 };
+    } else {
+      // Rect fallback for non-circle on-death AOEs (rare; cone/ray don't
+      // make sense from a corpse with no facing).
+      const half = placedDiameterPx / 2;
+      shapeData = { type: 'rectangle', x: cc.x - half, y: cc.y - half, width: placedDiameterPx, height: placedDiameterPx, rotation: 0 };
+    }
+
+    const regionData = {
+      name: `${this.name} (Death)`,
+      color: fillColor,
+      visibility: 2,
+      shapes: [shapeData],
+      behaviors: [],
+      flags: {
+        'aspects-of-power': {
+          aoe: true,
+          casterActorUuid: this.actor.uuid,
+          skillItemUuid: this.uuid,
+          templateDuration: 0,
+          placedRound: game.combat?.round ?? 0,
+          persistent: false,
+          persistentData: null,
+          deathTrigger: true,
+        },
+      },
+    };
+
+    const region = await this._gmCreateRegion(canvas.scene, regionData);
+    if (!region) return;
+    await new Promise(r => setTimeout(r, 50));
+
+    try {
+      // ── Build rolls ────────────────────────────────────────────────────
+      const { hitFormula, dmgFormula } = this._buildRollFormulas(rollData);
+      let hitRoll = null;
+      if (hitFormula) {
+        hitRoll = new Roll(hitFormula, rollData);
+        await hitRoll.evaluate();
+      }
+      const dmgRoll = new Roll(dmgFormula, rollData);
+      await dmgRoll.evaluate();
+
+      // ── Find targets ───────────────────────────────────────────────────
+      const targets = this._getAoeTargets(region);
+
+      // Announce death-trigger.
+      ChatMessage.create({
+        speaker, rollMode,
+        content: `<div class="aoe-result"><p><strong>${this.actor.name}</strong> dies — <strong>${this.name}</strong> bursts! ${targets.length} target(s)${targets.length ? ' — ' + targets.map(t => t.document.name).join(', ') : ''}.</p></div>`,
+      });
+
+      if (hitRoll) await hitRoll.toMessage({ speaker, rollMode, flavor: `${label} — To Hit` });
+      await dmgRoll.toMessage({ speaker, rollMode, flavor: `${label} — Roll` });
+
+      // ── Dispatch each tag to each qualifying token ─────────────────────
+      // Mirrors the AOE dispatch loop in roll(); skips tags that don't make
+      // sense for a death-trigger (craft / gather / refine / cleanse / repair).
+      const hitResults = new Map();
+      for (const tag of tags) {
+        for (const targetToken of targets) {
+          switch (tag) {
+            case 'attack': {
+              const result = await this._handleAttackTag(item, rollData, hitRoll, dmgRoll, speaker, rollMode, label, targetToken);
+              if (result) hitResults.set(targetToken, result);
+              break;
+            }
+            case 'debuff': {
+              const attackResult = hitResults.get(targetToken);
+              if (attackResult && !attackResult.isHit) break;
+              if (attackResult?.fullyBlocked) break;
+              const defMult = attackResult?.damageMultiplier ?? 1;
+              await this._handleDebuffTag(item, rollData, dmgRoll, speaker, rollMode, label, targetToken, defMult);
+              break;
+            }
+            case 'restoration':
+              await this._handleRestorationTag(item, rollData, dmgRoll, speaker, rollMode, label, targetToken);
+              break;
+            case 'buff':
+              await this._handleBuffTag(item, rollData, dmgRoll, speaker, rollMode, label, targetToken);
+              break;
+          }
+        }
+      }
+    } finally {
+      // Instantaneous burst — clean up the synthetic region.
+      await this._gmDeleteRegion(canvas.scene, region.id);
+    }
+  }
+
   /* ------------------------------------------------------------------ */
   /*  Consumable usage                                                   */
   /* ------------------------------------------------------------------ */

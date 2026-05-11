@@ -368,6 +368,8 @@ ASPECTSOFPOWER.skillTags = {
   sustain:     'ASPECTSOFPOWER.Tag.sustain',
   shrapnel:    'ASPECTSOFPOWER.Tag.shrapnel',
   craft:       'ASPECTSOFPOWER.Tag.craft',
+  // Trigger tags (auto-fire passives).
+  on_death:    'ASPECTSOFPOWER.Tag.on_death',
   // Descriptor tags (mechanical effects).
   magic:       'ASPECTSOFPOWER.Tag.magic',
   physical:    'ASPECTSOFPOWER.Tag.physical',
@@ -430,6 +432,8 @@ ASPECTSOFPOWER.combatTags = {
   aoe:         'ASPECTSOFPOWER.Tag.aoe',
   sustain:     'ASPECTSOFPOWER.Tag.sustain',
   shrapnel:    'ASPECTSOFPOWER.Tag.shrapnel',
+  // Triggers.
+  on_death:    'ASPECTSOFPOWER.Tag.on_death',
   // Descriptors.
   magic:       'ASPECTSOFPOWER.Tag.magic',
   physical:    'ASPECTSOFPOWER.Tag.physical',
