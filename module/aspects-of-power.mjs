@@ -1354,10 +1354,18 @@ Hooks.on('renderTokenHUD', (hud, html, data) => {
 
   button.addEventListener('click', async (ev) => {
     ev.preventDefault();
-    const map = { ...(game.user.getFlag('aspects-of-power', 'showRangeFor') ?? {}) };
-    if (map[tokenDoc.id]) delete map[tokenDoc.id];
-    else map[tokenDoc.id] = true;
-    await game.user.setFlag('aspects-of-power', 'showRangeFor', map);
+    const map = game.user.getFlag('aspects-of-power', 'showRangeFor') ?? {};
+    if (map[tokenDoc.id]) {
+      // Toggle off — use the `-=key` deletion prefix. setFlag merges by
+      // default, so a JS `delete` on the local copy + setFlag would just
+      // restore the key on the next merge. We need an explicit unset.
+      await game.user.update({
+        [`flags.aspects-of-power.showRangeFor.-=${tokenDoc.id}`]: null,
+      });
+    } else {
+      // Toggle on — merge a single new entry; merge semantics are fine here.
+      await game.user.setFlag('aspects-of-power', 'showRangeFor', { [tokenDoc.id]: true });
+    }
     button.classList.toggle('active');
     // Trigger refreshToken so the aura redraws (or clears) immediately.
     if (hud.object.refresh) hud.object.refresh();
