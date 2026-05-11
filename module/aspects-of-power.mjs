@@ -1433,82 +1433,208 @@ async function _triggerPersistentAoe(tokenDoc, force = false) {
     const speaker = ChatMessage.getSpeaker({ actor: casterActor });
     const rollTotal = pd.rollTotal ?? 0;
 
-    for (const tag of (pd.tags ?? [])) {
-      if (tag === 'debuff' && pd.tagConfig?.debuffType && pd.tagConfig.debuffType !== 'none') {
-        const debuffType = pd.tagConfig.debuffType;
-        const duration = pd.tagConfig.debuffDuration ?? 1;
-        const entries = (pd.tagConfig.debuffEntries ?? []).map(e => ({
-          key: `system.${e.attribute}.value`,
-          type: 'add',
-          value: -Math.round(rollTotal * (e.value || 1)),
-        }));
-        const dealsDmg = pd.tagConfig.debuffDealsDamage ?? false;
-        const dotType = pd.tagConfig.debuffDamageType ?? pd.damageType;
+    // Dispatch by tag composition per design-aoe-dispatch.md.
+    const tagSet = new Set(pd.tags ?? []);
+    const isShrapnel = pd.isShrapnel ?? tagSet.has('shrapnel');
+    const isMagic = pd.isMagic ?? tagSet.has('magic');
+    const targetDefense = pd.targetDefense ?? 'melee';
+    const targetingPool = (targetDefense === 'mind' || targetDefense === 'soul');
 
-        const effectData = {
-          name: `AOE: ${debuffType}`,
-          img: 'icons/svg/hazard.svg',
-          origin: flags.casterActorUuid,
-          duration: { rounds: duration, startRound: game.combat?.round ?? 0, startTurn: game.combat?.turn ?? 0 },
-          disabled: false,
-          changes: entries,
-          type: 'base',
-          system: {
-            debuffDamage: rollTotal,
-            debuffType,
-            casterActorUuid: flags.casterActorUuid,
-            ...(dealsDmg ? { dot: true, dotDamage: rollTotal, dotDamageType: dotType, applierActorUuid: flags.casterActorUuid } : {}),
-          },
-        };
+    if (tagSet.has('attack') && rollTotal > 0) {
+      // Damage AOE.
+      // - Shrapnel: ranged attack with hitBonus, pool applies (target's
+      //   ranged pool absorbs hit), then armor (physical) or veil (magical).
+      // - Plain attack-AOE: bypass pool (you're inside the effect),
+      //   route directly to armor (physical) or veil (magical) → DR → HP.
+      const hitBonus = isShrapnel ? (pd.tagConfig?.shrapnelHitBonus ?? 4) : 0;
+      const finalHit = (pd.hitTotal ?? rollTotal) + hitBonus;
+      const mitigationLine = isMagic
+        ? '(magical: → veil → DR → HP, ignore armor)'
+        : '(physical: → armor → DR → HP)';
+      const poolLine = isShrapnel
+        ? `Hit ${finalHit} vs target's ${targetDefense} pool — pool absorbs first.`
+        : 'Pool BYPASSED (persistent zone — no dodging).';
 
-        await AspectsofPowerItem.executeGmAction({
-          type: 'gmApplyDebuff',
-          targetActorUuid: targetActor.uuid,
-          effectName: effectData.name,
-          originUuid: flags.casterActorUuid,
-          effectData,
-          duration,
-          stackable: pd.tagConfig.debuffStackable ?? false,
-          statSummary: entries.map(e => `${e.key.replace('system.', '').replace('.value', '')} ${e.value}`).join(', '),
-          speaker,
-        });
+      ChatMessage.create({
+        whisper: ChatMessage.getWhisperRecipients('GM'),
+        content: `<p><strong>${targetActor.name}</strong> caught in AOE zone — `
+               + `<strong>${rollTotal}</strong> ${pd.damageType} damage `
+               + `${isShrapnel ? '(shrapnel)' : '(environmental)'}.</p>`
+               + `<p><em>${poolLine} ${mitigationLine}</em></p>`
+               + `<button class="apply-damage" data-actor-uuid="${targetActor.uuid}" `
+               + `data-damage="${rollTotal}" data-toughness="${targetActor.system.defense?.dr?.value ?? 0}" `
+               + `data-damage-type="${pd.damageType}" data-affinity-dr="0" `
+               + `data-bypass-pool="${!isShrapnel}" data-bypass-armor="${isMagic}">Apply Damage</button>`,
+      });
+    }
+
+    if (tagSet.has('debuff') && pd.tagConfig?.debuffType && pd.tagConfig.debuffType !== 'none') {
+      // Debuff AOE.
+      // - Mental (targetDefense mind/soul): ablative pool depletion. Each
+      //   tick subtracts debuffPoolCost from target's mind/soul pool. When
+      //   pool hits 0, the debuff applies fully.
+      // - Physical (targetDefense melee/ranged): bypass pool (no dodging),
+      //   apply per saveModel.
+      if (targetingPool) {
+        await _resolveMentalDebuffTick(targetActor, pd, flags, targetDefense, speaker);
+      } else {
+        await _resolvePhysicalDebuffTick(targetActor, pd, flags, rollTotal, speaker);
       }
+    }
 
-      if (tag === 'attack' && rollTotal > 0) {
-        ChatMessage.create({
-          whisper: ChatMessage.getWhisperRecipients('GM'),
-          content: `<p><strong>${targetActor.name}</strong> in AOE zone — `
-                 + `<strong>${rollTotal}</strong> ${pd.damageType} damage incoming.</p>`
-                 + `<button class="apply-damage" data-actor-uuid="${targetActor.uuid}" `
-                 + `data-damage="${rollTotal}" data-toughness="${targetActor.system.defense?.dr?.value ?? 0}" `
-                 + `data-damage-type="${pd.damageType}" data-affinity-dr="0">Apply Damage</button>`,
-        });
-      }
-
-      if (tag === 'buff' && (pd.tagConfig?.buffEntries ?? []).length > 0) {
-        const changes = pd.tagConfig.buffEntries.map(e => ({
-          key: `system.${e.attribute}.value`,
-          type: 'add',
-          value: Math.round(rollTotal * (e.value || 1)),
-        }));
-        await AspectsofPowerItem.executeGmAction({
-          type: 'gmApplyBuff',
-          targetActorUuid: targetActor.uuid,
-          effectName: `AOE Buff`,
-          originUuid: flags.casterActorUuid,
-          changes,
-          duration: pd.tagConfig.buffDuration ?? 1,
-          stackable: pd.tagConfig.buffStackable ?? false,
-          img: 'icons/svg/aura.svg',
-          speaker,
-        });
-      }
+    if (tagSet.has('buff') && (pd.tagConfig?.buffEntries ?? []).length > 0) {
+      const changes = pd.tagConfig.buffEntries.map(e => ({
+        key: `system.${e.attribute}.value`,
+        type: 'add',
+        value: Math.round(rollTotal * (e.value || 1)),
+      }));
+      await AspectsofPowerItem.executeGmAction({
+        type: 'gmApplyBuff',
+        targetActorUuid: targetActor.uuid,
+        effectName: `AOE Buff`,
+        originUuid: flags.casterActorUuid,
+        changes,
+        duration: pd.tagConfig.buffDuration ?? 1,
+        stackable: pd.tagConfig.buffStackable ?? false,
+        img: 'icons/svg/aura.svg',
+        speaker,
+      });
     }
 
     triggered = true;
   }
 
   return triggered;
+}
+
+/**
+ * Mental-debuff per-tick resolution. Per design-aoe-dispatch.md:
+ * mind/soul pools represent RESISTANCE (not avoidance). Each tick of a
+ * persistent mental AOE depletes the target's relevant pool by
+ * `debuffPoolCost`. When the pool hits 0, the debuff applies fully.
+ *
+ * Pool regenerates per round normally — a high-willpower target can
+ * sustain through a long zone, a weak-willed one folds quickly.
+ */
+async function _resolveMentalDebuffTick(targetActor, pd, flags, defenseKey, speaker) {
+  const cost = pd.tagConfig?.debuffPoolCost ?? 50;
+  const defense = targetActor.system.defense?.[defenseKey];
+  if (!defense) return;
+  const currentPool = defense.pool ?? 0;
+  const newPool = Math.max(0, currentPool - cost);
+  await targetActor.update({ [`system.defense.${defenseKey}.pool`]: newPool });
+
+  const debuffType = pd.tagConfig.debuffType;
+  if (newPool > 0) {
+    // Pool absorbed it — debuff doesn't land yet.
+    ChatMessage.create({
+      whisper: ChatMessage.getWhisperRecipients('GM'),
+      content: `<p><strong>${targetActor.name}</strong> resists <strong>${debuffType}</strong> from AOE — `
+             + `${defenseKey} pool ${currentPool} → ${newPool} (-${cost}).</p>`,
+    });
+    return;
+  }
+
+  // Pool depleted — debuff lands.
+  const duration = pd.tagConfig.debuffDuration ?? 1;
+  const entries = (pd.tagConfig.debuffEntries ?? []).map(e => ({
+    key: `system.${e.attribute}.value`,
+    type: 'add',
+    value: -Math.round((pd.rollTotal ?? 0) * (e.value || 1)),
+  }));
+  const dealsDmg = pd.tagConfig.debuffDealsDamage ?? false;
+  const dotType = pd.tagConfig.debuffDamageType ?? pd.damageType;
+
+  const effectData = {
+    name: `AOE: ${debuffType}`,
+    img: 'icons/svg/hazard.svg',
+    origin: flags.casterActorUuid,
+    duration: { rounds: duration, startRound: game.combat?.round ?? 0, startTurn: game.combat?.turn ?? 0 },
+    disabled: false,
+    changes: entries,
+    type: 'base',
+    system: {
+      debuffDamage: pd.rollTotal ?? 0,
+      debuffType,
+      casterActorUuid: flags.casterActorUuid,
+      ...(dealsDmg ? { dot: true, dotDamage: pd.rollTotal ?? 0, dotDamageType: dotType, applierActorUuid: flags.casterActorUuid } : {}),
+    },
+  };
+
+  await AspectsofPowerItem.executeGmAction({
+    type: 'gmApplyDebuff',
+    targetActorUuid: targetActor.uuid,
+    effectName: effectData.name,
+    originUuid: flags.casterActorUuid,
+    effectData,
+    duration,
+    stackable: pd.tagConfig.debuffStackable ?? false,
+    statSummary: `${defenseKey} pool depleted — succumbs to ${debuffType}`,
+    speaker,
+  });
+}
+
+/**
+ * Physical-debuff per-tick resolution. Per design-aoe-dispatch.md:
+ * physical pools (melee/ranged) BYPASS for persistent zones (no dodging
+ * a poison cloud you're standing in). Apply per `saveModel`:
+ *   'none'    — debuff always applies
+ *   'perTick' — save vs caster's hitTotal each cycle
+ *   'onEntry' — save once on entry; locked in on failure
+ *
+ * Default 'none' = original behavior (apply unconditionally).
+ */
+async function _resolvePhysicalDebuffTick(targetActor, pd, flags, rollTotal, speaker) {
+  const saveModel = pd.tagConfig?.saveModel ?? 'none';
+  if (saveModel === 'perTick') {
+    const ability = pd.tagConfig?.saveAbility ?? 'willpower';
+    const saveMod = targetActor.system.abilities?.[ability]?.mod ?? 0;
+    if (saveMod >= (pd.hitTotal ?? rollTotal)) {
+      ChatMessage.create({
+        whisper: ChatMessage.getWhisperRecipients('GM'),
+        content: `<p><strong>${targetActor.name}</strong> resists <strong>${pd.tagConfig.debuffType}</strong> via ${ability} save (${saveMod} vs ${pd.hitTotal ?? rollTotal}).</p>`,
+      });
+      return;
+    }
+  }
+
+  const debuffType = pd.tagConfig.debuffType;
+  const duration = pd.tagConfig.debuffDuration ?? 1;
+  const entries = (pd.tagConfig.debuffEntries ?? []).map(e => ({
+    key: `system.${e.attribute}.value`,
+    type: 'add',
+    value: -Math.round(rollTotal * (e.value || 1)),
+  }));
+  const dealsDmg = pd.tagConfig.debuffDealsDamage ?? false;
+  const dotType = pd.tagConfig.debuffDamageType ?? pd.damageType;
+
+  const effectData = {
+    name: `AOE: ${debuffType}`,
+    img: 'icons/svg/hazard.svg',
+    origin: flags.casterActorUuid,
+    duration: { rounds: duration, startRound: game.combat?.round ?? 0, startTurn: game.combat?.turn ?? 0 },
+    disabled: false,
+    changes: entries,
+    type: 'base',
+    system: {
+      debuffDamage: rollTotal,
+      debuffType,
+      casterActorUuid: flags.casterActorUuid,
+      ...(dealsDmg ? { dot: true, dotDamage: rollTotal, dotDamageType: dotType, applierActorUuid: flags.casterActorUuid } : {}),
+    },
+  };
+
+  await AspectsofPowerItem.executeGmAction({
+    type: 'gmApplyDebuff',
+    targetActorUuid: targetActor.uuid,
+    effectName: effectData.name,
+    originUuid: flags.casterActorUuid,
+    effectData,
+    duration,
+    stackable: pd.tagConfig.debuffStackable ?? false,
+    statSummary: entries.map(e => `${e.key.replace('system.', '').replace('.value', '')} ${e.value}`).join(', '),
+    speaker,
+  });
 }
 
 /**

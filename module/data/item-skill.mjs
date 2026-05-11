@@ -170,6 +170,26 @@ export class SkillData extends foundry.abstract.TypeDataModel {
 
         // Shrapnel: defense pool consumption multiplier (>1.0 = harder to dodge).
         shrapnelMultiplier: new fields.NumberField({ initial: 1.5, min: 1.0, max: 5.0 }),
+        // Shrapnel: flat hit-bonus added to ranged attack roll for shrapnel
+        // AOEs (compensates for "everyone's caught in the burst"). Per
+        // design-aoe-dispatch.md.
+        shrapnelHitBonus: new fields.NumberField({ initial: 4, min: 0, max: 20, integer: true }),
+
+        // AOE debuff dispatch (per design-aoe-dispatch.md):
+        //
+        // Mental debuffs (charm/fear/sleep/psychic/etc tags) use ABLATIVE
+        // pool depletion against mind/soul pool — each tick drains
+        // `debuffPoolCost`; when pool hits 0, debuff applies fully.
+        //
+        // Physical debuffs (poison/slow/weakness/etc) bypass pool entirely
+        // (you can't dodge a gas cloud you're standing in) and use saveModel
+        // to determine application:
+        //   'none'    — debuff always applies
+        //   'perTick' — save vs caster's hit total each tick
+        //   'onEntry' — save once on entry; locked in on failure
+        debuffPoolCost: new fields.NumberField({ initial: 50, min: 0, integer: true }),
+        saveModel:      new fields.StringField({ initial: 'none', choices: ['none', 'perTick', 'onEntry'] }),
+        saveAbility:    new fields.StringField({ initial: 'willpower' }),
 
         // Craft: output configuration.
         craftOutputSlot:     new fields.StringField({ initial: '' }),

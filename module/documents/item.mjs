@@ -3315,6 +3315,12 @@ export class AspectsofPowerItem extends Item {
                 rollTotal: null,
                 hitTotal: null,
                 damageType: this.system.roll?.damageType ?? 'physical',
+                // targetDefense + isMagic snapshotted so re-tick dispatch
+                // doesn't need to re-fetch the source skill (which may have
+                // been edited since cast). Per design-aoe-dispatch.md.
+                targetDefense: this.system.roll?.targetDefense ?? 'melee',
+                isMagic: (this.system.tags ?? []).includes('magic'),
+                isShrapnel: (this.system.tags ?? []).includes('shrapnel'),
                 targetingMode: aoe.targetingMode ?? 'all',
                 zoneEffect: aoe.zoneEffect ?? 'none',
                 casterDisposition: this.actor.getActiveTokens()?.[0]?.document?.disposition ?? CONST.TOKEN_DISPOSITIONS.NEUTRAL,
