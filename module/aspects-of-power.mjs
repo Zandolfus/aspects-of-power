@@ -1247,9 +1247,10 @@ Hooks.on('refreshToken', (token) => {
   // Guard: only draw for tokens the current user owns.
   if (!token.document.isOwner) return;
 
-  // Guard: check the toggle flag.
-  const showRange = token.document.getFlag('aspects-of-power', 'showRange');
-  if (!showRange) return;
+  // Guard: check the toggle flag (per-USER, not per-token, so the GM
+  // doesn't see the aura when a player toggles it on their own token).
+  const userMap = game.user.getFlag('aspects-of-power', 'showRangeFor') ?? {};
+  if (!userMap[token.document.id]) return;
 
   // Guard: need a valid actor with a derived castingRange.
   const actor = token.document.actor;
@@ -1298,19 +1299,27 @@ Hooks.on('renderTokenHUD', (hud, html, data) => {
   if (!tokenDoc.isOwner) return;
   if (!tokenDoc.actor?.system?.castingRange) return;
 
-  const isActive = tokenDoc.getFlag('aspects-of-power', 'showRange') ? 'active' : '';
+  // Per-user toggle — `showRangeFor` is a map { tokenId: true } stored on
+  // the user's own flags. Each client reads/writes their own. GM toggling
+  // on Token X doesn't show the aura on the player's view, and vice versa.
+  const userMap = game.user.getFlag('aspects-of-power', 'showRangeFor') ?? {};
+  const isActive = userMap[tokenDoc.id] ? 'active' : '';
   const button = document.createElement('div');
   button.classList.add('control-icon');
   if (isActive) button.classList.add('active');
   button.setAttribute('data-action', 'toggle-casting-range');
-  button.setAttribute('title', 'Toggle Casting Range');
+  button.setAttribute('title', 'Toggle Casting Range (this client only)');
   button.innerHTML = '<i class="fas fa-bullseye"></i>';
 
   button.addEventListener('click', async (ev) => {
     ev.preventDefault();
-    const current = tokenDoc.getFlag('aspects-of-power', 'showRange');
-    await tokenDoc.setFlag('aspects-of-power', 'showRange', !current);
+    const map = { ...(game.user.getFlag('aspects-of-power', 'showRangeFor') ?? {}) };
+    if (map[tokenDoc.id]) delete map[tokenDoc.id];
+    else map[tokenDoc.id] = true;
+    await game.user.setFlag('aspects-of-power', 'showRangeFor', map);
     button.classList.toggle('active');
+    // Trigger refreshToken so the aura redraws (or clears) immediately.
+    if (hud.object.refresh) hud.object.refresh();
   });
 
   // Append to the right-side column of the HUD.
