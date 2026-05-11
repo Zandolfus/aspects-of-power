@@ -1,6 +1,7 @@
 import { EquipmentSystem } from '../systems/equipment.mjs';
 import { getPositionalTags } from '../helpers/positioning.mjs';
 import { recordActionFired, declareAction, isInActiveCombat, computeActionWait, referenceRoundLength } from '../systems/celerity.mjs';
+import { selectTargetOnCanvas, skillNeedsTargetPrompt } from '../canvas/target-prompt.mjs';
 
 /**
  * Check if an actor is an assigned player character (not just owned).
@@ -3772,6 +3773,20 @@ export class AspectsofPowerItem extends Item {
       const weakenEffect = _hasDebuff('weaken');
       if (weakenEffect) {
         rollData._weakenDebuff = weakenEffect;
+      }
+    }
+
+    // ── Click-skill-then-pick-target (per design 2026-05-10) ──
+    // Replaces Foundry's pre-target-T-then-cast workflow. AOE skills
+    // bypass — their own placement flow handles canvas selection. Skipped
+    // on deferred fire (target was already picked at declare time).
+    if (!options.executeDeferred && options.preInvestAmount == null && skillNeedsTargetPrompt(this)) {
+      const picked = await selectTargetOnCanvas({
+        message: `Click target for ${this.name} (Esc to cancel)`,
+      });
+      if (!picked) {
+        ui.notifications.info(`${this.name} cancelled.`);
+        return;
       }
     }
 
