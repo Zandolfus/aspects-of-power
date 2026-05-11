@@ -146,6 +146,27 @@ export class AspectsofPowerToken extends foundry.documents.TokenDocument {
       y: movement.destination?.y ?? movement.pending?.y ?? this.y,
     };
 
+    // Wall-collision cancel. Per user 2026-05-11: a movement that would
+    // pass through a movement-blocking wall should be refused outright,
+    // not silently truncated. Foundry's drag tool pre-clips against
+    // walls, but keyboard-buffer moves and programmatic declares can
+    // still propose wall-crossing paths. Center-to-center collision test
+    // covers both cases.
+    const w = (this.width ?? 1) * canvas.grid.size;
+    const h = (this.height ?? 1) * canvas.grid.size;
+    const startCenter = { x: startPos.x + w / 2, y: startPos.y + h / 2 };
+    const endCenter = { x: endPos.x + w / 2, y: endPos.y + h / 2 };
+    let blocked = false;
+    try {
+      blocked = foundry.canvas.geometry.ClockwiseSweepPolygon.testCollision(
+        startCenter, endCenter, { type: 'move', mode: 'any' }
+      );
+    } catch { /* if the test errors (no walls layer / etc.), permit the move */ }
+    if (blocked) {
+      ui.notifications.warn(`${actor.name}: movement path blocked by wall — declare cancelled.`);
+      return false;
+    }
+
     // Declare on the celerity stack. The `await` runs async after we return
     // false; that's fine — the cancellation is synchronous, the declaration
     // can settle on its own.

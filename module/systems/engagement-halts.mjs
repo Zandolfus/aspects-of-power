@@ -42,10 +42,15 @@ const FLAG_NS = 'aspectsofpower';
 export async function checkEngagementHalts(combat, newClock) {
   if (!combat?.started) return;
 
-  // Build the set of all in-flight movements.
+  // Build the set of all in-flight movements. Skip movements that have
+  // already been halted (`halted: true` flag set by _applyHalt) — without
+  // this skip, the next advance re-evaluates the same path against the
+  // same opponent and the truncated endPos still sits inside the reach
+  // circle, firing duplicate halts at the same tick. The combat log
+  // showed Gabriel halting at the same Stalker / Brute 2-3 times.
   const inFlight = combat.combatants.contents
     .map(c => ({ cm: c, mv: c.flags?.[FLAG_NS]?.declaredAction }))
-    .filter(e => e.mv?.itemId === MOVEMENT_ITEM_ID && e.cm.token);
+    .filter(e => e.mv?.itemId === MOVEMENT_ITEM_ID && e.cm.token && !e.mv.halted);
 
   // Per-combatant earliest halt across all engagements they're part of.
   // combatantId → { type, cause, haltPos, scheduledTick, wait }
@@ -159,11 +164,18 @@ function _evaluatePair(moverEntry, opponentCm, newClock) {
   // ── First-contact LOS halt: snap check at newClock ───────────────────
   // (Less precise than analytical first-touch — fires when at newClock the
   // mover is now seeing or being seen by an unseen enemy. Halt at lerp pos.)
+  // ONLY friendly-disposition movers halt on first sight — hostiles
+  // shouldn't pause every time their pathing peeks around a corner. Per
+  // user feedback 2026-05-11: combats were drowning in LOS halts at
+  // start of combat from hostile-vs-hostile patrols. Players still get
+  // the first-sight reaction window when they move into LOS of a
+  // previously-unseen enemy.
+  const moverIsFriendly = moverTok.disposition === CONST.TOKEN_DISPOSITIONS.FRIENDLY;
   const moverSeen = new Set(mover.flags?.[FLAG_NS]?.firstContactSeen ?? []);
   const oppSeen = new Set(opponentCm.flags?.[FLAG_NS]?.firstContactSeen ?? []);
   const alreadySeen = moverSeen.has(opponentCm.id) || oppSeen.has(mover.id);
 
-  if (!alreadySeen) {
+  if (!alreadySeen && moverIsFriendly) {
     const moverLerpC = _addCenter(interpolateMovementPosition(moverMv, newClock), moverTok);
     const oppLerpC = oppMv
       ? _addCenter(interpolateMovementPosition(oppMv, newClock), oppTok)
@@ -295,6 +307,7 @@ async function _applyHalt(combat, cmId, haltInfo) {
     // overwrite if it was already set (chained halts on the same path).
     originalEndPos: mv.originalEndPos ?? mv.endPos,
     haltCauseCombatantId: haltInfo.cause?.id ?? null,
+    halted: true, // skip future halt-checks until this movement completes
   };
   const update = {
     [`flags.${FLAG_NS}.declaredAction`]: newDeclared,
