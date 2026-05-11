@@ -3790,6 +3790,19 @@ export class AspectsofPowerItem extends Item {
       }
     }
 
+    // ── Restore targets on deferred fire ──
+    // game.user.targets is per-client-per-session; the player who
+    // picked at declare time may have deselected by fire time. Restore
+    // from preTargetIds (snapshotted at declare time, passed through
+    // the celerity dispatch socket).
+    if (options.executeDeferred && Array.isArray(options.preTargetIds)) {
+      for (const t of game.user.targets) t.setTarget(false, { releaseOthers: false, groupSelection: false });
+      for (const id of options.preTargetIds) {
+        const tok = canvas.tokens?.get(id);
+        if (tok) tok.setTarget(true, { releaseOthers: false, groupSelection: false });
+      }
+    }
+
     // Flush any pending stamina costs from movement so resource checks are accurate.
     const TokenClass = CONFIG.Token.documentClass;
     if (TokenClass?.flushStamina) await TokenClass.flushStamina();
@@ -4290,6 +4303,10 @@ export class AspectsofPowerItem extends Item {
     // once the clock reaches the scheduled tick. The captured investedAmount
     // (above) feeds Wis-controlled channel time in the celerity wait calc.
     if (!options.executeDeferred && this.actor && isInActiveCombat(this.actor)) {
+      // Snapshot picked target IDs at declare time so the deferred fire
+      // can restore game.user.targets — the player may deselect between
+      // declare and fire (typical celerity gap of seconds-to-minutes).
+      const targetIds = [...game.user.targets].map(t => t.id);
       const declared = await declareAction(this.actor, this, {
         investAmount: investedAmount,
         manaInvestAmount: infusedManaCost > 0 ? infusedManaCost : null,
@@ -4297,6 +4314,7 @@ export class AspectsofPowerItem extends Item {
         // Persist the orb-discharge decision so the deferred fire honors it
         // even if the actor's spellCharge changes between declare and fire.
         orbDischarging: orbDischargedThisCast,
+        targetIds,
       });
       return declared;
     }

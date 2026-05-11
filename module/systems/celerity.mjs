@@ -286,6 +286,9 @@ export async function declareAction(actor, skill, options = {}) {
   // the actor's spellCharge changes between declare and fire (another spell
   // banked or discharged in the meantime).
   const orbDischarging = options.orbDischarging ?? false;
+  // Targets picked at declare time, snapshotted so the deferred fire can
+  // restore game.user.targets (which may have been cleared by then).
+  const targetIds = options.targetIds ?? [];
   const wait = computeActionWait(actor, skill, null, investAmount, manaInvestAmount);
   const clockTick = getClockTick(combatant.combat);
   const scheduledTick = clockTick + wait;
@@ -301,6 +304,7 @@ export async function declareAction(actor, skill, options = {}) {
       manaInvestAmount,
       aoeRegionId,
       orbDischarging,
+      targetIds,
     },
     'flags.aspectsofpower.nextActionTick': scheduledTick,
     'flags.aspectsofpower.lastActionWait': wait,
@@ -316,7 +320,7 @@ export async function declareAction(actor, skill, options = {}) {
     content: `<p><strong>${actor.name}</strong> declares <strong>${skill.name}</strong>${investNote}${infusedNote}${aoeNote}${orbNote} — scheduled for tick <strong>${scheduledTick}</strong> (wait ${wait}).</p>`,
   });
 
-  return { wait, scheduledTick, investAmount, manaInvestAmount, aoeRegionId, orbDischarging };
+  return { wait, scheduledTick, investAmount, manaInvestAmount, aoeRegionId, orbDischarging, targetIds };
 }
 
 /**
