@@ -333,39 +333,38 @@ export function isInActiveCombat(actor) {
 }
 
 /**
- * Fire round-end mechanics for a combatant whose personal round just ended.
- * Per design-celerity.md "Round-Anchored Mechanics", this delegates to:
- *   - actor.onStartTurn (regen, sustain upkeep, reactions reset, debuff
- *     break rolls, effect expiry)
- *   - DoT damage from any effect this actor placed (their applier UUID)
+ * Fire round-START mechanics for a combatant whose personal reference round
+ * has just begun. Per design-celerity.md "Round-Anchored Mechanics", this
+ * delegates to (in order):
+ *   1. DoT damage from any effect this actor placed — DoTs tick at the
+ *      START of the caster's reference round per user 2026-05-11. The
+ *      pattern is: tick once on application (immediate, in
+ *      _handleDebuffTag) then again at the start of each subsequent
+ *      caster round.
+ *   2. actor.onStartTurn (effect expiry, sustain upkeep, regen,
+ *      reactions reset, debuff break rolls).
  *
  * Called by the celerity tracker's advance handler once per round
- * boundary crossed, per actor.
+ * boundary crossed, per actor. The boundary tick is simultaneously the
+ * end of round N and the start of round N+1; we now phrase it as
+ * "round starts" since that better reflects the design intent.
  */
-export async function runRoundEnd(combat, combatant) {
+export async function runRoundStart(combat, combatant) {
   const actor = combatant.actor;
   if (!actor) return;
 
-  // Player-visible round-end announcement. PCs see it broadcast; NPCs
+  // Player-visible round-start announcement. PCs see it broadcast; NPCs
   // whisper-to-GM only so player chat doesn't fill with enemy round ticks.
   const isPC = !!actor.hasPlayerOwner;
   ChatMessage.create({
     speaker: ChatMessage.getSpeaker({ actor }),
-    content: `<p><em>${actor.name}'s round ends.</em></p>`,
+    content: `<p><em>${actor.name}'s reference round begins.</em></p>`,
     ...(isPC ? {} : { whisper: ChatMessage.getWhisperRecipients('GM') }),
   });
 
-  // Round-end via existing onStartTurn handler (effect expiry, sustain
-  // upkeep, reactions reset, regen, debuff break rolls).
-  if (typeof actor.onStartTurn === 'function') {
-    try {
-      await actor.onStartTurn(combat, { combatantId: combatant.id });
-    } catch (e) {
-      console.error('Celerity round-end onStartTurn failed for', actor.name, e);
-    }
-  }
-
-  // DoTs: any effect placed by this actor on any combatant ticks now.
+  // 1. DoTs: any effect placed by this actor on any combatant ticks now.
+  //    Fired BEFORE the caster's own onStartTurn so debuff DoTs land at
+  //    the canonical "start of caster round" moment.
   const applierUuid = actor.uuid;
   for (const c of combat.combatants) {
     if (!c.actor) continue;
@@ -387,7 +386,23 @@ export async function runRoundEnd(combat, combatant) {
       });
     }
   }
+
+  // 2. The actor's own round-start mechanics: regen, sustain upkeep,
+  //    debuff break rolls, effect expiry. Despite the legacy name, this
+  //    is now firing at round START (boundary == end of N == start of N+1
+  //    — same tick).
+  if (typeof actor.onStartTurn === 'function') {
+    try {
+      await actor.onStartTurn(combat, { combatantId: combatant.id });
+    } catch (e) {
+      console.error('Celerity round-start onStartTurn failed for', actor.name, e);
+    }
+  }
 }
+
+/** Backward-compat alias for the renamed function — anything importing the
+ *  old name still works. New code should use runRoundStart. */
+export const runRoundEnd = runRoundStart;
 
 /** Sentinel itemId stored on `declaredAction` to mark a movement entry. */
 export const MOVEMENT_ITEM_ID = '__movement__';

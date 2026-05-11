@@ -8,7 +8,7 @@
  * Wired by setting `CONFIG.ui.combat = CelerityCombatTracker` at init.
  */
 
-import { getClockTick, referenceRoundLength, runRoundEnd, MOVEMENT_ITEM_ID, interpolateMovementPosition, declareMovement } from '../systems/celerity.mjs';
+import { getClockTick, referenceRoundLength, runRoundStart, MOVEMENT_ITEM_ID, interpolateMovementPosition, declareMovement } from '../systems/celerity.mjs';
 import { checkEngagementHalts } from '../systems/engagement-halts.mjs';
 
 const MAX_ROUND_BOUNDARIES_PER_ADVANCE = 5; // safety cap on multi-round catches
@@ -37,24 +37,29 @@ async function _onCelAdvance(event, target) {
   let { c, declared } = queued[0];
   let newClock = declared.scheduledTick;
 
-  // Round-end mechanics: fire onStartTurn + DoTs for any actor whose personal
-  // round boundary was crossed by this clock advance. Per design-celerity.md
-  // round length is RL-tied (build-neutral), one boundary every roundLen ticks.
+  // Round-start mechanics: fire DoTs + onStartTurn for any actor whose
+  // personal reference-round boundary was crossed by this clock advance.
+  // The boundary tick simultaneously ends round N and starts round N+1;
+  // we now phrase it as round-start. Per design-celerity.md round length
+  // is RL-tied (build-neutral), one boundary every roundLen ticks.
   for (const member of combat.combatants) {
     const actor = member.actor;
     if (!actor) continue;
     const rl = actor.system.attributes?.race?.level ?? 1;
     const roundLen = referenceRoundLength(rl);
     if (roundLen <= 0) continue;
-    const lastEnd = member.flags?.[FLAG_NS]?.lastRoundEndAt ?? 0;
-    let crossings = Math.floor((newClock - lastEnd) / roundLen);
+    const lastBoundary = member.flags?.[FLAG_NS]?.lastRoundEndAt ?? 0;
+    let crossings = Math.floor((newClock - lastBoundary) / roundLen);
     if (crossings <= 0) continue;
     crossings = Math.min(crossings, MAX_ROUND_BOUNDARIES_PER_ADVANCE);
     for (let i = 0; i < crossings; i++) {
-      await runRoundEnd(combat, member);
+      await runRoundStart(combat, member);
     }
+    // Flag name kept (lastRoundEndAt) for backward compat with existing
+    // saved combats; semantically this is "tick of the most recent
+    // boundary crossed for this actor."
     await member.update({
-      [`flags.${FLAG_NS}.lastRoundEndAt`]: lastEnd + crossings * roundLen,
+      [`flags.${FLAG_NS}.lastRoundEndAt`]: lastBoundary + crossings * roundLen,
     });
   }
 
