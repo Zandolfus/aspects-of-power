@@ -268,8 +268,22 @@ export async function declareAction(actor, skill, options = {}) {
 
   const existing = combatant.flags?.aspectsofpower?.declaredAction;
   if (existing && existing.itemId) {
-    ui.notifications.warn(`${actor.name} already has "${existing.label}" queued. Cancel it first.`);
-    return null;
+    // Movement gets auto-overridden by any other action. The sprite snaps
+    // back to its document (start) position — the partial movement is
+    // rolled back as if it never happened. Per user 2026-05-11.
+    if (existing.itemId === MOVEMENT_ITEM_ID) {
+      await combatant.update({
+        'flags.aspectsofpower.declaredAction': null,
+        'flags.aspectsofpower.nextActionTick': null,
+      });
+      ChatMessage.create({
+        speaker: ChatMessage.getSpeaker({ actor }),
+        content: `<p><em>${actor.name} cancels <strong>${existing.label}</strong> to declare <strong>${skill.name}</strong>.</em></p>`,
+      });
+    } else {
+      ui.notifications.warn(`${actor.name} already has "${existing.label}" queued. Cancel it first.`);
+      return null;
+    }
   }
 
   const investAmount = options.investAmount ?? null;
