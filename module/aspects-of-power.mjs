@@ -1510,14 +1510,21 @@ async function _triggerPersistentAoe(tokenDoc, force = false) {
 /**
  * Mental-debuff per-tick resolution. Per design-aoe-dispatch.md:
  * mind/soul pools represent RESISTANCE (not avoidance). Each tick of a
- * persistent mental AOE depletes the target's relevant pool by
- * `debuffPoolCost`. When the pool hits 0, the debuff applies fully.
+ * persistent mental AOE depletes the target's relevant pool by the
+ * caster's full hit-roll total (snapshotted at cast time). When pool
+ * hits 0, the debuff applies fully.
+ *
+ * Per-skill tagConfig.debuffPoolCost overrides this if > 0 (lets designers
+ * set a flat per-tick cost for special skills). Default 0 = auto-derive
+ * from caster's hitTotal.
  *
  * Pool regenerates per round normally — a high-willpower target can
  * sustain through a long zone, a weak-willed one folds quickly.
  */
 async function _resolveMentalDebuffTick(targetActor, pd, flags, defenseKey, speaker) {
-  const cost = pd.tagConfig?.debuffPoolCost ?? 50;
+  const override = pd.tagConfig?.debuffPoolCost ?? 0;
+  const derived = pd.hitTotal ?? pd.rollTotal ?? 0;
+  const cost = override > 0 ? override : derived;
   const defense = targetActor.system.defense?.[defenseKey];
   if (!defense) return;
   const currentPool = defense.pool ?? 0;

@@ -177,9 +177,10 @@ export class SkillData extends foundry.abstract.TypeDataModel {
 
         // AOE debuff dispatch (per design-aoe-dispatch.md):
         //
-        // Mental debuffs (charm/fear/sleep/psychic/etc tags) use ABLATIVE
-        // pool depletion against mind/soul pool — each tick drains
-        // `debuffPoolCost`; when pool hits 0, debuff applies fully.
+        // Mental debuffs (targetDefense mind/soul) use ABLATIVE pool
+        // depletion. Per-tick cost defaults to the caster's full hitTotal
+        // (snapshotted at cast time). Override by setting debuffPoolCost > 0
+        // for a flat per-tick value (special skills like steady curses).
         //
         // Physical debuffs (poison/slow/weakness/etc) bypass pool entirely
         // (you can't dodge a gas cloud you're standing in) and use saveModel
@@ -187,7 +188,7 @@ export class SkillData extends foundry.abstract.TypeDataModel {
         //   'none'    — debuff always applies
         //   'perTick' — save vs caster's hit total each tick
         //   'onEntry' — save once on entry; locked in on failure
-        debuffPoolCost: new fields.NumberField({ initial: 50, min: 0, integer: true }),
+        debuffPoolCost: new fields.NumberField({ initial: 0, min: 0, integer: true }),
         saveModel:      new fields.StringField({ initial: 'none', choices: ['none', 'perTick', 'onEntry'] }),
         saveAbility:    new fields.StringField({ initial: 'willpower' }),
 
