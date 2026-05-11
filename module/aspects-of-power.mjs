@@ -1244,46 +1244,36 @@ Hooks.on('refreshToken', (token) => {
     token._castingRangeAura = null;
   }
 
-  // Guard: only draw for tokens the current user owns.
-  if (!token.document.isOwner) return;
+  // Wrapped in an IIFE so the inner early-returns only skip THIS branch,
+  // not the rest of the refreshToken hook (the in-range hostile highlight
+  // below this needs to run regardless of casting-aura state).
+  (() => {
+    if (!token.document.isOwner) return;
+    const userMap = game.user.getFlag('aspects-of-power', 'showRangeFor') ?? {};
+    if (!userMap[token.document.id]) return;
+    const actor = token.document.actor;
+    if (!actor?.system?.castingRange) return;
 
-  // Guard: check the toggle flag (per-USER, not per-token, so the GM
-  // doesn't see the aura when a player toggles it on their own token).
-  const userMap = game.user.getFlag('aspects-of-power', 'showRangeFor') ?? {};
-  if (!userMap[token.document.id]) return;
+    const rangeInFeet  = actor.system.castingRange;
+    const pixelsPerFoot = canvas.grid.size / canvas.grid.distance;
+    const radiusPx     = rangeInFeet * pixelsPerFoot;
+    const centerX = (token.document.width * canvas.grid.size) / 2;
+    const centerY = (token.document.height * canvas.grid.size) / 2;
 
-  // Guard: need a valid actor with a derived castingRange.
-  const actor = token.document.actor;
-  if (!actor?.system?.castingRange) return;
-
-  // Convert world-unit range (feet) to canvas pixels.
-  const rangeInFeet  = actor.system.castingRange;
-  const pixelsPerFoot = canvas.grid.size / canvas.grid.distance;
-  const radiusPx     = rangeInFeet * pixelsPerFoot;
-
-  // Center the circle on the token's visual center.
-  const centerX = (token.document.width * canvas.grid.size) / 2;
-  const centerY = (token.document.height * canvas.grid.size) / 2;
-
-  const gfx = new PIXI.Graphics();
-
-  // PIXI v7 (beginFill/drawCircle) vs v8 (circle/fill) — detect which API is available.
-  if (typeof gfx.drawCircle === 'function') {
-    // PIXI v7 style
-    gfx.beginFill(0x4488ff, 0.1);
-    gfx.lineStyle(2, 0x4488ff, 0.5);
-    gfx.drawCircle(centerX, centerY, radiusPx);
-    gfx.endFill();
-  } else {
-    // PIXI v8 style
-    gfx.circle(centerX, centerY, radiusPx);
-    gfx.fill({ color: 0x4488ff, alpha: 0.1 });
-    gfx.stroke({ color: 0x4488ff, alpha: 0.5, width: 2 });
-  }
-
-  // Add on top of the token's children so the circle is visible.
-  token.addChild(gfx);
-  token._castingRangeAura = gfx;
+    const gfx = new PIXI.Graphics();
+    if (typeof gfx.drawCircle === 'function') {
+      gfx.beginFill(0x4488ff, 0.1);
+      gfx.lineStyle(2, 0x4488ff, 0.5);
+      gfx.drawCircle(centerX, centerY, radiusPx);
+      gfx.endFill();
+    } else {
+      gfx.circle(centerX, centerY, radiusPx);
+      gfx.fill({ color: 0x4488ff, alpha: 0.1 });
+      gfx.stroke({ color: 0x4488ff, alpha: 0.5, width: 2 });
+    }
+    token.addChild(gfx);
+    token._castingRangeAura = gfx;
+  })();
 
   // ── In-range hostile highlight ─────────────────────────────────────────────
   // Replaces the auto-on-selection threat-range circle. When ANY friendly
