@@ -42,6 +42,8 @@ export function selectTargetOnCanvas(opts = {}) {
     canvas.tokens.releaseAll();
 
     let resolved = false;
+    let hoveredToken = null;
+
     const finish = (result) => {
       if (resolved) return;
       resolved = true;
@@ -50,30 +52,44 @@ export function selectTargetOnCanvas(opts = {}) {
     };
 
     const cleanup = () => {
-      Hooks.off('controlToken', onControl);
+      Hooks.off('hoverToken', onHover);
+      canvas.stage?.off?.('pointerdown', onPointerDown);
+      canvas.stage?.off?.('rightdown', onRightDown);
       document.removeEventListener('keydown', onKey, true);
       document.body.classList.remove('aop-targeting');
       try { ui.notifications.remove(notif); } catch { /* noop */ }
     };
 
-    // Listen for token selection. Foundry fires controlToken with
-    // controlled=true when the player clicks a token. We capture it as
-    // the target. Clicking empty canvas does nothing (no event fires).
-    const onControl = (token, controlled) => {
-      if (!controlled) return; // ignore deselects
-      const tokenDoc = token.document;
+    // Listening to controlToken doesn't work for players targeting hostile
+    // tokens (they don't own them, so the token never enters the controlled
+    // state). hoverToken fires for any visible token regardless of
+    // ownership, so we track the hovered token then capture the next
+    // canvas-stage pointerdown (PIXI federated, fires on bubble from
+    // whatever was clicked — token, ground, anything).
+    const onHover = (token, hovered) => {
+      if (hovered) hoveredToken = token;
+      else if (hoveredToken === token) hoveredToken = null;
+    };
+
+    const onPointerDown = (event) => {
+      if (!hoveredToken) return; // click on empty canvas — ignore
+      const tokenDoc = hoveredToken.document;
       if (!validate(tokenDoc)) {
         ui.notifications.warn(`${tokenDoc.name} is not a valid target.`);
         return;
       }
-      // Clear any prior targets, mark this token as the target via the
-      // v14 API (token.setTarget — game.user.updateTokenTargets doesn't
-      // exist), then release the control selection so the player isn't
-      // left with a stuck "select" on the target.
+      // Stop the click from also selecting/deselecting the token underneath.
+      if (event.stopPropagation) event.stopPropagation();
+      if (event.preventDefault) event.preventDefault();
+      // Clear any prior targets and mark this one. Use v14 setTarget API.
       for (const t of game.user.targets) t.setTarget(false, { releaseOthers: false, groupSelection: false });
-      token.setTarget(true, { releaseOthers: false, groupSelection: false });
-      token.release();
+      hoveredToken.setTarget(true, { releaseOthers: false, groupSelection: false });
       finish(tokenDoc);
+    };
+
+    const onRightDown = () => {
+      // Right-click cancels the prompt without targeting.
+      finish(null);
     };
 
     const onKey = (event) => {
@@ -85,7 +101,9 @@ export function selectTargetOnCanvas(opts = {}) {
       }
     };
 
-    Hooks.on('controlToken', onControl);
+    Hooks.on('hoverToken', onHover);
+    canvas.stage.on('pointerdown', onPointerDown);
+    canvas.stage.on('rightdown', onRightDown);
     document.addEventListener('keydown', onKey, true);
   });
 }
