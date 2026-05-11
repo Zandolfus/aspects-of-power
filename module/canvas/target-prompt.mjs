@@ -30,8 +30,16 @@ export function selectTargetOnCanvas(opts = {}) {
     const validate = opts.validate ?? (() => true);
 
     const notif = ui.notifications.info(message, { permanent: true });
-    const stage = canvas.app.stage;
-    document.body.style.cursor = 'crosshair';
+    // canvas.app.view is the actual <canvas> DOM element. Body cursor
+    // doesn't reach the canvas because PIXI manages its own cursor.
+    const canvasEl = canvas.app.view;
+    const oldCursor = canvasEl.style.cursor;
+    canvasEl.style.cursor = 'crosshair';
+
+    // Pre-clear any existing selection so the next click registers a
+    // fresh `controlToken` event. Without this, if the user already had
+    // a token selected, clicking the same one wouldn't re-fire.
+    canvas.tokens.releaseAll();
 
     let resolved = false;
     const finish = (result) => {
@@ -42,33 +50,27 @@ export function selectTargetOnCanvas(opts = {}) {
     };
 
     const cleanup = () => {
-      stage.off('pointerdown', onPointerDown);
+      Hooks.off('controlToken', onControl);
       document.removeEventListener('keydown', onKey, true);
-      document.body.style.cursor = '';
+      canvasEl.style.cursor = oldCursor;
       try { ui.notifications.remove(notif); } catch { /* noop */ }
     };
 
-    const onPointerDown = (event) => {
-      // event.data.global gives canvas-coords pointer position.
-      const global = event.data?.global ?? event.global;
-      if (!global) return;
-      // canvas.app.stage's children include the layers. We resolve the
-      // top-most token whose bounds contain the click point.
-      const local = canvas.tokens.toLocal(global);
-      const hit = canvas.tokens.placeables.find(t => {
-        if (!t.visible) return false;
-        const b = t.bounds;
-        return local.x >= b.x && local.x <= b.x + b.width
-            && local.y >= b.y && local.y <= b.y + b.height;
-      });
-      if (!hit) return; // Click on empty canvas — ignore, keep listening
-      const tokenDoc = hit.document;
+    // Listen for token selection. Foundry fires controlToken with
+    // controlled=true when the player clicks a token. We capture it as
+    // the target. Clicking empty canvas does nothing (no event fires).
+    const onControl = (token, controlled) => {
+      if (!controlled) return; // ignore deselects
+      const tokenDoc = token.document;
       if (!validate(tokenDoc)) {
         ui.notifications.warn(`${tokenDoc.name} is not a valid target.`);
         return;
       }
-      // Set as the player's target.
-      game.user.updateTokenTargets([hit.id]);
+      // Mark as target via Foundry's targeting API + release the
+      // control selection so the player isn't left with a stuck "select"
+      // on the target token.
+      game.user.updateTokenTargets([token.id]);
+      token.release();
       finish(tokenDoc);
     };
 
@@ -81,7 +83,7 @@ export function selectTargetOnCanvas(opts = {}) {
       }
     };
 
-    stage.on('pointerdown', onPointerDown);
+    Hooks.on('controlToken', onControl);
     document.addEventListener('keydown', onKey, true);
   });
 }
