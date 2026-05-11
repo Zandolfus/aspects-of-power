@@ -662,6 +662,9 @@ export class AspectsofPowerActor extends Actor {
       !e.disabled && e.system?.effectType === 'sustain'
     );
     for (const sustainFx of sustainEffects) {
+      // Defensive: another branch (effect expiry, multiple round-end calls
+      // in one advance, etc.) may have deleted this effect already.
+      if (!this.effects.has(sustainFx.id)) continue;
       const costAmt = sustainFx.system?.sustainCost ?? 0;
       const resKey  = sustainFx.system?.sustainResource ?? 'mana';
       const current = systemData[resKey]?.value ?? 0;
@@ -747,6 +750,7 @@ export class AspectsofPowerActor extends Actor {
         if (targetPool <= 0) {
           targetPool = 0;
           for (const se of sleepEffects) {
+            if (!this.effects.has(se.id)) continue;
             if (!se.system?.sleepActive) {
               await se.update({ 'system.sleepActive': true });
               ChatMessage.create({
@@ -757,6 +761,7 @@ export class AspectsofPowerActor extends Actor {
           }
         } else {
           for (const se of sleepEffects) {
+            if (!this.effects.has(se.id)) continue;
             if (se.system?.sleepActive && targetPool >= (se.system?.debuffDamage ?? 0)) {
               await se.delete();
               ChatMessage.create({
@@ -791,6 +796,9 @@ export class AspectsofPowerActor extends Actor {
     );
 
     for (const effect of typedDebuffs) {
+      // Defensive: snapshot may include effects deleted by the sleep
+      // wake branch above (sleep is also a debuff type). Skip if gone.
+      if (!this.effects.has(effect.id)) continue;
       const sys = effect.system;
       const debuffType = sys.debuffType;
       const rollTotal = sys.debuffDamage ?? 0;
