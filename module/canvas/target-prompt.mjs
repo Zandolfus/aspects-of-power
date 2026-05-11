@@ -66,10 +66,12 @@ export function selectTargetOnCanvas(opts = {}) {
         ui.notifications.warn(`${tokenDoc.name} is not a valid target.`);
         return;
       }
-      // Mark as target via Foundry's targeting API + release the
-      // control selection so the player isn't left with a stuck "select"
-      // on the target token.
-      game.user.updateTokenTargets([token.id]);
+      // Clear any prior targets, mark this token as the target via the
+      // v14 API (token.setTarget — game.user.updateTokenTargets doesn't
+      // exist), then release the control selection so the player isn't
+      // left with a stuck "select" on the target.
+      for (const t of game.user.targets) t.setTarget(false, { releaseOthers: false, groupSelection: false });
+      token.setTarget(true, { releaseOthers: false, groupSelection: false });
       token.release();
       finish(tokenDoc);
     };
@@ -78,7 +80,7 @@ export function selectTargetOnCanvas(opts = {}) {
       if (event.key === 'Escape') {
         event.stopPropagation();
         event.preventDefault();
-        game.user.updateTokenTargets([]);
+        for (const t of game.user.targets) t.setTarget(false, { releaseOthers: false, groupSelection: false });
         finish(null);
       }
     };
