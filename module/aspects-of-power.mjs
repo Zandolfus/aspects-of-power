@@ -1354,6 +1354,32 @@ Hooks.on('deleteCombat', () => refreshOverlay());
 // per encounter.
 Hooks.on('combatStart', combat => resetFirstContactSeen(combat));
 
+// Persistent AOE entry-tick on region creation. Foundry's RegionBehavior
+// tokenEnter only fires on token movement INTO a region — not when a
+// region is created with tokens already inside. Verified empirically
+// 2026-05-10. Without this hook, casting a Vine Trap on top of a target
+// would create the region but never fire the entry tick (no pool drain,
+// no immediate damage, etc.) until the target moved or the next round-tick.
+//
+// Run on GM only (matches the trigger function's isGM guard). Iterate
+// scene tokens, fire trigger with force=true for any inside the region.
+Hooks.on('createRegion', async (region, options, userId) => {
+  if (!game.user.isGM) return;
+  const flags = region.flags?.['aspects-of-power'];
+  if (!flags?.persistent || !flags.persistentData) return;
+  const scene = region.parent;
+  if (!scene) return;
+  const trigger = game.aspectsofpower?._triggerPersistentAoe;
+  if (typeof trigger !== 'function') return;
+  for (const tokenDoc of scene.tokens) {
+    const tok = tokenDoc.object;
+    if (!tok) continue;
+    const center = tok.center;
+    if (!region.testPoint({ x: center.x, y: center.y, elevation: tokenDoc.elevation ?? 0 })) continue;
+    await trigger(tokenDoc, true); // force=true — entry tick always fires
+  }
+});
+
 // Clear any staged movement buffers when combat ends or the scene tears
 // down — buffers are transient client-side state.
 Hooks.on('deleteCombat', () => clearAllBuffers());
