@@ -54,10 +54,10 @@
             {{/if}}
           </div>
 
-          {{! Celerity status — last action + scheduled tick / time-until-next }}
+          {{! Celerity status — last action (history) + scheduled tick / time-until-next }}
           <div class="cel-status" style="font-size:10px;color:#bbb;margin-top:2px;line-height:1.3;">
             {{#if t.celerity.lastActionName}}
-              <span title="Last action / wait">{{t.celerity.lastActionName}} ({{t.celerity.lastActionWait}}t)</span>
+              <span title="Last completed action" style="color:#888;">Last: {{t.celerity.lastActionName}} ({{t.celerity.lastActionWait}}t)</span>
             {{else}}
               <span style="color:#888;">no action declared</span>
             {{/if}}
@@ -65,7 +65,7 @@
             {{#if t.celerity.ready}}
               <span style="color:#6c6;">ready</span>
             {{else}}
-              <span>next @ <strong>{{t.celerity.nextActionTick}}</strong> (in <strong>{{t.celerity.ticksUntil}}</strong>)</span>
+              <span style="color:#fc6;"><strong>queued</strong> next @ {{t.celerity.nextActionTick}} (in {{t.celerity.ticksUntil}}t)</span>
             {{/if}}
           </div>
         </div>
