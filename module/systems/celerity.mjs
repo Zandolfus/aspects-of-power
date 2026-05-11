@@ -266,24 +266,22 @@ export async function declareAction(actor, skill, options = {}) {
   const combatant = findCombatantForActor(actor);
   if (!combatant) return null;
 
+  // Any existing declaration is auto-overridden by the new one. Per user
+  // 2026-05-11: players can change their mind at will. The prior action's
+  // placed AOE region (if any) is cleaned up automatically by the
+  // preUpdateCombatant orphan-cleanup hook when declaredAction changes;
+  // sprite snaps back to the movement start position if the prior action
+  // was an in-flight movement (no partial commit).
   const existing = combatant.flags?.aspectsofpower?.declaredAction;
   if (existing && existing.itemId) {
-    // Movement gets auto-overridden by any other action. The sprite snaps
-    // back to its document (start) position — the partial movement is
-    // rolled back as if it never happened. Per user 2026-05-11.
-    if (existing.itemId === MOVEMENT_ITEM_ID) {
-      await combatant.update({
-        'flags.aspectsofpower.declaredAction': null,
-        'flags.aspectsofpower.nextActionTick': null,
-      });
-      ChatMessage.create({
-        speaker: ChatMessage.getSpeaker({ actor }),
-        content: `<p><em>${actor.name} cancels <strong>${existing.label}</strong> to declare <strong>${skill.name}</strong>.</em></p>`,
-      });
-    } else {
-      ui.notifications.warn(`${actor.name} already has "${existing.label}" queued. Cancel it first.`);
-      return null;
-    }
+    await combatant.update({
+      'flags.aspectsofpower.declaredAction': null,
+      'flags.aspectsofpower.nextActionTick': null,
+    });
+    ChatMessage.create({
+      speaker: ChatMessage.getSpeaker({ actor }),
+      content: `<p><em>${actor.name} cancels <strong>${existing.label}</strong> to declare <strong>${skill.name}</strong>.</em></p>`,
+    });
   }
 
   const investAmount = options.investAmount ?? null;

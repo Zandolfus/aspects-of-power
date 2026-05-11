@@ -116,24 +116,16 @@ export class AspectsofPowerToken extends foundry.documents.TokenDocument {
       return false;
     }
 
-    // Existing action handling: a queued movement is auto-overridden by
-    // ANY new declaration (per user 2026-05-11) — the new move just
-    // replaces it. A queued non-movement (skill) still blocks; the
-    // player must cancel that first.
+    // Any existing declaration is auto-overridden by this new movement
+    // (per user 2026-05-11: players can change their mind at will).
+    // preUpdateCombatant orphan-cleanup will dispose of any AOE region
+    // that was placed by the prior action when declaredAction flips.
     const existing = combatant.flags?.aspectsofpower?.declaredAction;
-    const MOVE_ID = '__movement__'; // matches MOVEMENT_ITEM_ID in celerity.mjs
     if (existing && existing.itemId) {
-      if (existing.itemId === MOVE_ID) {
-        // Clear the prior movement synchronously-async; the rest of
-        // _preUpdateMovement runs and declares a fresh one below.
-        combatant.update({
-          'flags.aspectsofpower.declaredAction': null,
-          'flags.aspectsofpower.nextActionTick': null,
-        }).catch(err => console.warn('[celerity] override-clear failed:', err));
-      } else {
-        ui.notifications.warn(`${actor.name} already has "${existing.label}" queued. Cancel it first before declaring movement.`);
-        return false;
-      }
+      combatant.update({
+        'flags.aspectsofpower.declaredAction': null,
+        'flags.aspectsofpower.nextActionTick': null,
+      }).catch(err => console.warn('[celerity] override-clear failed:', err));
     }
 
     // Stamina cost from Foundry's movement-cost calculator.
