@@ -8,7 +8,7 @@
  * Wired by setting `CONFIG.ui.combat = CelerityCombatTracker` at init.
  */
 
-import { getClockTick, referenceRoundLength, runRoundEnd, MOVEMENT_ITEM_ID, interpolateMovementPosition } from '../systems/celerity.mjs';
+import { getClockTick, referenceRoundLength, runRoundEnd, MOVEMENT_ITEM_ID, interpolateMovementPosition, declareMovement } from '../systems/celerity.mjs';
 import { checkEngagementHalts } from '../systems/engagement-halts.mjs';
 
 const MAX_ROUND_BOUNDARIES_PER_ADVANCE = 5; // safety cap on multi-round catches
@@ -116,6 +116,13 @@ async function _onCelAdvance(event, target) {
 
   // Commit completion: clear flags + debit stamina for any movement that
   // just landed. This includes the "fired" combatant if it was a movement.
+  // After clearing, if the movement was a halt (truncated short of its
+  // original destination) AND the actor moved at all, auto-queue a fresh
+  // movement to the original destination so the player doesn't have to
+  // manually re-issue. The new move re-runs the halt check on the next
+  // advance — if the engagement is still active, it'll get re-truncated
+  // (potentially at 0 ft) and the player can cancel.
+  const autoResumes = [];
   for (const { id, mv } of completedMovementCombatantIds) {
     const member = combat.combatants.get(id);
     const updates = {
@@ -131,6 +138,39 @@ async function _onCelAdvance(event, target) {
       await member.actor.update({
         'system.stamina.value': Math.max(0, cur - mv.staminaCost),
       });
+    }
+    // Resume planning: only if there's an originalEndPos AND we actually
+    // covered ground (anti-loop: a 0-progress halt means we got pinned at
+    // the start, no point re-queueing).
+    if (mv.originalEndPos && mv.endPos) {
+      const dx = mv.endPos.x - mv.startPos.x;
+      const dy = mv.endPos.y - mv.startPos.y;
+      const moved = Math.hypot(dx, dy);
+      const remDx = mv.originalEndPos.x - mv.endPos.x;
+      const remDy = mv.originalEndPos.y - mv.endPos.y;
+      const remainingPx = Math.hypot(remDx, remDy);
+      if (moved > 1 && remainingPx > 1) {
+        // Convert remaining distance back to ft, scale stamina proportionally.
+        const pxPerFt = canvas.grid.size / canvas.grid.distance;
+        const remainingFt = Math.round(remainingPx / pxPerFt);
+        const totalDistFt = mv.distanceFt ?? 0;
+        const totalStamina = mv.staminaCost ?? 0;
+        const ratio = totalDistFt > 0 ? Math.min(1, remainingFt / totalDistFt) : 0;
+        const remStamina = Math.round(totalStamina * ratio);
+        autoResumes.push({ memberId: id, fromPos: mv.endPos, toPos: mv.originalEndPos, distFt: remainingFt, staminaCost: remStamina });
+      }
+    }
+  }
+
+  // Re-queue resumed movements after the clock advance so they're
+  // measured against newClock.
+  for (const { memberId, fromPos, toPos, distFt, staminaCost } of autoResumes) {
+    const member = combat.combatants.get(memberId);
+    if (!member?.actor) continue;
+    try {
+      await declareMovement(member.actor, fromPos, toPos, distFt, staminaCost);
+    } catch (e) {
+      console.warn(`[celerity] auto-resume failed for ${member.name}:`, e);
     }
   }
 
@@ -221,8 +261,14 @@ async function _onCelCancel(event, target) {
     [`flags.${FLAG_NS}.nextActionTick`]: null,
     [`flags.${FLAG_NS}.declaredAction`]: null,
   });
-  const noun = declared?.itemId === MOVEMENT_ITEM_ID ? 'movement' : 'action';
+  const noun = declared?.itemId === MOVEMENT_ITEM_ID ? 'movement' : (declared?.label ?? 'action');
   ui.notifications.info(`${c.name} — ${noun} cancelled.`);
+  if (declared) {
+    ChatMessage.create({
+      speaker: ChatMessage.getSpeaker({ actor: c.actor }),
+      content: `<p><em>${c.name} cancels <strong>${declared.label}</strong>.</em></p>`,
+    });
+  }
 }
 
 /**

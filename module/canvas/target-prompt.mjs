@@ -104,10 +104,33 @@ export function selectTargetOnCanvas(opts = {}) {
 export function skillNeedsTargetPrompt(item) {
   if (!item || item.type !== 'skill') return false;
   if (item.system.skillType === 'Passive') return false;
+  // Profession skills (craft, gather, refine, prep) operate on materials /
+  // workstations, never on canvas tokens. Skip the prompt entirely.
+  if (item.system.skillCategory === 'profession') return false;
   const tags = item.system.tags ?? [];
   // AOE has its own placement; skip the single-target prompt.
   if ((item.system.aoe?.enabled === true) || tags.includes('aoe') || (item.system.alterations ?? []).some(a => (a.id ?? a) === 'aoe')) return false;
   // Sustain toggles on self — no target.
   if (tags.includes('sustain')) return false;
   return true;
+}
+
+/**
+ * For ranged skills, the target should be picked at FIRE time, not at
+ * declare time — the situation may have changed during the celerity wait
+ * (target moved out of LOS, died, new better target appeared). Melee
+ * skills still pick at declare since the target needs to be in reach
+ * NOW for the engagement halt math to work.
+ *
+ * Returns true if the prompt should be deferred to executeDeferred.
+ */
+export function skillTargetsAtFire(item) {
+  if (!skillNeedsTargetPrompt(item)) return false;
+  const tags = item.system.tags ?? [];
+  if (tags.includes('ranged')) return true;
+  // Magic projectiles / direct magic skills behave as ranged (cast and
+  // resolve over distance). Channel them through fire-time targeting too.
+  const rt = item.system.roll?.type ?? '';
+  if (rt === 'phys_ranged' || rt === 'magic_projectile') return true;
+  return false;
 }

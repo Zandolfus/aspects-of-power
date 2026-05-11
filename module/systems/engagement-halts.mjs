@@ -290,6 +290,11 @@ async function _applyHalt(combat, cmId, haltInfo) {
     scheduledTick: haltInfo.scheduledTick,
     distanceFt: distFt,
     label: mv.label.replace(/ \(engaged .+\)| \(spotted .+\)/, '') + labelSuffix,
+    // Preserve the pre-truncation destination so the tracker can offer a
+    // resume after the halt fires and the engagement clears. Don't
+    // overwrite if it was already set (chained halts on the same path).
+    originalEndPos: mv.originalEndPos ?? mv.endPos,
+    haltCauseCombatantId: haltInfo.cause?.id ?? null,
   };
   const update = {
     [`flags.${FLAG_NS}.declaredAction`]: newDeclared,

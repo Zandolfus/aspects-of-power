@@ -1,7 +1,7 @@
 import { EquipmentSystem } from '../systems/equipment.mjs';
 import { getPositionalTags } from '../helpers/positioning.mjs';
 import { recordActionFired, declareAction, isInActiveCombat, computeActionWait, referenceRoundLength } from '../systems/celerity.mjs';
-import { selectTargetOnCanvas, skillNeedsTargetPrompt } from '../canvas/target-prompt.mjs';
+import { selectTargetOnCanvas, skillNeedsTargetPrompt, skillTargetsAtFire } from '../canvas/target-prompt.mjs';
 
 /**
  * Check if an actor is an assigned player character (not just owned).
@@ -3912,9 +3912,17 @@ export class AspectsofPowerItem extends Item {
 
     // ── Click-skill-then-pick-target (per design 2026-05-10) ──
     // Replaces Foundry's pre-target-T-then-cast workflow. AOE skills
-    // bypass — their own placement flow handles canvas selection. Skipped
-    // on deferred fire (target was already picked at declare time).
-    if (!options.executeDeferred && options.preInvestAmount == null && skillNeedsTargetPrompt(this)) {
+    // bypass — their own placement flow handles canvas selection.
+    //
+    // Two timing modes:
+    //   - Melee/instant: prompt at DECLARE so the engagement-halt math
+    //     can use the chosen target's position. Skipped on deferred fire.
+    //   - Ranged: prompt at FIRE so the situation (LOS, target HP,
+    //     better targets) reflects the moment of resolution. Skipped at
+    //     declare for these.
+    const targetsAtFire = skillTargetsAtFire(this);
+    if (!options.executeDeferred && options.preInvestAmount == null
+        && skillNeedsTargetPrompt(this) && !targetsAtFire) {
       const picked = await selectTargetOnCanvas({
         message: `Click target for ${this.name} (Esc to cancel)`,
       });
@@ -3929,11 +3937,26 @@ export class AspectsofPowerItem extends Item {
     // picked at declare time may have deselected by fire time. Restore
     // from preTargetIds (snapshotted at declare time, passed through
     // the celerity dispatch socket).
-    if (options.executeDeferred && Array.isArray(options.preTargetIds)) {
+    if (options.executeDeferred && Array.isArray(options.preTargetIds) && options.preTargetIds.length > 0) {
       for (const t of game.user.targets) t.setTarget(false, { releaseOthers: false, groupSelection: false });
       for (const id of options.preTargetIds) {
         const tok = canvas.tokens?.get(id);
         if (tok) tok.setTarget(true, { releaseOthers: false, groupSelection: false });
+      }
+    }
+
+    // ── Fire-time target prompt (ranged) ──
+    // Ranged skills defer the target pick until the cast actually fires.
+    // If the player declared without a target snapshot AND the skill is
+    // ranged, prompt them now. They'll see the current battlefield and
+    // pick whatever's optimal at this moment.
+    if (options.executeDeferred && targetsAtFire && game.user.targets.size === 0) {
+      const picked = await selectTargetOnCanvas({
+        message: `Click target for ${this.name} (Esc to abort)`,
+      });
+      if (!picked) {
+        ui.notifications.info(`${this.name} aborted at fire time — no target picked.`);
+        return;
       }
     }
 

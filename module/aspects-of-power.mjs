@@ -2060,6 +2060,22 @@ Hooks.on('updateActor', async (actor, changes, _options, userId) => {
         }
       }
     }
+
+    // Unqueue any pending celerity action — a corpse can't act. Posts a
+    // chat note so other players see why the next-up indicator changed.
+    for (const combat of game.combats) {
+      const cm = combat.combatants.find(c => c.actorId === actor.id);
+      const declared = cm?.flags?.aspectsofpower?.declaredAction;
+      if (!declared) continue;
+      await cm.update({
+        'flags.aspectsofpower.declaredAction': null,
+        'flags.aspectsofpower.nextActionTick': null,
+      });
+      ChatMessage.create({
+        speaker: ChatMessage.getSpeaker({ actor }),
+        content: `<p><em>${actor.name}'s queued <strong>${declared.label}</strong> is cancelled — incapacitated.</em></p>`,
+      });
+    }
   }
 
   const threshold = game.settings.get('aspects-of-power', 'woundedTokenThreshold');
