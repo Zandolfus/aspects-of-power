@@ -3287,9 +3287,12 @@ export class AspectsofPowerItem extends Item {
         // (the old updateToken endpoint check missed those).
         if ((aoe.templateDuration ?? 0) > 0) {
           behaviors.push({
-            // Bare type name. Foundry looks up the data model under
-            // CONFIG.RegionBehavior.dataModels['aspects-of-power.persistentAoe']
-            // by composing the system namespace internally.
+            // Bare type name. Must match the key our PersistentAoeBehavior
+            // is registered under in CONFIG.RegionBehavior.dataModels (also
+            // bare). Using the namespaced 'aspects-of-power.persistentAoe'
+            // here is rejected by validation; using the namespaced key on
+            // dataModels orphans the behavior from its class (no
+            // _getTerrainEffects, breaks the drag path planner).
             type: 'persistentAoe',
             name: 'Persistent AOE Trigger',
             system: {},

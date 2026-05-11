@@ -16,7 +16,13 @@
  */
 
 const FLAG_NS = 'aspects-of-power';
-const TYPE_KEY = `${FLAG_NS}.persistentAoe`;
+// Bare type name. v14 looks up CONFIG.RegionBehavior.dataModels[behavior.type]
+// directly — the key MUST match the bare type that creation uses (and what
+// system.json declares under documentTypes.RegionBehavior). Using the
+// namespaced key here orphans the behavior from its class and breaks any
+// inherited method (e.g. _getTerrainEffects, which the drag path planner
+// invokes). Verified empirically 2026-05-10.
+const TYPE_KEY = 'persistentAoe';
 
 let _triggerFn = null;
 
