@@ -1007,7 +1007,16 @@ export class AspectsofPowerItem extends Item {
 
     // Barrier fully absorbs → flag so debuff/DoT can be skipped.
     const fullyBlocked = isHit && preToughnessDmg > 0 && barrierValue >= preToughnessDmg;
-    return { isHit, fullyBlocked, damageMultiplier };
+    // Pierce flag for chained-skill gating: did some damage make it past
+    // the target's armor/veil into the DR layer? Used by chains tagged
+    // `requires_armor_pierce` (e.g. Hemorrhage — light-warrior bleed
+    // shouldn't trigger off a fully-deflected blow). Per design 2026-05-11:
+    // armor and veil are interchangeable for this check since some
+    // bolt-spells route through armor (Pyroblast) while bleed-style
+    // chains on magical parents would want the equivalent veil-pierce
+    // signal. Designers tag specific chains; untagged chains fire on hit.
+    const piercedMitigation = isHit && preToughnessDmg > 0;
+    return { isHit, fullyBlocked, damageMultiplier, piercedMitigation };
   }
 
   /**
@@ -4959,6 +4968,34 @@ export class AspectsofPowerItem extends Item {
         const wasHit = hitResult?.isHit;
         if (chain.trigger === 'on-hit' && wasHit !== true) continue;
         if (chain.trigger === 'on-miss' && wasHit !== false) continue;
+
+        // Per design 2026-05-11: chains only fire when the parent attack
+        // actually landed and delivered damage past the target's
+        // defensive layers up to the point each chain cares about.
+        //   - miss / fully-blocked barrier / fully-absorbed pool → skip
+        //   - chain tagged `requires_armor_pierce` AND parent didn't
+        //     pierce armor/veil → skip with a brief chat note
+        // Per-target so an AOE that bled through some targets but not
+        // others (boss with high armor vs minions) chains only on the
+        // pierced ones.
+        const chainTags = chainedItem.system.tags ?? [];
+        const isAttackChild = chainTags.includes('attack')
+          || chainTags.includes('debuff') || chainTags.includes('restoration')
+          || chainTags.includes('buff') || chainTags.includes('cleanse')
+          || chainTags.includes('repair');
+        if (isAttackChild && hitResult) {
+          if (hitResult.isHit === false) continue;
+          if (hitResult.fullyBlocked === true) continue;
+          if ((hitResult.damageMultiplier ?? 1) <= 0) continue;
+          if (chainTags.includes('requires_armor_pierce') && hitResult.piercedMitigation !== true) {
+            const tName = targetToken?.document?.name ?? 'target';
+            ChatMessage.create({
+              speaker, rollMode, ...(whisperGM ? { whisper: whisperGM } : {}),
+              content: `<p><em>${chainedItem.name} didn't trigger on ${tName} — ${this.name} didn't pierce armor.</em></p>`,
+            });
+            continue;
+          }
+        }
 
         // Build the chained skill's own rolls.
         const chainRollData = chainedItem.getRollData();

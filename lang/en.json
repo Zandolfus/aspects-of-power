@@ -39,6 +39,7 @@
       "sustain": "Sustain",
       "shrapnel": "Shrapnel",
       "on_death": "On Death",
+      "requires_armor_pierce": "Requires Armor Pierce",
       "craft": "Craft",
       "gather": "Gather",
       "refine": "Refine",

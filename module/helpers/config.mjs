@@ -370,6 +370,8 @@ ASPECTSOFPOWER.skillTags = {
   craft:       'ASPECTSOFPOWER.Tag.craft',
   // Trigger tags (auto-fire passives).
   on_death:    'ASPECTSOFPOWER.Tag.on_death',
+  // Chain conditional tags (gate when a chained skill is allowed to fire).
+  requires_armor_pierce: 'ASPECTSOFPOWER.Tag.requires_armor_pierce',
   // Descriptor tags (mechanical effects).
   magic:       'ASPECTSOFPOWER.Tag.magic',
   physical:    'ASPECTSOFPOWER.Tag.physical',
@@ -434,6 +436,8 @@ ASPECTSOFPOWER.combatTags = {
   shrapnel:    'ASPECTSOFPOWER.Tag.shrapnel',
   // Triggers.
   on_death:    'ASPECTSOFPOWER.Tag.on_death',
+  // Chain conditional.
+  requires_armor_pierce: 'ASPECTSOFPOWER.Tag.requires_armor_pierce',
   // Descriptors.
   magic:       'ASPECTSOFPOWER.Tag.magic',
   physical:    'ASPECTSOFPOWER.Tag.physical',
