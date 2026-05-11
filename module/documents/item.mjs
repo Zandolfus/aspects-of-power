@@ -3537,7 +3537,14 @@ export class AspectsofPowerItem extends Item {
       await dmgRoll.evaluate();
 
       // ── Find targets ───────────────────────────────────────────────────
-      const targets = this._getAoeTargets(region);
+      // _getAoeTargets only auto-excludes the caster from cone/ray shapes.
+      // Death blooms are circles centered ON the corpse, so the dying
+      // actor's token would otherwise be hit by its own burst (the
+      // 2026-05-10 combat log showed Saurians "1 target — Bloomed Saurian"
+      // — themselves). Strip the dead token explicitly.
+      const allTargets = this._getAoeTargets(region);
+      const deadTokenId = (deadToken.document ?? deadToken).id;
+      const targets = allTargets.filter(t => t.id !== deadTokenId);
 
       // Announce death-trigger.
       ChatMessage.create({

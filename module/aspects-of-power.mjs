@@ -2064,7 +2064,11 @@ async function _applyForcedMovement(targetActor, attackerTokenId, dir, distFt, h
  * Stores the original image in a flag so it can be restored when healed.
  */
 Hooks.on('updateActor', async (actor, changes, _options, userId) => {
-  if (!game.user.isGM) return;
+  // Multi-GM dedup: only the ACTIVE GM (one designated client) handles
+  // these effects. Plain `game.user.isGM` lets every connected GM client
+  // run the hook in parallel, which double-fired death blooms in the
+  // 2026-05-10 combat log (Claude + Gamemaster accounts both connected).
+  if (game.users.activeGM !== game.user) return;
   if (game.userId !== userId && !changes.system?.health) return;
 
   // Only react to health value changes.
@@ -2085,13 +2089,17 @@ Hooks.on('updateActor', async (actor, changes, _options, userId) => {
       });
     }
 
-    // on_death-tagged passive AOE skills auto-fire from each active token.
+    // on_death-tagged passive AOE skills auto-fire ONCE from a single
+    // representative token. For unlinked actors (one per token) this is
+    // the dying token. For linked actors with multiple tokens sharing
+    // HP, only one burst — firing from every token of a shared actor
+    // would produce N death blooms for one death.
     const deathSkills = actor.items.filter(i =>
       i.type === 'skill' && (i.system?.tags ?? []).includes('on_death')
     );
     if (deathSkills.length > 0) {
-      const tokens = actor.getActiveTokens();
-      for (const tok of tokens) {
+      const tok = actor.getActiveTokens()?.[0];
+      if (tok) {
         for (const skill of deathSkills) {
           try {
             await skill._fireOnDeath(tok);
