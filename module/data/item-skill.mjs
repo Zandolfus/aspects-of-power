@@ -152,6 +152,15 @@ export class SkillData extends foundry.abstract.TypeDataModel {
         debuffDirectional:  new fields.BooleanField({ initial: false }),
         debuffDealsDamage:  new fields.BooleanField({ initial: false }),
         debuffDamageType:   new fields.StringField({ initial: 'physical' }),
+        // DoT damage scaling: per-tick DoT damage = dmgRoll × dotScale ×
+        // defenseMultiplier. Separate from debuffScaleWithAttack (which
+        // scales the stat-reduction portion of the debuff) so designers
+        // can tune each independently. Per user 2026-05-11: DoTs are
+        // low-damage stacking sources; default 0.1 = 10% of attack roll
+        // per tick. Zero is a legitimate value (no DoT damage despite
+        // the debuff being damage-flagged) — the old "0 = full damage"
+        // surprise sentinel is gone.
+        dotScale: new fields.NumberField({ initial: 0.1, min: 0, max: 1 }),
 
         // Forced movement: push or pull target on hit.
         forcedMovement:     new fields.BooleanField({ initial: false }),

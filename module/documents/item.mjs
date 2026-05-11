@@ -2096,6 +2096,16 @@ export class AspectsofPowerItem extends Item {
       if (!dismemberedSlot) return; // cancelled
     }
 
+    // DoT damage uses its own scale factor (dotScale, default 0.1) so a
+    // bleed-style chain ticks for ~10% of the attack roll per round per
+    // stack rather than the full attack damage. Separate from
+    // debuffScaleWithAttack which keeps governing stat-reduction
+    // strength. Per user 2026-05-11.
+    const dotScale = this.system.tagConfig?.dotScale ?? 0.1;
+    const dotDmg = dealsDmg
+      ? Math.max(0, Math.round(dmgRoll.total * dotScale * defenseMultiplier))
+      : 0;
+
     // Store debuff metadata in the AE TypeDataModel system fields.
     effectData.type = 'base';
     effectData.system = {
@@ -2106,7 +2116,7 @@ export class AspectsofPowerItem extends Item {
       magicType: this.system.magicType ?? 'non-magical',
       directions,
       ...(dismemberedSlot ? { dismemberedSlot } : {}),
-      ...(dealsDmg ? { dot: true, dotDamage: rollTotal, dotDamageType: dmgType, applierActorUuid: this.actor.uuid } : {}),
+      ...(dealsDmg ? { dot: true, dotDamage: dotDmg, dotDamageType: dmgType, applierActorUuid: this.actor.uuid } : {}),
     };
 
     const statSummary = entries.length > 0
@@ -2120,7 +2130,7 @@ export class AspectsofPowerItem extends Item {
       originUuid: this.uuid,
       stackable: this.system.tagConfig?.debuffStackable ?? false,
       effectData: (changes.length > 0 || dealsDmg || debuffType !== 'none') ? effectData : null,
-      dotDamage: dealsDmg ? rollTotal : 0,
+      dotDamage: dotDmg,
       dotDamageType: dmgType,
       duration,
       statSummary,

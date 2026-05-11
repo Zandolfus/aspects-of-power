@@ -498,6 +498,10 @@
           <option value='physical' {{#if (eq system.tagConfig.debuffDamageType "physical")}}selected{{/if}}>Physical (ignores Armor)</option>
           <option value='magical' {{#if (eq system.tagConfig.debuffDamageType "magical")}}selected{{/if}}>Magical (ignores Veil)</option>
         </select>
+        <label class='resource-label'>DoT Scale</label>
+        <input type='number' name='system.tagConfig.dotScale'
+               value='{{system.tagConfig.dotScale}}' min='0' max='1' step='0.05'
+               title='Per-tick DoT damage as a fraction of the attack roll. 0.1 = 10%, 0 = no DoT damage. Stacks of the same debuff sum.' />
         {{/if}}
         <label class='resource-label'>{{localize "ASPECTSOFPOWER.TagConfig.duration"}}</label>
         <input type='number' name='system.tagConfig.debuffDuration'
