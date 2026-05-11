@@ -1361,14 +1361,15 @@ Hooks.on('combatStart', combat => resetFirstContactSeen(combat));
 // would create the region but never fire the entry tick (no pool drain,
 // no immediate damage, etc.) until the target moved or the next round-tick.
 //
-// Run on GM only (matches the trigger function's isGM guard). Iterate
-// scene tokens, fire trigger with force=false so the cadence check in
-// _triggerPersistentAoe naturally dedupes against multi-client fires
-// (createRegion fires on every connected client; first GM to fire sets
-// lastTickAt = currentClock, subsequent fires see it set and skip via
-// the `(currentTick - lastTickAt) < period` gate).
+// Gate to ACTIVE GM ONLY. createRegion fires on every connected client;
+// multiple GMs (e.g. GM + Claude) racing through the cadence check before
+// any document write commits will all pass the gate and apply duplicate
+// effects. The cadence dedupe alone isn't sufficient because document
+// updates propagate async via socket — the read state is stale across
+// clients. game.users.activeGM is Foundry's canonical "the GM that
+// handles GM-only actions" (typically the first/oldest active GM).
 Hooks.on('createRegion', async (region, options, userId) => {
-  if (!game.user.isGM) return;
+  if (game.user.id !== game.users.activeGM?.id) return;
   const flags = region.flags?.['aspects-of-power'];
   if (!flags?.persistent || !flags.persistentData) return;
   const scene = region.parent;
