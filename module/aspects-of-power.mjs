@@ -5,7 +5,7 @@ import { AspectsofPowerToken } from './documents/token.mjs';
 import { AspectsofPowerTokenObject } from './canvas/token.mjs';
 import { AspectsofPowerTokenRuler } from './canvas/token-ruler.mjs';
 import { attachOverlayLayer, detachOverlayLayer, refreshOverlay } from './canvas/movement-overlay.mjs';
-import { resetFirstContactSeen, getThreatRadiusFt } from './systems/engagement-halts.mjs';
+import { resetFirstContactSeen } from './systems/engagement-halts.mjs';
 import { onMoveKey, onCommitKey, onCancelKey, clearAllBuffers, getBuffer } from './canvas/movement-buffer.mjs';
 import { registerAoeBehavior, setAoeTrigger } from './canvas/aoe-region-behavior.mjs';
 // Import sheet classes.
@@ -1285,46 +1285,123 @@ Hooks.on('refreshToken', (token) => {
   token.addChild(gfx);
   token._castingRangeAura = gfx;
 
-  // ── Threat-range aura (auto-shown on selected token) ───────────────────────
-  // Mirrors casting aura but uses melee reach + appears automatically on
-  // controlled tokens. No HUD toggle — always on for the selected actor so
-  // the player can see who they threaten without extra clicks.
-  if (token._threatRangeAura) {
-    token._threatRangeAura.destroy();
-    token._threatRangeAura = null;
+  // ── In-range hostile highlight ─────────────────────────────────────────────
+  // Replaces the auto-on-selection threat-range circle. When ANY friendly
+  // token is controlled, every hostile within the controller's effective
+  // weapon/catalyst range gets a yellow outline ring. Tells the player
+  // exactly who they can act on right now without overlaying a giant
+  // circle on the map.
+  if (token._inRangeHighlight) {
+    token._inRangeHighlight.destroy();
+    token._inRangeHighlight = null;
   }
-  if (token.controlled && token.actor) {
-    const reachFt = getThreatRadiusFt(token.document);
-    const tokenRadiusFt = (Math.max(token.document.width ?? 1, token.document.height ?? 1) * canvas.grid.distance) / 2;
-    // Edge-to-edge reach: add the token's own radius so the visualised circle
-    // covers everything the wielder can melee, not just the wielder's center
-    // + reach. Two adjacent 1x1 tokens have centers 5ft apart; a 5-ft reach
-    // weapon should visibly include the next square.
-    const totalReachFt = reachFt + tokenRadiusFt;
-    const pxPerFt = canvas.grid.size / canvas.grid.distance;
-    const radiusPx = totalReachFt * pxPerFt;
-    const cxLocal = (token.document.width * canvas.grid.size) / 2;
-    const cyLocal = (token.document.height * canvas.grid.size) / 2;
-    const tg = new PIXI.Graphics();
-    if (typeof tg.drawCircle === 'function') {
-      tg.beginFill(0xff4444, 0.05);
-      tg.lineStyle(2, 0xff4444, 0.45);
-      tg.drawCircle(cxLocal, cyLocal, radiusPx);
-      tg.endFill();
+  if (token.document.disposition === CONST.TOKEN_DISPOSITIONS.HOSTILE
+      && shouldHighlightHostile(token)) {
+    const radiusPx = (Math.max(token.w, token.h) / 2) + 4; // slight overdraw outside the token bounds
+    const cxLocal = token.w / 2;
+    const cyLocal = token.h / 2;
+    const ring = new PIXI.Graphics();
+    if (typeof ring.drawCircle === 'function') {
+      ring.lineStyle(3, 0xffcc00, 0.9);
+      ring.drawCircle(cxLocal, cyLocal, radiusPx);
     } else {
-      tg.circle(cxLocal, cyLocal, radiusPx);
-      tg.fill({ color: 0xff4444, alpha: 0.05 });
-      tg.stroke({ color: 0xff4444, alpha: 0.45, width: 2 });
+      ring.circle(cxLocal, cyLocal, radiusPx);
+      ring.stroke({ color: 0xffcc00, alpha: 0.9, width: 3 });
     }
-    token.addChild(tg);
-    token._threatRangeAura = tg;
+    token.addChild(ring);
+    token._inRangeHighlight = ring;
   }
 });
 
-// Selection change — force a refresh so the threat-range aura appears /
-// disappears immediately rather than waiting for some other refresh trigger.
+/**
+ * Effective range a controlled actor can act at, in feet. Depends on
+ * the actor's equipped weaponry-slot item:
+ *  - Magic catalyst (wand/staff/orb tag): casting range from actor system.
+ *  - Melee weapon: weapon reach, min 5 ft.
+ *  - Ranged (pending design): returns null for now.
+ *  - Unarmed: 5 ft.
+ */
+function getEffectiveRangeFt(actor) {
+  if (!actor) return null;
+  const equipped = actor.items?.find(i =>
+    i.type === 'item' && i.system?.equipped && i.system?.slot === 'weaponry'
+  );
+  if (!equipped) return 5;
+  const tags = equipped.system?.tags ?? [];
+  if (tags.includes('wand') || tags.includes('staff') || tags.includes('orb')) {
+    return actor.system?.castingRange ?? 5;
+  }
+  if (tags.includes('ranged')) return null; // pending design
+  return Math.max(5, equipped.system?.reach ?? 5);
+}
+
+/**
+ * Edge-to-edge distance in feet between two tokens. Accounts for
+ * each token's size so a Large monster has its full edge reachable
+ * by an adjacent Medium, not center-to-center distance.
+ */
+function tokenEdgeDistanceFt(t1, t2) {
+  const dx = t1.center.x - t2.center.x;
+  const dy = t1.center.y - t2.center.y;
+  const centerDist = Math.hypot(dx, dy);
+  const r1 = Math.max(t1.document.width ?? 1, t1.document.height ?? 1) * canvas.grid.size / 2;
+  const r2 = Math.max(t2.document.width ?? 1, t2.document.height ?? 1) * canvas.grid.size / 2;
+  const edgeDistPx = Math.max(0, centerDist - r1 - r2);
+  return edgeDistPx / (canvas.grid.size / canvas.grid.distance);
+}
+
+/**
+ * True if `hostileToken` is within effective range of any currently
+ * controlled friendly token (caller passes only the hostile; we read
+ * controlled friendlies from canvas.tokens).
+ */
+function shouldHighlightHostile(hostileToken) {
+  const friendlies = canvas.tokens?.controlled?.filter(t =>
+    t.document.disposition === CONST.TOKEN_DISPOSITIONS.FRIENDLY && t.actor
+  ) ?? [];
+  if (friendlies.length === 0) return false;
+  return friendlies.some(f => {
+    const rangeFt = getEffectiveRangeFt(f.actor);
+    if (rangeFt == null) return false;
+    return tokenEdgeDistanceFt(f, hostileToken) <= rangeFt;
+  });
+}
+
+/** Force every hostile token to redraw so the highlight ring picks up
+ *  a new selection / friendly movement / weapon swap. */
+function refreshHostileHighlights() {
+  if (!canvas?.tokens?.placeables) return;
+  for (const t of canvas.tokens.placeables) {
+    if (t.document.disposition === CONST.TOKEN_DISPOSITIONS.HOSTILE && t.refresh) {
+      t.refresh();
+    }
+  }
+}
+
+// Selection change — refresh the token itself plus every hostile so the
+// in-range highlight rings appear / disappear immediately rather than
+// waiting for some other refresh trigger.
 Hooks.on('controlToken', (token, _controlled) => {
   if (token?.refresh) token.refresh();
+  refreshHostileHighlights();
+});
+
+// A friendly moved or had their equipment swapped — recompute hostile
+// highlights against the new position / range.
+Hooks.on('updateToken', (doc, changes, _options, _userId) => {
+  if (changes.x === undefined && changes.y === undefined) return;
+  if (doc.disposition !== CONST.TOKEN_DISPOSITIONS.FRIENDLY) return;
+  refreshHostileHighlights();
+});
+Hooks.on('updateItem', (item, changes, _options, _userId) => {
+  const sys = changes?.system ?? {};
+  if (sys.equipped === undefined && sys.reach === undefined && sys.tags === undefined && sys.slot === undefined) return;
+  const actor = item.parent;
+  if (!actor?.getActiveTokens) return;
+  const tokens = actor.getActiveTokens();
+  if (tokens.some(t => t.document.disposition === CONST.TOKEN_DISPOSITIONS.FRIENDLY)) {
+    refreshHostileHighlights();
+  }
 });
 
 /* -------------------------------------------- */
