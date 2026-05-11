@@ -36,13 +36,7 @@ export function selectTargetOnCanvas(opts = {}) {
     // `body.aop-targeting`.
     document.body.classList.add('aop-targeting');
 
-    // Pre-clear any existing selection so the next click registers a
-    // fresh `controlToken` event. Without this, if the user already had
-    // a token selected, clicking the same one wouldn't re-fire.
-    canvas.tokens.releaseAll();
-
     let resolved = false;
-    let hoveredToken = null;
 
     const finish = (result) => {
       if (resolved) return;
@@ -51,46 +45,32 @@ export function selectTargetOnCanvas(opts = {}) {
       resolve(result);
     };
 
-    const cleanup = () => {
-      Hooks.off('hoverToken', onHover);
-      canvas.stage?.off?.('pointerdown', onPointerDown);
-      canvas.stage?.off?.('rightdown', onRightDown);
-      document.removeEventListener('keydown', onKey, true);
-      document.body.classList.remove('aop-targeting');
-      try { ui.notifications.remove(notif); } catch { /* noop */ }
-    };
-
-    // Listening to controlToken doesn't work for players targeting hostile
-    // tokens (they don't own them, so the token never enters the controlled
-    // state). hoverToken fires for any visible token regardless of
-    // ownership, so we track the hovered token then capture the next
-    // canvas-stage pointerdown (PIXI federated, fires on bubble from
-    // whatever was clicked — token, ground, anything).
-    const onHover = (token, hovered) => {
-      if (hovered) hoveredToken = token;
-      else if (hoveredToken === token) hoveredToken = null;
-    };
-
-    const onPointerDown = (event) => {
-      if (!hoveredToken) return; // click on empty canvas — ignore
-      const tokenDoc = hoveredToken.document;
+    // Monkey-patch Token._onClickLeft so EVERY token click — owned or not,
+    // hostile or friendly — gets routed through us. The previous approaches
+    // (controlToken hook, canvas.stage pointerdown bubble) failed for
+    // players clicking unowned hostile tokens because:
+    //   - controlToken only fires when the token can actually be selected
+    //   - PIXI's pointerdown on the stage doesn't reliably bubble from a
+    //     token that absorbed the event in its own handler
+    // The patch is per-prompt-instance and is unwound in cleanup().
+    const TokenCls = CONFIG.Token.objectClass;
+    const origOnClickLeft = TokenCls.prototype._onClickLeft;
+    TokenCls.prototype._onClickLeft = function (event) {
+      const tokenDoc = this.document;
       if (!validate(tokenDoc)) {
         ui.notifications.warn(`${tokenDoc.name} is not a valid target.`);
         return;
       }
-      // Stop the click from also selecting/deselecting the token underneath.
-      if (event.stopPropagation) event.stopPropagation();
-      if (event.preventDefault) event.preventDefault();
-      // Clear any prior targets and mark this one. Use v14 setTarget API.
+      // Mark as the user's target via the v14 API.
       for (const t of game.user.targets) t.setTarget(false, { releaseOthers: false, groupSelection: false });
-      hoveredToken.setTarget(true, { releaseOthers: false, groupSelection: false });
+      this.setTarget(true, { releaseOthers: false, groupSelection: false });
       finish(tokenDoc);
+      // Don't fall through to the default click handler — would deselect /
+      // re-select Phil and feel weird.
     };
 
-    const onRightDown = () => {
-      // Right-click cancels the prompt without targeting.
-      finish(null);
-    };
+    // Right-click on canvas cancels.
+    const onRightDown = () => finish(null);
 
     const onKey = (event) => {
       if (event.key === 'Escape') {
@@ -101,8 +81,14 @@ export function selectTargetOnCanvas(opts = {}) {
       }
     };
 
-    Hooks.on('hoverToken', onHover);
-    canvas.stage.on('pointerdown', onPointerDown);
+    const cleanup = () => {
+      TokenCls.prototype._onClickLeft = origOnClickLeft;
+      canvas.stage?.off?.('rightdown', onRightDown);
+      document.removeEventListener('keydown', onKey, true);
+      document.body.classList.remove('aop-targeting');
+      try { ui.notifications.remove(notif); } catch { /* noop */ }
+    };
+
     canvas.stage.on('rightdown', onRightDown);
     document.addEventListener('keydown', onKey, true);
   });
