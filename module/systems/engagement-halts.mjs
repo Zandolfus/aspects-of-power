@@ -232,20 +232,24 @@ function _solveFirstTouch(aStart, aEnd, aDecl, aArrive, bStart, bEnd, bDecl, bAr
 
   let t = null;
   if (V2 < 1e-9) {
-    // No relative motion — distance is constant.
-    if (R02 + 2 * tMin * R0V + tMin * tMin * V2 <= d2 + 1e-6) {
-      t = tMin;
-    }
-  } else {
-    const disc = R0V * R0V - V2 * (R02 - d2);
-    if (disc < 0) return null;
-    const sqd = Math.sqrt(disc);
-    const t1 = (-R0V - sqd) / V2;
-    const t2 = (-R0V + sqd) / V2;
-    // Smallest t in window. t1 ≤ t2.
-    if (t1 >= tMin && t1 <= tMax) t = t1;
-    else if (t2 >= tMin && t2 <= tMax) t = t2;
-    else if (t1 < tMin && t2 >= tMin) t = tMin; // already engaged at window start
+    // No relative motion — distance is constant. No transition happens
+    // (no entry into reach), so no halt. Players already engaged with a
+    // stationary opponent can act as before; they're not "entering" reach.
+    return null;
+  }
+  const disc = R0V * R0V - V2 * (R02 - d2);
+  if (disc < 0) return null;
+  const sqd = Math.sqrt(disc);
+  const t1 = (-R0V - sqd) / V2; // entry into circle
+  const t2 = (-R0V + sqd) / V2; // exit from circle
+  // Halt only on ENTRY into reach. The other cases:
+  //   t1 < tMin && t2 in window → already inside at start, exiting now
+  //     (player moving AWAY from an enemy they were engaged with). Don't
+  //     halt — let them move.
+  //   t1 ≥ tMax → entry is past the movement window, never reaches reach.
+  //   Both out of window → never engages.
+  if (t1 >= tMin && t1 <= tMax) {
+    t = t1;
   }
   if (t === null) return null;
 
