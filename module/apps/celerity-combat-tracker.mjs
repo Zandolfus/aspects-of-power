@@ -194,10 +194,14 @@ async function _onCelAdvance(event, target) {
 
   // Skill-action branch (existing flow): clear the firer's flags + dispatch
   // the queued item to its canonical player (or run locally on GM).
+  // _aopFireDispatch flag signals the preUpdateCombatant orphan-cleanup
+  // hook to skip region deletion — the roll about to run still needs to
+  // resolve against this region. The AOE flow inside item.roll() deletes
+  // the region itself once damage has applied (for instantaneous AOEs).
   await c.update({
     [`flags.${FLAG_NS}.declaredAction`]: null,
     [`flags.${FLAG_NS}.nextActionTick`]: null,
-  });
+  }, { _aopFireDispatch: true });
   const item = c.actor?.items?.get(declared.itemId);
   if (!item) {
     ui.notifications.warn(`${c.name}: queued item not found (id=${declared.itemId}); action skipped.`);

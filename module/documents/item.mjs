@@ -1189,6 +1189,13 @@ export class AspectsofPowerItem extends Item {
     if (!meleeTypes.has(this.system?.roll?.type)) return true;
     const hasCleave = (this.system?.alterations ?? []).some(a => a.id === 'cleave');
     if (hasCleave) return true; // Cleave gates by cone shape, not target distance.
+    // AOE skills (Blazing Greatsword, etc.) are placement-gated, not
+    // target-reach-gated — their cone/circle/rect determines who's hit.
+    // Without this skip, magic_melee AOEs incorrectly demanded a melee-reach
+    // target before placement.
+    const tags = this.system?.tags ?? [];
+    if (this.system?.aoe?.enabled === true || tags.includes('aoe')
+        || (this.system?.alterations ?? []).some(a => (a.id ?? a) === 'aoe')) return true;
 
     const targets = [...game.user.targets];
     if (targets.length === 0) return true;

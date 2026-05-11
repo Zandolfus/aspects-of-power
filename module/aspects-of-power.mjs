@@ -735,7 +735,12 @@ Hooks.once('ready', async function () {
   // canvas indefinitely. Detect the pre→post transition here and delete.
   // GM-only path (direct delete) when running on the GM client; socket
   // dispatch otherwise to land at the gmDeleteAoeRegion handler.
-  Hooks.on('preUpdateCombatant', (combatant, changes, _options, _userId) => {
+  Hooks.on('preUpdateCombatant', (combatant, changes, options, _userId) => {
+    // Fire-time clear: the tracker clears declaredAction before dispatching
+    // the roll, but the roll still needs the placed AOE region to resolve.
+    // Skip orphan cleanup when this flag is set — item.roll() will delete
+    // the region itself after damage application (for instantaneous AOEs).
+    if (options?._aopFireDispatch) return;
     const newDeclared = foundry.utils.getProperty(changes, 'flags.aspectsofpower.declaredAction');
     if (newDeclared === undefined) return;
     const priorRegionId = combatant.flags?.aspectsofpower?.declaredAction?.aoeRegionId;
