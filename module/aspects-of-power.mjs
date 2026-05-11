@@ -1287,19 +1287,35 @@ Hooks.on('refreshToken', (token) => {
   }
   if (token.document.disposition === CONST.TOKEN_DISPOSITIONS.HOSTILE
       && shouldHighlightHostile(token)) {
-    const radiusPx = (Math.max(token.w, token.h) / 2) + 4; // slight overdraw outside the token bounds
+    // Soft halo: 4 concentric circles, each wider + dimmer + thicker.
+    // Reads as a faint warm glow leaking outside the token bounds
+    // rather than a hard yellow outline.
+    const baseRadius = Math.max(token.w, token.h) / 2;
     const cxLocal = token.w / 2;
     const cyLocal = token.h / 2;
-    const ring = new PIXI.Graphics();
-    if (typeof ring.drawCircle === 'function') {
-      ring.lineStyle(3, 0xffcc00, 0.9);
-      ring.drawCircle(cxLocal, cyLocal, radiusPx);
-    } else {
-      ring.circle(cxLocal, cyLocal, radiusPx);
-      ring.stroke({ color: 0xffcc00, alpha: 0.9, width: 3 });
+    const glow = new PIXI.Graphics();
+    // Render BEHIND the sprite so the glow halos behind the art.
+    // PIXI graphics with negative zIndex won't help here because Token
+    // doesn't sortChildren; instead use addChildAt(...,  0) so it draws
+    // first (behind everything else added later).
+    const layers = [
+      { extra: 10, width: 4, alpha: 0.08 },
+      { extra: 7,  width: 4, alpha: 0.14 },
+      { extra: 4,  width: 3, alpha: 0.20 },
+      { extra: 2,  width: 2, alpha: 0.28 },
+    ];
+    const color = 0xffd86b; // warm pale gold
+    for (const L of layers) {
+      if (typeof glow.drawCircle === 'function') {
+        glow.lineStyle(L.width, color, L.alpha);
+        glow.drawCircle(cxLocal, cyLocal, baseRadius + L.extra);
+      } else {
+        glow.circle(cxLocal, cyLocal, baseRadius + L.extra);
+        glow.stroke({ color, alpha: L.alpha, width: L.width });
+      }
     }
-    token.addChild(ring);
-    token._inRangeHighlight = ring;
+    token.addChildAt(glow, 0);
+    token._inRangeHighlight = glow;
   }
 });
 
