@@ -30,11 +30,11 @@ export function selectTargetOnCanvas(opts = {}) {
     const validate = opts.validate ?? (() => true);
 
     const notif = ui.notifications.info(message, { permanent: true });
-    // canvas.app.view is the actual <canvas> DOM element. Body cursor
-    // doesn't reach the canvas because PIXI manages its own cursor.
-    const canvasEl = canvas.app.view;
-    const oldCursor = canvasEl.style.cursor;
-    canvasEl.style.cursor = 'crosshair';
+    // CSS class with !important rule wins over PIXI's per-token inline
+    // cursor (which would otherwise revert to 'pointer' when hovering a
+    // token). Style is in css/aspects-of-power.css under
+    // `body.aop-targeting`.
+    document.body.classList.add('aop-targeting');
 
     // Pre-clear any existing selection so the next click registers a
     // fresh `controlToken` event. Without this, if the user already had
@@ -52,7 +52,7 @@ export function selectTargetOnCanvas(opts = {}) {
     const cleanup = () => {
       Hooks.off('controlToken', onControl);
       document.removeEventListener('keydown', onKey, true);
-      canvasEl.style.cursor = oldCursor;
+      document.body.classList.remove('aop-targeting');
       try { ui.notifications.remove(notif); } catch { /* noop */ }
     };
 

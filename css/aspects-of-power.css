@@ -2080,6 +2080,17 @@
   }
 }
 
+/* ─── Skill targeting cursor ───────────────────────────────────────────
+   While the click-skill-then-pick-target prompt is active, force a
+   crosshair cursor across the canvas — including over tokens, which
+   normally set their own pointer cursor on hover. !important is needed
+   to beat PIXI's inline cursor style. */
+body.aop-targeting,
+body.aop-targeting #board,
+body.aop-targeting #board canvas {
+  cursor: crosshair !important;
+}
+
 /* ─── Celerity combat tracker layout ───────────────────────────────────
    The custom tracker template wraps the combatant list in
    <section class="celerity-tracker-root">. Without explicit flex sizing
