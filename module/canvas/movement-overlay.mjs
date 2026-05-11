@@ -20,6 +20,9 @@ const FLAG_NS = 'aspectsofpower';
 /** Module-level container holding all path graphics for the current scene. */
 let _overlayContainer = null;
 
+/** rAF-debounce handle — coalesces multiple refresh calls within one frame. */
+let _refreshScheduled = null;
+
 /* ------------------------------------------------------------------ */
 /*  Lifecycle                                                          */
 /* ------------------------------------------------------------------ */
@@ -45,6 +48,10 @@ export function attachOverlayLayer() {
 }
 
 export function detachOverlayLayer() {
+  if (_refreshScheduled !== null) {
+    cancelAnimationFrame(_refreshScheduled);
+    _refreshScheduled = null;
+  }
   if (_overlayContainer && !_overlayContainer.destroyed) {
     _overlayContainer.destroy({ children: true });
   }
@@ -56,10 +63,24 @@ export function detachOverlayLayer() {
 /* ------------------------------------------------------------------ */
 
 /**
- * Re-render all path overlays for the active combat.
- * Idempotent — clears existing graphics first.
+ * Public entry — schedules a refresh on the next animation frame.
+ * Multiple calls within one frame coalesce into a single redraw,
+ * which keeps WASD bursts and parallel-animate clusters from
+ * triggering N full path-graphic rebuilds.
  */
 export function refreshOverlay() {
+  if (_refreshScheduled !== null) return;
+  _refreshScheduled = requestAnimationFrame(() => {
+    _refreshScheduled = null;
+    _refreshOverlayNow();
+  });
+}
+
+/**
+ * Synchronous redraw. Use only when you know exactly one refresh is
+ * needed (e.g., canvas teardown). Most callers should use refreshOverlay.
+ */
+function _refreshOverlayNow() {
   if (!_overlayContainer || _overlayContainer.destroyed) return;
   _overlayContainer.removeChildren().forEach(c => c.destroy({ children: true }));
 
