@@ -3521,9 +3521,32 @@ export class AspectsofPowerItem extends Item {
       if (originatesAtCaster && casterId && token.id === casterId) continue;
 
       const center = token.center;
+      const elev = token.document.elevation ?? 0;
 
-      // v14: use RegionDocument#testPoint with elevated point.
-      if (!regionDoc.testPoint({ x: center.x, y: center.y, elevation: token.document.elevation ?? 0 })) continue;
+      // Majority overlap rule: sample 5 points across the token's
+      // footprint (center + 4 corners), with the center weighted 2 and
+      // each corner weighted 1 — max score 6, threshold 3 (= half).
+      //
+      // Why weighted: a sliver of overlap that catches only one corner
+      // shouldn't apply damage, but the visually-clear "more than half
+      // your body is in the AOE" case should. Weighting the center
+      // higher means a clean center-hit (score 2) plus any single corner
+      // (1 more) hits the threshold, which matches the intuitive
+      // "if your center is inside, you're hit" while still requiring
+      // some corroboration — and a diagonal cleave that includes the
+      // center + one nearby corner = 3 = inside. Pure corner-clips
+      // (no center, 1-2 corners) don't qualify.
+      const halfW = (token.document.width ?? 1) * canvas.grid.size / 2;
+      const halfH = (token.document.height ?? 1) * canvas.grid.size / 2;
+      const inCenter = regionDoc.testPoint({ x: center.x, y: center.y, elevation: elev });
+      const inCorners = [
+        [center.x - halfW, center.y - halfH],
+        [center.x + halfW, center.y - halfH],
+        [center.x - halfW, center.y + halfH],
+        [center.x + halfW, center.y + halfH],
+      ].filter(([x, y]) => regionDoc.testPoint({ x, y, elevation: elev })).length;
+      const score = (inCenter ? 2 : 0) + inCorners;
+      if (score < 3) continue;
 
       // Disposition filter.
       if (targetingMode === 'enemies') {
