@@ -140,18 +140,43 @@ export function selectMarkerOnCanvas(markerKey, casterActorUuid, opts = {}) {
       resolve(result);
     };
 
-    const onPointerDown = (event) => {
-      // Hit-test the click position against marker shapes. The marker is
-      // a small region; we just need point-in-shape.
-      const pos = event.data?.getLocalPosition?.(canvas.stage) ?? canvas.mousePosition ?? { x: 0, y: 0 };
+    const tryHit = (pos) => {
       const hit = allMarkers.find(r =>
         r.testPoint({ x: pos.x, y: pos.y, elevation: 0 })
       );
-      if (hit) {
+      if (hit) finish(hit);
+      return !!hit;
+    };
+
+    const onPointerDown = (event) => {
+      // Click hit empty canvas (no token absorbed it). Hit-test against
+      // marker shapes here.
+      const pos = event.data?.getLocalPosition?.(canvas.stage) ?? canvas.mousePosition ?? { x: 0, y: 0 };
+      if (tryHit(pos)) {
         if (event.stopPropagation) event.stopPropagation();
         if (event.preventDefault)  event.preventDefault();
-        finish(hit);
       }
+    };
+
+    // Token-overlap case: when a marker is beneath an actor's token, PIXI
+    // routes the click to the token's _onClickLeft and the event never
+    // bubbles to the stage handler above. Monkey-patch the Token class
+    // for the prompt's lifetime so clicks on tokens also hit-test the
+    // marker at the click position. If a marker is found there, target
+    // it; otherwise no-op (the token's normal select/target behavior is
+    // suppressed during the prompt).
+    const TokenCls = CONFIG.Token.objectClass;
+    const origOnClickLeft = TokenCls.prototype._onClickLeft;
+    TokenCls.prototype._onClickLeft = function (event) {
+      const pos = event?.data?.getLocalPosition?.(canvas.stage)
+               ?? canvas.mousePosition
+               ?? { x: this.center?.x ?? 0, y: this.center?.y ?? 0 };
+      if (tryHit(pos)) {
+        if (event?.stopPropagation) event.stopPropagation();
+        if (event?.preventDefault)  event.preventDefault();
+        return;
+      }
+      // No marker under this click — swallow it (don't select/target).
     };
 
     const onRightDown = () => finish(null);
@@ -165,6 +190,7 @@ export function selectMarkerOnCanvas(markerKey, casterActorUuid, opts = {}) {
     };
 
     const cleanup = () => {
+      TokenCls.prototype._onClickLeft = origOnClickLeft;
       canvas.stage?.off?.('pointerdown', onPointerDown);
       canvas.stage?.off?.('rightdown', onRightDown);
       document.removeEventListener('keydown', onKey, true);
