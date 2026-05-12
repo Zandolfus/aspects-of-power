@@ -3986,7 +3986,9 @@ export class AspectsofPowerItem extends Item {
    */
   async roll(options = {}) {
     const item     = this;
-    const rollData = this.getRollData();
+    // `let` so the detonate-redirect path can shadow rollData with the
+    // summon's roll snapshot at AOE dispatch time.
+    let rollData = this.getRollData();
     const speaker  = ChatMessage.getSpeaker({ actor: this.actor });
     const rollMode = game.settings.get('core', 'messageMode');
     const label    = `[${item.type}] ${item.name}`;
@@ -4740,10 +4742,12 @@ export class AspectsofPowerItem extends Item {
     }
 
     // ── Evaluate both rolls (shared across all tags) ────────────────────
-    const hitRoll = hitFormula ? new Roll(hitFormula, rollData) : null;
+    // `let` so the detonate-redirect block below can swap in the summon's
+    // rolls when this cast is consuming a mine (damage = summon identity).
+    let hitRoll = hitFormula ? new Roll(hitFormula, rollData) : null;
     if (hitRoll) await hitRoll.evaluate();
 
-    const dmgRoll = new Roll(dmgFormula, rollData);
+    let dmgRoll = new Roll(dmgFormula, rollData);
     await dmgRoll.evaluate();
 
     // ── Apply debuff modifiers to roll totals ─────────────────────────
@@ -4926,9 +4930,44 @@ export class AspectsofPowerItem extends Item {
       // sized base could feed the invest dialog). Reuse that placement; only
       // place fresh for AOE skills outside the variable-spell path.
       let templateDoc = aoePerCastContext?.preplacedTemplateDoc ?? null;
+      // Fire-time region fetch: declare-time placement region for non-
+      // variable AOEs is threaded through options.preAoeRegionId. Without
+      // this fallback, Detonate / Vine Trap / etc. would re-prompt at fire
+      // time, breaking the static-declaration intent.
+      if (!templateDoc && options.preAoeRegionId) {
+        templateDoc = canvas.scene?.regions?.get(options.preAoeRegionId) ?? null;
+      }
       if (!templateDoc) {
         templateDoc = await this._placeAoeTemplate(casterToken, aoeOverride, null);
         if (!templateDoc) return dmgRoll;
+      }
+
+      // Detonate redirect: if this AOE was triggered by a `detonate`-
+      // tagged skill consuming a mine, the region carries the summon
+      // item's UUID. Override hit/dmg rolls with the summon's formulas
+      // built from the caster's current stats so damage reflects the
+      // summon's identity (Steel Tree Summon's piercing roll, not
+      // Detonate's generic trigger roll). Per design 2026-05-12.
+      const detonateSummonUuid = templateDoc.flags?.['aspects-of-power']?.summonItemUuid;
+      if (detonateSummonUuid) {
+        const summonItem = await fromUuid(detonateSummonUuid).catch(() => null);
+        if (summonItem && summonItem.actor?.id === this.actor?.id) {
+          const summonRollData = summonItem.getRollData();
+          const summonFormulas = summonItem._buildRollFormulas(summonRollData);
+          if (summonFormulas.hitFormula) {
+            hitRoll = new Roll(summonFormulas.hitFormula, summonRollData);
+            await hitRoll.evaluate();
+          } else {
+            hitRoll = null;
+          }
+          dmgRoll = new Roll(summonFormulas.dmgFormula, summonRollData);
+          await dmgRoll.evaluate();
+          // Also override damageType / targetDefense for downstream
+          // defense routing. rollData lives in this function's scope —
+          // shallow-merge the relevant roll fields.
+          rollData = foundry.utils.deepClone(rollData);
+          rollData.roll = { ...rollData.roll, ...summonRollData.roll };
+        }
       }
 
       // Orient caster toward the AOE center.
