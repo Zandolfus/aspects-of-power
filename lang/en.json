@@ -40,6 +40,8 @@
       "shrapnel": "Shrapnel",
       "on_death": "On Death",
       "requires_armor_pierce": "Requires Armor Pierce",
+      "mine": "Mine",
+      "detonate": "Detonate",
       "craft": "Craft",
       "gather": "Gather",
       "refine": "Refine",

@@ -162,6 +162,16 @@ export class SkillData extends foundry.abstract.TypeDataModel {
         // surprise sentinel is gone.
         dotScale: new fields.NumberField({ initial: 0.1, min: 0, max: 1 }),
 
+        // Mine-pair tags (mine / detonate):
+        //   mineCapacity: max concurrent mines per caster placed by this
+        //     summon. Default 1; upgrades can raise it so the caster can
+        //     plant multiple mines. FIFO-eviction at capacity. The mine
+        //     itself snapshots the summon's roll + aoe config at placement
+        //     so the generic Detonate skill can fire whatever explosion
+        //     the summoner defined. Detonate has no key and no capacity —
+        //     it consumes any of the caster's mines.
+        mineCapacity: new fields.NumberField({ initial: 1, min: 1, max: 10, integer: true }),
+
         // Forced movement: push or pull target on hit.
         forcedMovement:     new fields.BooleanField({ initial: false }),
         forcedMovementDir:  new fields.StringField({ initial: 'push' }),   // 'push' or 'pull'

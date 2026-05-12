@@ -538,6 +538,7 @@ export class AspectsofPowerItemSheet extends foundry.applications.api.Handlebars
         debuffDamageType:  form.querySelector('[name="system.tagConfig.debuffDamageType"]')?.value ?? 'physical',
         debuffDirectional: form.querySelector('[name="system.tagConfig.debuffDirectional"]')?.checked ?? false,
         dotScale:          (() => { const el = form.querySelector('[name="system.tagConfig.dotScale"]'); return el ? (Number(el.value) || 0) : 0.1; })(),
+        mineCapacity:      Number(form.querySelector('[name="system.tagConfig.mineCapacity"]')?.value) || 1,
 
         // Forced movement.
         forcedMovement:     form.querySelector('[name="system.tagConfig.forcedMovement"]')?.checked ?? false,

@@ -93,6 +93,92 @@ export function selectTargetOnCanvas(opts = {}) {
 }
 
 /**
+ * Prompt the player to click one of their mines on canvas. Resolves
+ * with the picked RegionDocument or null if cancelled.
+ *
+ * Used by the generic Detonate skill: the explosion's AOE center is
+ * the picked mine's position; the mine is deleted on cast resolution.
+ *
+ * If only one mine matches, resolves immediately. If none, resolves
+ * null and posts a warn toast.
+ *
+ * @param {string|null} markerKey    Optional family identifier. When
+ *                                   null, matches any mine of the caster.
+ *                                   Reserved for future per-family
+ *                                   filtering — Detonate today passes null.
+ * @param {string} casterActorUuid   The casting actor's UUID
+ * @param {object} [opts]
+ * @param {string} [opts.message]    Override the notification text
+ * @param {string} [opts.noneMessage] Override the no-matches text
+ */
+export function selectMarkerOnCanvas(markerKey, casterActorUuid, opts = {}) {
+  const allMarkers = (canvas.scene?.regions?.contents ?? []).filter(r => {
+    const f = r.flags?.['aspects-of-power'];
+    if (!f?.mine && !f?.marker) return false;
+    if (f?.casterActorUuid !== casterActorUuid) return false;
+    if (markerKey != null && f?.markerKey !== markerKey) return false;
+    return true;
+  });
+  if (allMarkers.length === 0) {
+    ui.notifications.warn(opts.noneMessage ?? `No ${markerKey} markers to detonate.`);
+    return Promise.resolve(null);
+  }
+  if (allMarkers.length === 1) {
+    return Promise.resolve(allMarkers[0]);
+  }
+
+  return new Promise((resolve) => {
+    const message = opts.message ?? `Click one of your ${markerKey} markers to detonate (Esc to cancel)`;
+    const notif = ui.notifications.info(message, { permanent: true });
+    document.body.classList.add('aop-targeting');
+
+    let resolved = false;
+    const finish = (result) => {
+      if (resolved) return;
+      resolved = true;
+      cleanup();
+      resolve(result);
+    };
+
+    const onPointerDown = (event) => {
+      // Hit-test the click position against marker shapes. The marker is
+      // a small region; we just need point-in-shape.
+      const pos = event.data?.getLocalPosition?.(canvas.stage) ?? canvas.mousePosition ?? { x: 0, y: 0 };
+      const hit = allMarkers.find(r =>
+        r.testPoint({ x: pos.x, y: pos.y, elevation: 0 })
+      );
+      if (hit) {
+        if (event.stopPropagation) event.stopPropagation();
+        if (event.preventDefault)  event.preventDefault();
+        finish(hit);
+      }
+    };
+
+    const onRightDown = () => finish(null);
+
+    const onKey = (event) => {
+      if (event.key === 'Escape') {
+        event.stopPropagation();
+        event.preventDefault();
+        finish(null);
+      }
+    };
+
+    const cleanup = () => {
+      canvas.stage?.off?.('pointerdown', onPointerDown);
+      canvas.stage?.off?.('rightdown', onRightDown);
+      document.removeEventListener('keydown', onKey, true);
+      document.body.classList.remove('aop-targeting');
+      try { ui.notifications.remove(notif); } catch { /* noop */ }
+    };
+
+    canvas.stage.on('pointerdown', onPointerDown);
+    canvas.stage.on('rightdown', onRightDown);
+    document.addEventListener('keydown', onKey, true);
+  });
+}
+
+/**
  * Decide whether a skill needs the target prompt. Returns false for:
  *  - AOE skills (handled by _placeAoeTemplate)
  *  - Passive skills (no roll, no target)

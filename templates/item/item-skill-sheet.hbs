@@ -525,6 +525,16 @@
       </div>
       {{/if}}
 
+      {{! ── Mine Tag Config ── (only the summon side has capacity; Detonate has no config) }}
+      {{#if (includes system.tags "mine")}}
+      <div class='tag-config mine-config'>
+        <label class='resource-label'>Mine Capacity</label>
+        <input type='number' name='system.tagConfig.mineCapacity'
+               value='{{system.tagConfig.mineCapacity}}' min='1' max='10' step='1'
+               title='Max concurrent mines per caster placed by this summon. Excess placements FIFO-evict the oldest. The mine snapshots this skill\'s aoe + roll config at placement, so its explosion is this skill\'s identity.' />
+      </div>
+      {{/if}}
+
       {{! ── Shrapnel Tag Config ── }}
       {{#if (includes system.tags "shrapnel")}}
       <div class='tag-config shrapnel-config'>

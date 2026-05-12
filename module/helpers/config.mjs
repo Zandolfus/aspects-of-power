@@ -372,6 +372,9 @@ ASPECTSOFPOWER.skillTags = {
   on_death:    'ASPECTSOFPOWER.Tag.on_death',
   // Chain conditional tags (gate when a chained skill is allowed to fire).
   requires_armor_pierce: 'ASPECTSOFPOWER.Tag.requires_armor_pierce',
+  // Mine-pair tags (summon places, generic Detonate consumes any).
+  mine:        'ASPECTSOFPOWER.Tag.mine',
+  detonate:    'ASPECTSOFPOWER.Tag.detonate',
   // Descriptor tags (mechanical effects).
   magic:       'ASPECTSOFPOWER.Tag.magic',
   physical:    'ASPECTSOFPOWER.Tag.physical',
@@ -438,6 +441,9 @@ ASPECTSOFPOWER.combatTags = {
   on_death:    'ASPECTSOFPOWER.Tag.on_death',
   // Chain conditional.
   requires_armor_pierce: 'ASPECTSOFPOWER.Tag.requires_armor_pierce',
+  // Mine-pair (summon places, generic Detonate consumes any).
+  mine:        'ASPECTSOFPOWER.Tag.mine',
+  detonate:    'ASPECTSOFPOWER.Tag.detonate',
   // Descriptors.
   magic:       'ASPECTSOFPOWER.Tag.magic',
   physical:    'ASPECTSOFPOWER.Tag.physical',

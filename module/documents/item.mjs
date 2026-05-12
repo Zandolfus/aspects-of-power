@@ -1,7 +1,7 @@
 import { EquipmentSystem } from '../systems/equipment.mjs';
 import { getPositionalTags } from '../helpers/positioning.mjs';
 import { recordActionFired, declareAction, isInActiveCombat, computeActionWait, referenceRoundLength } from '../systems/celerity.mjs';
-import { selectTargetOnCanvas, skillNeedsTargetPrompt, skillTargetsAtFire } from '../canvas/target-prompt.mjs';
+import { selectTargetOnCanvas, skillNeedsTargetPrompt, skillTargetsAtFire, selectMarkerOnCanvas } from '../canvas/target-prompt.mjs';
 
 /**
  * Check if an actor is an assigned player character (not just owned).
@@ -1016,7 +1016,86 @@ export class AspectsofPowerItem extends Item {
     // chains on magical parents would want the equivalent veil-pierce
     // signal. Designers tag specific chains; untagged chains fire on hit.
     const piercedMitigation = isHit && preToughnessDmg > 0;
+
+    // mine tag (per design 2026-05-12): summon-style skills plant a
+    // persistent region "mine" at the target's position. A generic
+    // Detonate skill (tag `detonate`) can later consume any of the
+    // caster's mines, firing this skill's snapshotted AOE + damage
+    // formula at the mine's location. FIFO-evict at mineCapacity.
+    // Only on hit and only via the primary defense.
+    if (isHit && (item.system.tags ?? []).includes('mine') && targetToken) {
+      await this._placeMine(targetToken, item.system.tagConfig?.mineCapacity ?? 1);
+    }
+
     return { isHit, fullyBlocked, damageMultiplier, piercedMitigation };
+  }
+
+  /**
+   * Place a mine region at a target token's position. Used by mine-
+   * tagged skills (Steel Tree Summon, etc.) so the generic Detonate
+   * skill can later consume any one of the caster's mines.
+   *
+   * The mine snapshots THIS skill's roll config and aoe shape/size at
+   * placement — Detonate reads these back to build the explosion. That
+   * keeps the explosion identity with the summon (different mine =
+   * different explosion) without requiring a paired attack-skill.
+   *
+   * - FIFO-eviction at capacity per caster + summon-source.
+   * - Region is small (5ft circle), visible to everyone, persists
+   *   indefinitely until detonated.
+   *
+   * @param {Token|TokenDocument} targetToken
+   * @param {number} capacity   max concurrent mines of THIS summon per caster
+   */
+  async _placeMine(targetToken, capacity) {
+    if (!this.actor) return;
+    const tokenDoc = targetToken.document ?? targetToken;
+    const tokenObj = targetToken.object ?? targetToken;
+    const center = tokenObj.center ?? {
+      x: tokenDoc.x + (tokenDoc.width * canvas.grid.size) / 2,
+      y: tokenDoc.y + (tokenDoc.height * canvas.grid.size) / 2,
+    };
+    const pxPerFt = canvas.grid.size / canvas.grid.distance;
+    const radiusPx = 5 * pxPerFt;
+    const casterUuid = this.actor.uuid;
+    const summonUuid = this.uuid;
+
+    // FIFO-evict over capacity for THIS summon-source on THIS caster.
+    // Different summons (Steel Tree vs. future Crystal Bomb) each have
+    // their own capacity counter.
+    const existing = (canvas.scene?.regions?.contents ?? []).filter(r => {
+      const f = r.flags?.['aspects-of-power'];
+      return f?.mine === true && f?.summonItemUuid === summonUuid && f?.casterActorUuid === casterUuid;
+    }).sort((a, b) => (a.flags?.['aspects-of-power']?.placedAt ?? 0)
+                    - (b.flags?.['aspects-of-power']?.placedAt ?? 0));
+    while (existing.length >= capacity) {
+      const toDelete = existing.shift();
+      if (toDelete) await this._gmDeleteRegion(canvas.scene, toDelete.id);
+    }
+
+    const regionData = {
+      name: `${this.name} mine`,
+      color: '#caa64f', // warm steel-amber
+      visibility: 2, // ALWAYS visible to all players
+      shapes: [{ type: 'circle', x: center.x, y: center.y, radius: radiusPx }],
+      behaviors: [], // pure marker — no entry/movement triggers
+      flags: {
+        'aspects-of-power': {
+          mine: true,
+          summonItemUuid: summonUuid,
+          summonSkillName: this.name,
+          casterActorUuid: casterUuid,
+          placedAt: Date.now(),
+          // Snapshot of the summon's roll + aoe so Detonate can fire
+          // exactly the right explosion later, even if the summon item
+          // is edited or unequipped between placement and detonation.
+          summonAoe: foundry.utils.deepClone(this.system.aoe ?? {}),
+          summonRoll: foundry.utils.deepClone(this.system.roll ?? {}),
+          summonTags: [...(this.system.tags ?? [])],
+        },
+      },
+    };
+    await this._gmCreateRegion(canvas.scene, regionData);
   }
 
   /**
@@ -3464,6 +3543,87 @@ export class AspectsofPowerItem extends Item {
   }
 
   /**
+   * Build an AOE region centered on a fixed point (e.g., a consumed
+   * marker's location). Mirrors the region-data construction in
+   * _placeAoeTemplate but without the interactive placement UI.
+   *
+   * Supports circle and rectangle shapes (the "explode in place" cases).
+   * Cone/ray on a fixed-point detonation is geometrically odd — the
+   * apex would be at the marker — and is not modeled here; designers
+   * using consumes_marker should keep the AOE shape circle/rect.
+   *
+   * @param {{x:number, y:number}} point  Canvas coordinates of the AOE center
+   * @returns {Promise<RegionDocument|null>}
+   */
+  async _placeAoeAtPoint(point, aoeOverride = null) {
+    if (!point || typeof point.x !== 'number' || typeof point.y !== 'number') return null;
+    const aoe = aoeOverride ?? this.system.aoe ?? {};
+    const shape = aoe.shape ?? 'circle';
+    const pxPerFt = canvas.grid.size / canvas.grid.distance;
+    const diameterPx = (aoe.diameter ?? 5) * pxPerFt;
+    const fillColor = this._getAoeColor();
+
+    let shapeData;
+    if (shape === 'circle') {
+      shapeData = { type: 'circle', x: point.x, y: point.y, radius: diameterPx / 2 };
+    } else if (shape === 'rectangle' || shape === 'rect') {
+      const half = diameterPx / 2;
+      shapeData = { type: 'rectangle', x: point.x - half, y: point.y - half, width: diameterPx, height: diameterPx, rotation: 0 };
+    } else {
+      // Fallback to circle for cone/ray — see method doc.
+      shapeData = { type: 'circle', x: point.x, y: point.y, radius: diameterPx / 2 };
+    }
+
+    const behaviors = [];
+    if ((aoe.templateDuration ?? 0) > 0) {
+      behaviors.push({ type: 'persistentAoe', name: 'Persistent AOE Trigger', system: {} });
+    }
+
+    const regionData = {
+      name: `${this.name} AOE`,
+      color: fillColor,
+      visibility: 2,
+      shapes: [shapeData],
+      behaviors,
+      flags: {
+        'aspects-of-power': {
+          aoe: true,
+          casterActorUuid: this.actor.uuid,
+          skillItemUuid: this.uuid,
+          templateDuration: aoe.templateDuration ?? 0,
+          placedRound: game.combat?.round ?? 0,
+          persistent: (aoe.templateDuration ?? 0) > 0,
+          persistentData: (aoe.templateDuration ?? 0) > 0 ? {
+            tags: this.system.tags ?? [],
+            tagConfig: this.system.tagConfig ?? {},
+            rollTotal: null,
+            hitTotal: null,
+            damageType: this.system.roll?.damageType ?? 'physical',
+            targetDefense: this.system.roll?.targetDefense ?? 'melee',
+            isMagic: (this.system.tags ?? []).includes('magic'),
+            isShrapnel: (this.system.tags ?? []).includes('shrapnel'),
+            targetingMode: aoe.targetingMode ?? 'all',
+            zoneEffect: aoe.zoneEffect ?? 'none',
+            casterDisposition: this.actor.getActiveTokens()?.[0]?.document?.disposition ?? CONST.TOKEN_DISPOSITIONS.NEUTRAL,
+            casterReticPeriod: (() => {
+              try {
+                const rl = this.actor.system?.attributes?.race?.level ?? 1;
+                const refRound = game.aspectsofpower?.celerity?.referenceRoundLength?.(rl) ?? 4702;
+                return Math.max(1, Math.round(refRound / 4));
+              } catch (e) { return 1175; }
+            })(),
+            affectedTokens: {},
+          } : null,
+        },
+      },
+    };
+    const created = await this._gmCreateRegion(canvas.scene, regionData);
+    if (!created) return null;
+    await new Promise(r => setTimeout(r, 50));
+    return created;
+  }
+
+  /**
    * Rotate the caster's token to face a target point.
    * @param {object} targetPoint  { x, y } in canvas coordinates.
    */
@@ -4498,9 +4658,47 @@ export class AspectsofPowerItem extends Item {
         && this.actor && isInActiveCombat(this.actor)) {
       const casterToken = this.actor.getActiveTokens()?.[0];
       if (casterToken) {
-        const placedRegion = await this._placeAoeTemplate(casterToken, null, null);
-        if (!placedRegion) return; // cancelled
-        aoePerCastContext = { preplacedTemplateDoc: placedRegion };
+        let placedRegion = null;
+        // detonate tag (per design 2026-05-12): the skill detonates any
+        // of the caster's previously-placed mines. The mine's flags
+        // carry a snapshot of the summon's aoe + roll config, so the
+        // explosion is the summon's identity (Steel Tree explodes as
+        // shrapnel, future Crystal Bomb explodes as light/cold, etc.).
+        // Detonate itself owns no AOE config beyond being the trigger.
+        const tagsList = this.system.tags ?? [];
+        if (tagsList.includes('detonate')) {
+          const mine = await selectMarkerOnCanvas(null, this.actor.uuid, {
+            message: `Click one of your mines to detonate ${this.name} (Esc to cancel)`,
+            noneMessage: `No mines to detonate — place one first.`,
+          });
+          if (!mine) return; // no mines OR cancelled
+          const markerShape = mine.shapes?.[0];
+          const markerCenter = markerShape?.type === 'circle'
+            ? { x: markerShape.x, y: markerShape.y }
+            : (markerShape?.type === 'rectangle'
+                ? { x: markerShape.x + (markerShape.width ?? 0) / 2, y: markerShape.y + (markerShape.height ?? 0) / 2 }
+                : null);
+          if (!markerCenter) return;
+          // Build the explosion region from the mine's snapshotted aoe
+          // config. _placeAoeAtPoint reads this.system.aoe, so for the
+          // duration of this call we override with the mine's snapshot.
+          const mineAoe = mine.flags?.['aspects-of-power']?.summonAoe ?? this.system.aoe;
+          placedRegion = await this._placeAoeAtPoint(markerCenter, mineAoe);
+          if (!placedRegion) return;
+          // Stash the mine ID + the summon UUID in the AOE region's
+          // flags so fire-time resolution can delete the mine AND use
+          // the summon's damage formula instead of Detonate's own.
+          await placedRegion.update({
+            'flags.aspects-of-power.consumedMarkerId': mine.id,
+            'flags.aspects-of-power.summonItemUuid': mine.flags?.['aspects-of-power']?.summonItemUuid ?? null,
+          });
+          aoePerCastContext = { preplacedTemplateDoc: placedRegion, consumedMarkerId: mine.id };
+        }
+        if (!placedRegion) {
+          placedRegion = await this._placeAoeTemplate(casterToken, null, null);
+          if (!placedRegion) return; // cancelled
+          aoePerCastContext = { preplacedTemplateDoc: placedRegion };
+        }
       }
     }
 
@@ -4835,6 +5033,16 @@ export class AspectsofPowerItem extends Item {
       // delete here would silently fail and orphan the region on canvas.
       if ((this.system.aoe.templateDuration ?? 0) === 0) {
         await this._gmDeleteRegion(canvas.scene, templateDoc.id);
+      }
+
+      // consumes_marker: also delete the marker that this cast detonated.
+      // The marker ID is stashed in the AOE region's flags at declare time
+      // (selectMarkerOnCanvas branch), which survives the declare→fire
+      // boundary so this works for both immediate and deferred resolution.
+      const consumedMarkerId = templateDoc?.flags?.['aspects-of-power']?.consumedMarkerId
+        ?? aoePerCastContext?.consumedMarkerId;
+      if (consumedMarkerId) {
+        await this._gmDeleteRegion(canvas.scene, consumedMarkerId);
       }
 
       await this._applySustainEffect(speaker);
