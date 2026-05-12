@@ -123,9 +123,9 @@ export function selectMarkerOnCanvas(markerKey, casterActorUuid, opts = {}) {
     ui.notifications.warn(opts.noneMessage ?? `No ${markerKey} markers to detonate.`);
     return Promise.resolve(null);
   }
-  if (allMarkers.length === 1) {
-    return Promise.resolve(allMarkers[0]);
-  }
+  // Always prompt for a click, even when only one mine is on the field.
+  // The auto-resolve shortcut was confusing — players want to confirm the
+  // target explicitly, and the cast queueing silently looked like a no-op.
 
   return new Promise((resolve) => {
     const message = opts.message ?? `Click one of your ${markerKey} markers to detonate (Esc to cancel)`;
