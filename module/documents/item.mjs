@@ -2,6 +2,7 @@ import { EquipmentSystem } from '../systems/equipment.mjs';
 import { getPositionalTags } from '../helpers/positioning.mjs';
 import { recordActionFired, declareAction, isInActiveCombat, computeActionWait, referenceRoundLength } from '../systems/celerity.mjs';
 import { selectTargetOnCanvas, skillNeedsTargetPrompt, skillTargetsAtFire, selectMarkerOnCanvas } from '../canvas/target-prompt.mjs';
+import { regionTokenOverlap } from '../helpers/geometry.mjs';
 
 /**
  * Check if an actor is an assigned player character (not just owned).
@@ -846,7 +847,7 @@ export class AspectsofPowerItem extends Item {
    *   armor/veil, toughness) runs ONCE on the combined post-defense damage —
    *   so the target isn't double-tapped by toughness across the two halves.
    */
-  async _handleAttackTag(item, rollData, hitRoll, dmgRoll, speaker, rollMode, label, targetTokenOverride = null) {
+  async _handleAttackTag(item, rollData, hitRoll, dmgRoll, speaker, rollMode, label, targetTokenOverride = null, aoeFraction = 1) {
     const whisperGM = !_isPlayerCharacter(this.actor) ? ChatMessage.getWhisperRecipients('GM') : undefined;
     const targetToken  = targetTokenOverride ?? game.user.targets.first() ?? null;
     const targetActor  = targetToken?.actor ?? null;
@@ -890,8 +891,16 @@ export class AspectsofPowerItem extends Item {
     const reactionLine     = (primaryResult.reactionLine ?? '')
                            + (secondaryResult ? secondaryResult.reactionLine : '');
 
-    // Damage pipeline: raw → per-half defense pool % → barrier (pre-armor) → armor/veil → toughness.
-    const rawDmg          = Math.round(dmgRoll.total);
+    // Damage pipeline: raw → AOE-overlap fraction → per-half defense
+    // pool % → barrier (pre-armor) → armor/veil → toughness.
+    //
+    // AOE fraction (per design 2026-05-12): for AOE attacks, the
+    // dispatch loop passes the per-target overlap fraction (0..1 of
+    // the token's footprint inside the AOE shape). Single-target
+    // attacks pass the default 1.0 → no scaling. A token half in the
+    // explosion takes half damage all the way through.
+    const fracClamped = Math.max(0, Math.min(1, aoeFraction ?? 1));
+    const rawDmg = Math.max(0, Math.round(dmgRoll.total * fracClamped));
     const primaryContrib   = primaryResult.isHit
       ? Math.max(0, Math.round(rawDmg * halfFactor * primaryResult.damageMultiplier))
       : 0;
@@ -971,7 +980,7 @@ export class AspectsofPowerItem extends Item {
            ${defenseLine}
            ${reactionLine}
            <hr>
-           <p>Raw damage: ${rawDmg}${hasDualDefense ? ' (split 50/50 across halves)' : ''}</p>
+           <p>Raw damage: ${rawDmg}${hasDualDefense ? ' (split 50/50 across halves)' : ''}${fracClamped < 1 ? ` <em>(AOE overlap ${Math.round(fracClamped * 100)}% × ${Math.round(dmgRoll.total)} roll)</em>` : ''}</p>
            ${halvesLine}
            <p>${mitigLabel}: −${mitigation}</p>
            ${defenseReductionLine}
@@ -3497,9 +3506,13 @@ export class AspectsofPowerItem extends Item {
 
   /**
    * Find all tokens within a placed AOE Region, filtered by targeting mode.
-   * v14: uses RegionDocument#testPoint for containment testing.
+   * Returns `Array<{ token, fraction }>` where fraction in [0, 1] is the
+   * portion of the token's footprint inside the region — used by the AOE
+   * dispatch to scale damage proportionally (per design 2026-05-12).
+   * Tokens below the inclusion floor (5%) are dropped entirely.
+   *
    * @param {RegionDocument} regionDoc
-   * @returns {Token[]}
+   * @returns {Array<{ token: Token, fraction: number }>}
    */
   _getAoeTargets(regionDoc) {
     const targetingMode = this.system.aoe.targetingMode ?? 'all';
@@ -3513,40 +3526,18 @@ export class AspectsofPowerItem extends Item {
     const shapes = regionDoc.shapes ?? [];
     const originatesAtCaster = shapes.some(s => s?.type === 'cone' || s?.type === 'line');
 
+    const INCLUSION_FLOOR = 0.05; // <5% overlap = treated as no hit
     const qualifying = [];
 
     for (const token of canvas.tokens.placeables) {
       if (token.document.hidden) continue;
-
       if (originatesAtCaster && casterId && token.id === casterId) continue;
 
-      const center = token.center;
-      const elev = token.document.elevation ?? 0;
-
-      // Majority overlap rule: sample 5 points across the token's
-      // footprint (center + 4 corners), with the center weighted 2 and
-      // each corner weighted 1 — max score 6, threshold 3 (= half).
-      //
-      // Why weighted: a sliver of overlap that catches only one corner
-      // shouldn't apply damage, but the visually-clear "more than half
-      // your body is in the AOE" case should. Weighting the center
-      // higher means a clean center-hit (score 2) plus any single corner
-      // (1 more) hits the threshold, which matches the intuitive
-      // "if your center is inside, you're hit" while still requiring
-      // some corroboration — and a diagonal cleave that includes the
-      // center + one nearby corner = 3 = inside. Pure corner-clips
-      // (no center, 1-2 corners) don't qualify.
-      const halfW = (token.document.width ?? 1) * canvas.grid.size / 2;
-      const halfH = (token.document.height ?? 1) * canvas.grid.size / 2;
-      const inCenter = regionDoc.testPoint({ x: center.x, y: center.y, elevation: elev });
-      const inCorners = [
-        [center.x - halfW, center.y - halfH],
-        [center.x + halfW, center.y - halfH],
-        [center.x - halfW, center.y + halfH],
-        [center.x + halfW, center.y + halfH],
-      ].filter(([x, y]) => regionDoc.testPoint({ x, y, elevation: elev })).length;
-      const score = (inCenter ? 2 : 0) + inCorners;
-      if (score < 3) continue;
+      // Exact polygon-intersection fraction: token rect clipped against
+      // each region shape, area summed, divided by token's footprint area.
+      // See helpers/geometry.mjs for the math.
+      const fraction = regionTokenOverlap(regionDoc, token.document);
+      if (fraction < INCLUSION_FLOOR) continue;
 
       // Disposition filter.
       if (targetingMode === 'enemies') {
@@ -3559,7 +3550,7 @@ export class AspectsofPowerItem extends Item {
         if (token.document.disposition !== casterDisp) continue;
       }
 
-      qualifying.push(token);
+      qualifying.push({ token, fraction });
     }
 
     return qualifying;
@@ -3753,12 +3744,12 @@ export class AspectsofPowerItem extends Item {
       // — themselves). Strip the dead token explicitly.
       const allTargets = this._getAoeTargets(region);
       const deadTokenId = (deadToken.document ?? deadToken).id;
-      const targets = allTargets.filter(t => t.id !== deadTokenId);
+      const targets = allTargets.filter(t => t.token.id !== deadTokenId);
 
       // Announce death-trigger.
       ChatMessage.create({
         speaker, rollMode,
-        content: `<div class="aoe-result"><p><strong>${this.actor.name}</strong> dies — <strong>${this.name}</strong> bursts! ${targets.length} target(s)${targets.length ? ' — ' + targets.map(t => t.document.name).join(', ') : ''}.</p></div>`,
+        content: `<div class="aoe-result"><p><strong>${this.actor.name}</strong> dies — <strong>${this.name}</strong> bursts! ${targets.length} target(s)${targets.length ? ' — ' + targets.map(t => t.token.document.name).join(', ') : ''}.</p></div>`,
       });
 
       if (hitRoll) await hitRoll.toMessage({ speaker, rollMode, flavor: `${label} — To Hit` });
@@ -3769,10 +3760,10 @@ export class AspectsofPowerItem extends Item {
       // sense for a death-trigger (craft / gather / refine / cleanse / repair).
       const hitResults = new Map();
       for (const tag of tags) {
-        for (const targetToken of targets) {
+        for (const { token: targetToken, fraction } of targets) {
           switch (tag) {
             case 'attack': {
-              const result = await this._handleAttackTag(item, rollData, hitRoll, dmgRoll, speaker, rollMode, label, targetToken);
+              const result = await this._handleAttackTag(item, rollData, hitRoll, dmgRoll, speaker, rollMode, label, targetToken, fraction);
               if (result) hitResults.set(targetToken, result);
               break;
             }
@@ -5022,22 +5013,27 @@ export class AspectsofPowerItem extends Item {
       if (hitRoll) await hitRoll.toMessage({ speaker, rollMode, ...(whisperGM ? { whisper: whisperGM } : {}), flavor: `${label} — To Hit` });
       await dmgRoll.toMessage({ speaker, rollMode, ...(whisperGM ? { whisper: whisperGM } : {}), flavor: `${label} — Roll` });
 
-      // Announce targets.
+      // Announce targets with their overlap fraction (informational).
       if (targets.length > 0) {
-        const targetNames = targets.map(t => t.document.name).join(', ');
+        const targetDescs = targets.map(t => {
+          const pct = Math.round(t.fraction * 100);
+          return pct >= 99 ? t.token.document.name : `${t.token.document.name} (${pct}%)`;
+        }).join(', ');
         ChatMessage.create({
           speaker, rollMode,
-          content: `<div class="aoe-result"><p><strong>AOE:</strong> ${targets.length} target(s) — ${targetNames}</p></div>`,
+          content: `<div class="aoe-result"><p><strong>AOE:</strong> ${targets.length} target(s) — ${targetDescs}</p></div>`,
         });
       }
 
-      // Dispatch each tag to each qualifying token.
+      // Dispatch each tag to each qualifying token. Damage is scaled by
+      // the per-target overlap fraction (per design 2026-05-12) — a token
+      // 50% inside the AOE takes 50% of the rolled damage.
       const hitResults = new Map();
       for (const tag of tags) {
-        for (const targetToken of targets) {
+        for (const { token: targetToken, fraction } of targets) {
           switch (tag) {
             case 'attack': {
-              const result = await this._handleAttackTag(item, rollData, hitRoll, dmgRoll, speaker, rollMode, label, targetToken);
+              const result = await this._handleAttackTag(item, rollData, hitRoll, dmgRoll, speaker, rollMode, label, targetToken, fraction);
               if (result) hitResults.set(targetToken, result);
               break;
             }
