@@ -242,11 +242,25 @@ function _solveFirstTouch(aStart, aEnd, aDecl, aArrive, bStart, bEnd, bDecl, bAr
   const tMax = Math.min(aArrive, bArrive);
   if (tMin >= tMax) return null;
 
+  // ── Already-engaged geometric pre-check ─────────────────────────────
+  // If the two actors are at or inside engagement distance at the
+  // movement's start, treat them as already engaged — no halt fires for
+  // this pair regardless of where they're heading. Without this check,
+  // touching-the-boundary (center distance == distPx, edge distance 0)
+  // produced a quadratic root at exactly t = tMin, which the entry-only
+  // gate below counted as a fresh entry → halt-at-zero-distance →
+  // "queue happens, sprite never moves" reported by user 2026-05-12.
+  // The epsilon (0.5 px ≈ 0.125 ft) absorbs floating-point error.
+  const aAtMin = { x: aStart.x + va.x * (tMin - aDecl), y: aStart.y + va.y * (tMin - aDecl) };
+  const bAtMin = { x: bStart.x + vb.x * (tMin - bDecl), y: bStart.y + vb.y * (tMin - bDecl) };
+  const distAtMin = Math.hypot(aAtMin.x - bAtMin.x, aAtMin.y - bAtMin.y);
+  if (distAtMin <= distPx + 0.5) return null;
+
   let t = null;
   if (V2 < 1e-9) {
-    // No relative motion — distance is constant. No transition happens
-    // (no entry into reach), so no halt. Players already engaged with a
-    // stationary opponent can act as before; they're not "entering" reach.
+    // No relative motion — distance is constant. Combined with the
+    // pre-check above (which catches distAtMin <= distPx), the only
+    // way we reach here is "constant distance > distPx" → never engages.
     return null;
   }
   const disc = R0V * R0V - V2 * (R02 - d2);
@@ -254,12 +268,9 @@ function _solveFirstTouch(aStart, aEnd, aDecl, aArrive, bStart, bEnd, bDecl, bAr
   const sqd = Math.sqrt(disc);
   const t1 = (-R0V - sqd) / V2; // entry into circle
   const t2 = (-R0V + sqd) / V2; // exit from circle
-  // Halt only on ENTRY into reach. The other cases:
-  //   t1 < tMin && t2 in window → already inside at start, exiting now
-  //     (player moving AWAY from an enemy they were engaged with). Don't
-  //     halt — let them move.
-  //   t1 ≥ tMax → entry is past the movement window, never reaches reach.
-  //   Both out of window → never engages.
+  // Halt only on ENTRY into reach. The pre-check above already filtered
+  // out the "already inside at start" case, so any t1 in the window
+  // here is a genuine fresh entry.
   if (t1 >= tMin && t1 <= tMax) {
     t = t1;
   }
