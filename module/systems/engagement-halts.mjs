@@ -295,12 +295,19 @@ async function _applyHalt(combat, cmId, haltInfo) {
   const ratio = totalDist > 0 ? Math.min(1, haltDist / totalDist) : 0;
   const distFt = Math.round((mv.distanceFt ?? 0) * ratio);
 
+  // Stamina must scale by the same ratio as distance — otherwise the
+  // truncated movement debits the FULL original staminaCost for a partial
+  // trip. John's last-night session paid 28 stamina × 4 chained halts on
+  // a single 73ft plan because of this.
+  const newStamina = Math.round((mv.staminaCost ?? 0) * ratio);
+
   const newDeclared = {
     ...mv,
     endPos: haltInfo.haltPos,
     wait: Math.max(1, haltInfo.wait),
     scheduledTick: haltInfo.scheduledTick,
     distanceFt: distFt,
+    staminaCost: newStamina,
     label: mv.label.replace(/ \(engaged .+\)| \(spotted .+\)/, '') + labelSuffix,
     // Preserve the pre-truncation destination so the tracker can offer a
     // resume after the halt fires and the engagement clears. Don't

@@ -155,13 +155,19 @@ async function _onCelAdvance(event, target) {
       const remDy = mv.originalEndPos.y - mv.endPos.y;
       const remainingPx = Math.hypot(remDx, remDy);
       if (moved > 1 && remainingPx > 1) {
-        // Convert remaining distance back to ft, scale stamina proportionally.
         const pxPerFt = canvas.grid.size / canvas.grid.distance;
         const remainingFt = Math.round(remainingPx / pxPerFt);
-        const totalDistFt = mv.distanceFt ?? 0;
-        const totalStamina = mv.staminaCost ?? 0;
-        const ratio = totalDistFt > 0 ? Math.min(1, remainingFt / totalDistFt) : 0;
-        const remStamina = Math.round(totalStamina * ratio);
+        // Per-ft stamina rate stays constant across truncation (engagement-
+        // halts.mjs scales both distanceFt and staminaCost by the same
+        // ratio). So perFt of the truncated mv equals perFt of the
+        // original — multiply by the remaining feet to get the resumed
+        // segment's correct cost. Prior bug: read total distance after
+        // truncation and capped ratio at 1, charging full original stamina
+        // per segment.
+        const truncDistFt = mv.distanceFt ?? 0;
+        const truncStamina = mv.staminaCost ?? 0;
+        const perFt = truncDistFt > 0 ? truncStamina / truncDistFt : 0;
+        const remStamina = Math.max(0, Math.round(perFt * remainingFt));
         autoResumes.push({ memberId: id, fromPos: mv.endPos, toPos: mv.originalEndPos, distFt: remainingFt, staminaCost: remStamina });
       }
     }
