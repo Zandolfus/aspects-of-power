@@ -53,6 +53,18 @@ export class AopEffectData extends foundry.data.ActiveEffectTypeDataModel {
       movementSpeedMultiplier:   new fields.NumberField({ initial: 1, min: 0 }),
       movementStaminaMultiplier: new fields.NumberField({ initial: 1, min: 0 }),
 
+      // ── Aura (actor-centered sustained AOE) ──
+      // Per design-movement-skills.md Phase B. Effects with auraRadius > 0
+      // tick each round via actor.onStartTurn, applying damage to tokens
+      // in radius. auraDamage is snapshotted from the casting skill at
+      // apply time (rollTotal × auraScale).
+      auraRadius:     new fields.NumberField({ initial: 0, min: 0 }),
+      auraDamage:     new fields.NumberField({ initial: 0, min: 0 }),
+      auraDamageType: new fields.StringField({ initial: 'physical' }),
+      auraTargeting:  new fields.StringField({ initial: 'enemies' }), // 'enemies' | 'allies' | 'all'
+      auraAffinities: new fields.ArrayField(new fields.StringField(), { initial: [] }),
+      auraIsMagic:    new fields.BooleanField({ initial: false }),
+
       // ── Special flags ──
       dismemberedSlot:          new fields.StringField({ initial: '' }),
       sleepActive:              new fields.BooleanField({ initial: false }),

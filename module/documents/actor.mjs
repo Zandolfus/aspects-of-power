@@ -664,6 +664,13 @@ export class AspectsofPowerActor extends Actor {
     const gmWhisper = _isPC ? {} : { whisper: ChatMessage.getWhisperRecipients('GM') };
     const updateData = {};
 
+    // ── Aura tick (per design-movement-skills.md Phase B) ──
+    // Fires BEFORE expiry so a duration-N buff ticks exactly N times.
+    // Iterates non-disabled effects with auraRadius > 0; for each, finds
+    // tokens within radius on the same scene, filters by disposition, and
+    // posts an apply-damage chat button per target.
+    await this._tickActorAuras(speaker, gmWhisper);
+
     // ── 0. Effect Expiry — delete effects whose duration has elapsed ──
     const currentRound = combat.round;
     const toExpire = [];
@@ -912,6 +919,72 @@ export class AspectsofPowerActor extends Actor {
     });
 
     return { broken, statMod, newProgress, breakThreshold };
+  }
+
+  /**
+   * Aura-tick loop. Iterates non-disabled effects with auraRadius > 0,
+   * finds tokens within radius, filters by disposition per auraTargeting,
+   * and posts an apply-damage chat button per target. Per design-movement-
+   * skills.md Phase B — used by Stormstride's electrical aura and any
+   * other "sustained AOE around the actor" pattern.
+   */
+  async _tickActorAuras(speaker, gmWhisper) {
+    const auraEffects = this.effects.filter(e =>
+      !e.disabled && (e.system?.auraRadius ?? 0) > 0
+    );
+    if (auraEffects.length === 0) return;
+    const token = this.getActiveTokens()[0];
+    if (!token) return;
+    const scene = token.document?.parent;
+    if (!scene || !canvas.scene || scene.id !== canvas.scene.id) return;
+
+    const myCenter = token.center;
+    const gridDist = canvas.grid.distance; // ft per grid unit
+    const gridSize = canvas.grid.size;     // px per grid unit
+    const pxPerFt = gridSize / gridDist;
+    const myDisp = token.document.disposition;
+
+    for (const effect of auraEffects) {
+      const sys = effect.system;
+      const dmg = sys.auraDamage ?? 0;
+      if (dmg <= 0) continue;
+      const radiusPx = (sys.auraRadius ?? 0) * pxPerFt;
+      const dmgType = sys.auraDamageType ?? 'physical';
+      const isMagic = sys.auraIsMagic ?? false;
+      const targeting = sys.auraTargeting ?? 'enemies';
+
+      for (const otherDoc of scene.tokens) {
+        if (otherDoc.id === token.document.id) continue; // skip self
+        const other = otherDoc.object;
+        if (!other) continue;
+        const dx = other.center.x - myCenter.x;
+        const dy = other.center.y - myCenter.y;
+        if (Math.hypot(dx, dy) > radiusPx) continue;
+
+        // Disposition filter.
+        const otherDisp = otherDoc.disposition;
+        if (targeting === 'enemies') {
+          if (myDisp === CONST.TOKEN_DISPOSITIONS.FRIENDLY && otherDisp !== CONST.TOKEN_DISPOSITIONS.HOSTILE) continue;
+          if (myDisp === CONST.TOKEN_DISPOSITIONS.HOSTILE && otherDisp !== CONST.TOKEN_DISPOSITIONS.FRIENDLY) continue;
+          if (myDisp === CONST.TOKEN_DISPOSITIONS.NEUTRAL) continue;
+        } else if (targeting === 'allies') {
+          if (otherDisp !== myDisp) continue;
+        }
+
+        const targetActor = otherDoc.actor;
+        if (!targetActor) continue;
+
+        ChatMessage.create({
+          speaker, ...gmWhisper,
+          content: `<p><strong>${targetActor.name}</strong> caught in <em>${effect.name}</em> aura — `
+                 + `<strong>${dmg}</strong> ${dmgType} damage.</p>`
+                 + `<button class="apply-damage" data-actor-uuid="${targetActor.uuid}" `
+                 + `data-damage="${dmg}" data-toughness="${targetActor.system.defense?.dr?.value ?? 0}" `
+                 + `data-damage-type="${dmgType}" data-affinity-dr="0" `
+                 + `data-bypass-pool="true" data-bypass-armor="${isMagic}">Apply Damage</button>`,
+        });
+      }
+    }
   }
 
   /**

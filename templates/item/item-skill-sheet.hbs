@@ -455,6 +455,26 @@
                value='{{system.tagConfig.movementStaminaBuff}}' min='0' step='0.1'
                title='Multiplier on stamina cost per ft. 0.5 = efficient, 2 = exhausting.' />
         {{/if}}
+        <label class='resource-label'>Aura Radius (ft)</label>
+        <input type='number' name='system.tagConfig.auraRadius'
+               value='{{system.tagConfig.auraRadius}}' min='0' step='1'
+               title='Sustained AOE radius around the buffed actor. 0 = no aura. Ticks each round-start applying damage to nearby tokens.' />
+        {{#if system.tagConfig.auraRadius}}
+        <label class='resource-label'>Aura Damage Type</label>
+        <input type='text' name='system.tagConfig.auraDamageType'
+               value='{{system.tagConfig.auraDamageType}}'
+               title='Damage type used for aura ticks (physical / lightning / fire / etc.). Magic-tag skills route through veil.' />
+        <label class='resource-label'>Aura Targets</label>
+        <select name='system.tagConfig.auraTargeting'>
+          <option value='enemies' {{#if (eq system.tagConfig.auraTargeting "enemies")}}selected{{/if}}>Enemies</option>
+          <option value='allies' {{#if (eq system.tagConfig.auraTargeting "allies")}}selected{{/if}}>Allies</option>
+          <option value='all' {{#if (eq system.tagConfig.auraTargeting "all")}}selected{{/if}}>All</option>
+        </select>
+        <label class='resource-label'>Aura Damage Scale (× roll)</label>
+        <input type='number' name='system.tagConfig.auraScale'
+               value='{{system.tagConfig.auraScale}}' min='0' max='5' step='0.05'
+               title='Fraction of the cast roll applied per tick. 0.3 = 30% per round.' />
+        {{/if}}
       </div>
       {{/if}}
 

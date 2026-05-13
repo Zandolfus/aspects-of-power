@@ -2152,14 +2152,28 @@ export class AspectsofPowerItem extends Item {
     }));
 
     // System overrides for non-stat buff fields (e.g. movement multipliers
-    // from Stormstride / Haste / Slow). Only populated when the skill
-    // actually defines them — keeps default 1.0 from getting written
-    // pointlessly on plain stat-buff skills.
+    // from Stormstride / Haste / Slow, aura damage from Stormstride's
+    // electrical field). Only populated when the skill actually defines
+    // them — keeps default values from getting written pointlessly.
     const systemOverrides = {};
     const moveSpeed   = tc.movementSpeedBuff ?? 1;
     const moveStamina = tc.movementStaminaBuff ?? 1;
     if (moveSpeed !== 1) systemOverrides.movementSpeedMultiplier = moveSpeed;
     if (moveStamina !== 1) systemOverrides.movementStaminaMultiplier = moveStamina;
+
+    // Aura snapshot: per-tick damage = rollTotal × auraScale, frozen at
+    // apply time. Each round-start the actor.onStartTurn aura-tick loop
+    // applies this against tokens within auraRadius.
+    const auraRadius = tc.auraRadius ?? 0;
+    if (auraRadius > 0) {
+      const auraScale = tc.auraScale ?? 0.3;
+      systemOverrides.auraRadius     = auraRadius;
+      systemOverrides.auraDamage     = Math.max(0, Math.round(rollTotal * auraScale));
+      systemOverrides.auraDamageType = tc.auraDamageType ?? 'physical';
+      systemOverrides.auraTargeting  = tc.auraTargeting ?? 'enemies';
+      systemOverrides.auraAffinities = [...(this.system.affinities ?? [])];
+      systemOverrides.auraIsMagic    = (this.system.tags ?? []).includes('magic');
+    }
 
     // If the only thing this skill does is set system overrides (no stat
     // changes), still let it through — Stormstride is the canonical case.

@@ -146,6 +146,14 @@ export class SkillData extends foundry.abstract.TypeDataModel {
         // stamina = more efficient. Default 1 = no movement effect.
         movementSpeedBuff:    new fields.NumberField({ initial: 1, min: 0 }),
         movementStaminaBuff:  new fields.NumberField({ initial: 1, min: 0 }),
+        // Aura authoring (per design-movement-skills.md Phase B). When the
+        // buff is applied, the casting skill's rollTotal × auraScale is
+        // snapshotted into the effect's system.auraDamage. Each round-start
+        // the aura ticks against tokens within auraRadius.
+        auraRadius:     new fields.NumberField({ initial: 0, min: 0 }),
+        auraDamageType: new fields.StringField({ initial: 'physical' }),
+        auraTargeting:  new fields.StringField({ initial: 'enemies' }), // 'enemies' | 'allies' | 'all'
+        auraScale:      new fields.NumberField({ initial: 0.3, min: 0, max: 5 }),
 
         // Debuff: subtype (root, stun, blind, etc.) + stat entries + duration + optional DoT.
         debuffType: new fields.StringField({ initial: 'none' }),
