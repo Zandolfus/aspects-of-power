@@ -148,12 +148,19 @@ export class SkillData extends foundry.abstract.TypeDataModel {
         movementStaminaBuff:  new fields.NumberField({ initial: 1, min: 0 }),
         // Aura authoring (per design-movement-skills.md Phase B). When the
         // buff is applied, the casting skill's rollTotal × auraScale is
-        // snapshotted into the effect's system.auraDamage. Each round-start
-        // the aura ticks against tokens within auraRadius.
-        auraRadius:     new fields.NumberField({ initial: 0, min: 0 }),
-        auraDamageType: new fields.StringField({ initial: 'physical' }),
-        auraTargeting:  new fields.StringField({ initial: 'enemies' }), // 'enemies' | 'allies' | 'all'
-        auraScale:      new fields.NumberField({ initial: 0.3, min: 0, max: 5 }),
+        // snapshotted into the effect's system.auraAmount. Each round-start
+        // (AND on entry via the movement hook) the aura ticks against
+        // tokens within auraRadius. auraEffectType dispatches:
+        //   'damage' → apply-damage button (Storm Stride, poison cloud)
+        //   'heal'   → gmApplyRestoration (Chanter's healing hymn)
+        //   'stam'   → gmApplyRestoration with stamina (Chanter's sustain aura)
+        auraRadius:        new fields.NumberField({ initial: 0, min: 0 }),
+        auraEffectType:    new fields.StringField({ initial: 'damage' }), // 'damage' | 'heal' | 'stam'
+        auraDamageType:    new fields.StringField({ initial: 'physical' }),
+        auraTargeting:     new fields.StringField({ initial: 'enemies' }), // 'enemies' | 'allies' | 'all'
+        auraScale:         new fields.NumberField({ initial: 0.3, min: 0, max: 5 }),
+        auraHealResource:  new fields.StringField({ initial: 'health' }), // 'health' | 'mana' | 'stamina'
+        auraHealOverhealth: new fields.BooleanField({ initial: false }),
 
         // Debuff: subtype (root, stun, blind, etc.) + stat entries + duration + optional DoT.
         debuffType: new fields.StringField({ initial: 'none' }),

@@ -2161,18 +2161,26 @@ export class AspectsofPowerItem extends Item {
     if (moveSpeed !== 1) systemOverrides.movementSpeedMultiplier = moveSpeed;
     if (moveStamina !== 1) systemOverrides.movementStaminaMultiplier = moveStamina;
 
-    // Aura snapshot: per-tick damage = rollTotal × auraScale, frozen at
-    // apply time. Each round-start the actor.onStartTurn aura-tick loop
-    // applies this against tokens within auraRadius.
+    // Aura snapshot: per-tick value = rollTotal × auraScale, frozen at
+    // apply time. Dispatched by auraEffectType in actor._tickActorAuras:
+    //   'damage' → apply-damage button + chat
+    //   'heal'   → gmApplyRestoration (health by default, configurable)
+    //   'stam'   → gmApplyRestoration with stamina
+    // Also fires on entry via the movement-hook trigger.
     const auraRadius = tc.auraRadius ?? 0;
     if (auraRadius > 0) {
       const auraScale = tc.auraScale ?? 0.3;
-      systemOverrides.auraRadius     = auraRadius;
-      systemOverrides.auraDamage     = Math.max(0, Math.round(rollTotal * auraScale));
-      systemOverrides.auraDamageType = tc.auraDamageType ?? 'physical';
-      systemOverrides.auraTargeting  = tc.auraTargeting ?? 'enemies';
-      systemOverrides.auraAffinities = [...(this.system.affinities ?? [])];
-      systemOverrides.auraIsMagic    = (this.system.tags ?? []).includes('magic');
+      const amount = Math.max(0, Math.round(rollTotal * auraScale));
+      systemOverrides.auraRadius        = auraRadius;
+      systemOverrides.auraAmount        = amount;
+      systemOverrides.auraDamage        = amount; // legacy alias
+      systemOverrides.auraDamageType    = tc.auraDamageType ?? 'physical';
+      systemOverrides.auraTargeting     = tc.auraTargeting ?? 'enemies';
+      systemOverrides.auraAffinities    = [...(this.system.affinities ?? [])];
+      systemOverrides.auraIsMagic       = (this.system.tags ?? []).includes('magic');
+      systemOverrides.auraEffectType    = tc.auraEffectType ?? 'damage';
+      systemOverrides.auraHealResource  = tc.auraHealResource ?? 'health';
+      systemOverrides.auraHealOverhealth = tc.auraHealOverhealth ?? false;
     }
 
     // If the only thing this skill does is set system overrides (no stat

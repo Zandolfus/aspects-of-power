@@ -1,4 +1,20 @@
 /**
+ * Disposition-targeting filter for auras. Returns true if `otherDisp` is a
+ * valid target given the source's `myDisp` and the aura's `targeting` mode.
+ * Exported for use by the movement-hook entry trigger (canvas/aura-entry-trigger).
+ */
+export function _passesAuraTargetingFilter(myDisp, otherDisp, targeting) {
+  if (targeting === 'all') return true;
+  if (targeting === 'enemies') {
+    if (myDisp === CONST.TOKEN_DISPOSITIONS.FRIENDLY) return otherDisp === CONST.TOKEN_DISPOSITIONS.HOSTILE;
+    if (myDisp === CONST.TOKEN_DISPOSITIONS.HOSTILE)  return otherDisp === CONST.TOKEN_DISPOSITIONS.FRIENDLY;
+    return false; // neutral source — no auto-enemies
+  }
+  if (targeting === 'allies') return otherDisp === myDisp;
+  return false;
+}
+
+/**
  * Extend the base Actor document by defining a custom roll data structure which is ideal for the Simple system.
  * @extends {Actor}
  */
@@ -924,9 +940,12 @@ export class AspectsofPowerActor extends Actor {
   /**
    * Aura-tick loop. Iterates non-disabled effects with auraRadius > 0,
    * finds tokens within radius, filters by disposition per auraTargeting,
-   * and posts an apply-damage chat button per target. Per design-movement-
-   * skills.md Phase B — used by Stormstride's electrical aura and any
-   * other "sustained AOE around the actor" pattern.
+   * and dispatches by auraEffectType. Per design-movement-skills.md Phase B.
+   *
+   * Cadence: called from onStartTurn each round (after-cadence tick) AND
+   * from the movement-hook entry trigger (per-token entry tick). The entry
+   * trigger calls _applyAuraToTarget directly for one target rather than
+   * iterating the whole scene.
    */
   async _tickActorAuras(speaker, gmWhisper) {
     const auraEffects = this.effects.filter(e =>
@@ -939,51 +958,81 @@ export class AspectsofPowerActor extends Actor {
     if (!scene || !canvas.scene || scene.id !== canvas.scene.id) return;
 
     const myCenter = token.center;
-    const gridDist = canvas.grid.distance; // ft per grid unit
-    const gridSize = canvas.grid.size;     // px per grid unit
+    const gridDist = canvas.grid.distance;
+    const gridSize = canvas.grid.size;
     const pxPerFt = gridSize / gridDist;
     const myDisp = token.document.disposition;
 
     for (const effect of auraEffects) {
       const sys = effect.system;
-      const dmg = sys.auraDamage ?? 0;
-      if (dmg <= 0) continue;
+      const amount = sys.auraAmount ?? sys.auraDamage ?? 0;
+      if (amount <= 0) continue;
       const radiusPx = (sys.auraRadius ?? 0) * pxPerFt;
-      const dmgType = sys.auraDamageType ?? 'physical';
-      const isMagic = sys.auraIsMagic ?? false;
       const targeting = sys.auraTargeting ?? 'enemies';
 
       for (const otherDoc of scene.tokens) {
-        if (otherDoc.id === token.document.id) continue; // skip self
+        if (otherDoc.id === token.document.id) continue;
         const other = otherDoc.object;
         if (!other) continue;
         const dx = other.center.x - myCenter.x;
         const dy = other.center.y - myCenter.y;
         if (Math.hypot(dx, dy) > radiusPx) continue;
 
-        // Disposition filter.
-        const otherDisp = otherDoc.disposition;
-        if (targeting === 'enemies') {
-          if (myDisp === CONST.TOKEN_DISPOSITIONS.FRIENDLY && otherDisp !== CONST.TOKEN_DISPOSITIONS.HOSTILE) continue;
-          if (myDisp === CONST.TOKEN_DISPOSITIONS.HOSTILE && otherDisp !== CONST.TOKEN_DISPOSITIONS.FRIENDLY) continue;
-          if (myDisp === CONST.TOKEN_DISPOSITIONS.NEUTRAL) continue;
-        } else if (targeting === 'allies') {
-          if (otherDisp !== myDisp) continue;
-        }
-
+        if (!_passesAuraTargetingFilter(myDisp, otherDoc.disposition, targeting)) continue;
         const targetActor = otherDoc.actor;
         if (!targetActor) continue;
 
-        ChatMessage.create({
-          speaker, ...gmWhisper,
-          content: `<p><strong>${targetActor.name}</strong> caught in <em>${effect.name}</em> aura — `
-                 + `<strong>${dmg}</strong> ${dmgType} damage.</p>`
-                 + `<button class="apply-damage" data-actor-uuid="${targetActor.uuid}" `
-                 + `data-damage="${dmg}" data-toughness="${targetActor.system.defense?.dr?.value ?? 0}" `
-                 + `data-damage-type="${dmgType}" data-affinity-dr="0" `
-                 + `data-bypass-pool="true" data-bypass-armor="${isMagic}">Apply Damage</button>`,
-        });
+        await this._applyAuraToTarget(effect, targetActor, speaker, gmWhisper);
       }
+    }
+  }
+
+  /**
+   * Apply one aura's effect to one target. Dispatches by auraEffectType:
+   *   'damage' → apply-damage chat button (GM-confirmed)
+   *   'heal'   → gmApplyRestoration (auto-applied)
+   *   'stam'   → gmApplyRestoration with stamina (auto-applied)
+   *
+   * Called by both the round-start tick (_tickActorAuras) and the
+   * movement-hook entry trigger.
+   */
+  async _applyAuraToTarget(effect, targetActor, speaker, gmWhisper = {}) {
+    const sys = effect.system;
+    const amount = sys.auraAmount ?? sys.auraDamage ?? 0;
+    if (amount <= 0) return;
+    const effectType = sys.auraEffectType ?? 'damage';
+
+    if (effectType === 'damage') {
+      const dmgType = sys.auraDamageType ?? 'physical';
+      const isMagic = sys.auraIsMagic ?? false;
+      ChatMessage.create({
+        speaker, ...gmWhisper,
+        content: `<p><strong>${targetActor.name}</strong> caught in <em>${effect.name}</em> aura — `
+               + `<strong>${amount}</strong> ${dmgType} damage.</p>`
+               + `<button class="apply-damage" data-actor-uuid="${targetActor.uuid}" `
+               + `data-damage="${amount}" data-toughness="${targetActor.system.defense?.dr?.value ?? 0}" `
+               + `data-damage-type="${dmgType}" data-affinity-dr="0" `
+               + `data-bypass-pool="true" data-bypass-armor="${isMagic}">Apply Damage</button>`,
+      });
+      return;
+    }
+
+    if (effectType === 'heal' || effectType === 'stam') {
+      const resource = effectType === 'stam'
+        ? 'stamina'
+        : (sys.auraHealResource ?? 'health');
+      const overhealth = (effectType === 'heal') ? (sys.auraHealOverhealth ?? false) : false;
+      // Route through the same gmAction the restoration tag uses so
+      // affinity / resource caps / overhealth overflow all apply correctly.
+      await CONFIG.Item.documentClass.executeGmAction({
+        type: 'gmApplyRestoration',
+        targetActorUuid: targetActor.uuid,
+        amount,
+        resource,
+        overhealth,
+        speaker,
+      });
+      return;
     }
   }
 

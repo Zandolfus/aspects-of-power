@@ -8,6 +8,7 @@ import { attachOverlayLayer, detachOverlayLayer, refreshOverlay } from './canvas
 import { resetFirstContactSeen } from './systems/engagement-halts.mjs';
 import { onMoveKey, onCommitKey, onCancelKey, clearAllBuffers, getBuffer } from './canvas/movement-buffer.mjs';
 import { registerAoeBehavior, setAoeTrigger } from './canvas/aoe-region-behavior.mjs';
+import { onPreUpdateTokenForAuras } from './canvas/aura-entry-trigger.mjs';
 // Import sheet classes.
 import { AspectsofPowerActorSheet } from './sheets/actor-sheet.mjs';
 import { AspectsofPowerItemSheet } from './sheets/item-sheet.mjs';
@@ -1921,6 +1922,15 @@ Hooks.on('updateToken', async (tokenDoc, changes, _options, _userId) => {
   await _checkZoneEffects(tokenDoc);
   await _triggerPersistentAoe(tokenDoc, false);
 });
+
+/**
+ * Aura entry trigger — when a token moves, fire aura effects for any
+ * (source, target) pair that transitioned from outside-aura to inside-aura.
+ * In-memory geometry, no document writes per check. Per design-movement-skills.md.
+ */
+Hooks.on('preUpdateToken', (tokenDoc, changes, options, userId) =>
+  onPreUpdateTokenForAuras(tokenDoc, changes, options, userId)
+);
 
 /**
  * At the start of each combatant's turn, re-trigger any persistent AOE
