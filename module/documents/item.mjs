@@ -1799,65 +1799,91 @@ export class AspectsofPowerItem extends Item {
         const startRound = combat?.round ?? 0;
         const startTurn  = combat?.turn ?? 0;
 
-        // Stackable debuffs: merge into existing effect with same origin + name.
+        // Apply strategy depends on debuff category:
+        //   - Singleton mental (charm/fear/taunt/enraged): caster-agnostic
+        //     search by debuffType. Existing → refresh-with-max. "You're
+        //     either charmed or not"; the strongest wins.
+        //   - Stackable physical (skill flag stackable=true): always create
+        //     a parallel effect with its own duration. Foundry sums their
+        //     `changes` natively (ADD mode), DoTs tick per-effect, oldest
+        //     expires first dropping its contribution to the aggregate.
+        //     Replaces the legacy "merge + stack value + refresh duration"
+        //     model which was an infinite-damage source (refreshing
+        //     duration while damage stacked forever).
+        //   - Non-stackable physical (skill flag stackable=false): search
+        //     by origin+name (same caster, same skill). Existing → refresh-
+        //     with-max. Different casters' versions remain parallel.
         if (payload.effectData) {
-          const existing = payload.stackable
-            ? target.effects.find(e => e.origin === payload.originUuid && e.name === payload.effectName && !e.disabled)
-            : null;
+          const debuffTypeForApply = payload.effectData?.system?.debuffType;
+          const singletons = CONFIG.ASPECTSOFPOWER.singletonDebuffs ?? [];
+          const isSingleton = singletons.includes(debuffTypeForApply);
+
+          let existing = null;
+          if (isSingleton) {
+            // Caster-agnostic: any active effect with same debuffType.
+            existing = target.effects.find(e =>
+              e.system?.debuffType === debuffTypeForApply && !e.disabled
+            );
+          } else if (!payload.stackable) {
+            // Same-source: caster's same skill.
+            existing = target.effects.find(e =>
+              e.origin === payload.originUuid &&
+              e.name === payload.effectName &&
+              !e.disabled
+            );
+          }
+          // Stackable physical: existing stays null → always create parallel.
 
           if (existing) {
-            // Merge stat changes: add incoming values to matching keys.
+            // ── Refresh-with-max ──
+            // For each stat change key: keep the larger-magnitude value
+            // (incoming "wins" if its absolute value is bigger).
             const merged = [...(existing.changes ?? [])].map(c => ({ ...c }));
             for (const incoming of (payload.effectData.changes ?? [])) {
               const match = merged.find(m => m.key === incoming.key && m.type === incoming.type);
               if (match) {
-                match.value = Number(match.value) + Number(incoming.value);
+                if (Math.abs(Number(incoming.value)) > Math.abs(Number(match.value))) {
+                  match.value = incoming.value;
+                }
               } else {
                 merged.push({ ...incoming });
               }
             }
 
-            // Duration becomes the maximum of what's remaining vs. the new application.
+            // Duration: max of remaining-on-existing vs new application.
             const existingRemaining = ((existing.duration?.startRound ?? 0) + (existing.duration?.rounds ?? 0)) - startRound;
             const newDuration = Math.max(existingRemaining, payload.duration);
 
-            // Merge DoT flags: add incoming damage to existing.
             const updateData = {
               changes: merged,
               'duration.rounds': newDuration,
               'duration.startRound': startRound,
               'duration.startTurn': startTurn,
             };
-            // Stack debuffDamage (break threshold) and DoT via system fields.
+
             const existingSys = existing.system ?? {};
             const incomingSys = payload.effectData.system ?? {};
-            const existingDebuffDmg = existingSys.debuffDamage ?? 0;
-            const incomingDebuffDmg = incomingSys.debuffDamage ?? 0;
-            const newDebuffDamage = existingDebuffDmg + incomingDebuffDmg;
+            const newDebuffDamage = Math.max(existingSys.debuffDamage ?? 0, incomingSys.debuffDamage ?? 0);
 
-            // Re-application resets roundsAfflicted to 0 — the caster's
-            // fresh affliction overwhelms whatever momentum the target
-            // had built toward breaking free. Per design-movement-modes
-            // (break-free momentum scaling).
+            // Reset breakProgress + roundsAfflicted: fresh affliction
+            // overwhelms accumulated break-momentum (per design-movement-modes).
             const systemUpdate = { debuffDamage: newDebuffDamage, breakProgress: 0, roundsAfflicted: 0 };
 
-            if (incomingSys.dot) {
-              const existingDot = existingSys.dotDamage ?? 0;
-              const incomingDot = incomingSys.dotDamage ?? 0;
+            // DoT: keep the larger damage of existing vs incoming.
+            if (incomingSys.dot || existingSys.dot) {
               systemUpdate.dot = true;
-              systemUpdate.dotDamage = existingDot + incomingDot;
-              systemUpdate.dotDamageType = incomingSys.dotDamageType;
-              systemUpdate.applierActorUuid = incomingSys.applierActorUuid;
+              systemUpdate.dotDamage = Math.max(existingSys.dotDamage ?? 0, incomingSys.dotDamage ?? 0);
+              systemUpdate.dotDamageType = incomingSys.dotDamageType || existingSys.dotDamageType;
+              systemUpdate.applierActorUuid = incomingSys.applierActorUuid || existingSys.applierActorUuid;
               updateData.description = `Deals <strong>${systemUpdate.dotDamage}</strong> ${systemUpdate.dotDamageType} damage per round (bypasses armor &amp; veil; reduced by Toughness).`;
             }
 
             updateData.system = systemUpdate;
-
             await existing.update(updateData);
-            const mergedTotal = merged.reduce((sum, c) => sum + Math.abs(Number(c.value)), 0);
-            const stackInfo = mergedTotal > 0 ? ` (stat total -${mergedTotal})` : ` (strength ${newDebuffDamage})`;
+
+            const refreshReason = isSingleton ? 'singleton-refresh' : 'same-source refresh';
             ChatMessage.create({ speaker: payload.speaker, ...msgWhisper,
-              content: `<p>Debuff on <strong>${target.name}</strong> stacked${stackInfo} for ${newDuration} rounds.</p>`,
+              content: `<p>Debuff on <strong>${target.name}</strong> refreshed (${refreshReason}, strength ${newDebuffDamage}) for ${newDuration} rounds.</p>`,
             });
           } else {
             // No existing — create new effect. Use nested duration object for v14.

@@ -273,6 +273,19 @@ ASPECTSOFPOWER.debuffBreakStats = {
 };
 
 /**
+ * Debuff types that represent a psychological state — exactly one instance
+ * exists on a target at a time regardless of source. Re-applying any of
+ * these (from any caster) refreshes the existing effect with max(existing,
+ * new) values rather than creating a parallel one. "You are either charmed
+ * or not"; two casters' charms collapse into the stronger.
+ *
+ * Physical debuffs (root, paralysis, hemorrhage, etc.) follow the per-skill
+ * `stackable` flag instead: stackable → parallel effects with own durations,
+ * non-stackable → same-source refresh-with-max.
+ */
+ASPECTSOFPOWER.singletonDebuffs = ['charm', 'fear', 'taunt', 'enraged'];
+
+/**
  * Casting-speed Wis/Int weights by spell tier — bigger spells lean more
  * toward Wis ("mastery shows"). Wis-spec casters are markedly faster on
  * Major/Grand spells; Int-spec casters retain per-cast damage but pay in
