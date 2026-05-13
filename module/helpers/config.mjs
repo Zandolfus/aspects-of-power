@@ -243,12 +243,13 @@ ASPECTSOFPOWER.celerity = {
   //   channel_ticks = invested × CHANNEL_FACTOR / Wis_mod
   // Spells fire at MAX(base_cast_time, channel_ticks).
   CHANNEL_FACTOR: 3000,
-  // Manual break-free celerity weight. Same shape as a weapon weight:
-  //   wait = (BREAK_FREE_WEIGHT × SCALE) / breakStatMod
-  // Sword baseline (100) — break attempts pace at roughly one sword swing.
-  // Speed stat = the relevant break stat for the targeted debuff (see
-  // debuffBreakStats below).
-  BREAK_FREE_WEIGHT: 100,
+  // Manual break-free is deterministic in time, NOT stat-dependent:
+  //   wait = referenceRoundLength(actorRL) × BREAK_FREE_ROUND_FRACTION
+  // 1/3 = one "action's worth" of an actor's round, matching the
+  // ~3-actions-per-round design invariant. Break attempts pace the same
+  // as a sword swing at any grade — the BREAK ROLL is what scales with
+  // stat, not the time to attempt.
+  BREAK_FREE_ROUND_FRACTION: 1 / 3,
   // Break-roll yield multiplier per round afflicted (linear growth):
   //   yieldMult = 1 + (roundsAfflicted × BREAK_FREE_YIELD_PER_ROUND)
   // Round 0 = 1×. Round 4 = 2×. Round 8 = 3×. Round 12 = 4×. Etc.

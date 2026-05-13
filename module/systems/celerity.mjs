@@ -536,11 +536,14 @@ export async function declareMovement(actor, startPos, endPos, distanceFt, stami
 
 /**
  * Declare a manual break-free attempt against a debuff effect on the
- * celerity stack. Replaces the legacy "1-of-3 actions per turn" gate with
- * a celerity wait derived from the actor's break-stat mod:
- *   wait = (BREAK_FREE_WEIGHT × SCALE) / breakStatMod
+ * celerity stack. Wait is deterministic in time — a fixed fraction of
+ * the actor's reference round, NOT stat-dependent:
+ *   wait = referenceRoundLength(actorRL) × BREAK_FREE_ROUND_FRACTION
  *
- * The tracker dispatches via the BREAK_FREE_ITEM_ID sentinel and calls
+ * Build-neutral by design: a charmed actor with weak willpower can still
+ * fire break attempts at one-action cadence; their stat affects the
+ * progress YIELDED per roll, not the time-per-attempt. The tracker
+ * dispatches via the BREAK_FREE_ITEM_ID sentinel and calls
  * `actor._attemptBreakRoll(effect)` when the scheduled tick fires.
  *
  * @param {Actor} actor
@@ -558,9 +561,10 @@ export async function declareBreakFree(actor, effect) {
     return null;
   }
   const sc = CONFIG.ASPECTSOFPOWER.celerity;
-  const weight = sc.BREAK_FREE_WEIGHT ?? 100;
-  const statMod = Math.max(1, actor.system.abilities?.[breakStat]?.mod ?? 0);
-  const wait = Math.max(1, Math.round(weight * sc.SCALE / statMod));
+  const fraction = sc.BREAK_FREE_ROUND_FRACTION ?? (1 / 3);
+  const rl = actor.system.attributes?.race?.level ?? 1;
+  const roundLen = referenceRoundLength(rl);
+  const wait = Math.max(1, Math.round(roundLen * fraction));
   const clockTick = getClockTick(combatant.combat);
   const scheduledTick = clockTick + wait;
   const typeName = game.i18n.localize(CONFIG.ASPECTSOFPOWER.debuffTypes[debuffType] ?? debuffType);
