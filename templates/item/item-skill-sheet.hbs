@@ -437,6 +437,24 @@
         <label class='resource-label'>{{localize "ASPECTSOFPOWER.TagConfig.duration"}}</label>
         <input type='number' name='system.tagConfig.buffDuration'
                value='{{system.tagConfig.buffDuration}}' min='0' step='1' />
+        <label class='resource-label'>Target</label>
+        <select name='system.tagConfig.buffTarget'>
+          {{#each config.buffTargets as |label key|}}
+            <option value='{{key}}' {{#if (eq key ../system.tagConfig.buffTarget)}}selected{{/if}}>
+              {{localize label}}
+            </option>
+          {{/each}}
+        </select>
+        {{#if (includes system.tags "movement")}}
+        <label class='resource-label'>Movement Speed Buff (×)</label>
+        <input type='number' name='system.tagConfig.movementSpeedBuff'
+               value='{{system.tagConfig.movementSpeedBuff}}' min='0' step='0.1'
+               title='Multiplier applied to the target&apos;s movement speed. 2 = double speed, 0.5 = half (slow).' />
+        <label class='resource-label'>Movement Stamina Buff (×)</label>
+        <input type='number' name='system.tagConfig.movementStaminaBuff'
+               value='{{system.tagConfig.movementStaminaBuff}}' min='0' step='0.1'
+               title='Multiplier on stamina cost per ft. 0.5 = efficient, 2 = exhausting.' />
+        {{/if}}
       </div>
       {{/if}}
 

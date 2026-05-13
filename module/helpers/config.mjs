@@ -902,6 +902,16 @@ ASPECTSOFPOWER.restorationTargets = {
 };
 
 /**
+ * Valid targets for the buff tag — mirror of restorationTargets.
+ * Self-buffs (Stormstride, Haste, etc.) skip the target prompt and
+ * apply to the caster.
+ */
+ASPECTSOFPOWER.buffTargets = {
+  self:     'ASPECTSOFPOWER.HealTarget.self',
+  selected: 'ASPECTSOFPOWER.HealTarget.selected',
+};
+
+/**
  * Resources the restoration tag can restore.
  */
 ASPECTSOFPOWER.restorationResources = {

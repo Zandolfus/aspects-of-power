@@ -1668,6 +1668,11 @@ export class AspectsofPowerItem extends Item {
         const startRound = combat?.round ?? 0;
         const startTurn  = combat?.turn ?? 0;
 
+        // System overrides (e.g. Stormstride's movementSpeedMultiplier).
+        // Applied verbatim to the effect's `system` fields on create/update.
+        const sysOverrides = payload.systemOverrides ?? {};
+        const hasSysOverrides = Object.keys(sysOverrides).length > 0;
+
         const existing = target.effects.find(
           e => e.origin === payload.originUuid && e.name === payload.effectName
         );
@@ -1687,12 +1692,14 @@ export class AspectsofPowerItem extends Item {
             // Duration becomes the maximum of what's remaining vs. the new application.
             const existingRemaining = ((existing.duration?.startRound ?? 0) + (existing.duration?.rounds ?? 0)) - startRound;
             const newDuration = Math.max(existingRemaining, payload.duration);
-            await existing.update({
+            const updateData = {
               changes: merged,
               'duration.rounds': newDuration,
               'duration.startRound': startRound,
               'duration.startTurn': startTurn,
-            });
+            };
+            if (hasSysOverrides) updateData.system = sysOverrides;
+            await existing.update(updateData);
             const mergedTotal = merged.reduce((sum, c) => sum + Number(c.value), 0);
             ChatMessage.create({ speaker: payload.speaker, ...msgWhisper,
               content: `<p>Buff on <strong>${target.name}</strong> stacked (total +${mergedTotal}) for ${newDuration} rounds.</p>`,
@@ -1701,15 +1708,17 @@ export class AspectsofPowerItem extends Item {
             // Non-stackable: keep higher total.
             const newTotal = payload.changes.reduce((sum, c) => sum + Number(c.value), 0);
             const currentTotal = (existing.changes ?? []).reduce((sum, c) => sum + Number(c.value), 0);
-            if (newTotal > currentTotal) {
-              await existing.update({
+            if (newTotal > currentTotal || hasSysOverrides) {
+              const updateData = {
                 changes: payload.changes,
                 'duration.rounds': payload.duration,
                 'duration.startRound': startRound,
                 'duration.startTurn': startTurn,
-              });
+              };
+              if (hasSysOverrides) updateData.system = sysOverrides;
+              await existing.update(updateData);
               ChatMessage.create({ speaker: payload.speaker, ...msgWhisper,
-                content: `<p>Buff on <strong>${target.name}</strong> upgraded (total +${newTotal}, was +${currentTotal}).</p>`,
+                content: `<p>Buff on <strong>${target.name}</strong> ${newTotal > currentTotal ? `upgraded (total +${newTotal}, was +${currentTotal})` : 'refreshed'}.</p>`,
               });
             } else {
               ChatMessage.create({ speaker: payload.speaker, ...msgWhisper,
@@ -1720,29 +1729,36 @@ export class AspectsofPowerItem extends Item {
         } else {
           // No existing active effect (or disabled) — create new.
           if (existing?.disabled) {
-            await existing.update({
+            const updateData = {
               disabled: false,
               changes: payload.changes,
               'duration.rounds': payload.duration,
               'duration.startRound': startRound,
               'duration.startTurn': startTurn,
-            });
+            };
+            if (hasSysOverrides) updateData.system = sysOverrides;
+            await existing.update(updateData);
           } else {
-            await target.createEmbeddedDocuments('ActiveEffect', [{
+            const createData = {
               name:   payload.effectName,
               img:    payload.img,
               origin: payload.originUuid,
+              type:   'base',
               duration: { rounds: payload.duration, startRound, startTurn },
               disabled: false,
               changes: payload.changes,
-            }]);
+            };
+            if (hasSysOverrides) createData.system = sysOverrides;
+            await target.createEmbeddedDocuments('ActiveEffect', [createData]);
           }
-          const summary = payload.changes.map(c => {
+          const statSummary = payload.changes.map(c => {
             const attr = c.key.replace('system.', '').replace('.value', '');
             return `${attr} +${c.value}`;
           }).join(', ');
+          const sysSummary = Object.entries(sysOverrides).map(([k, v]) => `${k} ×${v}`).join(', ');
+          const fullSummary = [statSummary, sysSummary].filter(Boolean).join('; ') || 'effect';
           ChatMessage.create({ speaker: payload.speaker, ...msgWhisper,
-            content: `<p><strong>${target.name}</strong> buffed: ${summary} for ${payload.duration} rounds.</p>`,
+            content: `<p><strong>${target.name}</strong> buffed: ${fullSummary} for ${payload.duration} rounds.</p>`,
           });
         }
         break;
@@ -2108,24 +2124,46 @@ export class AspectsofPowerItem extends Item {
    */
   async _handleBuffTag(item, rollData, dmgRoll, speaker, rollMode, label, targetTokenOverride = null) {
     const whisperGM = !_isPlayerCharacter(this.actor) ? ChatMessage.getWhisperRecipients('GM') : undefined;
-    const targetToken = targetTokenOverride ?? game.user.targets.first() ?? null;
-    const targetActor = targetToken?.actor ?? null;
+    const tc = this.system.tagConfig ?? {};
+
+    // Buff target resolution: self skips the target prompt and applies to
+    // the caster's actor. Selected uses the current target (default).
+    const buffTarget = tc.buffTarget ?? 'selected';
+    let targetActor = null;
+    if (buffTarget === 'self') {
+      targetActor = this.actor;
+    } else {
+      const targetToken = targetTokenOverride ?? game.user.targets.first() ?? null;
+      targetActor = targetToken?.actor ?? null;
+    }
     if (!targetActor) {
       ChatMessage.create({ speaker, rollMode, ...(whisperGM ? { whisper: whisperGM } : {}), content: `<p><em>No target for buff.</em></p>` });
       return;
     }
 
-    const entries  = this.system.tagConfig?.buffEntries ?? [];
-    const duration = this.system.tagConfig?.buffDuration ?? 1;
+    const entries  = tc.buffEntries ?? [];
+    const duration = tc.buffDuration ?? 1;
     const rollTotal = Math.round(dmgRoll.total);
-
-    if (entries.length === 0) return;
 
     const changes = entries.map(e => ({
       key:   `system.${e.attribute}.value`,
       type:  'add',
       value: Math.round(rollTotal * (e.value || 1)),
     }));
+
+    // System overrides for non-stat buff fields (e.g. movement multipliers
+    // from Stormstride / Haste / Slow). Only populated when the skill
+    // actually defines them — keeps default 1.0 from getting written
+    // pointlessly on plain stat-buff skills.
+    const systemOverrides = {};
+    const moveSpeed   = tc.movementSpeedBuff ?? 1;
+    const moveStamina = tc.movementStaminaBuff ?? 1;
+    if (moveSpeed !== 1) systemOverrides.movementSpeedMultiplier = moveSpeed;
+    if (moveStamina !== 1) systemOverrides.movementStaminaMultiplier = moveStamina;
+
+    // If the only thing this skill does is set system overrides (no stat
+    // changes), still let it through — Stormstride is the canonical case.
+    if (entries.length === 0 && Object.keys(systemOverrides).length === 0) return;
 
     await this._gmAction({
       type: 'gmApplyBuff',
@@ -2134,8 +2172,9 @@ export class AspectsofPowerItem extends Item {
       originUuid: this.uuid,
       changes,
       duration,
-      stackable: this.system.tagConfig?.buffStackable ?? false,
+      stackable: tc.buffStackable ?? false,
       img: item.img ?? 'icons/svg/aura.svg',
+      systemOverrides,
       speaker, rollMode,
     });
   }

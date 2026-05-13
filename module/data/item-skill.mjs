@@ -139,6 +139,13 @@ export class SkillData extends foundry.abstract.TypeDataModel {
         }), { initial: [] }),
         buffDuration:  new fields.NumberField({ initial: 1, integer: true, min: 0 }),
         buffStackable: new fields.BooleanField({ initial: false }),
+        buffTarget:    new fields.StringField({ initial: 'selected' }), // 'self' | 'selected'
+        // Movement-buff multipliers (per design-movement-skills.md Phase A.5).
+        // Written into the applied effect's system.movementSpeedMultiplier /
+        // system.movementStaminaMultiplier. > 1 on speed = faster; < 1 on
+        // stamina = more efficient. Default 1 = no movement effect.
+        movementSpeedBuff:    new fields.NumberField({ initial: 1, min: 0 }),
+        movementStaminaBuff:  new fields.NumberField({ initial: 1, min: 0 }),
 
         // Debuff: subtype (root, stun, blind, etc.) + stat entries + duration + optional DoT.
         debuffType: new fields.StringField({ initial: 'none' }),
