@@ -23,35 +23,6 @@ export class AspectsofPowerToken extends foundry.documents.TokenDocument {
   /* -------------------------------------------- */
 
   /**
-   * Per-turn action counter, still used by the break-free flow in
-   * actor-sheet.mjs to gate break attempts. The pre-celerity 3-action
-   * paradigm no longer drives movement (movement is its own celerity
-   * action now), but break-free hasn't been re-costed under celerity yet
-   * — see MEMORY.md "Break-free re-costing under celerity".
-   * @type {Map<string, number>}
-   */
-  static _moveActionTracker = new Map();
-
-  /** Clear all movement trackers (called on turn change). */
-  static clearTrackers() {
-    this._moveActionTracker.clear();
-  }
-
-  /**
-   * Consume an action for a combatant. Returns the new count. Used by the
-   * break-free flow as a per-turn gate; movement-as-action no longer reads it.
-   * @param {string} combatantId
-   * @returns {number}
-   */
-  static consumeAction(combatantId) {
-    const used = (this._moveActionTracker.get(combatantId) ?? 0) + 1;
-    this._moveActionTracker.set(combatantId, used);
-    return used;
-  }
-
-  /* -------------------------------------------- */
-
-  /**
    * v14 movement hook: called before a movement is committed.
    *
    * In active combat this hook DECLARES the movement onto the celerity stack

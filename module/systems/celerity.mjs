@@ -419,6 +419,9 @@ export const runRoundEnd = runRoundStart;
 /** Sentinel itemId stored on `declaredAction` to mark a movement entry. */
 export const MOVEMENT_ITEM_ID = '__movement__';
 
+/** Sentinel itemId stored on `declaredAction` to mark a manual break-free attempt. */
+export const BREAK_FREE_ITEM_ID = '__breakFree__';
+
 /**
  * Resolve a movement mode key (or unknown input) to a valid mode config
  * from CONFIG.ASPECTSOFPOWER.celerity.MOVEMENT_MODES. Falls back to the
@@ -526,6 +529,62 @@ export async function declareMovement(actor, startPos, endPos, distanceFt, stami
   ChatMessage.create({
     speaker: ChatMessage.getSpeaker({ actor }),
     content: `<p><em>${actor.name} declares <strong>${label}</strong> — wait ${wait} ticks, arrives at tick ${scheduledTick}${staminaCost ? `, stamina cost ${staminaCost}` : ''}.</em></p>`,
+  });
+
+  return { wait, scheduledTick };
+}
+
+/**
+ * Declare a manual break-free attempt against a debuff effect on the
+ * celerity stack. Replaces the legacy "1-of-3 actions per turn" gate with
+ * a celerity wait derived from the actor's break-stat mod:
+ *   wait = (BREAK_FREE_WEIGHT × SCALE) / breakStatMod
+ *
+ * The tracker dispatches via the BREAK_FREE_ITEM_ID sentinel and calls
+ * `actor._attemptBreakRoll(effect)` when the scheduled tick fires.
+ *
+ * @param {Actor} actor
+ * @param {ActiveEffect} effect  The debuff to break against.
+ * @returns {Promise<{wait, scheduledTick}|null>}
+ */
+export async function declareBreakFree(actor, effect) {
+  const combatant = findCombatantForActor(actor);
+  if (!combatant) return null;
+  if (!effect) return null;
+  const debuffType = effect.system?.debuffType;
+  const breakStat = CONFIG.ASPECTSOFPOWER.debuffBreakStats?.[debuffType];
+  if (!breakStat) {
+    ui.notifications.warn(`${actor.name}: ${debuffType ?? 'unknown debuff'} cannot be broken through force of will.`);
+    return null;
+  }
+  const sc = CONFIG.ASPECTSOFPOWER.celerity;
+  const weight = sc.BREAK_FREE_WEIGHT ?? 100;
+  const statMod = Math.max(1, actor.system.abilities?.[breakStat]?.mod ?? 0);
+  const wait = Math.max(1, Math.round(weight * sc.SCALE / statMod));
+  const clockTick = getClockTick(combatant.combat);
+  const scheduledTick = clockTick + wait;
+  const typeName = game.i18n.localize(CONFIG.ASPECTSOFPOWER.debuffTypes[debuffType] ?? debuffType);
+  const label = `Break Free (${typeName})`;
+
+  await combatant.update({
+    'flags.aspectsofpower.declaredAction': {
+      itemId: BREAK_FREE_ITEM_ID,
+      label,
+      wait,
+      scheduledTick,
+      declaredAtTick: clockTick,
+      effectId: effect.id,
+      debuffType,
+      breakStat,
+    },
+    'flags.aspectsofpower.nextActionTick': scheduledTick,
+    'flags.aspectsofpower.lastActionWait': wait,
+    'flags.aspectsofpower.lastActionName': `${label} (queued)`,
+  });
+
+  ChatMessage.create({
+    speaker: ChatMessage.getSpeaker({ actor }),
+    content: `<p><em>${actor.name} strains against <strong>${typeName}</strong> — break attempt scheduled in ${wait} ticks (tick ${scheduledTick}).</em></p>`,
   });
 
   return { wait, scheduledTick };

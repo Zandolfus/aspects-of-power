@@ -8,7 +8,7 @@
  * Wired by setting `CONFIG.ui.combat = CelerityCombatTracker` at init.
  */
 
-import { getClockTick, referenceRoundLength, runRoundStart, MOVEMENT_ITEM_ID, interpolateMovementPosition, declareMovement } from '../systems/celerity.mjs';
+import { getClockTick, referenceRoundLength, runRoundStart, MOVEMENT_ITEM_ID, BREAK_FREE_ITEM_ID, interpolateMovementPosition, declareMovement } from '../systems/celerity.mjs';
 import { checkEngagementHalts } from '../systems/engagement-halts.mjs';
 
 const MAX_ROUND_BOUNDARIES_PER_ADVANCE = 5; // safety cap on multi-round catches
@@ -202,6 +202,31 @@ async function _onCelAdvance(event, target) {
   // flag clear above is the entire "fire" step.
   if (declared.itemId === MOVEMENT_ITEM_ID) {
     ui.notifications.info(`Clock → ${declared.scheduledTick}. ${c.name} arrives (${declared.label}).`);
+    return;
+  }
+
+  // Break-free branch: actor declared a manual break-free against a debuff.
+  // Look up the effect (it may have been broken by another means since
+  // declaration — auto-break, dispel, expiry); if gone, skip with a notice.
+  // Otherwise roll the break check via the shared actor helper.
+  if (declared.itemId === BREAK_FREE_ITEM_ID) {
+    await c.update({
+      [`flags.${FLAG_NS}.declaredAction`]: null,
+      [`flags.${FLAG_NS}.nextActionTick`]: null,
+    });
+    const actor = c.actor;
+    const effect = declared.effectId ? actor?.effects?.get(declared.effectId) : null;
+    if (!actor || !effect) {
+      ui.notifications.info(`${c.name}: break-free attempt skipped (debuff already gone).`);
+      return;
+    }
+    ui.notifications.info(`Clock → ${declared.scheduledTick}. ${c.name} fires "${declared.label}".`);
+    const isPC = !!actor.hasPlayerOwner;
+    try {
+      await actor._attemptBreakRoll(effect, { whisper: !isPC });
+    } catch (e) {
+      console.error('[celerity] break-free dispatch failed:', e);
+    }
     return;
   }
 

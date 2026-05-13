@@ -46,10 +46,6 @@ function _isPlayerCharacter(actor) {
 /* -------------------------------------------- */
 /*  Movement Distance Tracker (per combat turn) */
 /* -------------------------------------------- */
-
-// Movement trackers are now on AspectsofPowerToken (module/documents/token.mjs).
-
-/* -------------------------------------------- */
 /*  Debuff Helpers                              */
 /* -------------------------------------------- */
 
@@ -100,24 +96,6 @@ Hooks.once('init', function () {
     massLeveler: MassLeveler,
     templateMigration: TemplateMigration,
     celerity: { ...Celerity, openTracker: openCelerityTracker, refreshTracker: refreshCelerityTracker, CelerityTracker },
-    /**
-     * Called when a skill is used to consume an action and reset the movement
-     * segment for the given actor.  Returns the new action count, or null
-     * if no combat / combatant found.
-     * @param {Actor} actor
-     * @returns {number|null}
-     */
-    consumeAction(actor) {
-      const combat = game.combat;
-      if (!combat?.started) return null;
-      const token = actor.getActiveTokens()[0];
-      if (!token) return null;
-      const combatant = combat.combatants.find(
-        c => c.tokenId === token.id && c.sceneId === token.document.parent?.id
-      );
-      if (!combatant) return null;
-      return AspectsofPowerToken.consumeAction(combatant.id);
-    },
   };
 
   // ── System Settings ──
@@ -1469,12 +1447,6 @@ Hooks.on('renderTokenHUD', (hud, html, data) => {
 /* -------------------------------------------- */
 /*  Movement Tracker Reset — Start of Turn      */
 /* -------------------------------------------- */
-
-/**
- * Clear movement trackers on turn change and combat end.
- */
-Hooks.on('combatTurnChange', () => AspectsofPowerToken.clearTrackers());
-Hooks.on('deleteCombat', () => AspectsofPowerToken.clearTrackers());
 
 /* -------------------------------------------- */
 /*  Movement Path Overlay                       */

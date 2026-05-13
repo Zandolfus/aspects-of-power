@@ -4907,9 +4907,6 @@ export class AspectsofPowerItem extends Item {
       }
     }
 
-    // ── Consume a combat action (for movement segmentation) ──
-    game.aspectsofpower?.consumeAction?.(this.actor);
-
     // ── AOE branch: place template, detect targets, then deduct cost ──
     // Cleave alteration: melee skill with the cleave tag becomes a cone
     // sized to the wielded weapon's reach. Treats Cleave as an AOE even

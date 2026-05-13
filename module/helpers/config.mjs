@@ -243,6 +243,26 @@ ASPECTSOFPOWER.celerity = {
   //   channel_ticks = invested × CHANNEL_FACTOR / Wis_mod
   // Spells fire at MAX(base_cast_time, channel_ticks).
   CHANNEL_FACTOR: 3000,
+  // Manual break-free celerity weight. Same shape as a weapon weight:
+  //   wait = (BREAK_FREE_WEIGHT × SCALE) / breakStatMod
+  // Sword baseline (100) — break attempts pace at roughly one sword swing.
+  // Speed stat = the relevant break stat for the targeted debuff (see
+  // debuffBreakStats below).
+  BREAK_FREE_WEIGHT: 100,
+};
+
+/**
+ * Which ability mod is rolled to break each debuff type. Shared between the
+ * auto-break loop (actor.onStartTurn) and the manual break-free flow
+ * (actor-sheet → celerity declare → tracker dispatch).
+ */
+ASPECTSOFPOWER.debuffBreakStats = {
+  root:       'strength',
+  paralysis:  'vitality',
+  fear:       'willpower',
+  taunt:      'intelligence',
+  charm:      'willpower',
+  enraged:    'wisdom',
 };
 
 /**

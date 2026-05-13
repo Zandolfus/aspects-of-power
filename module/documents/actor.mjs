@@ -793,10 +793,8 @@ export class AspectsofPowerActor extends Actor {
     }
 
     // ── 4. Debuff Break Rolls ──
-    const DEBUFF_BREAK_STAT = {
-      root: 'strength', paralysis: 'vitality', fear: 'willpower',
-      taunt: 'intelligence', charm: 'willpower', enraged: 'wisdom',
-    };
+    // Per-debuff break-stat table now lives at CONFIG.ASPECTSOFPOWER.debuffBreakStats
+    // (shared with the manual break-free flow). Auto-attempt each round.
     const TURN_SKIP_DEBUFFS = ['stun', 'paralysis', 'sleep', 'immobilized'];
 
     const typedDebuffs = this.effects.filter(e =>
@@ -807,49 +805,12 @@ export class AspectsofPowerActor extends Actor {
       // Defensive: snapshot may include effects deleted by the sleep
       // wake branch above (sleep is also a debuff type). Skip if gone.
       if (!this.effects.has(effect.id)) continue;
-      const sys = effect.system;
-      const debuffType = sys.debuffType;
-      const rollTotal = sys.debuffDamage ?? 0;
+      const debuffType = effect.system?.debuffType;
       const typeName = game.i18n.localize(CONFIG.ASPECTSOFPOWER.debuffTypes[debuffType] ?? debuffType);
 
-      const breakStat = DEBUFF_BREAK_STAT[debuffType];
-      if (breakStat) {
-        let statMod, breakLabel, breakThreshold;
-        statMod = this.system.abilities?.[breakStat]?.mod ?? 0;
-        breakLabel = game.i18n.localize(`ASPECTSOFPOWER.Ability.${breakStat}.long`);
-        breakThreshold = rollTotal;
+      await this._attemptBreakRoll(effect, { whisper: !_isPC });
 
-        const breakRoll = new Roll('(1d20 / 100) * @mod + @mod', { mod: statMod });
-        await breakRoll.evaluate();
-
-        const previousProgress = sys.breakProgress ?? 0;
-        const newProgress = previousProgress + breakRoll.total;
-
-        if (newProgress >= breakThreshold) {
-          await effect.delete();
-          await breakRoll.toMessage({
-            speaker, ...gmWhisper,
-            flavor: `${typeName} — ${game.i18n.localize('ASPECTSOFPOWER.Debuff.breakRoll')} (${breakLabel}) [${newProgress} / ${breakThreshold}]`,
-          });
-          ChatMessage.create({
-            speaker, ...gmWhisper,
-            content: `<p><strong>${this.name}</strong> ${game.i18n.localize('ASPECTSOFPOWER.Debuff.broke')} <strong>${typeName}</strong>!</p>`,
-          });
-          continue;
-        } else {
-          await effect.update({ 'system.breakProgress': newProgress });
-          await breakRoll.toMessage({
-            speaker, ...gmWhisper,
-            flavor: `${typeName} — ${game.i18n.localize('ASPECTSOFPOWER.Debuff.breakRoll')} (${breakLabel}) [${newProgress} / ${breakThreshold}]`,
-          });
-          ChatMessage.create({
-            speaker, ...gmWhisper,
-            content: `<p><strong>${this.name}</strong> ${game.i18n.localize('ASPECTSOFPOWER.Debuff.failedBreak')} <strong>${typeName}</strong>.</p>`,
-          });
-        }
-      }
-
-      if (TURN_SKIP_DEBUFFS.includes(debuffType)) {
+      if (TURN_SKIP_DEBUFFS.includes(debuffType) && this.effects.has(effect.id)) {
         ChatMessage.create({
           speaker, ...gmWhisper,
           content: `<p><strong>${this.name}</strong> ${game.i18n.localize('ASPECTSOFPOWER.Debuff.cannotAct')} (${typeName})</p>`,
@@ -861,6 +822,58 @@ export class AspectsofPowerActor extends Actor {
     if (Object.keys(updateData).length > 0) {
       await this.update(updateData);
     }
+  }
+
+  /**
+   * Roll a single break attempt against one debuff effect. Shared between
+   * the per-round auto-break loop (`onStartTurn`) and the manual break-free
+   * flow (player declares on the celerity stack; tracker fires this on
+   * schedule). Mutates the effect on progress; deletes it on success.
+   *
+   * @param {ActiveEffect} effect  The debuff to roll against.
+   * @param {object}  [opts]
+   * @param {boolean} [opts.whisper=false]  Whisper chat output to GM only.
+   * @returns {Promise<{broken:boolean, statMod:number, newProgress:number, breakThreshold:number}|null>}
+   *   null if the debuff type isn't breakable; otherwise the result of the attempt.
+   */
+  async _attemptBreakRoll(effect, { whisper = false } = {}) {
+    if (!effect) return null;
+    const sys = effect.system ?? {};
+    const debuffType = sys.debuffType;
+    const breakStat = CONFIG.ASPECTSOFPOWER.debuffBreakStats?.[debuffType];
+    if (!breakStat) return null;
+
+    const statMod = this.system.abilities?.[breakStat]?.mod ?? 0;
+    const breakLabel = game.i18n.localize(`ASPECTSOFPOWER.Ability.${breakStat}.long`);
+    const breakThreshold = sys.debuffDamage ?? 0;
+    const typeName = game.i18n.localize(CONFIG.ASPECTSOFPOWER.debuffTypes[debuffType] ?? debuffType);
+
+    const breakRoll = new Roll('(1d20 / 100) * @mod + @mod', { mod: statMod });
+    await breakRoll.evaluate();
+    const previousProgress = sys.breakProgress ?? 0;
+    const newProgress = previousProgress + breakRoll.total;
+
+    const speaker = ChatMessage.getSpeaker({ actor: this });
+    const msgOpts = whisper ? { whisper: ChatMessage.getWhisperRecipients('GM') } : {};
+    const broken = newProgress >= breakThreshold;
+
+    if (broken) {
+      await effect.delete();
+    } else {
+      await effect.update({ 'system.breakProgress': newProgress });
+    }
+    await breakRoll.toMessage({
+      speaker, ...msgOpts,
+      flavor: `${typeName} — ${game.i18n.localize('ASPECTSOFPOWER.Debuff.breakRoll')} (${breakLabel}) [${Math.round(newProgress)} / ${breakThreshold}]`,
+    });
+    ChatMessage.create({
+      speaker, ...msgOpts,
+      content: broken
+        ? `<p><strong>${this.name}</strong> ${game.i18n.localize('ASPECTSOFPOWER.Debuff.broke')} <strong>${typeName}</strong>!</p>`
+        : `<p><strong>${this.name}</strong> ${game.i18n.localize('ASPECTSOFPOWER.Debuff.failedBreak')} <strong>${typeName}</strong>.</p>`,
+    });
+
+    return { broken, statMod, newProgress, breakThreshold };
   }
 
   /**
