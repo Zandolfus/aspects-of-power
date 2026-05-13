@@ -1070,6 +1070,10 @@ export class AspectsofPowerActorSheet extends foundry.applications.api.Handlebar
         duration = `${remaining} rnd${remaining !== 1 ? 's' : ''} left`;
       }
 
+      const roundsAfflicted = sys.roundsAfflicted ?? 0;
+      const yieldPerRound = CONFIG.ASPECTSOFPOWER.celerity?.BREAK_FREE_YIELD_PER_ROUND ?? 0.25;
+      const momentum = 1 + (roundsAfflicted * yieldPerRound);
+
       debuffs.push({
         id: effect.id,
         parent: effect.parent,
@@ -1081,6 +1085,8 @@ export class AspectsofPowerActorSheet extends foundry.applications.api.Handlebar
         breakStatLabel,
         breakProgress: sys.breakProgress ?? 0,
         breakThreshold,
+        roundsAfflicted,
+        momentum: momentum.toFixed(2),
         dot: sys.dot ?? false,
         dotDamage: sys.dotDamage ?? 0,
         dotType: sys.dotDamageType ?? 'physical',

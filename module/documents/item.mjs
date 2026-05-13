@@ -1835,7 +1835,11 @@ export class AspectsofPowerItem extends Item {
             const incomingDebuffDmg = incomingSys.debuffDamage ?? 0;
             const newDebuffDamage = existingDebuffDmg + incomingDebuffDmg;
 
-            const systemUpdate = { debuffDamage: newDebuffDamage, breakProgress: 0 };
+            // Re-application resets roundsAfflicted to 0 — the caster's
+            // fresh affliction overwhelms whatever momentum the target
+            // had built toward breaking free. Per design-movement-modes
+            // (break-free momentum scaling).
+            const systemUpdate = { debuffDamage: newDebuffDamage, breakProgress: 0, roundsAfflicted: 0 };
 
             if (incomingSys.dot) {
               const existingDot = existingSys.dotDamage ?? 0;

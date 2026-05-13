@@ -18,6 +18,7 @@ export class AopEffectData extends foundry.data.ActiveEffectTypeDataModel {
       debuffType:       new fields.StringField({ initial: 'none' }),
       debuffDamage:     new fields.NumberField({ initial: 0 }),      // roll total / break threshold
       breakProgress:    new fields.NumberField({ initial: 0 }),      // cumulative break progress
+      roundsAfflicted:  new fields.NumberField({ initial: 0, min: 0, integer: true }), // increments per round; scales break-roll yield; resets on re-apply
 
       // ── Damage over time ──
       dot:              new fields.BooleanField({ initial: false }),

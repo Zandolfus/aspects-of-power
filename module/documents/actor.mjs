@@ -795,6 +795,9 @@ export class AspectsofPowerActor extends Actor {
     // ── 4. Debuff Break Rolls ──
     // Per-debuff break-stat table now lives at CONFIG.ASPECTSOFPOWER.debuffBreakStats
     // (shared with the manual break-free flow). Auto-attempt each round.
+    // roundsAfflicted increments here (before the roll), so the round-0 attempt
+    // happens at 1× yield and subsequent rounds escalate. Caster must re-apply
+    // to reset the counter and keep the target on the slow grind.
     const TURN_SKIP_DEBUFFS = ['stun', 'paralysis', 'sleep', 'immobilized'];
 
     const typedDebuffs = this.effects.filter(e =>
@@ -807,6 +810,11 @@ export class AspectsofPowerActor extends Actor {
       if (!this.effects.has(effect.id)) continue;
       const debuffType = effect.system?.debuffType;
       const typeName = game.i18n.localize(CONFIG.ASPECTSOFPOWER.debuffTypes[debuffType] ?? debuffType);
+
+      // Increment counter BEFORE the auto-break attempt. The auto-roll at
+      // round N benefits from N rounds of accumulated struggle.
+      const prevRounds = effect.system?.roundsAfflicted ?? 0;
+      await effect.update({ 'system.roundsAfflicted': prevRounds + 1 });
 
       await this._attemptBreakRoll(effect, { whisper: !_isPC });
 
@@ -850,8 +858,15 @@ export class AspectsofPowerActor extends Actor {
 
     const breakRoll = new Roll('(1d20 / 100) * @mod + @mod', { mod: statMod });
     await breakRoll.evaluate();
+    // Yield scales with rounds afflicted (linear growth). Re-applying a
+    // non-stackable debuff resets roundsAfflicted to 0, putting the target
+    // back on the slow grind. Per design 2026-05-12.
+    const rounds = sys.roundsAfflicted ?? 0;
+    const yieldPerRound = CONFIG.ASPECTSOFPOWER.celerity?.BREAK_FREE_YIELD_PER_ROUND ?? 0.25;
+    const yieldMult = 1 + (rounds * yieldPerRound);
+    const yieldedProgress = breakRoll.total * yieldMult;
     const previousProgress = sys.breakProgress ?? 0;
-    const newProgress = previousProgress + breakRoll.total;
+    const newProgress = previousProgress + yieldedProgress;
 
     const speaker = ChatMessage.getSpeaker({ actor: this });
     const msgOpts = whisper ? { whisper: ChatMessage.getWhisperRecipients('GM') } : {};
@@ -862,9 +877,12 @@ export class AspectsofPowerActor extends Actor {
     } else {
       await effect.update({ 'system.breakProgress': newProgress });
     }
+    const momentumNote = yieldMult > 1
+      ? ` ×${yieldMult.toFixed(2)} momentum (round ${rounds})`
+      : '';
     await breakRoll.toMessage({
       speaker, ...msgOpts,
-      flavor: `${typeName} — ${game.i18n.localize('ASPECTSOFPOWER.Debuff.breakRoll')} (${breakLabel}) [${Math.round(newProgress)} / ${breakThreshold}]`,
+      flavor: `${typeName} — ${game.i18n.localize('ASPECTSOFPOWER.Debuff.breakRoll')} (${breakLabel}) [${Math.round(newProgress)} / ${breakThreshold}]${momentumNote}`,
     });
     ChatMessage.create({
       speaker, ...msgOpts,

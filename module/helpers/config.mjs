@@ -249,6 +249,12 @@ ASPECTSOFPOWER.celerity = {
   // Speed stat = the relevant break stat for the targeted debuff (see
   // debuffBreakStats below).
   BREAK_FREE_WEIGHT: 100,
+  // Break-roll yield multiplier per round afflicted (linear growth):
+  //   yieldMult = 1 + (roundsAfflicted × BREAK_FREE_YIELD_PER_ROUND)
+  // Round 0 = 1×. Round 4 = 2×. Round 8 = 3×. Round 12 = 4×. Etc.
+  // Re-applying a non-stackable debuff resets the counter to 0. Caster
+  // must keep afflicting to keep the target on the slow grind.
+  BREAK_FREE_YIELD_PER_ROUND: 0.25,
 };
 
 /**

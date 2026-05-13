@@ -1,3 +1,68 @@
+{{!-- Debuffs Section — combat-relevant; promoted to top of effects panel --}}
+{{#if @root.debuffs.length}}
+<div class="debuffs-section">
+  <h3 class="debuffs-header">Active Debuffs</h3>
+  {{#each @root.debuffs as |debuff|}}
+    <div class="debuff-card" data-effect-id="{{debuff.id}}" data-parent-id="{{debuff.parent.id}}">
+      <div class="debuff-card-header">
+        <img src="{{debuff.img}}" width="20" height="20"/>
+        <span class="debuff-card-name">{{debuff.name}}</span>
+        <span class="debuff-type-badge">{{debuff.typeLabel}}</span>
+        <div class="debuff-card-controls">
+          <a class="effect-control" data-action="delete" title="Remove"><i class="fas fa-trash"></i></a>
+        </div>
+      </div>
+      <div class="debuff-card-body">
+        {{#if debuff.rollTotal}}
+          <div class="debuff-field">
+            <label>Roll</label>
+            <span>{{debuff.rollTotal}}</span>
+          </div>
+        {{/if}}
+        {{#if debuff.breakStat}}
+          <div class="debuff-field">
+            <label>Break</label>
+            <span class="break-value">{{debuff.breakProgress}} / {{debuff.breakThreshold}}</span>
+            <span class="break-stat-label">({{debuff.breakStatLabel}})</span>
+          </div>
+          {{#if debuff.roundsAfflicted}}
+          <div class="debuff-field">
+            <label>Momentum</label>
+            <span>×{{debuff.momentum}} (round {{debuff.roundsAfflicted}})</span>
+          </div>
+          {{/if}}
+        {{/if}}
+        {{#if debuff.dot}}
+          <div class="debuff-field dot-field">
+            <label>DoT</label>
+            <span>{{debuff.dotDamage}} {{debuff.dotType}}/rnd</span>
+          </div>
+        {{/if}}
+        {{#if debuff.duration}}
+          <div class="debuff-field">
+            <label>Duration</label>
+            <span>{{debuff.duration}}</span>
+          </div>
+        {{/if}}
+        {{#if debuff.statChanges.length}}
+          <div class="debuff-field">
+            <label>Stats</label>
+            <span>{{debuff.statSummary}}</span>
+          </div>
+        {{/if}}
+        {{#if debuff.breakStat}}
+          <button type="button" class="break-free-btn" data-effect-id="{{debuff.id}}"
+                  data-break-stat="{{debuff.breakStat}}" data-threshold="{{debuff.breakThreshold}}"
+                  title="Declare a celerity break-free attempt">
+            <i class="fas fa-fist-raised"></i> Break Free
+          </button>
+        {{/if}}
+      </div>
+    </div>
+  {{/each}}
+</div>
+{{/if}}
+
 <ol class="items-list effects-list">
   {{#each effects as |section sid|}}
     <li class="items-header flexrow" data-effect-type="{{section.type}}" data-parent-id="{{@root.actor.id}}" >
@@ -37,62 +102,3 @@
     </ol>
   {{/each}}
 </ol>
-
-{{!-- Debuffs Section — separate display with combat-relevant info --}}
-{{#if @root.debuffs.length}}
-<div class="debuffs-section">
-  <h3 class="debuffs-header">Active Debuffs</h3>
-  {{#each @root.debuffs as |debuff|}}
-    <div class="debuff-card" data-effect-id="{{debuff.id}}" data-parent-id="{{debuff.parent.id}}">
-      <div class="debuff-card-header">
-        <img src="{{debuff.img}}" width="20" height="20"/>
-        <span class="debuff-card-name">{{debuff.name}}</span>
-        <span class="debuff-type-badge">{{debuff.typeLabel}}</span>
-        <div class="debuff-card-controls">
-          <a class="effect-control" data-action="delete" title="Remove"><i class="fas fa-trash"></i></a>
-        </div>
-      </div>
-      <div class="debuff-card-body">
-        {{#if debuff.rollTotal}}
-          <div class="debuff-field">
-            <label>Roll</label>
-            <span>{{debuff.rollTotal}}</span>
-          </div>
-        {{/if}}
-        {{#if debuff.breakStat}}
-          <div class="debuff-field">
-            <label>Break</label>
-            <span class="break-value">{{debuff.breakProgress}} / {{debuff.breakThreshold}}</span>
-            <span class="break-stat-label">({{debuff.breakStatLabel}})</span>
-          </div>
-        {{/if}}
-        {{#if debuff.dot}}
-          <div class="debuff-field dot-field">
-            <label>DoT</label>
-            <span>{{debuff.dotDamage}} {{debuff.dotType}}/rnd</span>
-          </div>
-        {{/if}}
-        {{#if debuff.duration}}
-          <div class="debuff-field">
-            <label>Duration</label>
-            <span>{{debuff.duration}}</span>
-          </div>
-        {{/if}}
-        {{#if debuff.statChanges.length}}
-          <div class="debuff-field">
-            <label>Stats</label>
-            <span>{{debuff.statSummary}}</span>
-          </div>
-        {{/if}}
-        {{#if debuff.breakStat}}
-          <button type="button" class="break-free-btn" data-effect-id="{{debuff.id}}"
-                  data-break-stat="{{debuff.breakStat}}" data-threshold="{{debuff.breakThreshold}}"
-                  title="Spend an action to attempt breaking free">
-            <i class="fas fa-fist-raised"></i> Break Free
-          </button>
-        {{/if}}
-      </div>
-    </div>
-  {{/each}}
-</div>
-{{/if}}
