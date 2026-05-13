@@ -1,4 +1,15 @@
-import { declareMovement } from '../systems/celerity.mjs';
+import { declareMovement, resolveMovementMode } from '../systems/celerity.mjs';
+
+/**
+ * Read the current Shift-key state from Foundry's keyboard manager. Used
+ * to pick movement mode at drag-release / WASD-press time. Returns false
+ * if the keyboard manager is not yet available (system init order).
+ */
+function _isShiftHeld() {
+  const dk = game.keyboard?.downKeys;
+  if (!dk) return false;
+  return dk.has('ShiftLeft') || dk.has('ShiftRight') || dk.has('Shift');
+}
 
 /**
  * Extended TokenDocument for Aspects of Power.
@@ -11,61 +22,31 @@ export class AspectsofPowerToken extends foundry.documents.TokenDocument {
   /*  Movement Enforcement                        */
   /* -------------------------------------------- */
 
-  /** Cumulative distance within the current action segment. @type {Map<string, number>} */
-  static _segmentMovement = new Map();
-
-  /** Skill-actions used this turn. @type {Map<string, number>} */
+  /**
+   * Per-turn action counter, still used by the break-free flow in
+   * actor-sheet.mjs to gate break attempts. The pre-celerity 3-action
+   * paradigm no longer drives movement (movement is its own celerity
+   * action now), but break-free hasn't been re-costed under celerity yet
+   * — see MEMORY.md "Break-free re-costing under celerity".
+   * @type {Map<string, number>}
+   */
   static _moveActionTracker = new Map();
 
-  /** Accumulated stamina cost not yet committed to the database. @type {Map<string, number>} */
-  static _pendingStaminaCost = new Map();
-
-  /** Clear all movement trackers (called on turn change). Flushes pending stamina first. */
+  /** Clear all movement trackers (called on turn change). */
   static clearTrackers() {
-    this.flushStamina();
-    this._segmentMovement.clear();
     this._moveActionTracker.clear();
   }
 
   /**
-   * Consume an action for a combatant and reset their movement segment.
-   * Flushes pending stamina before resetting.
+   * Consume an action for a combatant. Returns the new count. Used by the
+   * break-free flow as a per-turn gate; movement-as-action no longer reads it.
    * @param {string} combatantId
-   * @returns {number} New action count.
+   * @returns {number}
    */
   static consumeAction(combatantId) {
-    this.flushStamina();
     const used = (this._moveActionTracker.get(combatantId) ?? 0) + 1;
     this._moveActionTracker.set(combatantId, used);
-    this._segmentMovement.set(combatantId, 0);
     return used;
-  }
-
-  /**
-   * Persist pending stamina costs to the database and post chat messages.
-   * In-memory values are already correct — this syncs the database + other clients.
-   * Called on turn change, skill use, or any other boundary event.
-   */
-  static async flushStamina() {
-    if (!this._pendingStaminaCost.size) return;
-
-    for (const [actorId, cost] of this._pendingStaminaCost) {
-      if (cost <= 0) continue;
-      const actor = game.actors.get(actorId);
-      if (!actor) continue;
-
-      // In-memory value already subtracted — just persist it.
-      await actor.update({ 'system.stamina.value': actor.system.stamina.value });
-
-      const _isPC = game.users.some(u => !u.isGM && u.active && u.character?.id === actor.id);
-      const whisper = _isPC ? {} : { whisper: ChatMessage.getWhisperRecipients('GM') };
-      ChatMessage.create({
-        speaker: ChatMessage.getSpeaker({ actor }),
-        ...whisper,
-        content: `<p><em>${actor.name} spent ${cost} stamina on movement (${actor.system.stamina.value}/${actor.system.stamina.max})</em></p>`,
-      });
-    }
-    this._pendingStaminaCost.clear();
   }
 
   /* -------------------------------------------- */
@@ -128,17 +109,25 @@ export class AspectsofPowerToken extends foundry.documents.TokenDocument {
       }).catch(err => console.warn('[celerity] override-clear failed:', err));
     }
 
-    // Stamina cost from Foundry's movement-cost calculator.
-    const staminaCost = Math.round((movement.passed?.cost ?? 0) + (movement.pending?.cost ?? 0));
+    // Stamina cost from Foundry's movement-cost calculator (anchored to
+    // Sprint = today's rate). Scaled by mode (Walk = 0.5×, Sprint = 1×)
+    // and then by encumbrance ratio (1 + carryWeight/carryCapacity) per
+    // design-movement-modes.md. No clamp — over-cap actors pay proportional cost.
+    const rawStaminaCost = (movement.passed?.cost ?? 0) + (movement.pending?.cost ?? 0);
+    const mode = resolveMovementMode(_isShiftHeld() ? 'sprint' : 'walk');
+    const carryRatio = Math.max(0, actor.system.carryRatio ?? 0);
+    const encumbranceMult = 1 + carryRatio;
+    const staminaCost = Math.round(rawStaminaCost * mode.staminaMult * encumbranceMult);
     if (staminaCost > actor.system.stamina.value) {
       ui.notifications.warn(`${actor.name}: insufficient stamina (${actor.system.stamina.value}/${staminaCost} needed).`);
       return false;
     }
 
-    // Distance traveled (snapped to grid) drives celerity wait.
+    // Distance traveled drives celerity wait. Gridless scene → continuous
+    // feet; round to whole feet for cost-math + display, no 5-ft snap.
     const moveDist = (movement.passed?.distance ?? 0) + (movement.pending?.distance ?? 0);
-    const moveSnapped = Math.round(moveDist / 5) * 5;
-    if (moveSnapped <= 0) return; // zero-distance update (e.g., elevation only) — let through
+    const moveFt = Math.round(moveDist);
+    if (moveFt <= 0) return; // zero-distance update (e.g., elevation only) — let through
 
     // Resolve start + end canvas coordinates. Start = current document
     // position (token hasn't moved yet); end = movement.destination if
@@ -173,7 +162,7 @@ export class AspectsofPowerToken extends foundry.documents.TokenDocument {
     // Declare on the celerity stack. The `await` runs async after we return
     // false; that's fine — the cancellation is synchronous, the declaration
     // can settle on its own.
-    declareMovement(actor, startPos, endPos, moveSnapped, staminaCost).catch(err => {
+    declareMovement(actor, startPos, endPos, moveFt, staminaCost, mode.key).catch(err => {
       console.error('declareMovement failed:', err);
     });
 
@@ -204,23 +193,5 @@ export class AspectsofPowerToken extends foundry.documents.TokenDocument {
     return actor.effects.find(e =>
       !e.disabled && blockTypes.includes(e.system?.debuffType)
     );
-  }
-
-  _getMovementRanges(actor) {
-    let walkRange = actor.system.walkRange ?? 0;
-    let sprintRange = actor.system.sprintRange ?? 0;
-
-    const chilledEffect = actor.effects.find(e =>
-      !e.disabled && e.system?.debuffType === 'chilled'
-    );
-    if (chilledEffect) {
-      const debuffRoll   = chilledEffect.system?.debuffDamage ?? 0;
-      const enduranceMod = actor.system.abilities?.endurance?.mod ?? 0;
-      const reduction    = Math.max(0, debuffRoll - enduranceMod);
-      walkRange   = Math.max(0, walkRange - reduction);
-      sprintRange = Math.max(0, sprintRange - reduction);
-    }
-
-    return { walkRange, sprintRange };
   }
 }

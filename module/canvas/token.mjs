@@ -1,19 +1,34 @@
 /**
  * Extended canvas Token for Aspects of Power.
- * Overrides the movement cost function to integrate stamina costs
- * with Foundry's native ruler and movement system.
+ *
+ * Overrides Foundry's movement-cost function so the ruler-preview shows
+ * the same stamina cost the celerity declare path will actually charge.
+ *
+ * Cost model (post-2026-05-12 modes ship):
+ *   stamina_per_ft = 0.2 × mode.staminaMult × (1 + carryRatio)
+ *
+ * Where 0.2 stamina/ft = 1 stamina per 5ft is the baseline sprint anchor.
+ * Walk halves this; encumbrance scales proportionally. No hard distance
+ * cap — movement is one action no matter how long, paid in celerity ticks
+ * at declare time. Gridless: continuous feet, no zone split.
+ *
  * @extends {foundry.canvas.placeables.Token}
  */
+import { resolveMovementMode } from '../systems/celerity.mjs';
+
+function _isShiftHeld() {
+  const dk = game.keyboard?.downKeys;
+  if (!dk) return false;
+  return dk.has('ShiftLeft') || dk.has('ShiftRight') || dk.has('Shift');
+}
+
 export class AspectsofPowerTokenObject extends foundry.canvas.placeables.Token {
 
   /**
-   * Override the movement cost function to use the system's stamina model.
-   * Walk zone: 1 stamina per grid unit of distance.
-   * Sprint zone: 3 stamina per grid unit of distance.
-   * Beyond sprint range: Infinity (blocked).
-   *
-   * The function is called per grid cell along the path, so we use a closure
-   * to track cumulative distance and switch from walk to sprint costs.
+   * Override the movement cost function so Foundry's ruler-preview shows
+   * the same stamina the celerity declare-path will actually charge on
+   * commit. Mode picked from current Shift state — drag-preview updates
+   * live as the player presses/releases Shift.
    *
    * @param {object} options
    * @returns {Function} Cost function: (from, to, distance, segment) => cost
@@ -22,71 +37,24 @@ export class AspectsofPowerTokenObject extends foundry.canvas.placeables.Token {
     const actor = this.document.actor;
     if (!actor?.system) return super._getMovementCostFunction(options);
 
-    // No combat or GM using unconstrained movement — use default cost.
+    // Out of combat — fall back to Foundry's default cost (distance).
     const combat = game.combat;
     if (!combat?.started) return super._getMovementCostFunction(options);
 
-    const TokenClass = CONFIG.Token.documentClass;
-
-    // Get combatant for this token.
-    const combatant = combat.combatants.find(
-      c => c.tokenId === this.document.id && c.sceneId === this.document.parent?.id
-    );
-    if (!combatant) return super._getMovementCostFunction(options);
-
-    // Get movement ranges (with chilled reduction from TokenDocument).
-    let walkRange = actor.system.walkRange ?? 35;
-    let sprintRange = actor.system.sprintRange ?? 70;
-
-    // Apply chilled reduction.
-    const chilledEffect = actor.effects.find(e =>
-      !e.disabled && e.system?.debuffType === 'chilled'
-    );
-    if (chilledEffect) {
-      const debuffRoll = chilledEffect.system?.debuffDamage ?? 0;
-      const enduranceMod = actor.system.abilities?.endurance?.mod ?? 0;
-      const reduction = Math.max(0, debuffRoll - enduranceMod);
-      walkRange = Math.max(0, walkRange - reduction);
-      sprintRange = Math.max(0, sprintRange - reduction);
-    }
-
-    // Get the cumulative distance already moved this segment.
-    const segmentSoFar = TokenClass._segmentMovement?.get(combatant.id) ?? 0;
-
-    // Get terrain cost function for stacking with difficult terrain.
+    // Stack any difficult-terrain modifier on top of our per-ft rate.
     const terrainCostFn = CONFIG.Token.movement.TerrainData.getMovementCostFunction(this.document, options);
 
-    // Accumulated distance and actions within this cost function evaluation.
-    let accumulated = segmentSoFar;
-    let actions = TokenClass._moveActionTracker?.get(combatant.id) ?? 0;
-
     return (from, to, distance, segment) => {
-      // Apply terrain modifiers first (e.g., difficult terrain doubles distance).
-      const terrainCost = terrainCostFn(from, to, distance, segment);
-
-      // Check if this step would exceed sprint range — if so, consume an action and reset.
-      if (accumulated + terrainCost > sprintRange) {
-        actions++;
-        if (actions >= 3) return Infinity; // No more actions available.
-        accumulated = 0; // Reset segment for the new action.
-      }
-
-      // Determine stamina cost based on walk/sprint zone.
-      let staminaCost = 0;
-      const startDist = accumulated;
-      accumulated += terrainCost;
-
-      // Calculate per-unit cost stepping through walk → sprint threshold.
-      for (let ft = startDist + 5; ft <= accumulated; ft += 5) {
-        staminaCost += (ft <= walkRange) ? 1 : 3;
-      }
-
-      // Handle partial steps (if terrainCost isn't a multiple of 5).
-      if (staminaCost === 0 && terrainCost > 0) {
-        staminaCost = (accumulated <= walkRange) ? 1 : 3;
-      }
-
-      return staminaCost;
+      // Terrain modifies the effective distance (difficult terrain = ×2).
+      const effectiveDist = terrainCostFn(from, to, distance, segment);
+      // Pick mode + encumbrance live from current state. The ruler refreshes
+      // continuously during drag, so Shift toggles and item-weight changes
+      // are reflected immediately.
+      const mode = resolveMovementMode(_isShiftHeld() ? 'sprint' : 'walk');
+      const carryRatio = Math.max(0, actor.system.carryRatio ?? 0);
+      const encumbranceMult = 1 + carryRatio;
+      // Sprint baseline: 1 stamina per 5ft = 0.2 stamina/ft.
+      return effectiveDist * 0.2 * mode.staminaMult * encumbranceMult;
     };
   }
 }

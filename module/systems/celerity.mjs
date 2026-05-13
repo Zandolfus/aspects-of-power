@@ -420,18 +420,36 @@ export const runRoundEnd = runRoundStart;
 export const MOVEMENT_ITEM_ID = '__movement__';
 
 /**
+ * Resolve a movement mode key (or unknown input) to a valid mode config
+ * from CONFIG.ASPECTSOFPOWER.celerity.MOVEMENT_MODES. Falls back to the
+ * configured default ('walk').
+ *
+ * @param {string} [modeKey]
+ * @returns {{key:string, celerityMult:number, staminaMult:number, label:string}}
+ */
+export function resolveMovementMode(modeKey) {
+  const sc = CONFIG.ASPECTSOFPOWER.celerity;
+  const modes = sc.MOVEMENT_MODES ?? {};
+  const defaultKey = sc.DEFAULT_MOVEMENT_MODE ?? 'walk';
+  const key = modes[modeKey] ? modeKey : defaultKey;
+  return { key, ...modes[key] };
+}
+
+/**
  * Compute movement wait in ticks for `distanceFt` traveled by `actor`.
- *   wait = (distanceFt / 5) × MOVEMENT_BASE_WEIGHT_PER_5FT × SCALE / dex.mod
+ *   wait = (distanceFt / 5) × MOVEMENT_BASE_WEIGHT_PER_5FT × mode.celerityMult × SCALE / dex.mod
  *
  * @param {Actor}  actor
  * @param {number} distanceFt
+ * @param {string} [mode]  Movement mode key ('walk' | 'sprint'); defaults to walk.
  * @returns {number} wait in ticks (min 1)
  */
-export function computeMovementWait(actor, distanceFt) {
+export function computeMovementWait(actor, distanceFt, mode) {
   const sc = CONFIG.ASPECTSOFPOWER.celerity;
   const moveBaseWeight = sc.MOVEMENT_BASE_WEIGHT_PER_5FT ?? 10;
   const dexMod = Math.max(1, actor.system.abilities?.dexterity?.mod ?? 0);
-  return Math.max(1, Math.round((distanceFt / 5) * moveBaseWeight * sc.SCALE / dexMod));
+  const m = resolveMovementMode(mode);
+  return Math.max(1, Math.round((distanceFt / 5) * moveBaseWeight * m.celerityMult * sc.SCALE / dexMod));
 }
 
 /**
@@ -472,18 +490,20 @@ export function interpolateMovementPosition(mv, currentTick) {
  * @param {{x:number, y:number}} startPos   Token's current canvas position
  * @param {{x:number, y:number}} endPos     Intended destination
  * @param {number} distanceFt               Distance for cost / wait math
- * @param {number} staminaCost              Stamina to debit at execute time
+ * @param {number} staminaCost              Stamina to debit at execute time (mode-scaled by caller)
+ * @param {string} [mode]                   Movement mode key ('walk' | 'sprint'); defaults to walk.
  * @returns {Promise<{wait, scheduledTick}|null>}
  */
-export async function declareMovement(actor, startPos, endPos, distanceFt, staminaCost) {
+export async function declareMovement(actor, startPos, endPos, distanceFt, staminaCost, mode) {
   const combatant = findCombatantForActor(actor);
   if (!combatant) return null;
   if (distanceFt <= 0) return null;
 
-  const wait = computeMovementWait(actor, distanceFt);
+  const m = resolveMovementMode(mode);
+  const wait = computeMovementWait(actor, distanceFt, m.key);
   const clockTick = getClockTick(combatant.combat);
   const scheduledTick = clockTick + wait;
-  const label = `Move ${distanceFt}ft`;
+  const label = `Move ${distanceFt}ft (${m.label})`;
 
   await combatant.update({
     'flags.aspectsofpower.declaredAction': {
@@ -496,6 +516,7 @@ export async function declareMovement(actor, startPos, endPos, distanceFt, stami
       endPos,
       staminaCost,
       distanceFt,
+      movementMode: m.key,
     },
     'flags.aspectsofpower.nextActionTick': scheduledTick,
     'flags.aspectsofpower.lastActionWait': wait,

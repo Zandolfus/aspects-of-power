@@ -4169,10 +4169,6 @@ export class AspectsofPowerItem extends Item {
       }
     }
 
-    // Flush any pending stamina costs from movement so resource checks are accurate.
-    const TokenClass = CONFIG.Token.documentClass;
-    if (TokenClass?.flushStamina) await TokenClass.flushStamina();
-
     // Melee reach gate: skip the cast if any selected target is beyond reach.
     // Skipped at fire time (preInvestAmount supplied) since the player already
     // committed at declare time and the target may have moved harmlessly since.

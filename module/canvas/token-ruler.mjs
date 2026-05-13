@@ -1,8 +1,19 @@
 /**
  * Extended TokenRuler for Aspects of Power.
- * Shows stamina cost on waypoint labels during movement.
+ *
+ * Waypoint label shows the current movement mode + cumulative stamina
+ * cost during drag-preview. Post-2026-05-12: no more 3-action gate, no
+ * walk/sprint zone split — single rate per mode, ruler updates live as
+ * Shift state toggles.
+ *
  * @extends {foundry.canvas.placeables.tokens.TokenRuler}
  */
+function _isShiftHeld() {
+  const dk = game.keyboard?.downKeys;
+  if (!dk) return false;
+  return dk.has('ShiftLeft') || dk.has('ShiftRight') || dk.has('Shift');
+}
+
 export class AspectsofPowerTokenRuler extends foundry.canvas.placeables.tokens.TokenRuler {
 
   static WAYPOINT_LABEL_TEMPLATE = 'systems/aspects-of-power/templates/hud/token-ruler-waypoint-label.hbs';
@@ -21,27 +32,13 @@ export class AspectsofPowerTokenRuler extends foundry.canvas.placeables.tokens.T
       return context;
     }
 
-    // The cost is already in stamina (from our _getMovementCostFunction).
     const cost = waypoint.measurement?.cost ?? 0;
-    const sprintRange = actor.system.sprintRange ?? 0;
-    const TokenClass = CONFIG.Token.documentClass;
-    const combatant = combat.combatants.find(
-      c => c.tokenId === this.token.document.id && c.sceneId === this.token.document.parent?.id
-    );
-    const segmentSoFar = combatant ? (TokenClass._segmentMovement?.get(combatant.id) ?? 0) : 0;
-    const actionsUsed = combatant ? (TokenClass._moveActionTracker?.get(combatant.id) ?? 0) : 0;
-    const distanceMoved = waypoint.measurement?.distance ?? 0;
-    const totalDist = segmentSoFar + distanceMoved;
-    const actionsFromMove = Math.floor(totalDist / sprintRange);
-    const currentAction = actionsUsed + actionsFromMove + 1;
-    const distInSegment = totalDist % sprintRange;
-    const remaining = Math.max(0, Math.round(sprintRange - distInSegment));
+    const mode = _isShiftHeld() ? 'sprint' : 'walk';
 
     context.stamina = {
       display: true,
       cost: isFinite(cost) ? Math.round(cost) : '---',
-      remaining,
-      action: Math.min(currentAction, 3),
+      mode,
     };
 
     return context;

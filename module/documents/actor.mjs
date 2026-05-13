@@ -327,13 +327,21 @@ export class AspectsofPowerActor extends Actor {
     systemData.sprintRange  = 2 * systemData.walkRange;
 
     // --- Carrying capacity ---
-    systemData.carryCapacity = Math.round(50 + systemData.abilities.strength.mod + systemData.abilities.endurance.mod * 0.5);
+    // Per design-movement-modes.md (decision locked 2026-05-08): Str is the
+    // carry stat. The flat +50 baseline and End's half-credit are gone;
+    // proportional stamina-cost-by-encumbrance (token._preUpdateMovement)
+    // handles the low-level "instantly overloaded" feel that +50 papered over.
+    systemData.carryCapacity = Math.max(1, Math.round(systemData.abilities.strength.mod * 2.5));
     systemData.carryWeight = 0;
     for (const item of this.items) {
       systemData.carryWeight += (item.system.weight ?? 0) * (item.system.quantity ?? 1);
     }
     systemData.carryWeight = Math.round(systemData.carryWeight * 10) / 10;
     systemData.encumbered = systemData.carryWeight > systemData.carryCapacity;
+    // Continuous encumbrance ratio (0 = empty, 1 = at cap, >1 = over-cap).
+    // No cliff: every pound matters. Drives the per-ft stamina multiplier
+    // applied in token._preUpdateMovement.
+    systemData.carryRatio = systemData.carryWeight / systemData.carryCapacity;
 
     // --- Barrier: aggregate from ActiveEffects ---
     // Find the active barrier effect and populate system.barrier for the sheet.

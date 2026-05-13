@@ -219,10 +219,22 @@ ASPECTSOFPOWER.celerity = {
   // Universal across tiers per design 2026-05-06 — Wand stays the speed
   // king on Basic; Orb is the mana-economy alternative.
   ORB_DISCHARGE_THRESHOLD: 400,
-  // Placeholder per design-celerity.md open item #4 — exact movement weights
-  // for step/walk/sprint/dash still TBD. For now: linear cost per 5ft moved,
-  // divided by dex.mod for speed scaling.
+  // Base movement weight per 5ft. Multiplied by the selected mode's
+  // `celerityMult` (see MOVEMENT_MODES below). Sprint = 1× baseline (this
+  // value), Walk = 2× (slower per ft).
   MOVEMENT_BASE_WEIGHT_PER_5FT: 10,
+  // Movement modes per design-movement-modes.md. Sprint = today's rate
+  // (anchor); Walk halves both speed and stamina cost. Default is Walk.
+  // Selected via Shift modifier during drag / WASD.
+  MOVEMENT_MODES: {
+    walk:   { celerityMult: 2.0, staminaMult: 0.5, label: 'walk'   },
+    sprint: { celerityMult: 1.0, staminaMult: 1.0, label: 'sprint' },
+  },
+  DEFAULT_MOVEMENT_MODE: 'walk',
+  // Walk-mode bonus to the relevant defense roll when triggering terrain
+  // effects (regions that declare a `targetStat`). +25% of the actor's
+  // mod for that stat is added to the roll. Per design-movement-modes.md.
+  WALK_TERRAIN_BONUS_FRACTION: 0.25,
   // Channel rate factor — per the Wis-controlled-channel design, channeling
   // mana costs additional celerity time:
   //   channel_ticks = invested × CHANNEL_FACTOR / Wis_mod

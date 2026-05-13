@@ -113,8 +113,9 @@ function _refreshOverlayNow() {
   }
 }
 
-/** Buffered (pre-commit) staging line in yellow. Dashed line + open circle
- *  at destination + ft label. Distinct from the blue/red declared lines. */
+/** Buffered (pre-commit) staging line. Yellow for walk-buffer, orange for
+ *  sprint-buffer. Dashed line + open circle + ft label + mode tag. Distinct
+ *  from the blue/red declared (committed) lines. */
 function _buildBufferGraphic(tokenDoc, buf) {
   const gfx = new PIXI.Graphics();
   gfx.eventMode = 'none';
@@ -128,10 +129,11 @@ function _buildBufferGraphic(tokenDoc, buf) {
   const dx = ex - sx, dy = ey - sy;
   const len = Math.hypot(dx, dy);
   if (len <= 1) return null;
-  const color = 0xffcc33; // yellow — pre-commit
+  const isSprint = buf.mode === 'sprint';
+  const color = isSprint ? 0xff8833 : 0xffcc33; // orange = sprint, yellow = walk
   const alpha = 0.95;
   _drawDashedLine(gfx, sx, sy, ex, ey, color, alpha);
-  // Open circle at destination (filled white center, yellow border).
+  // Open circle at destination (filled white center, mode-tinted border).
   if (typeof gfx.drawCircle === 'function') {
     gfx.beginFill(0xffffff, 0.6);
     gfx.lineStyle(2, color, 1.0);
@@ -142,10 +144,10 @@ function _buildBufferGraphic(tokenDoc, buf) {
     gfx.fill({ color: 0xffffff, alpha: 0.6 });
     gfx.stroke({ color, alpha: 1.0, width: 2 });
   }
-  // Distance label as a PIXI Text near the destination.
-  const label = new PIXI.Text(`${buf.totalDistFt}ft (Enter to commit)`, {
+  // Distance + mode label near the destination.
+  const label = new PIXI.Text(`${buf.totalDistFt}ft ${isSprint ? '(sprint)' : '(walk)'} — Enter to commit`, {
     fontSize: 12,
-    fill: 0xffcc33,
+    fill: color,
     stroke: 0x000000,
     strokeThickness: 3,
     fontWeight: 'bold',
@@ -190,9 +192,13 @@ function _buildPathGraphic(tokenDoc, mv, clockTick) {
   const ux = dx / len;
   const uy = dy / len;
 
-  // Color: blue tint for PC-owned, red tint for others (visible to GM).
+  // Color: PC vs NPC (blue/red base), brighter saturation for sprint.
+  // Walk paths are slightly desaturated to reinforce "the cautious mode".
   const isPC = tokenDoc.actor?.hasPlayerOwner === true;
-  const color = isPC ? 0x4488ff : 0xff5555;
+  const isSprint = mv.movementMode === 'sprint';
+  let color;
+  if (isPC) color = isSprint ? 0x55aaff : 0x4477cc;     // bright blue / muted blue
+  else      color = isSprint ? 0xff4444 : 0xcc6666;     // bright red / muted red
   const alpha = 0.85;
 
   // Dashed line (rendered as repeating segments).

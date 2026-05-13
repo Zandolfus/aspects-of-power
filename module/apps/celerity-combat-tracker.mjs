@@ -168,18 +168,25 @@ async function _onCelAdvance(event, target) {
         const truncStamina = mv.staminaCost ?? 0;
         const perFt = truncDistFt > 0 ? truncStamina / truncDistFt : 0;
         const remStamina = Math.max(0, Math.round(perFt * remainingFt));
-        autoResumes.push({ memberId: id, fromPos: mv.endPos, toPos: mv.originalEndPos, distFt: remainingFt, staminaCost: remStamina });
+        autoResumes.push({
+          memberId: id,
+          fromPos: mv.endPos,
+          toPos: mv.originalEndPos,
+          distFt: remainingFt,
+          staminaCost: remStamina,
+          mode: mv.movementMode,
+        });
       }
     }
   }
 
   // Re-queue resumed movements after the clock advance so they're
   // measured against newClock.
-  for (const { memberId, fromPos, toPos, distFt, staminaCost } of autoResumes) {
+  for (const { memberId, fromPos, toPos, distFt, staminaCost, mode } of autoResumes) {
     const member = combat.combatants.get(memberId);
     if (!member?.actor) continue;
     try {
-      await declareMovement(member.actor, fromPos, toPos, distFt, staminaCost);
+      await declareMovement(member.actor, fromPos, toPos, distFt, staminaCost, mode);
     } catch (e) {
       console.warn(`[celerity] auto-resume failed for ${member.name}:`, e);
     }

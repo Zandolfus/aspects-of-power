@@ -1688,6 +1688,29 @@ async function _triggerPersistentAoe(tokenDoc, force = false) {
 }
 
 /**
+ * Walk-mode terrain-resistance bonus per design-movement-modes.md. An actor
+ * with an in-flight Walk movement declaration gets +25% of their relevant
+ * stat's mod added to defense rolls vs terrain effects. Sprint movers and
+ * stationary tokens (no movement declared) get no bonus.
+ *
+ * @param {Actor}  targetActor
+ * @param {string} ability       e.g. 'dexterity', 'willpower'
+ * @returns {number}             flat bonus to add (rounded)
+ */
+function _walkTerrainBonus(targetActor, ability) {
+  const combat = game.combat;
+  if (!combat?.started) return 0;
+  const combatant = combat.combatants.find(c => c.actor?.id === targetActor?.id);
+  if (!combatant) return 0;
+  const decl = combatant.flags?.aspectsofpower?.declaredAction;
+  if (!decl || decl.itemId !== Celerity.MOVEMENT_ITEM_ID) return 0;
+  if (decl.movementMode !== 'walk') return 0;
+  const fraction = CONFIG.ASPECTSOFPOWER.celerity?.WALK_TERRAIN_BONUS_FRACTION ?? 0.25;
+  const mod = targetActor.system.abilities?.[ability]?.mod ?? 0;
+  return Math.round(mod * fraction);
+}
+
+/**
  * Mental-debuff per-tick resolution. Per design-aoe-dispatch.md:
  * mind/soul pools represent RESISTANCE (not avoidance). Each tick of a
  * persistent mental AOE depletes the target's relevant pool by the
@@ -1704,7 +1727,13 @@ async function _triggerPersistentAoe(tokenDoc, force = false) {
 async function _resolveMentalDebuffTick(targetActor, pd, flags, defenseKey, speaker) {
   const override = pd.tagConfig?.debuffPoolCost ?? 0;
   const derived = pd.hitTotal ?? pd.rollTotal ?? 0;
-  const cost = override > 0 ? override : derived;
+  const rawCost = override > 0 ? override : derived;
+  // Walk-mode terrain resistance applies to mental pool depletion too if
+  // tagConfig declares a `targetStat` for this region (e.g., willpower for
+  // hypnotic pattern). Reduces the per-tick cost by 0.25 × that stat's mod.
+  const targetStat = pd.tagConfig?.targetStat ?? null;
+  const walkReduction = targetStat ? _walkTerrainBonus(targetActor, targetStat) : 0;
+  const cost = Math.max(0, rawCost - walkReduction);
   const defense = targetActor.system.defense?.[defenseKey];
   if (!defense) return;
   const currentPool = defense.pool ?? 0;
@@ -1712,12 +1741,13 @@ async function _resolveMentalDebuffTick(targetActor, pd, flags, defenseKey, spea
   await targetActor.update({ [`system.defense.${defenseKey}.pool`]: newPool });
 
   const debuffType = pd.tagConfig.debuffType;
+  const walkNote = walkReduction > 0 ? ` (walking: -${walkReduction})` : '';
   if (newPool > 0) {
     // Pool absorbed it — debuff doesn't land yet.
     ChatMessage.create({
       whisper: ChatMessage.getWhisperRecipients('GM'),
       content: `<p><strong>${targetActor.name}</strong> resists <strong>${debuffType}</strong> from AOE — `
-             + `${defenseKey} pool ${currentPool} → ${newPool} (-${cost}).</p>`,
+             + `${defenseKey} pool ${currentPool} → ${newPool} (-${cost}${walkNote}).</p>`,
     });
     return;
   }
@@ -1775,11 +1805,15 @@ async function _resolvePhysicalDebuffTick(targetActor, pd, flags, rollTotal, spe
   const saveModel = pd.tagConfig?.saveModel ?? 'none';
   if (saveModel === 'perTick') {
     const ability = pd.tagConfig?.saveAbility ?? 'willpower';
-    const saveMod = targetActor.system.abilities?.[ability]?.mod ?? 0;
-    if (saveMod >= (pd.hitTotal ?? rollTotal)) {
+    const baseMod = targetActor.system.abilities?.[ability]?.mod ?? 0;
+    const walkBonus = _walkTerrainBonus(targetActor, ability);
+    const saveMod = baseMod + walkBonus;
+    const target = pd.hitTotal ?? rollTotal;
+    if (saveMod >= target) {
+      const walkNote = walkBonus > 0 ? ` (walking: +${walkBonus})` : '';
       ChatMessage.create({
         whisper: ChatMessage.getWhisperRecipients('GM'),
-        content: `<p><strong>${targetActor.name}</strong> resists <strong>${pd.tagConfig.debuffType}</strong> via ${ability} save (${saveMod} vs ${pd.hitTotal ?? rollTotal}).</p>`,
+        content: `<p><strong>${targetActor.name}</strong> resists <strong>${pd.tagConfig.debuffType}</strong> via ${ability} save (${saveMod}${walkNote} vs ${target}).</p>`,
       });
       return;
     }
