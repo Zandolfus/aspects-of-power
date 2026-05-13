@@ -53,8 +53,11 @@ export class AspectsofPowerTokenObject extends foundry.canvas.placeables.Token {
       const mode = resolveMovementMode(_isShiftHeld() ? 'sprint' : 'walk');
       const carryRatio = Math.max(0, actor.system.carryRatio ?? 0);
       const encumbranceMult = 1 + carryRatio;
+      // Active-effect-driven stamina multiplier (Stormstride efficiency,
+      // Exhaustion penalties). >1 = burns more, <1 = burns less. Default 1.
+      const staminaMult = Math.max(0, actor.system.movementStaminaMultiplier ?? 1);
       // Sprint baseline: 1 stamina per 5ft = 0.2 stamina/ft.
-      return effectiveDist * 0.2 * mode.staminaMult * encumbranceMult;
+      return effectiveDist * 0.2 * mode.staminaMult * encumbranceMult * staminaMult;
     };
   }
 }

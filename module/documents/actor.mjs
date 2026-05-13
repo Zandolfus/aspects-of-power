@@ -343,6 +343,26 @@ export class AspectsofPowerActor extends Actor {
     // applied in token._preUpdateMovement.
     systemData.carryRatio = systemData.carryWeight / systemData.carryCapacity;
 
+    // --- Movement multipliers from active effects ---
+    // Aggregate every non-disabled effect's movement multipliers
+    // (multiplicative composition). Stormstride / Haste boost speedMult
+    // above 1 (faster); Slow / Chilled drop it below 1. Stamina mult > 1
+    // means movement burns MORE stamina (debuff); < 1 = efficient (buff).
+    // Read by celerity.computeMovementWait and the cost function in
+    // canvas/token._getMovementCostFunction.
+    let _moveSpeed = 1;
+    let _moveStamina = 1;
+    for (const effect of this.effects) {
+      if (effect.disabled) continue;
+      const sys = effect.system;
+      const s = sys?.movementSpeedMultiplier ?? 1;
+      const t = sys?.movementStaminaMultiplier ?? 1;
+      if (s !== 1) _moveSpeed *= s;
+      if (t !== 1) _moveStamina *= t;
+    }
+    systemData.movementSpeedMultiplier = _moveSpeed;
+    systemData.movementStaminaMultiplier = _moveStamina;
+
     // --- Barrier: aggregate from ActiveEffects ---
     // Find the active barrier effect and populate system.barrier for the sheet.
     if (systemData.barrier) {

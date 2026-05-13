@@ -440,7 +440,11 @@ export function resolveMovementMode(modeKey) {
 
 /**
  * Compute movement wait in ticks for `distanceFt` traveled by `actor`.
- *   wait = (distanceFt / 5) × MOVEMENT_BASE_WEIGHT_PER_5FT × mode.celerityMult × SCALE / dex.mod
+ *   wait = (distanceFt / 5) × MOVEMENT_BASE_WEIGHT_PER_5FT × mode.celerityMult × SCALE / (dex.mod × movementSpeedMultiplier)
+ *
+ * Active-effect-driven movementSpeedMultiplier (Stormstride, Haste, Slow) is
+ * an additional divisor on the wait — > 1 = faster, < 1 = slower. Aggregated
+ * multiplicatively across non-disabled effects in actor.prepareDerivedData.
  *
  * @param {Actor}  actor
  * @param {number} distanceFt
@@ -452,7 +456,8 @@ export function computeMovementWait(actor, distanceFt, mode) {
   const moveBaseWeight = sc.MOVEMENT_BASE_WEIGHT_PER_5FT ?? 10;
   const dexMod = Math.max(1, actor.system.abilities?.dexterity?.mod ?? 0);
   const m = resolveMovementMode(mode);
-  return Math.max(1, Math.round((distanceFt / 5) * moveBaseWeight * m.celerityMult * sc.SCALE / dexMod));
+  const speedMult = Math.max(0.01, actor.system.movementSpeedMultiplier ?? 1);
+  return Math.max(1, Math.round((distanceFt / 5) * moveBaseWeight * m.celerityMult * sc.SCALE / (dexMod * speedMult)));
 }
 
 /**

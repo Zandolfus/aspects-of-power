@@ -499,6 +499,11 @@ ASPECTSOFPOWER.combatTags = {
   // Mine-pair (summon places, generic Detonate consumes any).
   mine:        'ASPECTSOFPOWER.Tag.mine',
   detonate:    'ASPECTSOFPOWER.Tag.detonate',
+  // Movement-skill family (Stormstride, Charge, Leap, Teleport, Blink, etc.).
+  // Marks any skill that affects or executes movement. Used for queryability
+  // ("dispel all movement buffs"), Mobility-aura stacking, and the
+  // movement-buff handler that applies system-field multipliers to effects.
+  movement:    'ASPECTSOFPOWER.Tag.movement',
   // Descriptors.
   magic:       'ASPECTSOFPOWER.Tag.magic',
   physical:    'ASPECTSOFPOWER.Tag.physical',

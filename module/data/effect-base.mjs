@@ -44,6 +44,15 @@ export class AopEffectData extends foundry.data.ActiveEffectTypeDataModel {
       sustainCost:     new fields.NumberField({ initial: 0, integer: true }),
       sustainResource: new fields.StringField({ initial: 'mana' }),
 
+      // ── Movement modifiers ──
+      // Active effects with these fields contribute to the actor's
+      // aggregate movement multipliers (computed in prepareDerivedData).
+      // Stormstride / Haste set movementSpeedMultiplier > 1 (faster);
+      // Slow / Chilled set it < 1. Stamina multiplier > 1 means the
+      // movement burns MORE stamina (encumbrance-style); < 1 = efficient.
+      movementSpeedMultiplier:   new fields.NumberField({ initial: 1, min: 0 }),
+      movementStaminaMultiplier: new fields.NumberField({ initial: 1, min: 0 }),
+
       // ── Special flags ──
       dismemberedSlot:          new fields.StringField({ initial: '' }),
       sleepActive:              new fields.BooleanField({ initial: false }),

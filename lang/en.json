@@ -42,6 +42,7 @@
       "requires_armor_pierce": "Requires Armor Pierce",
       "mine": "Mine",
       "detonate": "Detonate",
+      "movement": "Movement",
       "craft": "Craft",
       "gather": "Gather",
       "refine": "Refine",
