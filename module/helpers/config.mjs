@@ -223,12 +223,15 @@ ASPECTSOFPOWER.celerity = {
   // `celerityMult` (see MOVEMENT_MODES below). Sprint = 1× baseline (this
   // value), Walk = 2× (slower per ft).
   MOVEMENT_BASE_WEIGHT_PER_5FT: 10,
-  // Movement modes per design-movement-modes.md. Sprint = today's rate
-  // (anchor); Walk halves both speed and stamina cost. Default is Walk.
-  // Selected via Shift modifier during drag / WASD.
+  // Movement modes per design-movement-modes.md. Anchors:
+  //   - Celerity: Sprint = 1× baseline (fast); Walk = 2× ticks/ft (slow).
+  //   - Stamina:  Walk   = 1× baseline (1 stamina per 5 ft); Sprint = 3×
+  //               (3 stamina per 5 ft).
+  // The anchors swap between the two dimensions — walking is slow but
+  // cheap, sprinting is fast but expensive. Default is Walk; Shift = Sprint.
   MOVEMENT_MODES: {
-    walk:   { celerityMult: 2.0, staminaMult: 0.5, label: 'walk'   },
-    sprint: { celerityMult: 1.0, staminaMult: 1.0, label: 'sprint' },
+    walk:   { celerityMult: 2.0, staminaMult: 1.0, label: 'walk'   },
+    sprint: { celerityMult: 1.0, staminaMult: 3.0, label: 'sprint' },
   },
   DEFAULT_MOVEMENT_MODE: 'walk',
   // Walk-mode bonus to the relevant defense roll when triggering terrain

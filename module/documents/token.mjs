@@ -109,15 +109,12 @@ export class AspectsofPowerToken extends foundry.documents.TokenDocument {
       }).catch(err => console.warn('[celerity] override-clear failed:', err));
     }
 
-    // Stamina cost from Foundry's movement-cost calculator (anchored to
-    // Sprint = today's rate). Scaled by mode (Walk = 0.5×, Sprint = 1×)
-    // and then by encumbrance ratio (1 + carryWeight/carryCapacity) per
-    // design-movement-modes.md. No clamp — over-cap actors pay proportional cost.
-    const rawStaminaCost = (movement.passed?.cost ?? 0) + (movement.pending?.cost ?? 0);
+    // Stamina cost from Foundry's movement-cost calculator. Our cost fn
+    // (canvas/token._getMovementCostFunction) already applies mode and
+    // encumbrance multipliers along the path — read the summed result here
+    // and use it directly. Re-applying would double-charge.
     const mode = resolveMovementMode(_isShiftHeld() ? 'sprint' : 'walk');
-    const carryRatio = Math.max(0, actor.system.carryRatio ?? 0);
-    const encumbranceMult = 1 + carryRatio;
-    const staminaCost = Math.round(rawStaminaCost * mode.staminaMult * encumbranceMult);
+    const staminaCost = Math.round((movement.passed?.cost ?? 0) + (movement.pending?.cost ?? 0));
     if (staminaCost > actor.system.stamina.value) {
       ui.notifications.warn(`${actor.name}: insufficient stamina (${actor.system.stamina.value}/${staminaCost} needed).`);
       return false;
