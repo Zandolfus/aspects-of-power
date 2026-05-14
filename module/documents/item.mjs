@@ -2161,10 +2161,16 @@ export class AspectsofPowerItem extends Item {
     const w = casterToken.document.width * gridSize;
     const h = casterToken.document.height * gridSize;
     const tl = { x: destination.x - w / 2, y: destination.y - h / 2 };
-    await casterToken.document.update({
+    // Use Foundry v14 native `displace` movement action: walls=null,
+    // visualize=false — no animation slide, no path-segment region
+    // triggers, no wall collision. Region behaviors STILL fire on
+    // arrival (the destination is inside) via Foundry's normal entry
+    // detection. This is the right semantic for "true" teleportation.
+    await casterToken.document.move({
       x: tl.x,
       y: tl.y,
       elevation: destination.elevation ?? casterToken.document.elevation ?? 0,
+      action: 'displace',
     }, { _aopTeleport: true });
     ChatMessage.create({
       speaker, rollMode,
