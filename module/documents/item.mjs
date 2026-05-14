@@ -2232,18 +2232,17 @@ export class AspectsofPowerItem extends Item {
       if (t >= 0 && t < bestT) { bestT = t; finalCenter = engHit.intersection; truncated = true; truncReason = 'engagement'; }
     }
     const tl = { x: finalCenter.x - w / 2, y: finalCenter.y - h / 2 };
-    // Foundry v14 native `displace` action: walls=null, visualize=false.
-    // We've already done our own wall-apex check (consulting scene
-    // levels.elevation.top) and engagement-halt check above, so the
-    // computed endpoint is authoritative. Using the default `walk`
-    // action would re-collide with walls and truncate further; using
-    // `displace` accepts our endpoint as-is. Visualization (jump arc)
-    // is deferred — correct behavior first, animation later.
-    await casterToken.document.move({
+    // Default movement (action='walk' under the hood). Foundry's native
+    // wall collision applies — meaning the wall-apex bypass we compute
+    // above is currently advisory only (Foundry will re-truncate at
+    // any wall). Apex-aware bypass requires a custom v14 movement
+    // action with walls=null and is deferred to a follow-up.
+    // Path-region triggering and AOE-on-path work normally here, which
+    // is the correct A' behavior (leaping through a fire field hits).
+    await casterToken.document.update({
       x: tl.x,
       y: tl.y,
       elevation: destination.elevation ?? casterToken.document.elevation ?? 0,
-      action: 'displace',
     }, { _aopLeap: true });
     const truncatedNote = truncated
       ? (truncReason === 'engagement' ? ' — leap halted at enemy engagement' : ' — leap halted at wall')
