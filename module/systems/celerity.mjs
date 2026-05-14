@@ -115,9 +115,13 @@ export function computeActionWait(actor, skill, weapon = null, investAmount = nu
     // Teleport / Leap: lerp min→max by distance/maxDistance. Other granted
     // skills (or teleport/leap without a picked distance) use maxFrac flat.
     let fraction = maxFrac;
-    const maxDist = tags.includes('teleport') ? (cfg.teleportMaxDistance ?? 0)
-                  : tags.includes('leap')     ? (cfg.leapMaxDistance ?? 0)
-                  : 0;
+    let maxDist = 0;
+    if (tags.includes('teleport')) {
+      const explicit = cfg.teleportMaxDistance ?? 0;
+      maxDist = explicit > 0 ? explicit : Math.max(5, Math.round(actor?.system?.castingRange ?? 30));
+    } else if (tags.includes('leap')) {
+      maxDist = cfg.leapMaxDistance ?? 0;
+    }
     if (distanceFt != null && maxDist > 0) {
       const norm = Math.max(0, Math.min(1, distanceFt / maxDist));
       fraction = minFrac + (maxFrac - minFrac) * norm;

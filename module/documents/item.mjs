@@ -2120,6 +2120,23 @@ export class AspectsofPowerItem extends Item {
   }
 
   /**
+   * Resolve a teleport skill's effective max distance in feet. When the
+   * skill's `tagConfig.teleportMaxDistance` is 0 (the default), inherit
+   * the caster's spell-throwing reach via `actor.system.castingRange`
+   * (40 + Per.mod/10). When the skill author sets an explicit > 0 value,
+   * use that as a fixed override (short Blink-style skills, or super-
+   * long-range Mass Teleport).
+   *
+   * Returns rounded feet. Used by the declare-time destination prompt
+   * (range gate) and the computeActionWait granted-tag distance lerp.
+   */
+  _resolveTeleportMaxDistance(actor) {
+    const explicit = this.system?.tagConfig?.teleportMaxDistance ?? 0;
+    if (explicit > 0) return explicit;
+    return Math.max(5, Math.round(actor?.system?.castingRange ?? 30));
+  }
+
+  /**
    * Teleport tag: relocate the caster's token to the previously-picked
    * destination. Validation (range + sight) happened at declare time via
    * selectDestinationOnCanvas; this handler just commits the move. Walls
@@ -5038,7 +5055,7 @@ export class AspectsofPowerItem extends Item {
       const _casterToken = this.actor?.getActiveTokens?.()?.[0] ?? null;
       if (tags.includes('teleport') && _casterToken) {
         const { selectDestinationOnCanvas } = await import('../canvas/destination-prompt.mjs');
-        const maxFt = this.system.tagConfig?.teleportMaxDistance ?? 30;
+        const maxFt = this._resolveTeleportMaxDistance(this.actor);
         teleportDestination = await selectDestinationOnCanvas(_casterToken, {
           maxDistanceFt: maxFt,
           requireSight: true,

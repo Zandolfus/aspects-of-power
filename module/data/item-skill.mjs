@@ -163,12 +163,16 @@ export class SkillData extends foundry.abstract.TypeDataModel {
         auraHealOverhealth: new fields.BooleanField({ initial: false }),
 
         // Teleport (per design-movement-skills.md Phase C). Max distance
-        // from caster's token center to destination. Sight required (vision
-        // polygon, not raw LOS) — caster's vision currently reaching the
-        // destination, including from auxiliary sources like scrying skills.
-        // Walls and engagement halts are bypassed. Aura entry triggers
-        // fire on arrival.
-        teleportMaxDistance: new fields.NumberField({ initial: 30, min: 5, integer: true }),
+        // from caster's token center to destination. Default 0 = inherit
+        // the caster's `system.castingRange` (40 + Per.mod/10) so teleport
+        // reach scales with the caster's spell-throwing reach. Override
+        // with > 0 for a fixed-range teleport (e.g., short Blink-style
+        // skills) regardless of the caster's casting range. Sight required
+        // (vision polygon, not raw LOS) — caster's vision currently reaching
+        // the destination, including from auxiliary sources like scrying
+        // skills. Walls and engagement halts are bypassed. Aura entry
+        // triggers fire on arrival.
+        teleportMaxDistance: new fields.NumberField({ initial: 0, min: 0, integer: true }),
 
         // Leap (per design-movement-skills.md Phase C). Max arc distance
         // start-to-end. The apex value is consulted ONLY for the wall

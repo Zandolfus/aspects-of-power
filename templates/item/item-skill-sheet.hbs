@@ -502,10 +502,10 @@
       {{! ── Teleport Tag Config ── }}
       {{#if (includes system.tags "teleport")}}
       <div class='tag-config teleport-config'>
-        <label class='resource-label'>Teleport Max Distance (ft)</label>
+        <label class='resource-label'>Teleport Max Distance (ft, 0 = caster casting range)</label>
         <input type='number' name='system.tagConfig.teleportMaxDistance'
-               value='{{system.tagConfig.teleportMaxDistance}}' min='5' step='5'
-               title='Max distance caster can teleport from current position. Sight is required at declare time (Foundry vision polygon).' />
+               value='{{system.tagConfig.teleportMaxDistance}}' min='0' step='5'
+               title='Max teleport distance. 0 = inherit caster casting range (40 + Per.mod/10). Set > 0 to override (short Blink-style or fixed Mass Teleport). Sight always required at declare time.' />
       </div>
       {{/if}}
 
