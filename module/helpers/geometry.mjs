@@ -196,6 +196,20 @@ function lineIntersect(a, b, p, q) {
   return { x: x1 + t * (x2 - x1), y: y1 + t * (y2 - y1) };
 }
 
+/**
+ * Proper segment-segment intersection. Returns the intersection point
+ * `{x, y}` if both segments actually cross (both parametric scalars in
+ * [0,1]); otherwise null. Used for the leap wall-collision check.
+ */
+export function segmentIntersect(ax, ay, bx, by, cx, cy, dx, dy) {
+  const denom = (bx - ax) * (dy - cy) - (by - ay) * (dx - cx);
+  if (denom === 0) return null;
+  const t = ((cx - ax) * (dy - cy) - (cy - ay) * (dx - cx)) / denom;
+  const u = ((cx - ax) * (by - ay) - (cy - ay) * (bx - ax)) / denom;
+  if (t < 0 || t > 1 || u < 0 || u > 1) return null;
+  return { x: ax + t * (bx - ax), y: ay + t * (by - ay) };
+}
+
 /* -------------------------------------------- */
 /*  Shoelace area                                */
 /* -------------------------------------------- */

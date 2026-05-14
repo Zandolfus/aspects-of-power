@@ -226,6 +226,9 @@ export function skillNeedsTargetPrompt(item) {
   if ((item.system.aoe?.enabled === true) || tags.includes('aoe') || (item.system.alterations ?? []).some(a => (a.id ?? a) === 'aoe')) return false;
   // Sustain toggles on self — no target.
   if (tags.includes('sustain')) return false;
+  // Teleport / Leap prompt for a destination (selectDestinationOnCanvas),
+  // not a target token. Their declare-time flow runs alongside this gate.
+  if (tags.includes('teleport') || tags.includes('leap')) return false;
   return true;
 }
 

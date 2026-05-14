@@ -162,6 +162,33 @@ export class SkillData extends foundry.abstract.TypeDataModel {
         auraHealResource:  new fields.StringField({ initial: 'health' }), // 'health' | 'mana' | 'stamina'
         auraHealOverhealth: new fields.BooleanField({ initial: false }),
 
+        // Teleport (per design-movement-skills.md Phase C). Max distance
+        // from caster's token center to destination. Sight required (vision
+        // polygon, not raw LOS) — caster's vision currently reaching the
+        // destination, including from auxiliary sources like scrying skills.
+        // Walls and engagement halts are bypassed. Aura entry triggers
+        // fire on arrival.
+        teleportMaxDistance: new fields.NumberField({ initial: 30, min: 5, integer: true }),
+
+        // Leap (per design-movement-skills.md Phase C). Max arc distance
+        // start-to-end. The apex value is consulted ONLY for the wall
+        // pass-through check: walls with top < leapApexFt are non-blocking
+        // for this movement; taller walls still block. Token stays at
+        // ground elevation throughout — AOEs and engagement evaluate the
+        // 2D path normally (so leaping through a fire field still eats
+        // the fire, and an enemy's threat radius halts the arc).
+        leapMaxDistance: new fields.NumberField({ initial: 20, min: 5, integer: true }),
+        leapApexFt:      new fields.NumberField({ initial: 10, min: 0, integer: true }),
+
+        // Granted activation fraction (per design-movement-skills.md).
+        // When the `granted` tag is on the skill, computeActionWait bypasses
+        // the standard stat-driven formula and returns:
+        //   wait = referenceRoundLength(actor) × grantedActivationFraction
+        // Default 1/3 = one action's worth of an actor's round, mirroring
+        // break-free. Author can override per-skill (slower granted skills
+        // like a multi-target Mass Teleport could go 1/2 or full round).
+        grantedActivationFraction: new fields.NumberField({ initial: 1 / 3, min: 0, max: 2 }),
+
         // Debuff: subtype (root, stun, blind, etc.) + stat entries + duration + optional DoT.
         debuffType: new fields.StringField({ initial: 'none' }),
         debuffEntries: new fields.ArrayField(new fields.SchemaField({

@@ -102,6 +102,20 @@ function _resolveCelerityWeight(skill, weapon = null) {
  */
 export function computeActionWait(actor, skill, weapon = null, investAmount = null, manaInvestAmount = null) {
   const sc = CONFIG.ASPECTSOFPOWER.celerity;
+
+  // Granted skills (race/item/system-given) bypass the stat-driven cast-time
+  // formula. Time is the design dial; build doesn't affect it. Channel time,
+  // implement discounts, and rarity weight-mods all skip — the source is
+  // providing the ability, not the caster's training.
+  const tags = skill?.system?.tags ?? [];
+  if (tags.includes('granted')) {
+    const fraction = skill?.system?.tagConfig?.grantedActivationFraction
+      ?? (sc.GRANTED_DEFAULT_FRACTION ?? (1 / 3));
+    const rl = actor.system?.attributes?.race?.level ?? 1;
+    const roundLen = referenceRoundLength(rl);
+    return Math.max(1, Math.round(roundLen * fraction));
+  }
+
   const speed = Math.max(1, _actorSpeedFor(actor, skill));
   const weight = _resolveCelerityWeight(skill, weapon);
   // Total weight multiplier = manual designer override (legacy) ×
@@ -301,6 +315,12 @@ export async function declareAction(actor, skill, options = {}) {
   // Targets picked at declare time, snapshotted so the deferred fire can
   // restore game.user.targets (which may have been cleared by then).
   const targetIds = options.targetIds ?? [];
+  // Teleport / Leap destinations captured at declare time. selectDestinationOnCanvas
+  // validates range + (for teleport) sight at the moment of pick; the destination
+  // is committed even if vision changes during the wait.
+  const teleportDestination = options.teleportDestination ?? null;
+  const leapDestination     = options.leapDestination ?? null;
+  const leapApexFt          = options.leapApexFt ?? null;
   const wait = computeActionWait(actor, skill, null, investAmount, manaInvestAmount);
   const clockTick = getClockTick(combatant.combat);
   const scheduledTick = clockTick + wait;
@@ -317,6 +337,9 @@ export async function declareAction(actor, skill, options = {}) {
       aoeRegionId,
       orbDischarging,
       targetIds,
+      teleportDestination,
+      leapDestination,
+      leapApexFt,
     },
     'flags.aspectsofpower.nextActionTick': scheduledTick,
     'flags.aspectsofpower.lastActionWait': wait,

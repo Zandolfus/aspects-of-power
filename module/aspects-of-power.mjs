@@ -777,6 +777,9 @@ Hooks.once('ready', async function () {
       preAoeRegionId: data.preAoeRegionId ?? null,
       preOrbDischarging: data.preOrbDischarging ?? false,
       preTargetIds: data.preTargetIds ?? [],
+      preTeleportDestination: data.preTeleportDestination ?? null,
+      preLeapDestination: data.preLeapDestination ?? null,
+      preLeapApexFt: data.preLeapApexFt ?? null,
     });
   });
 

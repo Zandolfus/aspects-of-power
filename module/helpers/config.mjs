@@ -256,6 +256,11 @@ ASPECTSOFPOWER.celerity = {
   // Re-applying a non-stackable debuff resets the counter to 0. Caster
   // must keep afflicting to keep the target on the slow grind.
   BREAK_FREE_YIELD_PER_ROUND: 0.25,
+  // Default activation fraction for `granted` skills (race/item/system-given).
+  // wait = referenceRoundLength(actorRL) × tagConfig.grantedActivationFraction
+  // (defaulting here when the skill omits an explicit value). 1/3 mirrors
+  // break-free — one action's worth of an actor's round. Build-neutral.
+  GRANTED_DEFAULT_FRACTION: 1 / 3,
 };
 
 /**
@@ -504,6 +509,15 @@ ASPECTSOFPOWER.combatTags = {
   // ("dispel all movement buffs"), Mobility-aura stacking, and the
   // movement-buff handler that applies system-field multipliers to effects.
   movement:    'ASPECTSOFPOWER.Tag.movement',
+  // Teleport (instant relocation, ignores walls/terrain/engagement) and
+  // Leap (arc movement, halts on engagement, walls below leapApexFt are
+  // crossable). Per design-movement-skills.md Phase C.
+  teleport:    'ASPECTSOFPOWER.Tag.teleport',
+  leap:        'ASPECTSOFPOWER.Tag.leap',
+  // Granted: skill is provided by the source (race/item/system primitive)
+  // rather than learned/trained. Routes through computeActionWait's
+  // build-neutral fixed-fraction path instead of the stat-driven formula.
+  granted:     'ASPECTSOFPOWER.Tag.granted',
   // Descriptors.
   magic:       'ASPECTSOFPOWER.Tag.magic',
   physical:    'ASPECTSOFPOWER.Tag.physical',

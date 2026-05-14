@@ -257,6 +257,9 @@ async function _onCelAdvance(event, target) {
   const aoeRegionId = declared.aoeRegionId ?? null;
   const orbDischarging = declared.orbDischarging ?? false;
   const targetIds = declared.targetIds ?? [];
+  const teleportDestination = declared.teleportDestination ?? null;
+  const leapDestination = declared.leapDestination ?? null;
+  const leapApexFt = declared.leapApexFt ?? null;
   const linkedPlayer = game.users.find(u => !u.isGM && u.active && u.character?.id === c.actor?.id);
   if (linkedPlayer) {
     game.socket.emit('system.aspects-of-power', {
@@ -269,10 +272,13 @@ async function _onCelAdvance(event, target) {
       preAoeRegionId: aoeRegionId,
       preOrbDischarging: orbDischarging,
       preTargetIds: targetIds,
+      preTeleportDestination: teleportDestination,
+      preLeapDestination: leapDestination,
+      preLeapApexFt: leapApexFt,
     });
   } else {
     // No linked player online — GM (or whoever clicked Advance) runs it.
-    await item.roll({ executeDeferred: true, preInvestAmount: investAmount, preManaInvestAmount: manaInvestAmount, preAoeRegionId: aoeRegionId, preOrbDischarging: orbDischarging, preTargetIds: targetIds });
+    await item.roll({ executeDeferred: true, preInvestAmount: investAmount, preManaInvestAmount: manaInvestAmount, preAoeRegionId: aoeRegionId, preOrbDischarging: orbDischarging, preTargetIds: targetIds, preTeleportDestination: teleportDestination, preLeapDestination: leapDestination, preLeapApexFt: leapApexFt });
   }
 
   // Sync Foundry's combat.turn pointer to the new celerity-next-up combatant

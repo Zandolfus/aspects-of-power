@@ -499,6 +499,40 @@
       </div>
       {{/if}}
 
+      {{! ── Teleport Tag Config ── }}
+      {{#if (includes system.tags "teleport")}}
+      <div class='tag-config teleport-config'>
+        <label class='resource-label'>Teleport Max Distance (ft)</label>
+        <input type='number' name='system.tagConfig.teleportMaxDistance'
+               value='{{system.tagConfig.teleportMaxDistance}}' min='5' step='5'
+               title='Max distance caster can teleport from current position. Sight is required at declare time (Foundry vision polygon).' />
+      </div>
+      {{/if}}
+
+      {{! ── Leap Tag Config ── }}
+      {{#if (includes system.tags "leap")}}
+      <div class='tag-config leap-config'>
+        <label class='resource-label'>Leap Max Distance (ft)</label>
+        <input type='number' name='system.tagConfig.leapMaxDistance'
+               value='{{system.tagConfig.leapMaxDistance}}' min='5' step='5'
+               title='Max start-to-end distance for the leap arc.' />
+        <label class='resource-label'>Leap Apex Height (ft)</label>
+        <input type='number' name='system.tagConfig.leapApexFt'
+               value='{{system.tagConfig.leapApexFt}}' min='0' step='1'
+               title='Vault height. Walls in scene levels with elevation.top &lt; apex are bypassed; taller walls still block. Token stays at ground elevation throughout (AOEs and engagement evaluate the 2D path).' />
+      </div>
+      {{/if}}
+
+      {{! ── Granted Tag Config (build-neutral activation time) ── }}
+      {{#if (includes system.tags "granted")}}
+      <div class='tag-config granted-config'>
+        <label class='resource-label'>Activation Fraction (× round)</label>
+        <input type='number' name='system.tagConfig.grantedActivationFraction'
+               value='{{system.tagConfig.grantedActivationFraction}}' min='0' max='2' step='0.01'
+               title='Wait = referenceRoundLength × this. Bypasses the stat-driven formula. Default 1/3 (one action) — mirrors break-free.' />
+      </div>
+      {{/if}}
+
       {{! ── Debuff Tag Config ── }}
       {{#if (includes system.tags "debuff")}}
       <div class='tag-config debuff-config'>

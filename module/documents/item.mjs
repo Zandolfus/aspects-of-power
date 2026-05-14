@@ -1,8 +1,9 @@
 import { EquipmentSystem } from '../systems/equipment.mjs';
 import { getPositionalTags } from '../helpers/positioning.mjs';
 import { recordActionFired, declareAction, isInActiveCombat, computeActionWait, referenceRoundLength } from '../systems/celerity.mjs';
+import { getThreatRadiusFt } from '../systems/engagement-halts.mjs';
 import { selectTargetOnCanvas, skillNeedsTargetPrompt, skillTargetsAtFire, selectMarkerOnCanvas } from '../canvas/target-prompt.mjs';
-import { regionTokenOverlap } from '../helpers/geometry.mjs';
+import { regionTokenOverlap, segmentIntersect } from '../helpers/geometry.mjs';
 
 /**
  * Check if an actor is an assigned player character (not just owned).
@@ -2116,6 +2117,228 @@ export class AspectsofPowerItem extends Item {
     }
 
     await this._gmAction(actionPayload);
+  }
+
+  /**
+   * Teleport tag: relocate the caster's token to the previously-picked
+   * destination. Validation (range + sight) happened at declare time via
+   * selectDestinationOnCanvas; this handler just commits the move. Walls
+   * and engagement are bypassed (no path traversal). Aura entry triggers
+   * fire automatically via the preUpdateToken hook on the position change.
+   *
+   * @param {Item}   item
+   * @param {object} rollData
+   * @param {object} speaker
+   * @param {string} rollMode
+   * @param {string} label
+   * @param {object|null} destination  {x, y, elevation} from declare-time pick.
+   */
+  async _handleTeleportTag(item, rollData, speaker, rollMode, label, destination) {
+    const whisperGM = !_isPlayerCharacter(this.actor) ? ChatMessage.getWhisperRecipients('GM') : undefined;
+    const casterToken = this.actor?.getActiveTokens?.()?.[0] ?? null;
+    if (!casterToken || !destination) {
+      ChatMessage.create({ speaker, rollMode, ...(whisperGM ? { whisper: whisperGM } : {}), content: `<p><em>${this.actor?.name ?? 'Caster'} — teleport failed (no destination at fire time).</em></p>` });
+      return;
+    }
+    const gridSize = canvas.grid.size;
+    const w = casterToken.document.width * gridSize;
+    const h = casterToken.document.height * gridSize;
+    const tl = { x: destination.x - w / 2, y: destination.y - h / 2 };
+    await casterToken.document.update({
+      x: tl.x,
+      y: tl.y,
+      elevation: destination.elevation ?? casterToken.document.elevation ?? 0,
+    }, { _aopTeleport: true });
+    ChatMessage.create({
+      speaker, rollMode,
+      ...(whisperGM ? { whisper: whisperGM } : {}),
+      content: `<p><em>${this.actor.name} teleports via <strong>${label}</strong>.</em></p>`,
+    });
+  }
+
+  /**
+   * Leap tag: arc movement to a destination. The caster's token is moved
+   * along a 2D path (token stays at ground elevation throughout — AOEs
+   * and engagement evaluate normally). Walls in scene levels with
+   * elevation.top ≥ leapApexFt block; lower-level walls are bypassed.
+   * Engagement-halts apply mid-arc per design (Phase C Q4 = halts).
+   *
+   * @param {Item}   item
+   * @param {object} rollData
+   * @param {object} speaker
+   * @param {string} rollMode
+   * @param {string} label
+   * @param {object|null} destination  {x, y, elevation} from declare-time pick.
+   * @param {number|null} apexFt       Skill's leap apex height.
+   */
+  async _handleLeapTag(item, rollData, speaker, rollMode, label, destination, apexFt) {
+    const whisperGM = !_isPlayerCharacter(this.actor) ? ChatMessage.getWhisperRecipients('GM') : undefined;
+    const casterToken = this.actor?.getActiveTokens?.()?.[0] ?? null;
+    if (!casterToken || !destination) {
+      ChatMessage.create({ speaker, rollMode, ...(whisperGM ? { whisper: whisperGM } : {}), content: `<p><em>${this.actor?.name ?? 'Caster'} — leap failed (no destination at fire time).</em></p>` });
+      return;
+    }
+    const gridSize = canvas.grid.size;
+    const w = casterToken.document.width * gridSize;
+    const h = casterToken.document.height * gridSize;
+    const apex = apexFt ?? this.system.tagConfig?.leapApexFt ?? 10;
+
+    // Walls in scene levels whose elevation.top is at-or-above leapApexFt
+    // remain blocking; lower-level walls are bypassed. Engagement halt
+    // (entry into an opposing token's threat radius) also truncates the
+    // arc — engagement applies mid-arc per Phase C Q4. Final truncation
+    // = closest of (wall hit, engagement entry, full destination).
+    const startCenter = { x: casterToken.center.x, y: casterToken.center.y };
+    const endCenter   = { x: destination.x, y: destination.y };
+    const wallHit = this._findLeapBlockingWall(startCenter, endCenter, apex);
+    const engHit  = this._findLeapEngagementHalt(startCenter, endCenter, casterToken);
+    let finalCenter = endCenter;
+    let truncated = false;
+    let truncReason = '';
+    let bestT = 1.0;
+    const dxSeg = endCenter.x - startCenter.x;
+    const dySeg = endCenter.y - startCenter.y;
+    const lenSqSeg = dxSeg * dxSeg + dySeg * dySeg || 1;
+    const _tFor = (pt) => ((pt.x - startCenter.x) * dxSeg + (pt.y - startCenter.y) * dySeg) / lenSqSeg;
+    if (wallHit) {
+      const t = _tFor(wallHit.intersection);
+      if (t >= 0 && t < bestT) { bestT = t; finalCenter = wallHit.intersection; truncated = true; truncReason = 'wall'; }
+    }
+    if (engHit) {
+      const t = _tFor(engHit.intersection);
+      if (t >= 0 && t < bestT) { bestT = t; finalCenter = engHit.intersection; truncated = true; truncReason = 'engagement'; }
+    }
+    const tl = { x: finalCenter.x - w / 2, y: finalCenter.y - h / 2 };
+    await casterToken.document.update({
+      x: tl.x,
+      y: tl.y,
+      elevation: destination.elevation ?? casterToken.document.elevation ?? 0,
+    }, { _aopLeap: true });
+    const truncatedNote = truncated
+      ? (truncReason === 'engagement' ? ' — leap halted at enemy engagement' : ' — leap halted at wall')
+      : '';
+    ChatMessage.create({
+      speaker, rollMode,
+      ...(whisperGM ? { whisper: whisperGM } : {}),
+      content: `<p><em>${this.actor.name} leaps via <strong>${label}</strong> (apex ${apex} ft)${truncatedNote}.</em></p>`,
+    });
+  }
+
+  /**
+   * Find the closest point along a leap segment where the leaper enters an
+   * opposing token's threat radius. Same engagement model as normal movement
+   * (per engagement-halts.mjs) but evaluated against the leap's 2D segment
+   * rather than a queued movement on the celerity stack.
+   *
+   * Returns { intersection: {x, y}, opponentId } or null.
+   */
+  _findLeapEngagementHalt(start, end, casterToken) {
+    if (!game.combat?.started) return null;
+    const moverDisp = casterToken.document?.disposition ?? 0;
+    if (moverDisp === 0) return null;
+    const gridSize = canvas.grid.size;
+    const gridDist = canvas.grid.distance;
+    const pxPerFt  = gridSize / gridDist;
+
+    const casterReachFt = getThreatRadiusFt(casterToken.document);
+
+    let bestT = Infinity;
+    let bestPt = null;
+    let bestOppId = null;
+    const dx = end.x - start.x;
+    const dy = end.y - start.y;
+    const lenSq = dx * dx + dy * dy;
+    if (lenSq <= 0) return null;
+
+    for (const cm of game.combat.combatants) {
+      const oppToken = cm.token?.object ?? cm.token;
+      if (!oppToken || !cm.token) continue;
+      if (cm.actor?.id === this.actor?.id) continue;
+      const oppDisp = cm.token.disposition;
+      // Only opposing-disposition tokens (positive vs negative). Friendly /
+      // neutral don't halt the leap.
+      if (oppDisp === 0 || moverDisp === 0) continue;
+      if ((moverDisp > 0) === (oppDisp > 0)) continue;
+      const oppCenter = oppToken.center ?? { x: cm.token.x + (cm.token.width * gridSize) / 2, y: cm.token.y + (cm.token.height * gridSize) / 2 };
+
+      // Threat distance: max(caster reach, opponent reach) — long-reach
+      // weapons control the engagement, matching normal-movement halts.
+      const oppReachFt = getThreatRadiusFt(cm.token);
+      const threatFt = Math.max(casterReachFt, oppReachFt);
+      // Include the token's effective radius in pixels so the halt fires
+      // when the leaper touches the threat ring, not the token center.
+      const oppRadiusFt = (cm.token.width * gridDist) / 2;
+      const radiusPx = (threatFt + oppRadiusFt) * pxPerFt;
+      // Skip if start is already inside the threat circle — leaper is
+      // already engaged; the leap launches FROM engagement, doesn't
+      // halt on first entry.
+      const sdx = start.x - oppCenter.x;
+      const sdy = start.y - oppCenter.y;
+      if ((sdx * sdx + sdy * sdy) <= radiusPx * radiusPx) continue;
+
+      // Line-circle intersection. Solve (start + t*(end-start) - center)^2 = r^2
+      const fx = start.x - oppCenter.x;
+      const fy = start.y - oppCenter.y;
+      const a = lenSq;
+      const b = 2 * (fx * dx + fy * dy);
+      const c = (fx * fx + fy * fy) - radiusPx * radiusPx;
+      const disc = b * b - 4 * a * c;
+      if (disc < 0) continue;
+      const sq = Math.sqrt(disc);
+      const t1 = (-b - sq) / (2 * a);
+      const t2 = (-b + sq) / (2 * a);
+      // First entry into the circle: smaller t (provided it's in [0,1]).
+      const t = t1 >= 0 ? t1 : (t2 >= 0 ? t2 : -1);
+      if (t < 0 || t > 1) continue;
+      if (t < bestT) {
+        bestT = t;
+        bestPt = { x: start.x + t * dx, y: start.y + t * dy };
+        bestOppId = cm.id;
+      }
+    }
+    return bestPt ? { intersection: bestPt, opponentId: bestOppId } : null;
+  }
+
+  /**
+   * Find the first wall along a leap segment that blocks the leap.
+   * A wall blocks if any of its scene-levels has elevation.top ≥ apexFt.
+   * Returns { wallId, intersection: {x, y} } or null.
+   */
+  _findLeapBlockingWall(start, end, apexFt) {
+    const scene = canvas.scene;
+    if (!scene) return null;
+    const sceneLevels = scene.levels?.contents ?? scene.levels ?? [];
+    const levelTopById = new Map();
+    for (const lvl of sceneLevels) {
+      const top = lvl.elevation?.top;
+      levelTopById.set(lvl._id ?? lvl.id, typeof top === 'number' ? top : Infinity);
+    }
+    let bestT = Infinity;
+    let bestPt = null;
+    for (const wall of scene.walls.contents) {
+      if (wall.move === 0) continue; // wall doesn't restrict movement
+      const wallLevels = wall.levels ?? [];
+      // No level association = treat as full-height (always blocks leap).
+      let maxTop = wallLevels.length === 0 ? Infinity : 0;
+      for (const lid of wallLevels) {
+        const top = levelTopById.get(lid) ?? Infinity;
+        if (top > maxTop) maxTop = top;
+      }
+      if (maxTop < apexFt) continue; // wall is shorter than apex — bypass
+      // Intersect the leap segment with the wall segment.
+      const [wx1, wy1, wx2, wy2] = wall.c;
+      const hit = segmentIntersect(start.x, start.y, end.x, end.y, wx1, wy1, wx2, wy2);
+      if (!hit) continue;
+      // Parametric t along the leap segment for ordering.
+      const dx = end.x - start.x;
+      const dy = end.y - start.y;
+      const lenSq = dx * dx + dy * dy;
+      if (lenSq <= 0) continue;
+      const t = ((hit.x - start.x) * dx + (hit.y - start.y) * dy) / lenSq;
+      if (t < 0 || t > 1) continue;
+      if (t < bestT) { bestT = t; bestPt = hit; }
+    }
+    return bestPt ? { intersection: bestPt } : null;
   }
 
   /**
@@ -4805,6 +5028,45 @@ export class AspectsofPowerItem extends Item {
       }
     }
 
+    // ── Movement-skill destination prompt (teleport / leap) ───────────
+    // Captured at declare time so the deferred fire knows where to go.
+    // Skips when re-entering on executeDeferred. selectDestinationOnCanvas
+    // validates range + (for teleport) sight via canvas.visibility.testVisibility.
+    let teleportDestination = null;
+    let leapDestination = null;
+    if (!options.executeDeferred) {
+      const _casterToken = this.actor?.getActiveTokens?.()?.[0] ?? null;
+      if (tags.includes('teleport') && _casterToken) {
+        const { selectDestinationOnCanvas } = await import('../canvas/destination-prompt.mjs');
+        const maxFt = this.system.tagConfig?.teleportMaxDistance ?? 30;
+        teleportDestination = await selectDestinationOnCanvas(_casterToken, {
+          maxDistanceFt: maxFt,
+          requireSight: true,
+          snapToGrid: true,
+          label: this.name,
+          message: `Click destination for ${this.name} (range ${maxFt} ft, sight required; Esc cancels)`,
+        });
+        if (!teleportDestination) {
+          ui.notifications.info(`${this.name} cancelled.`);
+          return;
+        }
+      } else if (tags.includes('leap') && _casterToken) {
+        const { selectDestinationOnCanvas } = await import('../canvas/destination-prompt.mjs');
+        const maxFt = this.system.tagConfig?.leapMaxDistance ?? 20;
+        leapDestination = await selectDestinationOnCanvas(_casterToken, {
+          maxDistanceFt: maxFt,
+          requireSight: false,
+          snapToGrid: true,
+          label: this.name,
+          message: `Click leap destination for ${this.name} (range ${maxFt} ft; Esc cancels)`,
+        });
+        if (!leapDestination) {
+          ui.notifications.info(`${this.name} cancelled.`);
+          return;
+        }
+      }
+    }
+
     // ── Celerity declaration gate ─────────────────────────────────────
     // In an active combat, queue this skill on the combatant's
     // declaredAction flag and bail. The tracker's "Advance to next" fires
@@ -4824,6 +5086,9 @@ export class AspectsofPowerItem extends Item {
         // even if the actor's spellCharge changes between declare and fire.
         orbDischarging: orbDischargedThisCast,
         targetIds,
+        teleportDestination,
+        leapDestination,
+        leapApexFt: leapDestination ? (this.system.tagConfig?.leapApexFt ?? 10) : null,
       });
       return declared;
     }
@@ -5260,6 +5525,12 @@ export class AspectsofPowerItem extends Item {
           break;
         case 'refine':
           await this._handleRefineTag(item, rollData, dmgRoll, speaker, rollMode, label);
+          break;
+        case 'teleport':
+          await this._handleTeleportTag(item, rollData, speaker, rollMode, label, options.preTeleportDestination ?? null);
+          break;
+        case 'leap':
+          await this._handleLeapTag(item, rollData, speaker, rollMode, label, options.preLeapDestination ?? null, options.preLeapApexFt ?? null);
           break;
       }
     }
