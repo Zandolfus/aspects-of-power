@@ -40,6 +40,12 @@ export class AspectsofPowerToken extends foundry.documents.TokenDocument {
     // token.update({x, y}) would recurse back through this hook and try to
     // re-declare the same movement.
     if (operation?._celerityCommit) return;
+    // Bypass for movement-skill primitives (Teleport / Leap) — these are
+    // discrete relocations driven by their own skill handler at fire time;
+    // they must not re-enter the regular movement-declare pipeline (which
+    // would queue a NEW Move on the celerity stack and skip the actual
+    // relocation, leaving the token where it was).
+    if (operation?._aopTeleport || operation?._aopLeap) return;
 
     // Only intercept during active combat.
     const combat = game.combat;
