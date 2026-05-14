@@ -543,6 +543,7 @@ export class AspectsofPowerItemSheet extends foundry.applications.api.Handlebars
         leapMaxDistance:     Number(form.querySelector('[name="system.tagConfig.leapMaxDistance"]')?.value ?? 20) || 20,
         leapApexFt:          Number(form.querySelector('[name="system.tagConfig.leapApexFt"]')?.value ?? 10) || 10,
         grantedActivationFraction: (() => { const el = form.querySelector('[name="system.tagConfig.grantedActivationFraction"]'); return el ? (Number(el.value) || (1/3)) : (1/3); })(),
+        grantedMinActivationFraction: (() => { const el = form.querySelector('[name="system.tagConfig.grantedMinActivationFraction"]'); return el ? (Number(el.value) || (1/9)) : (1/9); })(),
         debuffEntries,
         debuffType:        form.querySelector('[name="system.tagConfig.debuffType"]')?.value ?? 'none',
         debuffDuration:    Number(form.querySelector('[name="system.tagConfig.debuffDuration"]')?.value) || 1,

@@ -182,12 +182,17 @@ export class SkillData extends foundry.abstract.TypeDataModel {
 
         // Granted activation fraction (per design-movement-skills.md).
         // When the `granted` tag is on the skill, computeActionWait bypasses
-        // the standard stat-driven formula and returns:
+        // the standard stat-driven formula. For non-distance skills the
+        // result is simply:
         //   wait = referenceRoundLength(actor) × grantedActivationFraction
-        // Default 1/3 = one action's worth of an actor's round, mirroring
-        // break-free. Author can override per-skill (slower granted skills
-        // like a multi-target Mass Teleport could go 1/2 or full round).
-        grantedActivationFraction: new fields.NumberField({ initial: 1 / 3, min: 0, max: 2 }),
+        // For teleport/leap (distance varies per cast), wait LERPs between
+        // the min and max fractions by `distancePicked / maxDistance`:
+        //   frac = lerp(grantedMinActivationFraction, grantedActivationFraction, dist/max)
+        // Default min = 1/9, max = 1/3 = short teleport 1/9 round, max-range
+        // 1/3 round. Author can set min == max to disable distance scaling
+        // (use for non-mobility granted skills like break-free reactions).
+        grantedActivationFraction:    new fields.NumberField({ initial: 1 / 3, min: 0, max: 2 }),
+        grantedMinActivationFraction: new fields.NumberField({ initial: 1 / 9, min: 0, max: 2 }),
 
         // Debuff: subtype (root, stun, blind, etc.) + stat entries + duration + optional DoT.
         debuffType: new fields.StringField({ initial: 'none' }),

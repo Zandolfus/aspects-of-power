@@ -100,7 +100,7 @@ function _resolveCelerityWeight(skill, weapon = null) {
  * @param {Item|null} weapon         Optional weapon override
  * @param {number|null} investAmount Optional pre-captured invest (mana for spells)
  */
-export function computeActionWait(actor, skill, weapon = null, investAmount = null, manaInvestAmount = null) {
+export function computeActionWait(actor, skill, weapon = null, investAmount = null, manaInvestAmount = null, distanceFt = null) {
   const sc = CONFIG.ASPECTSOFPOWER.celerity;
 
   // Granted skills (race/item/system-given) bypass the stat-driven cast-time
@@ -109,8 +109,19 @@ export function computeActionWait(actor, skill, weapon = null, investAmount = nu
   // providing the ability, not the caster's training.
   const tags = skill?.system?.tags ?? [];
   if (tags.includes('granted')) {
-    const fraction = skill?.system?.tagConfig?.grantedActivationFraction
-      ?? (sc.GRANTED_DEFAULT_FRACTION ?? (1 / 3));
+    const cfg = skill?.system?.tagConfig ?? {};
+    const maxFrac = cfg.grantedActivationFraction ?? (sc.GRANTED_DEFAULT_FRACTION ?? (1 / 3));
+    const minFrac = cfg.grantedMinActivationFraction ?? maxFrac;
+    // Teleport / Leap: lerp min→max by distance/maxDistance. Other granted
+    // skills (or teleport/leap without a picked distance) use maxFrac flat.
+    let fraction = maxFrac;
+    const maxDist = tags.includes('teleport') ? (cfg.teleportMaxDistance ?? 0)
+                  : tags.includes('leap')     ? (cfg.leapMaxDistance ?? 0)
+                  : 0;
+    if (distanceFt != null && maxDist > 0) {
+      const norm = Math.max(0, Math.min(1, distanceFt / maxDist));
+      fraction = minFrac + (maxFrac - minFrac) * norm;
+    }
     const rl = actor.system?.attributes?.race?.level ?? 1;
     const roundLen = referenceRoundLength(rl);
     return Math.max(1, Math.round(roundLen * fraction));
@@ -321,7 +332,21 @@ export async function declareAction(actor, skill, options = {}) {
   const teleportDestination = options.teleportDestination ?? null;
   const leapDestination     = options.leapDestination ?? null;
   const leapApexFt          = options.leapApexFt ?? null;
-  const wait = computeActionWait(actor, skill, null, investAmount, manaInvestAmount);
+
+  // Distance from caster to picked destination, in feet — feeds distance-
+  // scaled granted-tag activation fraction (shorter teleport = faster cast).
+  let distanceFt = null;
+  const _dest = teleportDestination ?? leapDestination;
+  if (_dest) {
+    const tok = actor.getActiveTokens?.()?.[0];
+    if (tok && canvas?.grid) {
+      const dx = _dest.x - tok.center.x;
+      const dy = _dest.y - tok.center.y;
+      const px = Math.hypot(dx, dy);
+      distanceFt = px * canvas.grid.distance / canvas.grid.size;
+    }
+  }
+  const wait = computeActionWait(actor, skill, null, investAmount, manaInvestAmount, distanceFt);
   const clockTick = getClockTick(combatant.combat);
   const scheduledTick = clockTick + wait;
 

@@ -526,10 +526,14 @@
       {{! ── Granted Tag Config (build-neutral activation time) ── }}
       {{#if (includes system.tags "granted")}}
       <div class='tag-config granted-config'>
-        <label class='resource-label'>Activation Fraction (× round)</label>
+        <label class='resource-label'>Min Activation Fraction (× round, at 0 ft)</label>
+        <input type='number' name='system.tagConfig.grantedMinActivationFraction'
+               value='{{system.tagConfig.grantedMinActivationFraction}}' min='0' max='2' step='0.01'
+               title='Lower bound of cast wait for teleport/leap (very short hops). Set equal to Max to disable distance scaling.' />
+        <label class='resource-label'>Max Activation Fraction (× round, at max range)</label>
         <input type='number' name='system.tagConfig.grantedActivationFraction'
                value='{{system.tagConfig.grantedActivationFraction}}' min='0' max='2' step='0.01'
-               title='Wait = referenceRoundLength × this. Bypasses the stat-driven formula. Default 1/3 (one action) — mirrors break-free.' />
+               title='Cast wait at the skill&apos;s max teleport/leap distance. Wait lerps from min to this by distancePicked / maxDistance.' />
       </div>
       {{/if}}
 
