@@ -638,6 +638,16 @@ Handlebars.registerHelper('includes', function (array, value) {
   return Array.isArray(array) && array.includes(value);
 });
 
+Handlebars.registerHelper('or', function (...args) {
+  args.pop(); // remove Handlebars options object
+  return args.some(Boolean);
+});
+
+Handlebars.registerHelper('and', function (...args) {
+  args.pop(); // remove Handlebars options object
+  return args.every(Boolean);
+});
+
 /**
  * Simple math helper for templates: {{math a '*' b '/' c}}
  * Supports +, -, *, /. Evaluates left-to-right.

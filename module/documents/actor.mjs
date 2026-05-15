@@ -834,6 +834,21 @@ export class AspectsofPowerActor extends Actor {
     if (reactions && reactions.value !== reactions.max) {
       updateData['system.reactions.value'] = reactions.max;
     }
+    // Reaction cooldown cleanup. Entries map skillId → roundLastFired.
+    // At each onStartTurn, prune entries whose cooldown window has passed
+    // (currentRound - roundLastFired >= skill.reactionCooldown). Stays
+    // bounded by the number of reactions an actor has ever fired in this
+    // combat. Live writes happen at reaction-dispatch time (Phase B).
+    const cooldowns = this.flags?.aspectsofpower?.reactionCooldowns ?? {};
+    const cleaned = {};
+    for (const [skillId, firedAt] of Object.entries(cooldowns)) {
+      const skill = this.items.get(skillId);
+      const cooldownLen = skill?.system?.tagConfig?.reactionCooldown ?? 1;
+      if (currentRound - firedAt < cooldownLen) cleaned[skillId] = firedAt;
+    }
+    if (Object.keys(cleaned).length !== Object.keys(cooldowns).length) {
+      updateData['flags.aspectsofpower.reactionCooldowns'] = cleaned;
+    }
 
     // ── 4. Debuff Break Rolls ──
     // Per-debuff break-stat table now lives at CONFIG.ASPECTSOFPOWER.debuffBreakStats

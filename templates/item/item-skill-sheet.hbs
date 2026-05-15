@@ -538,6 +538,50 @@
       </div>
       {{/if}}
 
+      {{! ── Reaction Config (Reaction skillType OR Passive + retaliation tag) ── }}
+      {{#if (or (eq system.skillType "Reaction") (and (eq system.skillType "Passive") (includes system.tags "retaliation")))}}
+      <div class='tag-config reaction-config'>
+        <label class='resource-label'>Reaction Trigger</label>
+        <select name='system.tagConfig.reactionTrigger'>
+          <option value='' {{#unless system.tagConfig.reactionTrigger}}selected{{/unless}}>(none)</option>
+          <option value='self_attacked' {{#if (eq system.tagConfig.reactionTrigger "self_attacked")}}selected{{/if}}>Self attacked (pre-damage)</option>
+          <option value='self_damage_taken' {{#if (eq system.tagConfig.reactionTrigger "self_damage_taken")}}selected{{/if}}>Self damage taken (post-defense, pre-HP)</option>
+          <option value='ally_attacked' {{#if (eq system.tagConfig.reactionTrigger "ally_attacked")}}selected{{/if}}>Ally attacked (within range)</option>
+          <option value='self_struck' {{#if (eq system.tagConfig.reactionTrigger "self_struck")}}selected{{/if}}>Self struck (post-resolve)</option>
+          <option value='hp_threshold' {{#if (eq system.tagConfig.reactionTrigger "hp_threshold")}}selected{{/if}}>HP below threshold</option>
+        </select>
+
+        {{#if (eq system.tagConfig.reactionTrigger "ally_attacked")}}
+        <label class='resource-label'>Trigger Range (ft)</label>
+        <input type='number' name='system.tagConfig.reactionTriggerRange'
+               value='{{system.tagConfig.reactionTriggerRange}}' min='0' step='5'
+               title='How far from this actor an ally must be attacked to fire the reaction.' />
+        {{/if}}
+
+        {{#if (eq system.tagConfig.reactionTrigger "hp_threshold")}}
+        <label class='resource-label'>HP Threshold (fraction)</label>
+        <input type='number' name='system.tagConfig.reactionThresholdPct'
+               value='{{system.tagConfig.reactionThresholdPct}}' min='0' max='1' step='0.05'
+               title='Fires when HP/maxHP drops below this value. 0.25 = 25%.' />
+        {{/if}}
+
+        <label class='resource-label'>Cooldown (rounds)</label>
+        <input type='number' name='system.tagConfig.reactionCooldown'
+               value='{{system.tagConfig.reactionCooldown}}' min='0' step='1'
+               title='Rounds between fires. 1 = once per round. 0 = no cooldown (limited only by the actor&apos;s reactions-per-round budget).' />
+
+        <label class='resource-label'>Phase Override (advanced)</label>
+        <select name='system.tagConfig.reactionPhase'
+                title='Override the default pipeline injection point. Empty = derives from reactionType (dodge=pre-defense, parry=at-defense, barrier=at-damage, retaliation=post-resolve).'>
+          <option value='' {{#unless system.tagConfig.reactionPhase}}selected{{/unless}}>(default for reactionType)</option>
+          <option value='pre_defense' {{#if (eq system.tagConfig.reactionPhase "pre_defense")}}selected{{/if}}>Pre-defense</option>
+          <option value='at_defense' {{#if (eq system.tagConfig.reactionPhase "at_defense")}}selected{{/if}}>At-defense</option>
+          <option value='at_damage_app' {{#if (eq system.tagConfig.reactionPhase "at_damage_app")}}selected{{/if}}>At-damage-application</option>
+          <option value='post_resolve' {{#if (eq system.tagConfig.reactionPhase "post_resolve")}}selected{{/if}}>Post-resolve</option>
+        </select>
+      </div>
+      {{/if}}
+
       {{! ── Debuff Tag Config ── }}
       {{#if (includes system.tags "debuff")}}
       <div class='tag-config debuff-config'>

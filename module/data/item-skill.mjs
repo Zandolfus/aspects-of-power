@@ -27,7 +27,13 @@ export class SkillData extends foundry.abstract.TypeDataModel {
       originalSkillId: new fields.StringField({ initial: '' }),
       skillCategory: new fields.StringField({ initial: 'combat' }),
       skillType:     new fields.StringField({ initial: 'Passive' }),
-      // For Reaction skills: what type of reaction (dodge, parry, barrier).
+      // For Reaction skills: what type of reaction (dodge, parry, barrier,
+      // retaliation). Drives the default pipeline injection point:
+      //   dodge       → pre-defense (can cancel the hit)
+      //   parry       → at defense roll (modifies / counters)
+      //   barrier     → at damage application (consumes barrier first)
+      //   retaliation → post-resolve (counter-strike the attacker)
+      // Override per-skill via tagConfig.reactionPhase (advanced).
       reactionType:  new fields.StringField({ initial: 'dodge' }),
       formula:     new fields.StringField({ initial: '' }),
       roll: new fields.SchemaField({
@@ -197,6 +203,32 @@ export class SkillData extends foundry.abstract.TypeDataModel {
         // (use for non-mobility granted skills like break-free reactions).
         grantedActivationFraction:    new fields.NumberField({ initial: 1 / 3, min: 0, max: 2 }),
         grantedMinActivationFraction: new fields.NumberField({ initial: 1 / 9, min: 0, max: 2 }),
+
+        // ── Reaction subsystem (per design-reaction-subsystem.md) ────────
+        // What event the reaction listens to. Shared with passive-retaliation
+        // skills (skillType=Passive + `retaliation` tag) so the same event
+        // detection covers both reactive (player-prompted) and passive
+        // (auto-fire) flows. Empty = not a reaction-driven skill.
+        //   self_attacked      — to-hit roll vs self (pre-damage)
+        //   self_damage_taken  — damage about to apply (post-defense, pre-HP)
+        //   ally_attacked      — to-hit roll vs non-hostile within reactionTriggerRange
+        //   self_struck        — post-resolve damage actually dealt
+        //   hp_threshold       — actor's HP drops below reactionThresholdPct
+        reactionTrigger:       new fields.StringField({ initial: '' }),
+        // Range gate for `ally_attacked` — ft from the reactor to the
+        // attacked ally that triggers the reaction. 0 = no range gate.
+        reactionTriggerRange:  new fields.NumberField({ initial: 0, min: 0, integer: true }),
+        // HP-fraction threshold for `hp_threshold` triggers (Bloodrage etc.).
+        // Fires when (HP / maxHP) drops below this value.
+        reactionThresholdPct:  new fields.NumberField({ initial: 0, min: 0, max: 1 }),
+        // Reaction cooldown in actor's reference rounds. Default 1 = once
+        // per round. Skill can fire once per `reactionCooldown` rounds.
+        reactionCooldown:      new fields.NumberField({ initial: 1, min: 0, integer: true }),
+        // Advanced: override the pipeline injection point. Default derives
+        // from `roll.reactionType` (dodge=pre_defense, parry=at_defense,
+        // barrier=at_damage_app, retaliation=post_resolve). Set explicitly
+        // for skills that need a non-default phase. Empty = use default.
+        reactionPhase:         new fields.StringField({ initial: '' }),
 
         // Debuff: subtype (root, stun, blind, etc.) + stat entries + duration + optional DoT.
         debuffType: new fields.StringField({ initial: 'none' }),
