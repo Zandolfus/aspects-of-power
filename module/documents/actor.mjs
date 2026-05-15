@@ -836,18 +836,20 @@ export class AspectsofPowerActor extends Actor {
     }
     // Reaction cooldown cleanup. Entries map skillId → roundLastFired.
     // At each onStartTurn, prune entries whose cooldown window has passed
-    // (currentRound - roundLastFired >= skill.reactionCooldown). Stays
-    // bounded by the number of reactions an actor has ever fired in this
-    // combat. Live writes happen at reaction-dispatch time (Phase B).
+    // (currentRound - roundLastFired >= skill.reactionCooldown). Foundry
+    // merges nested flag updates by default — to actually DELETE a key
+    // we use the ForcedDeletion sentinel per-key (see reference_foundry_quirks).
+    // Stays bounded by the number of reactions an actor has fired this combat.
+    // Live writes happen at reaction-dispatch time (Phase B).
     const cooldowns = this.flags?.aspectsofpower?.reactionCooldowns ?? {};
-    const cleaned = {};
+    const ForcedDeletion = foundry.data?.operators?.ForcedDeletion;
     for (const [skillId, firedAt] of Object.entries(cooldowns)) {
       const skill = this.items.get(skillId);
       const cooldownLen = skill?.system?.tagConfig?.reactionCooldown ?? 1;
-      if (currentRound - firedAt < cooldownLen) cleaned[skillId] = firedAt;
-    }
-    if (Object.keys(cleaned).length !== Object.keys(cooldowns).length) {
-      updateData['flags.aspectsofpower.reactionCooldowns'] = cleaned;
+      // Prune when window expired OR the skill itself is gone (orphaned entry).
+      if (!skill || (currentRound - firedAt >= cooldownLen)) {
+        updateData[`flags.aspectsofpower.reactionCooldowns.${skillId}`] = ForcedDeletion;
+      }
     }
 
     // ── 4. Debuff Break Rolls ──
