@@ -518,6 +518,10 @@ ASPECTSOFPOWER.combatTags = {
   // rather than learned/trained. Routes through computeActionWait's
   // build-neutral fixed-fraction path instead of the stat-driven formula.
   granted:     'ASPECTSOFPOWER.Tag.granted',
+  // Ground-anchored AOEs (oil slicks, spike traps, vine fields) — only
+  // affect targets on the ground. A leaping actor passing overhead
+  // skips them. Volumetric AOEs (fireball, gas cloud) leave this OFF.
+  ground:      'ASPECTSOFPOWER.Tag.ground',
   // Descriptors.
   magic:       'ASPECTSOFPOWER.Tag.magic',
   physical:    'ASPECTSOFPOWER.Tag.physical',

@@ -3795,7 +3795,6 @@ export class AspectsofPowerItem extends Item {
                 isShrapnel: (this.system.tags ?? []).includes('shrapnel'),
                 targetingMode: aoe.targetingMode ?? 'all',
                 zoneEffect: aoe.zoneEffect ?? 'none',
-                isGroundAnchored: aoe.isGroundAnchored ?? false,
                 casterDisposition: this.actor.getActiveTokens()?.[0]?.document?.disposition ?? CONST.TOKEN_DISPOSITIONS.NEUTRAL,
                 // Cadence period in ticks: caster's reference round / 4.
                 // Per design 2026-05-10: an AOE ticks on entry, then every
@@ -3973,7 +3972,6 @@ export class AspectsofPowerItem extends Item {
             isShrapnel: (this.system.tags ?? []).includes('shrapnel'),
             targetingMode: aoe.targetingMode ?? 'all',
             zoneEffect: aoe.zoneEffect ?? 'none',
-            isGroundAnchored: aoe.isGroundAnchored ?? false,
             casterDisposition: this.actor.getActiveTokens()?.[0]?.document?.disposition ?? CONST.TOKEN_DISPOSITIONS.NEUTRAL,
             casterReticPeriod: (() => {
               try {
