@@ -842,13 +842,16 @@ export class AspectsofPowerActor extends Actor {
     // Stays bounded by the number of reactions an actor has fired this combat.
     // Live writes happen at reaction-dispatch time (Phase B).
     const cooldowns = this.flags?.aspectsofpower?.reactionCooldowns ?? {};
-    const ForcedDeletion = foundry.data?.operators?.ForcedDeletion;
+    const FD = foundry.data?.operators?.ForcedDeletion;
     for (const [skillId, firedAt] of Object.entries(cooldowns)) {
       const skill = this.items.get(skillId);
       const cooldownLen = skill?.system?.tagConfig?.reactionCooldown ?? 1;
       // Prune when window expired OR the skill itself is gone (orphaned entry).
       if (!skill || (currentRound - firedAt >= cooldownLen)) {
-        updateData[`flags.aspectsofpower.reactionCooldowns.${skillId}`] = ForcedDeletion;
+        // ForcedDeletion needs to be an INSTANCE (`new FD()`), not the class
+        // itself — verified empirically 2026-05-16; the class-as-value pattern
+        // in the augment-tag-grants hook may be a latent bug there too.
+        updateData[`flags.aspectsofpower.reactionCooldowns.${skillId}`] = FD ? new FD() : null;
       }
     }
 
