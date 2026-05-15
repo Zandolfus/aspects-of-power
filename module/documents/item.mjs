@@ -794,6 +794,13 @@ export class AspectsofPowerItem extends Item {
       if (reactionSkill) {
         const rType = reactionSkill.system.reactionType ?? 'dodge';
         await this._gmAction({ type: 'gmConsumeReaction', targetActorUuid: targetActor.uuid });
+        // Phase B cooldown write: stamp the current combat round so this
+        // reaction respects its `reactionCooldown` window. Cleaned up at
+        // the actor's next onStartTurn (per Phase A).
+        const _cdRound = game.combat?.round ?? 0;
+        await targetActor.update({
+          [`flags.aspectsofpower.reactionCooldowns.${reactionSkill.id}`]: _cdRound,
+        });
         const reactionSpeaker = ChatMessage.getSpeaker({ actor: targetActor });
 
         if (rType === 'dodge') {
@@ -1117,10 +1124,34 @@ export class AspectsofPowerItem extends Item {
     const poolMax = targetActor.system.defense[defKey]?.poolMax ?? 0;
     const defLabel = defKey.charAt(0).toUpperCase() + defKey.slice(1);
 
-    // Gather reaction skills — always show them if the actor has any,
-    // even if reactions are consumed (player sees them greyed context).
+    // Gather reaction skills, filtered by trigger + cooldown + resource.
+    // Phase B v1 = trigger `self_attacked` (this prompt fires when the actor
+    // is being attacked). Legacy reactions with no trigger set are included
+    // for back-compat. Cooldowns and resource costs gate availability.
     const reactions = targetActor.system.reactions ?? { value: 0, max: 1 };
-    const reactionSkills = targetActor.items.filter(i => i.type === 'skill' && i.system.skillType === 'Reaction');
+    const combatRound = game.combat?.round ?? 0;
+    const cooldowns = targetActor.flags?.aspectsofpower?.reactionCooldowns ?? {};
+    const reactionSkills = targetActor.items.filter(s => {
+      if (s.type !== 'skill' || s.system.skillType !== 'Reaction') return false;
+      const trig = s.system.tagConfig?.reactionTrigger ?? '';
+      // Empty trigger = legacy; include for back-compat. Specific trigger
+      // must match the current event (`self_attacked`).
+      if (trig && trig !== 'self_attacked') return false;
+      // Cooldown gate: if the skill has been fired recently, check window.
+      const firedAt = cooldowns[s.id];
+      if (firedAt != null) {
+        const cdLen = s.system.tagConfig?.reactionCooldown ?? 1;
+        if ((combatRound - firedAt) < cdLen) return false;
+      }
+      // Resource gate: actor must be able to afford the cost.
+      const resKey = s.system.roll?.resource;
+      const cost   = s.system.roll?.cost ?? 0;
+      if (resKey && cost > 0) {
+        const have = targetActor.system[resKey]?.value ?? 0;
+        if (have < cost) return false;
+      }
+      return true;
+    });
     const reactionList = reactionSkills.map(s => ({
       id: s.id, name: s.name, img: s.img,
       reactionType: s.system.reactionType ?? 'dodge',
