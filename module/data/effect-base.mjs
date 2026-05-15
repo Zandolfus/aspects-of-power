@@ -71,6 +71,13 @@ export class AopEffectData extends foundry.data.ActiveEffectTypeDataModel {
       auraHealResource:  new fields.StringField({ initial: 'health' }),  // for 'heal' type: 'health' | 'mana' | 'stamina'
       auraHealOverhealth: new fields.BooleanField({ initial: false }),   // for 'heal' type: overflow into overhealth
 
+      // ── Effect tags ──
+      // Subset of skill tags that propagate to the spawned effect when
+      // applied as a buff/debuff. Used for behavior gating: `dash` makes
+      // engagement halts skip while the effect is non-disabled. Future:
+      // dispel-by-tag, status display, etc.
+      tags: new fields.ArrayField(new fields.StringField(), { initial: [] }),
+
       // ── Special flags ──
       dismemberedSlot:          new fields.StringField({ initial: '' }),
       sleepActive:              new fields.BooleanField({ initial: false }),

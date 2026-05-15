@@ -60,6 +60,10 @@ export async function checkEngagementHalts(combat, newClock) {
   // Opponent might or might not be in flight themselves.
   for (const moverEntry of inFlight) {
     const moverDisp = moverEntry.cm.token.disposition;
+    // Dashing actors skip ALL engagement halts on their own movement —
+    // they're moving too fast to be engaged. They can still HALT others
+    // when they're an opponent in another mover's check.
+    const moverDashing = actorIsDashing(moverEntry.cm.actor);
     for (const opponent of combat.combatants) {
       if (opponent.id === moverEntry.cm.id) continue;
       if (!opponent.token) continue;
@@ -68,12 +72,16 @@ export async function checkEngagementHalts(combat, newClock) {
       const evalResult = _evaluatePair(moverEntry, opponent, newClock);
       if (!evalResult) continue;
 
-      // Update each side's earliest halt.
-      if (evalResult.moverHalt) {
+      // Update each side's earliest halt — but skip the mover's own halt
+      // when they're dashing.
+      if (evalResult.moverHalt && !moverDashing) {
         _setEarliestHalt(haltsByCombatantId, moverEntry.cm.id, evalResult.moverHalt);
       }
       if (evalResult.opponentHalt) {
-        _setEarliestHalt(haltsByCombatantId, opponent.id, evalResult.opponentHalt);
+        // Opponent halts only if THEY aren't dashing.
+        if (!actorIsDashing(opponent.actor)) {
+          _setEarliestHalt(haltsByCombatantId, opponent.id, evalResult.opponentHalt);
+        }
       }
     }
   }
@@ -373,6 +381,22 @@ function _topLeftFromCenter(centerPos, tokenDoc) {
   const w = (tokenDoc.width ?? 1) * canvas.grid.size;
   const h = (tokenDoc.height ?? 1) * canvas.grid.size;
   return { x: Math.round(centerPos.x - w / 2), y: Math.round(centerPos.y - h / 2) };
+}
+
+/**
+ * True when the actor has any non-disabled active effect carrying the
+ * `dash` tag. Engagement halts skip for dashing actors — they're moving
+ * too fast to be engaged. Used by both the regular halts pipeline and
+ * by the leap handler's engagement check.
+ */
+export function actorIsDashing(actor) {
+  if (!actor?.effects) return false;
+  for (const eff of actor.effects) {
+    if (eff.disabled) continue;
+    const tags = eff.system?.tags ?? [];
+    if (tags.includes('dash')) return true;
+  }
+  return false;
 }
 
 /**

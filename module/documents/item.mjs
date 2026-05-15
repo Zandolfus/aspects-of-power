@@ -1,7 +1,7 @@
 import { EquipmentSystem } from '../systems/equipment.mjs';
 import { getPositionalTags } from '../helpers/positioning.mjs';
 import { recordActionFired, declareAction, isInActiveCombat, computeActionWait, referenceRoundLength } from '../systems/celerity.mjs';
-import { getThreatRadiusFt } from '../systems/engagement-halts.mjs';
+import { getThreatRadiusFt, actorIsDashing } from '../systems/engagement-halts.mjs';
 import { selectTargetOnCanvas, skillNeedsTargetPrompt, skillTargetsAtFire, selectMarkerOnCanvas } from '../canvas/target-prompt.mjs';
 import { regionTokenOverlap, segmentIntersect } from '../helpers/geometry.mjs';
 
@@ -2276,6 +2276,8 @@ export class AspectsofPowerItem extends Item {
     if (!game.combat?.started) return null;
     const moverDisp = casterToken.document?.disposition ?? 0;
     if (moverDisp === 0) return null;
+    // Dashing leapers skip engagement entirely — Stormstride etc.
+    if (this.actor && actorIsDashing(this.actor)) return null;
     const gridSize = canvas.grid.size;
     const gridDist = canvas.grid.distance;
     const pxPerFt  = gridSize / gridDist;
@@ -2423,6 +2425,16 @@ export class AspectsofPowerItem extends Item {
     const moveStamina = tc.movementStaminaBuff ?? 1;
     if (moveSpeed !== 1) systemOverrides.movementSpeedMultiplier = moveSpeed;
     if (moveStamina !== 1) systemOverrides.movementStaminaMultiplier = moveStamina;
+
+    // Effect-tag propagation. A whitelisted subset of the source skill's
+    // tags lands on the spawned effect's `system.tags` so behavior gates
+    // (e.g., engagement-halt skip on `dash`) can read them. Author opts
+    // in by adding the tag to the SKILL — Stormstride tagged `dash` makes
+    // its buff effect carry `dash`.
+    const EFFECT_TAG_WHITELIST = ['dash'];
+    const skillTagsArr = this.system.tags ?? [];
+    const propagatedTags = EFFECT_TAG_WHITELIST.filter(t => skillTagsArr.includes(t));
+    if (propagatedTags.length > 0) systemOverrides.tags = propagatedTags;
 
     // Aura snapshot: per-tick value = rollTotal × auraScale, frozen at
     // apply time. Dispatched by auraEffectType in actor._tickActorAuras:

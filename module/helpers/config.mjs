@@ -522,6 +522,11 @@ ASPECTSOFPOWER.combatTags = {
   // affect targets on the ground. A leaping actor passing overhead
   // skips them. Volumetric AOEs (fireball, gas cloud) leave this OFF.
   ground:      'ASPECTSOFPOWER.Tag.ground',
+  // Dash: while the actor has any non-disabled effect carrying this tag,
+  // engagement halts skip — they're moving too fast to engage. Author by
+  // tagging the buff skill (Stormstride) with `dash`; the spawned effect
+  // inherits the tag via _handleBuffTag.
+  dash:        'ASPECTSOFPOWER.Tag.dash',
   // Descriptors.
   magic:       'ASPECTSOFPOWER.Tag.magic',
   physical:    'ASPECTSOFPOWER.Tag.physical',
