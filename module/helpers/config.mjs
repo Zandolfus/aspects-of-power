@@ -535,6 +535,10 @@ ASPECTSOFPOWER.combatTags = {
   // dynamics rather than direct combat math. Marker tag for the
   // future social mechanics subsystem.
   social:      'ASPECTSOFPOWER.Tag.social',
+  // Retaliation: skill fires in response to being attacked. Marker
+  // for the future reaction subsystem; currently a queryable category
+  // (Shocking Retort, Retaliatory Strike, etc.).
+  retaliation: 'ASPECTSOFPOWER.Tag.retaliation',
   // Descriptors.
   magic:       'ASPECTSOFPOWER.Tag.magic',
   physical:    'ASPECTSOFPOWER.Tag.physical',
