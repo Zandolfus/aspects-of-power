@@ -534,6 +534,8 @@ ASPECTSOFPOWER.combatTags = {
   ranged:      'ASPECTSOFPOWER.Tag.ranged',
   melee:       'ASPECTSOFPOWER.Tag.melee',
   // Affinities.
+  time:          'ASPECTSOFPOWER.Tag.time',
+  karma:         'ASPECTSOFPOWER.Tag.karma',
   fire:          'ASPECTSOFPOWER.Tag.fire',
   heat:          'ASPECTSOFPOWER.Tag.heat',
   ice:           'ASPECTSOFPOWER.Tag.ice',
@@ -594,6 +596,7 @@ ASPECTSOFPOWER.affinityTags = new Set([
   'fire', 'heat', 'ice', 'lightning', 'earth', 'water', 'wind', 'metal',
   'lunar', 'solar', 'space', 'shadow', 'light', 'nature',
   'poison', 'blood', 'necromantic', 'holy', 'arcane', 'psychic',
+  'time', 'karma',
 ]);
 
 /**
