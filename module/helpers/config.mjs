@@ -527,6 +527,14 @@ ASPECTSOFPOWER.combatTags = {
   // tagging the buff skill (Stormstride) with `dash`; the spawned effect
   // inherits the tag via _handleBuffTag.
   dash:        'ASPECTSOFPOWER.Tag.dash',
+  // Aura: skill produces an actor-centered sustained AOE effect.
+  // (Distinct from the aura mechanic baked into buffs — this is a
+  // queryable marker for skills whose primary form is an aura.)
+  aura:        'ASPECTSOFPOWER.Tag.aura',
+  // Social: skill primarily affects social/persuasion/intimidation
+  // dynamics rather than direct combat math. Marker tag for the
+  // future social mechanics subsystem.
+  social:      'ASPECTSOFPOWER.Tag.social',
   // Descriptors.
   magic:       'ASPECTSOFPOWER.Tag.magic',
   physical:    'ASPECTSOFPOWER.Tag.physical',
