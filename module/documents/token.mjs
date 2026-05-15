@@ -76,10 +76,17 @@ export class AspectsofPowerToken extends foundry.documents.TokenDocument {
 
     // Any existing declaration is auto-overridden by this new movement
     // (per user 2026-05-11: players can change their mind at will).
+    // EXCEPT: leap-in-flight is committed motion (Newton's first law —
+    // the actor is conceptually mid-air during the celerity wait between
+    // declare and fire). Refuse the new movement until the leap resolves.
     // preUpdateCombatant orphan-cleanup will dispose of any AOE region
     // that was placed by the prior action when declaredAction flips.
     const existing = combatant.flags?.aspectsofpower?.declaredAction;
     if (existing && existing.itemId) {
+      if (existing.uncancellable) {
+        ui.notifications.warn(`${actor.name} is mid-${existing.label} — cannot redirect until it resolves.`);
+        return false;
+      }
       combatant.update({
         'flags.aspectsofpower.declaredAction': null,
         'flags.aspectsofpower.nextActionTick': null,

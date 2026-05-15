@@ -296,13 +296,19 @@ export async function declareAction(actor, skill, options = {}) {
   if (!combatant) return null;
 
   // Any existing declaration is auto-overridden by the new one. Per user
-  // 2026-05-11: players can change their mind at will. The prior action's
-  // placed AOE region (if any) is cleaned up automatically by the
-  // preUpdateCombatant orphan-cleanup hook when declaredAction changes;
-  // sprite snaps back to the movement start position if the prior action
-  // was an in-flight movement (no partial commit).
+  // 2026-05-11: players can change their mind at will. EXCEPT: leap-in-
+  // flight is committed motion (the actor is conceptually mid-air during
+  // the celerity wait between declare and fire — Newton's first law: an
+  // object in motion stays in motion until acted on by an external force).
+  // Override is refused with a toast. The prior action's placed AOE region
+  // (if any) is cleaned up automatically by the preUpdateCombatant orphan-
+  // cleanup hook when declaredAction changes.
   const existing = combatant.flags?.aspectsofpower?.declaredAction;
   if (existing && existing.itemId) {
+    if (existing.uncancellable) {
+      ui.notifications.warn(`${actor.name} is mid-${existing.label} — cannot redirect until it resolves.`);
+      return null;
+    }
     await combatant.update({
       'flags.aspectsofpower.declaredAction': null,
       'flags.aspectsofpower.nextActionTick': null,
@@ -354,6 +360,13 @@ export async function declareAction(actor, skill, options = {}) {
   const clockTick = getClockTick(combatant.combat);
   const scheduledTick = clockTick + wait;
 
+  // Leap is committed motion from declare to fire (Newton's first law:
+  // the actor is conceptually mid-air during the wait). Refuse override
+  // attempts. Teleport stays cancellable — it's a spell channel, not
+  // physical motion; the spell hasn't completed until fire.
+  const skillTags = skill?.system?.tags ?? [];
+  const uncancellable = skillTags.includes('leap');
+
   await combatant.update({
     'flags.aspectsofpower.declaredAction': {
       itemId: skill.id,
@@ -369,6 +382,7 @@ export async function declareAction(actor, skill, options = {}) {
       teleportDestination,
       leapDestination,
       leapApexFt,
+      uncancellable,
     },
     'flags.aspectsofpower.nextActionTick': scheduledTick,
     'flags.aspectsofpower.lastActionWait': wait,
