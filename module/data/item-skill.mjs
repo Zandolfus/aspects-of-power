@@ -113,6 +113,13 @@ export class SkillData extends foundry.abstract.TypeDataModel {
         targetingMode:    new fields.StringField({ initial: 'all' }),
         templateDuration: new fields.NumberField({ initial: 0, min: 0, integer: true }),
         zoneEffect:       new fields.StringField({ initial: 'none' }),
+        // Ground-anchored AOEs (oil slick, spike trap, lava patch, vine
+        // trap) only affect targets on the ground. A leaping actor passing
+        // overhead skips them — they're in the air. Volumetric AOEs
+        // (fireball, gas cloud, fog) still hit the leaper because the
+        // medium fills the volume above the ground. Default false =
+        // volumetric (preserves existing behavior).
+        isGroundAnchored: new fields.BooleanField({ initial: false }),
       }),
 
       // Player-marked "favorite" skill — surfaced in the post-action

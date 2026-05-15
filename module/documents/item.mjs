@@ -2239,11 +2239,21 @@ export class AspectsofPowerItem extends Item {
     // action with walls=null and is deferred to a follow-up.
     // Path-region triggering and AOE-on-path work normally here, which
     // is the correct A' behavior (leaping through a fire field hits).
-    await casterToken.document.update({
-      x: tl.x,
-      y: tl.y,
-      elevation: destination.elevation ?? casterToken.document.elevation ?? 0,
-    }, { _aopLeap: true });
+    //
+    // Transient `_aopInLeap` marker on the token document — read by the
+    // persistent-AOE region behavior to filter ground-anchored AOEs
+    // (oil slicks, spike traps): leaper passes overhead, skips them.
+    // Cleared after the await so subsequent moves don't carry the flag.
+    casterToken.document._aopInLeap = true;
+    try {
+      await casterToken.document.update({
+        x: tl.x,
+        y: tl.y,
+        elevation: destination.elevation ?? casterToken.document.elevation ?? 0,
+      }, { _aopLeap: true });
+    } finally {
+      delete casterToken.document._aopInLeap;
+    }
     const truncatedNote = truncated
       ? (truncReason === 'engagement' ? ' — leap halted at enemy engagement' : ' — leap halted at wall')
       : '';
@@ -3785,6 +3795,7 @@ export class AspectsofPowerItem extends Item {
                 isShrapnel: (this.system.tags ?? []).includes('shrapnel'),
                 targetingMode: aoe.targetingMode ?? 'all',
                 zoneEffect: aoe.zoneEffect ?? 'none',
+                isGroundAnchored: aoe.isGroundAnchored ?? false,
                 casterDisposition: this.actor.getActiveTokens()?.[0]?.document?.disposition ?? CONST.TOKEN_DISPOSITIONS.NEUTRAL,
                 // Cadence period in ticks: caster's reference round / 4.
                 // Per design 2026-05-10: an AOE ticks on entry, then every
@@ -3962,6 +3973,7 @@ export class AspectsofPowerItem extends Item {
             isShrapnel: (this.system.tags ?? []).includes('shrapnel'),
             targetingMode: aoe.targetingMode ?? 'all',
             zoneEffect: aoe.zoneEffect ?? 'none',
+            isGroundAnchored: aoe.isGroundAnchored ?? false,
             casterDisposition: this.actor.getActiveTokens()?.[0]?.document?.disposition ?? CONST.TOKEN_DISPOSITIONS.NEUTRAL,
             casterReticPeriod: (() => {
               try {

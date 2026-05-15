@@ -45,6 +45,16 @@ class PersistentAoeBehavior extends foundry.data.regionBehaviors.RegionBehaviorT
     const tokenDoc = event.data?.token;
     if (!tokenDoc) return;
 
+    // Ground-anchored AOEs (oil slicks, spike traps, vine fields) only
+    // affect targets on the ground. A leaping actor passing overhead
+    // skips them. The leap handler sets _aopInLeap on the token doc
+    // for the duration of the move; clear it before/after via try/finally.
+    const region = this.region;
+    const isGroundAnchored = region?.flags?.['aspects-of-power']?.persistentData?.isGroundAnchored;
+    if (isGroundAnchored && tokenDoc._aopInLeap) {
+      return;
+    }
+
     // tokenEnter and tokenMoveIn both indicate "the token is now inside";
     // tokenMoveIn is the path-segmentation variant that fires when the
     // sprite passes through the region between two updates.
