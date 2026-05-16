@@ -745,6 +745,103 @@ export class AspectsofPowerItem extends Item {
    *   - defenseLine, reactionLine: HTML fragments for the chat result block
    */
   /**
+   * Reactive choice prompt for non-`self_attacked` triggers (Phase D).
+   * Filters reactor's Reaction-skillType skills by trigger + cooldown +
+   * budget + resource cost, then routes the choice to the reactor's owner
+   * via the existing `defensePrompt` socket flow (no defense-pool option).
+   *
+   * Returns the chosen reaction skill ID (string) or null on decline /
+   * timeout / no candidates.
+   */
+  async _promptReactiveChoice(reactorActor, triggerKey, ctx) {
+    if (!reactorActor) return null;
+    const reactions = reactorActor.system.reactions ?? { value: 0, max: 1 };
+    if (reactions.value <= 0) return null;
+    const combatRound = game.combat?.round ?? 0;
+    const cooldowns = reactorActor.flags?.aspectsofpower?.reactionCooldowns ?? {};
+    const candidates = reactorActor.items.filter(s => {
+      if (s.type !== 'skill' || s.system.skillType !== 'Reaction') return false;
+      const trig = s.system.tagConfig?.reactionTrigger ?? '';
+      if (trig !== triggerKey) return false; // strict match — no legacy fallback for non-self_attacked
+      const firedAt = cooldowns[s.id];
+      if (firedAt != null) {
+        const cdLen = s.system.tagConfig?.reactionCooldown ?? 1;
+        if ((combatRound - firedAt) < cdLen) return false;
+      }
+      const resKey = s.system.roll?.resource;
+      const cost = s.system.roll?.cost ?? 0;
+      if (resKey && cost > 0) {
+        const have = reactorActor.system[resKey]?.value ?? 0;
+        if (have < cost) return false;
+      }
+      return true;
+    });
+    if (candidates.length === 0) return null;
+
+    const reactionList = candidates.map(s => ({
+      id: s.id, name: s.name, img: s.img,
+      reactionType: s.system.reactionType ?? 'dodge',
+      available: true,
+    }));
+    const promptContent = ctx?.promptText ?? `<p>Reactive trigger: ${triggerKey}</p>`;
+
+    const characterOwner = game.users.find(u =>
+      u.active && !u.isGM && u.character?.id === reactorActor.id
+    );
+    const playerOwner = characterOwner?.id ?? null;
+
+    let result = { reactionSkillId: null };
+    if (playerOwner) {
+      const requestId = foundry.utils.randomID();
+      result = await new Promise((resolve) => {
+        const timeout = setTimeout(() => { cleanup(); resolve({ reactionSkillId: null }); }, 30000);
+        const handler = (response) => {
+          if (response.type !== 'defensePromptResponse' || response.requestId !== requestId) return;
+          cleanup();
+          resolve({ reactionSkillId: response.reactionSkillId ?? null });
+        };
+        const cleanup = () => {
+          clearTimeout(timeout);
+          game.socket.off('system.aspects-of-power', handler);
+        };
+        game.socket.on('system.aspects-of-power', handler);
+        game.socket.emit('system.aspects-of-power', {
+          type: 'defensePrompt',
+          targetUserId: playerOwner,
+          targetName: reactorActor.name,
+          promptContent,
+          requestId,
+          hasPool: false,
+          reactionSkills: reactionList,
+        });
+      });
+    } else if (game.user.isGM) {
+      result = await this._showDefenseDialog(reactorActor.name, promptContent, false, reactionList);
+    }
+    return result.reactionSkillId ?? null;
+  }
+
+  /**
+   * Fire a chosen reactive skill with budget + cooldown bookkeeping.
+   * Used by Phase D triggers after `_promptReactiveChoice` returns a pick.
+   */
+  async _commitReactiveFire(reactorActor, reactionSkill, attackerToken) {
+    if (!reactorActor || !reactionSkill) return;
+    await this._gmAction({ type: 'gmConsumeReaction', targetActorUuid: reactorActor.uuid });
+    const _cdRound = game.combat?.round ?? 0;
+    await reactorActor.update({
+      [`flags.aspectsofpower.reactionCooldowns.${reactionSkill.id}`]: _cdRound,
+    });
+    if (attackerToken) {
+      await reactionSkill.roll({ executeDeferred: true, preTargetIds: [attackerToken.id] });
+    }
+    ChatMessage.create({
+      speaker: ChatMessage.getSpeaker({ actor: reactorActor }),
+      content: `<p><em>${reactorActor.name} reacts with <strong>${reactionSkill.name}</strong>!</em></p>`,
+    });
+  }
+
+  /**
    * Passive reaction auto-fire. Scans `reactorActor`'s `skillType: 'Passive'`
    * skills tagged `retaliation` whose `tagConfig.reactionTrigger` matches
    * `triggerKey`. Each match fires automatically — no player prompt, no
@@ -983,6 +1080,30 @@ export class AspectsofPowerItem extends Item {
             });
           } catch (err) {
             console.warn('[reactions] ally_attacked roll failed:', skill.name, err);
+          }
+        }
+
+        // ── Reactive (player-prompted) ally_attacked (Phase D) ──
+        // After passive auto-fires, offer the reactor a choice for their
+        // Reaction-skillType `ally_attacked` skills (range-gated). Filters
+        // candidates by range, then falls into the shared prompt+commit
+        // helper. Skips silently if no candidates.
+        const reactiveCandidates = reactor.items.filter(s =>
+          s.type === 'skill' &&
+          s.system.skillType === 'Reaction' &&
+          (s.system.tagConfig?.reactionTrigger ?? '') === 'ally_attacked'
+        ).filter(s => {
+          const range = s.system.tagConfig?.reactionTriggerRange ?? 0;
+          return range === 0 || distFt <= range;
+        });
+        if (reactiveCandidates.length > 0) {
+          const promptText = `<p><strong>${targetActor.name}</strong> is being attacked within ${Math.round(distFt)} ft. React?</p>`;
+          // _promptReactiveChoice does its own filter pass too (cooldown,
+          // budget, cost). The pre-filter above just enforces the range.
+          const chosenId = await this._promptReactiveChoice(reactor, 'ally_attacked', { promptText, attackerToken, attackedActor: targetActor });
+          if (chosenId) {
+            const chosen = reactor.items.get(chosenId);
+            if (chosen) await this._commitReactiveFire(reactor, chosen, attackerToken);
           }
         }
       }
