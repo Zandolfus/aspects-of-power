@@ -547,6 +547,10 @@ ASPECTSOFPOWER.combatTags = {
   // charge. Activation uses the granted skill timing (1/3 reference
   // round). See design-ritual-subsystem.md.
   ritual:      'ASPECTSOFPOWER.Tag.ritual',
+  // Inscribe: profession-style action that takes a raw gem from inventory
+  // and a ritual skill known to the caster, and produces a consumable
+  // with effectType='ritual' encoding that skill. Mirrors craft/refine.
+  inscribe:    'ASPECTSOFPOWER.Tag.inscribe',
   // Descriptors.
   magic:       'ASPECTSOFPOWER.Tag.magic',
   physical:    'ASPECTSOFPOWER.Tag.physical',
