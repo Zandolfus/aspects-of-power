@@ -606,6 +606,11 @@
       "repairKit": "Repair Kit",
       "ritual": "Ritual",
       "none": "None"
+    },
+    "MediumType": {
+      "gem":    "Gem (held / touch)",
+      "circle": "Inscribed Circle (scene-anchored)",
+      "pylon":  "Pylon (long-range node)"
     }
   },
 

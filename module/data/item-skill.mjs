@@ -302,6 +302,20 @@ export class SkillData extends foundry.abstract.TypeDataModel {
         // Gather: output material configuration.
         gatherMaterial: new fields.StringField({ initial: '' }),
         gatherElement:  new fields.StringField({ initial: '' }),
+
+        // Ritual (per design-ritual-subsystem.md Phase 2.5):
+        //   ritualChargesProduced — how many charges one successful prep
+        //     creates on the resulting Medium. Set per ritual. Default 1
+        //     (single-use). Higher for rituals designed for stretched use.
+        //   ritualMinMana — floor on the prep mana-invest slider. The
+        //     ritualist can't attempt this ritual with less mana than this.
+        //     Doesn't guarantee success — the progress formula (wisdom +
+        //     material + mana, weights 0.55 / 0.30 / 0.15) still has to
+        //     clear the rarity-derived threshold (see CONFIG.ASPECTSOFPOWER
+        //     .ritualScale). Below threshold → materials + mana consumed,
+        //     no Medium produced.
+        ritualChargesProduced: new fields.NumberField({ initial: 1, min: 1, integer: true }),
+        ritualMinMana:         new fields.NumberField({ initial: 0, min: 0, integer: true }),
       }),
     };
   }

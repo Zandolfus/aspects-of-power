@@ -2957,30 +2957,36 @@ export class AspectsofPowerItem extends Item {
     const actor = this.actor;
     if (!actor) return;
 
-    // ── Step 1: Material picker (raw gems in inventory) ──
-    // A "raw gem" is any consumable with consumableType='gem' that hasn't
-    // already been inscribed (effectType != 'ritual'). Player marks an
-    // item as a gem via its consumableType field — no separate item type.
-    const rawGems = actor.items.filter(i =>
-      i.type === 'consumable'
-      && i.system?.consumableType === 'gem'
-      && i.system?.effectType !== 'ritual'
+    const sc = CONFIG.ASPECTSOFPOWER;
+    const weights = sc.ritualProgressWeights ?? { wisdom: 0.55, material: 0.30, mana: 0.15 };
+    const ritualScale = sc.ritualScale ?? {};
+
+    // ── Step 1: Material picker — gems with non-zero progress ──
+    // Per the user 2026-05-16: rituals consume crafting materials (type='item',
+    // isMaterial) whose `progress` value feeds the prep formula. Filter for
+    // gem-material specifically (system.material === 'gem').
+    const gemMaterials = actor.items.filter(i =>
+      i.type === 'item'
+      && i.system?.isMaterial
+      && (i.system?.material === 'gem' || (i.system?.tags ?? []).includes('gem'))
+      && (i.system?.progress ?? 0) > 0
       && (i.system?.quantity ?? 1) > 0
     );
-    if (rawGems.length === 0) {
+    if (gemMaterials.length === 0) {
       ChatMessage.create({ speaker, rollMode,
-        content: `<p><em>${actor.name} has no raw gems in inventory to inscribe.</em></p>` });
+        content: `<p><em>${actor.name} has no progress-bearing gem materials to inscribe with.</em></p>` });
       return;
     }
-    const gemButtons = rawGems.map(g => {
+    const gemButtons = gemMaterials.map(g => {
       const qty = g.system.quantity ?? 1;
       const rare = g.system.rarity ?? 'common';
-      return { action: g.id, label: `${g.name} [${rare}]${qty > 1 ? ` ×${qty}` : ''}` };
+      const prog = g.system.progress ?? 0;
+      return { action: g.id, label: `${g.name} [${rare}, progress ${prog}]${qty > 1 ? ` ×${qty}` : ''}` };
     });
     gemButtons.push({ action: 'cancel', label: 'Cancel' });
     const gemChoice = await foundry.applications.api.DialogV2.wait({
       window: { title: `${item.name} — Select Material` },
-      content: '<p>Pick a raw gem to inscribe:</p>',
+      content: '<p>Pick a gem material to inscribe with. The gem\'s progress value contributes to the ritual\'s success.</p>',
       buttons: gemButtons,
       close: () => 'cancel',
     });
@@ -2988,9 +2994,7 @@ export class AspectsofPowerItem extends Item {
     const sourceGem = actor.items.get(gemChoice);
     if (!sourceGem) return;
 
-    // ── Step 2: Ritual subset (skills on the actor with the `ritual` tag) ──
-    // The inscribing skill itself (carrying `inscribe`) is excluded so the
-    // list isn't polluted with profession actions.
+    // ── Step 2: Ritual subset (ritual-tagged skills the actor knows) ──
     const ritualSkills = actor.items.filter(i =>
       i.type === 'skill'
       && (i.system?.tags ?? []).includes('ritual')
@@ -3001,7 +3005,15 @@ export class AspectsofPowerItem extends Item {
         content: `<p><em>${actor.name} knows no ritual skills to inscribe.</em></p>` });
       return;
     }
-    const ritualButtons = ritualSkills.map(s => ({ action: s.id, label: s.name }));
+    const ritualButtons = ritualSkills.map(s => {
+      const rarity = s.system?.rarity ?? 'common';
+      const scaleEntry = ritualScale[rarity] ?? ritualScale.common ?? { threshold: 0, cap: 0 };
+      const charges = s.system?.tagConfig?.ritualChargesProduced ?? 1;
+      return {
+        action: s.id,
+        label: `${s.name} [${rarity}] — thr ${scaleEntry.threshold} / cap ${scaleEntry.cap}, ${charges} charge${charges === 1 ? '' : 's'}`,
+      };
+    });
     ritualButtons.push({ action: 'cancel', label: 'Cancel' });
     const ritualChoice = await foundry.applications.api.DialogV2.wait({
       window: { title: `${item.name} — Select Ritual` },
@@ -3013,68 +3025,138 @@ export class AspectsofPowerItem extends Item {
     const ritualSkill = actor.items.get(ritualChoice);
     if (!ritualSkill) return;
 
-    // ── Step 3: Combined Setup confirm ──
-    const newCharges = 3;
-    const inscribedName = `Inscribed ${sourceGem.name.replace(/^Raw\s+/i, '')} (${ritualSkill.name})`;
-    const confirmChoice = await foundry.applications.api.DialogV2.wait({
-      window: { title: `${item.name} — Confirm Inscription` },
+    // ── Step 3: Setup dialog — mana invest + projected progress ──
+    const rarity = ritualSkill.system?.rarity ?? 'common';
+    const scaleEntry = ritualScale[rarity] ?? ritualScale.common ?? { threshold: 0, cap: 0 };
+    const threshold = scaleEntry.threshold ?? 0;
+    const cap = scaleEntry.cap ?? 0;
+    const charges = ritualSkill.system?.tagConfig?.ritualChargesProduced ?? 1;
+    const minMana = ritualSkill.system?.tagConfig?.ritualMinMana ?? 0;
+    const wisdomMod = Math.max(0, Math.round(actor.system?.abilities?.wisdom?.mod ?? 0));
+    const materialProgress = sourceGem.system?.progress ?? 0;
+    const currentMana = Math.round(actor.system?.mana?.value ?? 0);
+    const initialMana = Math.max(minMana, Math.min(currentMana, minMana || 1));
+
+    if (currentMana < minMana) {
+      ChatMessage.create({ speaker, rollMode,
+        content: `<p><em>${actor.name} needs at least ${minMana} mana to prepare ${ritualSkill.name} (has ${currentMana}).</em></p>` });
+      return;
+    }
+
+    // Inline JS in the dialog content updates the projected-progress readout
+    // when the player drags the mana input. Span ids are scoped enough that
+    // duplicate dialogs are unlikely; if they collide it just means stale
+    // numbers in the older instance.
+    const setupResult = await foundry.applications.api.DialogV2.wait({
+      window: { title: `${item.name} — Ritual Setup` },
       content: `
         <div class="craft-setup">
-          <p><strong>Skill:</strong> ${item.name}</p>
-          <p><strong>Material:</strong> ${sourceGem.name} (one ${(sourceGem.system.quantity ?? 1) > 1 ? `of ×${sourceGem.system.quantity}` : ''} consumed)</p>
-          <p><strong>Ritual:</strong> ${ritualSkill.name}</p>
-          <p><strong>Output:</strong> ${inscribedName} (${newCharges} charges)</p>
-          <p class="hint">Roll quality: ${Math.round(dmgRoll?.total ?? 0)}</p>
+          <p><strong>Ritualist:</strong> ${actor.name} (wisdom mod ${wisdomMod})</p>
+          <p><strong>Material:</strong> ${sourceGem.name} — progress ${materialProgress}</p>
+          <p><strong>Ritual:</strong> ${ritualSkill.name} [${rarity}] — threshold ${threshold} / cap ${cap}, produces ${charges} charge${charges === 1 ? '' : 's'}</p>
+          <hr>
+          <div class="form-group">
+            <label>Mana to invest (${minMana} – ${currentMana})</label>
+            <input type="number" name="manaInvest" id="aop-ritual-mana" value="${initialMana}" min="${minMana}" max="${currentMana}" step="1" />
+          </div>
+          <p class="hint">
+            Progress = round(${weights.wisdom} × wis + ${weights.material} × mat + ${weights.mana} × mana)<br>
+            Projected: <strong id="aop-ritual-projected">—</strong>
+            (needs ≥ ${threshold} to succeed; cap ${cap})
+          </p>
+          <script>
+            (() => {
+              const inp = document.getElementById('aop-ritual-mana');
+              const out = document.getElementById('aop-ritual-projected');
+              if (!inp || !out) return;
+              const update = () => {
+                const m = Math.max(${minMana}, Math.min(${currentMana}, Number(inp.value) || 0));
+                const p = Math.round(${weights.wisdom} * ${wisdomMod} + ${weights.material} * ${materialProgress} + ${weights.mana} * m);
+                const ok = p >= ${threshold};
+                out.textContent = p + (ok ? ' (success)' : ' (FAIL — materials + mana lost)');
+                out.style.color = ok ? '#4caf50' : '#ef5350';
+              };
+              inp.addEventListener('input', update);
+              update();
+            })();
+          </script>
         </div>
       `,
       buttons: [
-        { action: 'inscribe', label: 'Inscribe', icon: 'fas fa-gem', default: true },
+        { action: 'prep', label: 'Prepare', icon: 'fas fa-gem', default: true, callback: (event, button, dialog) => {
+          const inp = dialog.element.querySelector('[name="manaInvest"]');
+          return { mana: Math.max(minMana, Math.min(currentMana, Number(inp?.value) || minMana)) };
+        } },
         { action: 'cancel', label: 'Cancel' },
       ],
       close: () => 'cancel',
     });
-    if (confirmChoice !== 'inscribe') return;
+    if (!setupResult || setupResult === 'cancel') return;
 
-    // Re-fetch source gem in case state changed during dialog walk.
+    const manaInvested = setupResult.mana;
+    const progress = Math.round(weights.wisdom * wisdomMod + weights.material * materialProgress + weights.mana * manaInvested);
+
+    // Re-fetch the gem in case state shifted while dialogs were open.
     const liveSrc = actor.items.get(sourceGem.id);
     if (!liveSrc) {
       ChatMessage.create({ speaker, rollMode,
-        content: '<p><em>Inscribe failed: gem no longer available.</em></p>' });
+        content: '<p><em>Inscribe failed: material no longer available. (No mana/material spent.)</em></p>' });
       return;
     }
 
-    // ── Create the inscribed gem consumable ──
-    const [inscribed] = await actor.createEmbeddedDocuments('Item', [{
-      name: inscribedName,
-      type: 'consumable',
-      img: liveSrc.img,
-      system: {
-        description: `<p>A gem inscribed with the sigils of ${ritualSkill.name}. Activating it consumes one charge to invoke the encoded ritual.</p>`,
-        quantity: 1,
-        weight: liveSrc.system.weight ?? 0.1,
-        rarity: liveSrc.system.rarity ?? 'common',
-        consumableType: 'gem',
-        effectType: 'ritual',
-        ritualSkillId: ritualSkill.uuid,
-        charges: { value: newCharges, max: newCharges },
-      },
-    }]);
-
-    // ── Consume one of the source gem ──
+    // ── Always consume: one material + the invested mana ──
     const srcQty = liveSrc.system.quantity ?? 1;
     if (srcQty <= 1) {
       await liveSrc.delete();
     } else {
       await liveSrc.update({ 'system.quantity': srcQty - 1 });
     }
+    if (manaInvested > 0) {
+      const manaNow = Math.round(actor.system?.mana?.value ?? 0);
+      await actor.update({ 'system.mana.value': Math.max(0, manaNow - manaInvested) });
+    }
+
+    // ── Branch on success/failure ──
+    if (progress < threshold) {
+      ChatMessage.create({ speaker, rollMode,
+        content: `<div class="craft-result">
+          <h3>${item.name} — Ritual Failed</h3>
+          <hr>
+          <p><strong>${actor.name}</strong> attempts to inscribe <strong>${ritualSkill.name}</strong> into <strong>${liveSrc.name}</strong>, but the progress falls short.</p>
+          <p>Progress: <strong style="color:#ef5350;">${progress}</strong> / threshold ${threshold}</p>
+          <p class="hint">Inputs — wis ${wisdomMod}, material ${materialProgress}, mana ${manaInvested} → consumed.</p>
+        </div>` });
+      return;
+    }
+
+    const storedPower = Math.min(progress, cap);
+    const inscribedName = `Inscribed ${liveSrc.name.replace(/^Raw\s+/i, '')} (${ritualSkill.name})`;
+    const [inscribed] = await actor.createEmbeddedDocuments('Item', [{
+      name: inscribedName,
+      type: 'consumable',
+      img: liveSrc.img,
+      system: {
+        description: `<p>A gem inscribed with the sigils of ${ritualSkill.name}. Activating it consumes one charge to invoke the encoded ritual with stored power ${storedPower}.</p>`,
+        quantity: 1,
+        weight: liveSrc.system.weight ?? 0.1,
+        rarity: liveSrc.system.rarity ?? 'common',
+        consumableType: 'gem',
+        effectType: 'ritual',
+        ritualSkillId: ritualSkill.uuid,
+        ritualPower: storedPower,
+        mediumType: 'gem',
+        charges: { value: charges, max: charges },
+      },
+    }]);
 
     ChatMessage.create({ speaker, rollMode,
       content: `<div class="craft-result">
         <h3>${item.name} — Inscription Complete</h3>
         <hr>
         <p><strong>${actor.name}</strong> inscribes <strong>${ritualSkill.name}</strong> into <strong>${liveSrc.name}</strong>.</p>
-        <p>Result: <strong>${inscribed.name}</strong> (${newCharges} charges).</p>
-        <p class="hint">Roll quality: ${Math.round(dmgRoll?.total ?? 0)}.</p>
+        <p>Progress: <strong style="color:#4caf50;">${progress}</strong> / threshold ${threshold} ${progress > cap ? `(capped at ${cap})` : ''}</p>
+        <p>Result: <strong>${inscribed.name}</strong> — stored power <strong>${storedPower}</strong>, ${charges} charge${charges === 1 ? '' : 's'}.</p>
+        <p class="hint">Inputs — wis ${wisdomMod}, material ${materialProgress}, mana ${manaInvested}.</p>
       </div>` });
   }
 
@@ -4719,9 +4801,19 @@ export class AspectsofPowerItem extends Item {
         // build-neutral 1/3 reference round (per design — the gem grants the
         // ability, not the caster's training). Fire through the standard
         // skill pipeline — declare-then-fire happens via celerity as normal.
+        //
+        // Phase 2.5: pass the stored ritualPower as preInvestAmount so the
+        // skill's variable-mana invest path uses it directly (skipping the
+        // player invest prompt). Effect strength scales from the prep-time
+        // ritualPower, not the activating caster's resources. Ritual skills
+        // should be authored as variable-mana magic skills for this to
+        // actually scale the rolled effect; if they aren't, preInvestAmount
+        // is ignored and the cast runs at baseline strength.
+        const ritualPower = sys.ritualPower ?? 0;
         ChatMessage.create({ speaker, rollMode, ...(whisperGM ? { whisper: whisperGM } : {}),
-          content: `<p><strong>${this.actor.name}</strong> activates <strong>${this.name}</strong> — invoking <em>${ritualSkill.name}</em>.</p>` });
-        await ritualSkill.roll({});
+          content: `<p><strong>${this.actor.name}</strong> activates <strong>${this.name}</strong> — invoking <em>${ritualSkill.name}</em> at stored power ${ritualPower}.</p>` });
+        const rollOptions = ritualPower > 0 ? { preInvestAmount: ritualPower } : {};
+        await ritualSkill.roll(rollOptions);
         break;
       }
 

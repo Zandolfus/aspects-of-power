@@ -1017,6 +1017,52 @@ ASPECTSOFPOWER.consumableEffectTypes = {
 };
 
 /**
+ * Ritual quality scaling per design-ritual-subsystem.md Phase 2.5.
+ * The ritual skill's rarity is the "machine quality" — drives the
+ * progress threshold (minimum to succeed) and the cap (maximum strength
+ * the Medium can store). Better materials and more mana let a ritualist
+ * approach the cap of a given ritual, but going beyond requires
+ * acquiring a higher-rarity version of the ritual itself.
+ *
+ * Progress formula: round(wisdom_mod × 0.55 + material_progress × 0.30
+ *                          + mana_invested × 0.15)
+ * Failure (progress < threshold) consumes materials + mana, no Medium.
+ * Success stores Medium with ritualPower = min(progress, cap).
+ */
+ASPECTSOFPOWER.ritualScale = {
+  inferior:  { threshold:   0, cap:   50 },
+  common:    { threshold:  20, cap:  100 },
+  uncommon:  { threshold:  35, cap:  175 },
+  rare:      { threshold:  60, cap:  300 },
+  epic:      { threshold: 100, cap:  500 },
+  legendary: { threshold: 160, cap:  800 },
+  mythic:    { threshold: 250, cap: 1300 },
+  divine:    { threshold: 400, cap: 2100 },
+};
+
+/**
+ * Progress formula weights per design-ritual-subsystem.md Phase 2.5.
+ * Sum to 1.0; "wisdom is the dominant input but materials + mana matter."
+ */
+ASPECTSOFPOWER.ritualProgressWeights = {
+  wisdom:   0.55,
+  material: 0.30,
+  mana:     0.15,
+};
+
+/**
+ * Medium types — the physical form an inscribed ritual takes. Drives
+ * range/geometry at activation. Phase 2.5 ships `gem` (touch/self) only;
+ * `circle` and `pylon` are deferred to a later phase that needs scene-
+ * region or persistent-token plumbing.
+ */
+ASPECTSOFPOWER.mediumTypes = {
+  gem:    { label: 'ASPECTSOFPOWER.MediumType.gem',    range:   0, placement: false },
+  circle: { label: 'ASPECTSOFPOWER.MediumType.circle', range:  60, placement: true  },
+  pylon:  { label: 'ASPECTSOFPOWER.MediumType.pylon',  range: 300, placement: true  },
+};
+
+/**
  * Material types for equipment — determines which repair skills can target them.
  */
 ASPECTSOFPOWER.materialTypes = {

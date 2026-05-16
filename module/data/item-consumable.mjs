@@ -68,7 +68,20 @@ export class ConsumableData extends foundry.abstract.TypeDataModel {
       // referenced skill with granted-skill timing (1/3 reference round).
       // Charges track uses remaining; when value hits 0 the item is depleted.
       // See design-ritual-subsystem.md.
+      //
+      // Phase 2.5 fields:
+      //   mediumType  — drives range/geometry behavior at activation.
+      //     gem    = held / touch range (no placement step)
+      //     circle = scene-anchored AOE (placed at prep time, fires from
+      //              the inscribed location; range derived from placement)
+      //     pylon  = long-range network node (deferred)
+      //   ritualPower — strength stored on the Medium at prep time. Equal
+      //     to the achieved progress, clamped to the ritual's quality cap
+      //     (rarity-derived). Passed into activation as preInvestAmount so
+      //     the existing roll pipeline scales effect strength accordingly.
       ritualSkillId: new fields.StringField({ initial: '' }),
+      mediumType:    new fields.StringField({ initial: 'gem' }),
+      ritualPower:   new fields.NumberField({ initial: 0, min: 0, integer: true }),
     };
   }
 }
