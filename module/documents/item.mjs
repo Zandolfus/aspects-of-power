@@ -1058,18 +1058,19 @@ export class AspectsofPowerItem extends Item {
         if (reactor.id === this.actor?.id) continue; // attacker can't react on its own attack
         // Only same-disposition (friendly) reactors trigger.
         if (cm.token.disposition !== targetToken.document.disposition) continue;
-        // Find matching skills + check range.
-        const candidates = reactor.items.filter(s =>
+        // Compute distance once — used by both passive + reactive checks.
+        const dx = targetCenter.x - rTok.center.x;
+        const dy = targetCenter.y - rTok.center.y;
+        const distFt = Math.hypot(dx, dy) / pxPerFt;
+
+        // ── Passive ally_attacked auto-fire ──
+        const passiveCandidates = reactor.items.filter(s =>
           s.type === 'skill' &&
           s.system.skillType === 'Passive' &&
           (s.system.tags ?? []).includes('retaliation') &&
           (s.system.tagConfig?.reactionTrigger ?? '') === 'ally_attacked'
         );
-        if (candidates.length === 0) continue;
-        const dx = targetCenter.x - rTok.center.x;
-        const dy = targetCenter.y - rTok.center.y;
-        const distFt = Math.hypot(dx, dy) / pxPerFt;
-        for (const skill of candidates) {
+        for (const skill of passiveCandidates) {
           const range = skill.system.tagConfig?.reactionTriggerRange ?? 0;
           if (range > 0 && distFt > range) continue;
           try {
@@ -1079,15 +1080,13 @@ export class AspectsofPowerItem extends Item {
               content: `<p><em>${reactor.name}'s <strong>${skill.name}</strong> triggers (${targetActor.name} attacked within ${Math.round(distFt)}ft)!</em></p>`,
             });
           } catch (err) {
-            console.warn('[reactions] ally_attacked roll failed:', skill.name, err);
+            console.warn('[reactions] ally_attacked passive failed:', skill.name, err);
           }
         }
 
         // ── Reactive (player-prompted) ally_attacked (Phase D) ──
-        // After passive auto-fires, offer the reactor a choice for their
-        // Reaction-skillType `ally_attacked` skills (range-gated). Filters
-        // candidates by range, then falls into the shared prompt+commit
-        // helper. Skips silently if no candidates.
+        // Independent of passive presence — a reactor with ONLY a Reaction-
+        // skillType ally_attacked skill (no passive) still gets the prompt.
         const reactiveCandidates = reactor.items.filter(s =>
           s.type === 'skill' &&
           s.system.skillType === 'Reaction' &&
@@ -1098,8 +1097,6 @@ export class AspectsofPowerItem extends Item {
         });
         if (reactiveCandidates.length > 0) {
           const promptText = `<p><strong>${targetActor.name}</strong> is being attacked within ${Math.round(distFt)} ft. React?</p>`;
-          // _promptReactiveChoice does its own filter pass too (cooldown,
-          // budget, cost). The pre-filter above just enforces the range.
           const chosenId = await this._promptReactiveChoice(reactor, 'ally_attacked', { promptText, attackerToken, attackedActor: targetActor });
           if (chosenId) {
             const chosen = reactor.items.get(chosenId);
