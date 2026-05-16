@@ -258,11 +258,14 @@ export class PlayerRelevelDialog extends foundry.applications.api.HandlebarsAppl
       'system.attributes.class.templateId': '',
       'system.attributes.class.name':       '',
       'system.attributes.class.cachedTags': [],
+      'system.attributes.class.history':    [],
       'system.attributes.profession.level':      0,
       'system.attributes.profession.templateId': '',
       'system.attributes.profession.name':       '',
       'system.attributes.profession.cachedTags': [],
+      'system.attributes.profession.history':    [],
       'system.attributes.race.level':       0,
+      'system.attributes.race.history':     [],
       'system.freePoints': 0,
     };
     // Set race templateId to the player-chosen starting race (defaults to current).
@@ -272,6 +275,9 @@ export class PlayerRelevelDialog extends foundry.applications.api.HandlebarsAppl
       let raceTemplate = null;
       try { raceTemplate = await fromUuid(this.startingRaceId); } catch (e) { /* unavailable */ }
       updates['system.attributes.race.templateId'] = this.startingRaceId;
+      // Seed race history: the starting race covers from level 1 onward (race
+      // level starts at 0; the first level the walker adds is 1).
+      updates['system.attributes.race.history'] = [{ fromLevel: 1, templateId: this.startingRaceId }];
       if (raceTemplate) {
         updates['system.attributes.race.name']       = raceTemplate.name;
         // Cache the unified tags array as `[{id, value:0}]` for back-compat
@@ -317,7 +323,7 @@ export class PlayerRelevelDialog extends foundry.applications.api.HandlebarsAppl
       if (!templateId) {
         const nextLevel = cur + 1;
         const neededRank = CONFIG.ASPECTSOFPOWER.getRankForLevel(nextLevel);
-        await this._promptTemplatePick(track, neededRank);
+        await this._promptTemplatePick(track, neededRank, nextLevel);
         continue; // re-loop to re-check templateId (which is now set) and proceed
       }
 
@@ -331,9 +337,10 @@ export class PlayerRelevelDialog extends foundry.applications.api.HandlebarsAppl
       if (result.halted && result.reason) {
         // Halted at rank boundary — clear the now-wrong templateId and prompt.
         const newCur = this.actor.system.attributes?.[track]?.level ?? 0;
-        const neededRank = CONFIG.ASPECTSOFPOWER.getRankForLevel(newCur + 1);
+        const nextLevel = newCur + 1;
+        const neededRank = CONFIG.ASPECTSOFPOWER.getRankForLevel(nextLevel);
         await this.actor.update({ [`system.attributes.${track}.templateId`]: '' });
-        await this._promptTemplatePick(track, neededRank);
+        await this._promptTemplatePick(track, neededRank, nextLevel);
       } else if (result.applied === 0) {
         throw new Error(`${track} walk made no progress: ${result.reason ?? 'unknown'}`);
       }
@@ -362,7 +369,7 @@ export class PlayerRelevelDialog extends foundry.applications.api.HandlebarsAppl
 
       // Need a template before applying.
       if (!this.actor.system.attributes?.race?.templateId) {
-        await this._promptTemplatePick('race', nextRank);
+        await this._promptTemplatePick('race', nextRank, nextLevel);
         continue;
       }
 
@@ -374,8 +381,9 @@ export class PlayerRelevelDialog extends foundry.applications.api.HandlebarsAppl
 
       // Halted mid-segment (template lacked rankGains for this rank).
       if (result.halted && result.applied < segmentSize) {
+        const newCur = this.actor.system.attributes?.race?.level ?? 0;
         await this.actor.update({ 'system.attributes.race.templateId': '' });
-        await this._promptTemplatePick('race', nextRank);
+        await this._promptTemplatePick('race', nextRank, newCur + 1);
         continue;
       }
 
@@ -383,7 +391,7 @@ export class PlayerRelevelDialog extends foundry.applications.api.HandlebarsAppl
       const nowAt = this.actor.system.attributes?.race?.level ?? 0;
       if (nowAt < targetLevel) {
         const upcomingRank = sc.getRankForLevel(nowAt + 1);
-        await this._promptOptionalRaceChange(upcomingRank);
+        await this._promptOptionalRaceChange(upcomingRank, nowAt + 1);
       }
     }
   }
@@ -392,9 +400,9 @@ export class PlayerRelevelDialog extends foundry.applications.api.HandlebarsAppl
    * Show the template picker step and await the player's choice. Returns
    * after the picker action handler has assigned the template to the actor.
    */
-  async _promptTemplatePick(track, neededRank) {
+  async _promptTemplatePick(track, neededRank, fromLevel) {
     const candidates = await this._findTemplatesByRank(track, neededRank);
-    this.runState.waitingForPick = { track, neededRank, candidates, allowSkip: false };
+    this.runState.waitingForPick = { track, neededRank, fromLevel, candidates, allowSkip: false };
     this.runState.logLines.push(`Pick a ${track} template for rank ${neededRank}…`);
     await this.render();
     return new Promise(resolve => { this._pickResolve = resolve; });
@@ -405,9 +413,9 @@ export class PlayerRelevelDialog extends foundry.applications.api.HandlebarsAppl
    * picker UI as `_promptTemplatePick` but with `allowSkip: true` so the
    * player can choose "Keep current race" to proceed without changing.
    */
-  async _promptOptionalRaceChange(upcomingRank) {
+  async _promptOptionalRaceChange(upcomingRank, fromLevel) {
     const candidates = await this._findTemplatesByRank('race', upcomingRank);
-    this.runState.waitingForPick = { track: 'race', neededRank: upcomingRank, candidates, allowSkip: true };
+    this.runState.waitingForPick = { track: 'race', neededRank: upcomingRank, fromLevel, candidates, allowSkip: true };
     this.runState.logLines.push(`Optional race change at the rank ${upcomingRank} threshold…`);
     await this.render();
     return new Promise(resolve => { this._pickResolve = resolve; });
@@ -446,12 +454,17 @@ export class PlayerRelevelDialog extends foundry.applications.api.HandlebarsAppl
       ...(item.system.tags ?? []),
       ...(item.system.systemTags ?? []).map(t => t.id),
     ];
+    // Append a history entry: this template covers from `pick.fromLevel` onward.
+    // Lookup at level L = findLast(entry => entry.fromLevel <= L).
+    const prevHistory = this.actor.system.attributes?.[pick.track]?.history ?? [];
+    const nextHistory = [...prevHistory, { fromLevel: pick.fromLevel, templateId: item.uuid }];
     await this.actor.update({
       [`system.attributes.${pick.track}.templateId`]: item.uuid,
       [`system.attributes.${pick.track}.name`]:       item.name,
       [`system.attributes.${pick.track}.cachedTags`]: tagIds.map(id => ({ id, value: 0 })),
+      [`system.attributes.${pick.track}.history`]:    nextHistory,
     });
-    this.runState.logLines.push(`${pick.track} → ${item.name} (rank ${pick.neededRank})`);
+    this.runState.logLines.push(`${pick.track} → ${item.name} (rank ${pick.neededRank}, from level ${pick.fromLevel})`);
     await this.render();
     resolvePick();
   }
