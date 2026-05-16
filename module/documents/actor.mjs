@@ -829,29 +829,27 @@ export class AspectsofPowerActor extends Actor {
       }
     }
 
-    // Reset reactions.
+    // Reset reactions + tick down per-skill reaction cooldowns.
+    // Same per-actor-round signal that already refreshes the budget.
     const reactions = systemData.reactions;
     if (reactions && reactions.value !== reactions.max) {
       updateData['system.reactions.value'] = reactions.max;
     }
-    // Reaction cooldown cleanup. Entries map skillId → roundLastFired.
-    // At each onStartTurn, prune entries whose cooldown window has passed
-    // (currentRound - roundLastFired >= skill.reactionCooldown). Foundry
-    // merges nested flag updates by default — to actually DELETE a key
-    // we use the ForcedDeletion sentinel per-key (see reference_foundry_quirks).
-    // Stays bounded by the number of reactions an actor has fired this combat.
-    // Live writes happen at reaction-dispatch time (Phase B).
+
+    // Reaction cooldowns. Entries map skillId → roundsRemaining (set at
+    // fire time to skill.reactionCooldown). At each onStartTurn we
+    // decrement; entries that hit 0 (or below) get pruned via
+    // ForcedDeletion (Foundry merges nested flag updates by default).
     const cooldowns = this.flags?.aspectsofpower?.reactionCooldowns ?? {};
     const FD = foundry.data?.operators?.ForcedDeletion;
-    for (const [skillId, firedAt] of Object.entries(cooldowns)) {
-      const skill = this.items.get(skillId);
-      const cooldownLen = skill?.system?.tagConfig?.reactionCooldown ?? 1;
-      // Prune when window expired OR the skill itself is gone (orphaned entry).
-      if (!skill || (currentRound - firedAt >= cooldownLen)) {
-        // ForcedDeletion needs to be an INSTANCE (`new FD()`), not the class
-        // itself — verified empirically 2026-05-16; the class-as-value pattern
-        // in the augment-tag-grants hook may be a latent bug there too.
+    for (const [skillId, remaining] of Object.entries(cooldowns)) {
+      const next = (remaining ?? 0) - 1;
+      // ForcedDeletion needs an INSTANCE (`new FD()`), not the class —
+      // verified empirically 2026-05-16; see reference_foundry_quirks #11.
+      if (next <= 0) {
         updateData[`flags.aspectsofpower.reactionCooldowns.${skillId}`] = FD ? new FD() : null;
+      } else {
+        updateData[`flags.aspectsofpower.reactionCooldowns.${skillId}`] = next;
       }
     }
 

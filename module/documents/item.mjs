@@ -757,17 +757,14 @@ export class AspectsofPowerItem extends Item {
     if (!reactorActor) return null;
     const reactions = reactorActor.system.reactions ?? { value: 0, max: 1 };
     if (reactions.value <= 0) return null;
-    const combatRound = game.combat?.round ?? 0;
+    // Cooldown entries: skillId → roundsRemaining. Decremented at onStartTurn.
+    // Entry present with > 0 = on cooldown. No entry = ready.
     const cooldowns = reactorActor.flags?.aspectsofpower?.reactionCooldowns ?? {};
     const candidates = reactorActor.items.filter(s => {
       if (s.type !== 'skill' || s.system.skillType !== 'Reaction') return false;
       const trig = s.system.tagConfig?.reactionTrigger ?? '';
       if (trig !== triggerKey) return false; // strict match — no legacy fallback for non-self_attacked
-      const firedAt = cooldowns[s.id];
-      if (firedAt != null) {
-        const cdLen = s.system.tagConfig?.reactionCooldown ?? 1;
-        if ((combatRound - firedAt) < cdLen) return false;
-      }
+      if ((cooldowns[s.id] ?? 0) > 0) return false;
       const resKey = s.system.roll?.resource;
       const cost = s.system.roll?.cost ?? 0;
       if (resKey && cost > 0) {
@@ -828,10 +825,15 @@ export class AspectsofPowerItem extends Item {
   async _commitReactiveFire(reactorActor, reactionSkill, attackerToken) {
     if (!reactorActor || !reactionSkill) return;
     await this._gmAction({ type: 'gmConsumeReaction', targetActorUuid: reactorActor.uuid });
-    const _cdRound = game.combat?.round ?? 0;
-    await reactorActor.update({
-      [`flags.aspectsofpower.reactionCooldowns.${reactionSkill.id}`]: _cdRound,
-    });
+    // Stamp rounds-remaining = skill.reactionCooldown. Decremented at each
+    // onStartTurn; auto-pruned when it hits 0. Default 1 = unavailable
+    // until the actor's next reference round begins.
+    const cdLen = reactionSkill.system?.tagConfig?.reactionCooldown ?? 1;
+    if (cdLen > 0) {
+      await reactorActor.update({
+        [`flags.aspectsofpower.reactionCooldowns.${reactionSkill.id}`]: cdLen,
+      });
+    }
     if (attackerToken) {
       await reactionSkill.roll({ executeDeferred: true, preTargetIds: [attackerToken.id] });
     }
@@ -934,13 +936,14 @@ export class AspectsofPowerItem extends Item {
       if (reactionSkill) {
         const rType = reactionSkill.system.reactionType ?? 'dodge';
         await this._gmAction({ type: 'gmConsumeReaction', targetActorUuid: targetActor.uuid });
-        // Phase B cooldown write: stamp the current combat round so this
-        // reaction respects its `reactionCooldown` window. Cleaned up at
-        // the actor's next onStartTurn (per Phase A).
-        const _cdRound = game.combat?.round ?? 0;
-        await targetActor.update({
-          [`flags.aspectsofpower.reactionCooldowns.${reactionSkill.id}`]: _cdRound,
-        });
+        // Stamp rounds-remaining = skill.reactionCooldown (decremented at
+        // each onStartTurn; auto-pruned at 0). Default 1 = next round.
+        const _cdLen = reactionSkill.system?.tagConfig?.reactionCooldown ?? 1;
+        if (_cdLen > 0) {
+          await targetActor.update({
+            [`flags.aspectsofpower.reactionCooldowns.${reactionSkill.id}`]: _cdLen,
+          });
+        }
         const reactionSpeaker = ChatMessage.getSpeaker({ actor: targetActor });
 
         if (rType === 'dodge') {
@@ -1366,7 +1369,7 @@ export class AspectsofPowerItem extends Item {
     // is being attacked). Legacy reactions with no trigger set are included
     // for back-compat. Cooldowns and resource costs gate availability.
     const reactions = targetActor.system.reactions ?? { value: 0, max: 1 };
-    const combatRound = game.combat?.round ?? 0;
+    // Cooldown entries: skillId → roundsRemaining. Entry present with > 0 = on cooldown.
     const cooldowns = targetActor.flags?.aspectsofpower?.reactionCooldowns ?? {};
     const reactionSkills = targetActor.items.filter(s => {
       if (s.type !== 'skill' || s.system.skillType !== 'Reaction') return false;
@@ -1374,12 +1377,7 @@ export class AspectsofPowerItem extends Item {
       // Empty trigger = legacy; include for back-compat. Specific trigger
       // must match the current event (`self_attacked`).
       if (trig && trig !== 'self_attacked') return false;
-      // Cooldown gate: if the skill has been fired recently, check window.
-      const firedAt = cooldowns[s.id];
-      if (firedAt != null) {
-        const cdLen = s.system.tagConfig?.reactionCooldown ?? 1;
-        if ((combatRound - firedAt) < cdLen) return false;
-      }
+      if ((cooldowns[s.id] ?? 0) > 0) return false;
       // Resource gate: actor must be able to afford the cost.
       const resKey = s.system.roll?.resource;
       const cost   = s.system.roll?.cost ?? 0;
