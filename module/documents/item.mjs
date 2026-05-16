@@ -744,7 +744,43 @@ export class AspectsofPowerItem extends Item {
    *   - damageMultiplier: 1.0 = full damage, <1.0 = partial defense reduction
    *   - defenseLine, reactionLine: HTML fragments for the chat result block
    */
-  async _resolveDefenseCheck(item, targetActor, defKey, hitTotal) {
+  /**
+   * Passive retaliation auto-fire (Phase B). Scans the target actor's
+   * `skillType: 'Passive'` skills tagged `retaliation` whose
+   * `tagConfig.reactionTrigger` matches `triggerKey`. Each match fires
+   * automatically — no player prompt, no reactions-budget consumption,
+   * no cooldown enforcement. Author sets cost=0 for free-fire (Thorns);
+   * non-zero cost still gets deducted by the standard roll path.
+   *
+   * Distinct from the Reactive flow which prompts the player and is
+   * gated by budget + cooldown. Passives are always-on.
+   *
+   * @param {Actor} targetActor   The actor being attacked.
+   * @param {Token|null} attackerToken  The attacker's token (target of the retaliation).
+   * @param {string} triggerKey   The event key (e.g. 'self_attacked').
+   */
+  async _firePassiveRetaliations(targetActor, attackerToken, triggerKey) {
+    if (!targetActor || !attackerToken) return;
+    const passives = targetActor.items.filter(s =>
+      s.type === 'skill' &&
+      s.system.skillType === 'Passive' &&
+      (s.system.tags ?? []).includes('retaliation') &&
+      (s.system.tagConfig?.reactionTrigger ?? '') === triggerKey
+    );
+    for (const skill of passives) {
+      try {
+        await skill.roll({ executeDeferred: true, preTargetIds: [attackerToken.id] });
+        ChatMessage.create({
+          speaker: ChatMessage.getSpeaker({ actor: targetActor }),
+          content: `<p><em>${targetActor.name}'s <strong>${skill.name}</strong> retaliates!</em></p>`,
+        });
+      } catch (err) {
+        console.warn('[reactions] passive retaliation roll failed:', skill.name, err);
+      }
+    }
+  }
+
+  async _resolveDefenseCheck(item, targetActor, defKey, hitTotal, attackerToken = null) {
     const pool    = targetActor.system.defense[defKey]?.pool ?? 0;
     const poolMax = targetActor.system.defense[defKey]?.poolMax ?? 0;
     const defLabel = defKey.charAt(0).toUpperCase() + defKey.slice(1);
@@ -832,6 +868,17 @@ export class AspectsofPowerItem extends Item {
           ChatMessage.create({ speaker: reactionSpeaker,
             content: `<p><strong>${targetActor.name}</strong> raises a barrier with <strong>${reactionSkill.name}</strong>!</p>`,
           });
+        } else if (rType === 'retaliation') {
+          // Phase B post-resolve: counter-strike the attacker. The incoming
+          // attack still resolves normally (retaliation doesn't negate it);
+          // the reaction fires its own damage roll against the attacker.
+          if (attackerToken) {
+            await reactionSkill.roll({ executeDeferred: true, preTargetIds: [attackerToken.id] });
+          }
+          reactionLine = `<p><em>${targetActor.name} retaliates with <strong>${reactionSkill.name}</strong>!</em></p>`;
+          ChatMessage.create({ speaker: reactionSpeaker,
+            content: `<p><strong>${targetActor.name}</strong> strikes back with <strong>${reactionSkill.name}</strong>!</p>`,
+          });
         }
       }
     }
@@ -882,11 +929,18 @@ export class AspectsofPowerItem extends Item {
     let primaryResult   = { isHit: true, damageMultiplier: 1, defenseLine: '', reactionLine: '' };
     let secondaryResult = null;
 
+    // ── Passive retaliation auto-fire (Phase B) ──
+    // Before the defense check, scan target's Passive + retaliation skills
+    // matching the `self_attacked` trigger. They fire automatically — no
+    // budget, no cooldown enforcement, no player prompt. Author sets cost=0
+    // for free-fire passives (Thorns-style); non-zero cost is still paid.
+    await this._firePassiveRetaliations(targetActor, attackerToken, 'self_attacked');
+
     if (hitRoll && targetDefKey) {
-      primaryResult = await this._resolveDefenseCheck(item, targetActor, targetDefKey, hitTotal);
+      primaryResult = await this._resolveDefenseCheck(item, targetActor, targetDefKey, hitTotal, attackerToken);
     }
     if (hasDualDefense && hitRoll) {
-      secondaryResult = await this._resolveDefenseCheck(item, targetActor, secondaryDefKey, hitTotal);
+      secondaryResult = await this._resolveDefenseCheck(item, targetActor, secondaryDefKey, hitTotal, attackerToken);
     }
 
     const halfFactor = hasDualDefense ? 0.5 : 1.0;
