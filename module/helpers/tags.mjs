@@ -100,6 +100,7 @@ export const TAG_REGISTRY = {
   'aquatic':       { label: 'ASPECTSOFPOWER.SystemTag.aquatic.label',       category: 'passive', implies: [],                                    description: 'ASPECTSOFPOWER.SystemTag.aquatic.desc' },
   'darkvision':    { label: 'ASPECTSOFPOWER.SystemTag.darkvision.label',    category: 'passive', implies: [],                                    description: 'ASPECTSOFPOWER.SystemTag.darkvision.desc' },
   'noncorporeal':  { label: 'ASPECTSOFPOWER.SystemTag.noncorporeal.label',  category: 'passive', implies: [],                                    description: 'ASPECTSOFPOWER.SystemTag.noncorporeal.desc' },
+  'cleave-expansion': { label: 'ASPECTSOFPOWER.SystemTag.cleaveExpansion.label', category: 'passive', implies: [], description: 'ASPECTSOFPOWER.SystemTag.cleaveExpansion.desc' },
   // Creature types.
   'humanoid':    { label: 'ASPECTSOFPOWER.SystemTag.humanoid.label',    category: 'passive', implies: [],                                                      description: 'ASPECTSOFPOWER.SystemTag.humanoid.desc' },
   'beast':       { label: 'ASPECTSOFPOWER.SystemTag.beast.label',       category: 'passive', implies: [],                                                      description: 'ASPECTSOFPOWER.SystemTag.beast.desc' },

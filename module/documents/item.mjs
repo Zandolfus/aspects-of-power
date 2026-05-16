@@ -1524,9 +1524,23 @@ export class AspectsofPowerItem extends Item {
    */
   _resolveSkillReach(weapon = null) {
     const skillReach = this.system?.reach ?? 0;
-    if (skillReach > 0) return skillReach;
-    const w = weapon ?? this._resolveWeaponForSkill?.();
-    return w?.system?.reach ?? 5;
+    let reach = skillReach > 0
+      ? skillReach
+      : ((weapon ?? this._resolveWeaponForSkill?.())?.system?.reach ?? 5);
+    if ((this.system?.alterations ?? []).some(a => a.id === 'thrust')) reach += 5;
+    return reach;
+  }
+
+  /**
+   * Cleave cone size in feet. Base Cleave caps at 5ft regardless of weapon;
+   * actors with the `cleave-expansion` passive tag scale up to full weapon
+   * reach (via _resolveSkillReach). The expansion is binary — no per-step
+   * stamina cost. The passive itself is the gate.
+   */
+  _resolveCleaveReach(weapon = null) {
+    const fullReach = this._resolveSkillReach(weapon);
+    if (this.actor?.hasTag?.('cleave-expansion')) return fullReach;
+    return Math.min(fullReach, 5);
   }
 
   /**
@@ -1610,7 +1624,7 @@ export class AspectsofPowerItem extends Item {
         }
       }
     }
-    const skillMagicType  = this.system.magicType ?? '';
+    const skillMagicType  = (this.system.tags ?? []).includes('magic') ? 'magical' : '';
     if (!skillAffinities.length && !skillMagicType) return 0;
 
     const currentPositions = (attackerToken && targetToken)
@@ -2840,7 +2854,7 @@ export class AspectsofPowerItem extends Item {
       debuffType,
       casterActorUuid: this.actor.uuid,
       affinities: this.system.affinities ?? [],
-      magicType: this.system.magicType ?? 'non-magical',
+      magicType: (this.system.tags ?? []).includes('magic') ? 'magical' : 'non-magical',
       directions,
       ...(dismemberedSlot ? { dismemberedSlot } : {}),
       ...(dealsDmg ? { dot: true, dotDamage: dotDmg, dotDamageType: dmgType, applierActorUuid: this.actor.uuid } : {}),
@@ -2912,7 +2926,7 @@ export class AspectsofPowerItem extends Item {
     }
 
     // Only magical skills can cleanse.
-    if ((this.system.magicType ?? 'non-magical') !== 'magical') {
+    if (!(this.system.tags ?? []).includes('magic')) {
       ChatMessage.create({ speaker, rollMode, ...(whisperGM ? { whisper: whisperGM } : {}), content: `<p><em>${game.i18n.localize('ASPECTSOFPOWER.Cleanse.nonMagical')}</em></p>` });
       return;
     }
@@ -4923,7 +4937,7 @@ export class AspectsofPowerItem extends Item {
         // Compute Cleave override regardless of declare-vs-fire path.
         if (hasCleave) {
           const wpn = this._resolveWeaponForSkill?.();
-          const reach = this._resolveSkillReach(wpn);
+          const reach = this._resolveCleaveReach(wpn);
           preplacedAoeOverride = {
             ...(this.system.aoe ?? {}),
             enabled: true,
@@ -5152,15 +5166,9 @@ export class AspectsofPowerItem extends Item {
         // depends on build-vs-weapon match — off-spec weapons cost less AND
         // damage less, which is more coherent than purely flat costs).
         let baseStamina = Math.max(1, Math.round((weaponWeight / sc.invest.staminaBaseDivisor) * (statBlend / sc.invest.staminaNormalizer)));
-        // Cleave: scales stamina cost 2^((reach - 5) / 5), mirroring the
-        // spell-AOE 2^n model. Reach is derived from the wielded weapon —
-        // dagger (5) = 1×, polearm (10) = 2×, etc.
-        const meleeHasCleave = (this.system.alterations ?? []).some(a => a.id === 'cleave');
-        if (meleeHasCleave && weapon) {
-          const reach = this._resolveSkillReach(weapon);
-          const cleaveMult = Math.pow(2, Math.max(0, (reach - 5) / 5));
-          baseStamina = Math.max(1, Math.round(baseStamina * cleaveMult));
-        }
+        // Cleave stamina cost is flat (no per-reach scaling). Expansion past
+        // 5ft cone is gated by the `cleave-expansion` passive tag rather than
+        // a per-cast cost — see _resolveCleaveReach.
         const safeInvest = Math.max(0, Math.round(toughMod * sc.invest.toughCapFactor));
         // Live read — see equivalent comment above on the spell path.
         const livePool = Math.round(this.actor.system[rollData.roll.resource]?.value ?? 0);
@@ -5589,7 +5597,7 @@ export class AspectsofPowerItem extends Item {
     let aoeOverride = aoePerCastContext?.preplacedAoeOverride ?? null;
     if (!aoeOverride && hasCleave) {
       const wpn = this._resolveWeaponForSkill?.();
-      const reach = this._resolveSkillReach(wpn);
+      const reach = this._resolveCleaveReach(wpn);
       aoeOverride = {
         ...(this.system.aoe ?? {}),
         enabled: true,

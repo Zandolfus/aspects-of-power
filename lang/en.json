@@ -347,6 +347,7 @@
       "aquatic": { "label": "Aquatic", "desc": "Can breathe underwater" },
       "darkvision": { "label": "Darkvision", "desc": "Can see in darkness" },
       "noncorporeal": { "label": "Noncorporeal", "desc": "Lacks a physical form" },
+      "cleaveExpansion": { "label": "Cleave Expansion", "desc": "Unlocks Cleave cone scaling beyond 5ft up to the wielded weapon's reach. Without it, Cleave is capped at a 5ft cone regardless of weapon." },
       "humanoid": { "label": "Humanoid", "desc": "Humanoid creature type" },
       "beast": { "label": "Beast", "desc": "Beast creature type" },
       "elemental": { "label": "Elemental", "desc": "Elemental creature — immune to poison and charm" },
@@ -426,6 +427,7 @@
       "dot": "Damage over Time",
       "penetration": "Penetration",
       "reach": "Reach",
+      "thrust": "Thrust (+5 melee reach)",
       "channeled": "Channeled",
       "self_buff": "Self-Buff"
     },

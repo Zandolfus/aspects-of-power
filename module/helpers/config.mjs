@@ -132,6 +132,9 @@ ASPECTSOFPOWER.alterationTags = {
   // Cleave: melee-only. Cone shape with size = wielded weapon's reach.
   // Damage/cost penalties; weightMod is small because reach itself is the gate.
   cleave:      { label: 'ASPECTSOFPOWER.Alteration.cleave',      dmgMod: -0.10, costMod:  0.20, weightMod: 0.30, category: 'damage_shape', stacking: 'max_one' },
+  // Thrust: melee-only +5 reach. Consumed in _resolveSkillReach. Mods mirror
+  // the generic `reach` alteration; tune once we have play data.
+  thrust:      { label: 'ASPECTSOFPOWER.Alteration.thrust',      dmgMod: -0.05, costMod:  0.10, weightMod: 0.10, category: 'range',        stacking: 'max_one'  },
   debuff:      { label: 'ASPECTSOFPOWER.Alteration.debuff',      dmgMod: -0.10, costMod:  0.20, weightMod: 0.20, category: 'status',       stacking: 'multiple' },
   dot:         { label: 'ASPECTSOFPOWER.Alteration.dot',         dmgMod: -0.15, costMod:  0.30, weightMod: 0.30, category: 'status',       stacking: 'max_one'  },
   penetration: { label: 'ASPECTSOFPOWER.Alteration.penetration', dmgMod: -0.05, costMod:  0.00, weightMod: 0.10, category: 'damage_shape', stacking: 'multiple' },

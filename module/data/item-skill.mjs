@@ -12,8 +12,6 @@ export class SkillData extends foundry.abstract.TypeDataModel {
       // Auto-demotes one tier on character grade-up E→D and beyond (floor at not_proficient).
       // No `choices` here so old data with off-list values doesn't reject; migration normalizes.
       rarity:      new fields.StringField({ initial: 'common' }),
-      // What the skill's primary effect IS — locked at creation. Alterations only add SIDE effects.
-      effectType:  new fields.StringField({ initial: 'damage', choices: ['damage', 'heal', 'debuff', 'utility'] }),
       // Alteration tags acquired through upgrades. Each entry refs an entry in
       // CONFIG.ASPECTSOFPOWER.alterationTags (which carries dmgMod/costMod/capability metadata).
       // Per-instance params (e.g. which debuff a 'debuff' alteration applies) live in `params`.
@@ -89,10 +87,6 @@ export class SkillData extends foundry.abstract.TypeDataModel {
       // Elemental or thematic affinities (e.g. "fire", "lunar", "space").
       // Used to match against debuffs on the target to reduce toughness DR.
       affinities: new fields.ArrayField(new fields.StringField(), { initial: [] }),
-
-      // Whether this skill is magical or non-magical.
-      // Used alongside affinities to match target debuffs.
-      magicType: new fields.StringField({ initial: 'non-magical' }),
 
       // ID of the item that must be equipped to use this skill. Empty = no requirement.
       requiredEquipment: new fields.StringField({ initial: '' }),
