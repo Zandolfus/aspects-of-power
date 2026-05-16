@@ -2090,6 +2090,55 @@ Hooks.on('renderChatMessageHTML', (message, html) => {
         await _applyForcedMovement(target, btn.dataset.attackerTokenId, forcedDir, forcedDist, parseInt(btn.dataset.hitTotal, 10) || 0);
       }
 
+      // ── Post-resolve passive reactions (Phase C) ──
+      // self_struck: HP damage actually dealt. hp_threshold: HP fraction
+      // crossed below the per-skill threshold. Both fire AFTER the HP
+      // update commits. Reaches the attacker via the button's data attr.
+      const attackerTokenId = btn.dataset.attackerTokenId;
+      const attackerToken = attackerTokenId ? canvas.tokens?.get(attackerTokenId) : null;
+      if (attackerToken) {
+        // self_struck: only if HP loss occurred.
+        if (actualHpLoss > 0) {
+          const struckPassives = target.items.filter(s =>
+            s.type === 'skill' &&
+            s.system.skillType === 'Passive' &&
+            (s.system.tags ?? []).includes('retaliation') &&
+            (s.system.tagConfig?.reactionTrigger ?? '') === 'self_struck'
+          );
+          for (const skill of struckPassives) {
+            try {
+              await skill.roll({ executeDeferred: true, preTargetIds: [attackerToken.id] });
+              ChatMessage.create({
+                speaker: ChatMessage.getSpeaker({ actor: target }),
+                content: `<p><em>${target.name}'s <strong>${skill.name}</strong> triggers (self_struck)!</em></p>`,
+              });
+            } catch (err) { console.warn('[reactions] self_struck failed:', skill.name, err); }
+          }
+        }
+        // hp_threshold: per-skill crossing check (oldFrac >= T, newFrac < T).
+        const maxHp = health.max || 1;
+        const oldFrac = health.value / maxHp;
+        const newFrac = newHealth / maxHp;
+        const hpThreshPassives = target.items.filter(s =>
+          s.type === 'skill' &&
+          s.system.skillType === 'Passive' &&
+          (s.system.tags ?? []).includes('retaliation') &&
+          (s.system.tagConfig?.reactionTrigger ?? '') === 'hp_threshold'
+        );
+        for (const skill of hpThreshPassives) {
+          const threshold = skill.system.tagConfig?.reactionThresholdPct ?? 0;
+          if (threshold > 0 && oldFrac >= threshold && newFrac < threshold) {
+            try {
+              await skill.roll({ executeDeferred: true, preTargetIds: [attackerToken.id] });
+              ChatMessage.create({
+                speaker: ChatMessage.getSpeaker({ actor: target }),
+                content: `<p><em>${target.name}'s <strong>${skill.name}</strong> triggers (HP crossed below ${Math.round(threshold * 100)}%)!</em></p>`,
+              });
+            } catch (err) { console.warn('[reactions] hp_threshold failed:', skill.name, err); }
+          }
+        }
+      }
+
       // Disable the button so it can't be double-applied.
       btn.disabled = true;
       btn.textContent = 'Applied';

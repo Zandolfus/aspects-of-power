@@ -1086,9 +1086,13 @@ export class AspectsofPowerItem extends Item {
     const fmLine = hasForcedMovement
       ? `<p><strong>${game.i18n.localize('ASPECTSOFPOWER.ForcedMovement.label')}:</strong> ${game.i18n.localize(`ASPECTSOFPOWER.ForcedMovement.${fmDir}`)} ${fmDist} ft</p>`
       : '';
+    // Always emit attacker-token-id so the apply-damage handler can fire
+    // post-resolve triggers (self_struck, hp_threshold) at the attacker.
+    // Forced-movement attrs piggyback on the same button when applicable.
+    const _atkAttr = ` data-attacker-token-id="${attackerToken?.id ?? ''}"`;
     const fmAttrs = hasForcedMovement
-      ? ` data-forced-dir="${fmDir}" data-forced-dist="${fmDist}" data-attacker-token-id="${attackerToken?.id ?? ''}" data-hit-total="${hitTotal}"`
-      : '';
+      ? `${_atkAttr} data-forced-dir="${fmDir}" data-forced-dist="${fmDist}" data-hit-total="${hitTotal}"`
+      : _atkAttr;
 
     // Defense-reduction line: hidden for dual defense (the per-half halvesLine
     // already conveys partial reductions); shown for single defense as before.
