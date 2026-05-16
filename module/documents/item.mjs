@@ -3064,14 +3064,29 @@ export class AspectsofPowerItem extends Item {
             Projected: <strong id="aop-ritual-projected">—</strong>
             (needs ≥ ${threshold} to succeed; cap ${cap})
           </p>
+          <p id="aop-ritual-warn" class="hint" style="display:none;color:#ef5350;"></p>
           <script>
             (() => {
-              const inp = document.getElementById('aop-ritual-mana');
-              const out = document.getElementById('aop-ritual-projected');
+              const inp  = document.getElementById('aop-ritual-mana');
+              const out  = document.getElementById('aop-ritual-projected');
+              const warn = document.getElementById('aop-ritual-warn');
+              const btn  = document.querySelector('button[data-action="prep"]');
               if (!inp || !out) return;
               const update = () => {
-                const m = Math.max(${minMana}, Math.min(${currentMana}, Number(inp.value) || 0));
-                const p = Math.round(${weights.wisdom} * ${wisdomMod} + ${weights.material} * ${materialProgress} + ${weights.mana} * m);
+                const raw = Number(inp.value);
+                const inRange = Number.isFinite(raw) && raw >= ${minMana} && raw <= ${currentMana};
+                if (!inRange) {
+                  out.textContent = '—';
+                  warn.style.display = 'block';
+                  warn.textContent = raw < ${minMana}
+                    ? \`Below minimum mana (${minMana}).\`
+                    : \`Above available mana (${currentMana}).\`;
+                  if (btn) btn.disabled = true;
+                  return;
+                }
+                warn.style.display = 'none';
+                if (btn) btn.disabled = false;
+                const p = Math.round(${weights.wisdom} * ${wisdomMod} + ${weights.material} * ${materialProgress} + ${weights.mana} * raw);
                 const ok = p >= ${threshold};
                 out.textContent = p + (ok ? ' (success)' : ' (FAIL — materials + mana lost)');
                 out.style.color = ok ? '#4caf50' : '#ef5350';
@@ -3085,13 +3100,22 @@ export class AspectsofPowerItem extends Item {
       buttons: [
         { action: 'prep', label: 'Prepare', icon: 'fas fa-gem', default: true, callback: (event, button, dialog) => {
           const inp = dialog.element.querySelector('[name="manaInvest"]');
-          return { mana: Math.max(minMana, Math.min(currentMana, Number(inp?.value) || minMana)) };
+          const raw = Number(inp?.value);
+          // Server-side guard — JS button-disable can be bypassed; refuse
+          // out-of-range values here too.
+          if (!Number.isFinite(raw) || raw < minMana || raw > currentMana) return { invalid: true };
+          return { mana: raw };
         } },
         { action: 'cancel', label: 'Cancel' },
       ],
       close: () => 'cancel',
     });
     if (!setupResult || setupResult === 'cancel') return;
+    if (setupResult.invalid) {
+      ChatMessage.create({ speaker, rollMode,
+        content: `<p><em>Ritual aborted: mana invest must be between ${minMana} and ${currentMana}.</em></p>` });
+      return;
+    }
 
     const manaInvested = setupResult.mana;
     const progress = Math.round(weights.wisdom * wisdomMod + weights.material * materialProgress + weights.mana * manaInvested);
@@ -4812,8 +4836,16 @@ export class AspectsofPowerItem extends Item {
         const ritualPower = sys.ritualPower ?? 0;
         ChatMessage.create({ speaker, rollMode, ...(whisperGM ? { whisper: whisperGM } : {}),
           content: `<p><strong>${this.actor.name}</strong> activates <strong>${this.name}</strong> — invoking <em>${ritualSkill.name}</em> at stored power ${ritualPower}.</p>` });
-        const rollOptions = ritualPower > 0 ? { preInvestAmount: ritualPower } : {};
-        await ritualSkill.roll(rollOptions);
+        // ritualActivation flag: in the variable-spell branch, forces cost
+        // to 0 (the prep mana was the only payment). preInvestAmount drives
+        // damage scaling via (invested/baseMana)^0.2 — the Medium's stored
+        // power IS the invest amount. Ritual skills need to be authored as
+        // variable-spell-qualifying (attack tag + spellTier + spellGrade)
+        // for this to actually move the damage number.
+        await ritualSkill.roll({
+          preInvestAmount: Math.max(1, ritualPower),
+          ritualActivation: true,
+        });
         break;
       }
 
@@ -5314,7 +5346,11 @@ export class AspectsofPowerItem extends Item {
       }
 
       investedAmount = invested;
-      rollData.roll.cost = orbDischarging ? 0 : invested;
+      // ritualActivation: when firing a ritual via a Medium, the mana was
+      // already spent at prep time. The stored ritualPower drives invest for
+      // damage scaling, but the activator pays nothing — the gem is the
+      // energy source. Same zero-cost branch as orbDischarging.
+      rollData.roll.cost = (orbDischarging || options.ritualActivation) ? 0 : invested;
       rollData.roll.variableSpellInvest = invested;
       // Persist Orb state for _commitCastCost: discharge resets, normal
       // qualifying cast banks the spell's tier weight (banking weight, not
