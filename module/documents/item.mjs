@@ -4566,6 +4566,29 @@ export class AspectsofPowerItem extends Item {
         break;
       }
 
+      case 'ritual': {
+        if (!sys.ritualSkillId) {
+          ChatMessage.create({ speaker, rollMode, ...(whisperGM ? { whisper: whisperGM } : {}),
+            content: `<p><em>${this.name} has no ritual skill encoded — nothing happens.</em></p>` });
+          return; // don't consume a charge on a null-ritual no-op
+        }
+        let ritualSkill = null;
+        try { ritualSkill = await fromUuid(sys.ritualSkillId); } catch (e) { /* not found */ }
+        if (!ritualSkill || ritualSkill.type !== 'skill') {
+          ChatMessage.create({ speaker, rollMode, ...(whisperGM ? { whisper: whisperGM } : {}),
+            content: `<p><em>${this.name}: encoded ritual skill not found (${sys.ritualSkillId}).</em></p>` });
+          return;
+        }
+        // Ritual skills carry the `granted` tag so their cast timing is the
+        // build-neutral 1/3 reference round (per design — the gem grants the
+        // ability, not the caster's training). Fire through the standard
+        // skill pipeline — declare-then-fire happens via celerity as normal.
+        ChatMessage.create({ speaker, rollMode, ...(whisperGM ? { whisper: whisperGM } : {}),
+          content: `<p><strong>${this.actor.name}</strong> activates <strong>${this.name}</strong> — invoking <em>${ritualSkill.name}</em>.</p>` });
+        await ritualSkill.roll({});
+        break;
+      }
+
       case 'none': {
         ChatMessage.create({ speaker, rollMode, ...(whisperGM ? { whisper: whisperGM } : {}), content: chatContent });
         break;
@@ -4630,6 +4653,10 @@ export class AspectsofPowerItem extends Item {
         return `${effectLabel}: ${sys.bomb.damage} ${sys.bomb.damageType} damage, ${sys.bomb.diameter}ft ${sys.bomb.shape}`;
       case 'repairKit':
         return `${effectLabel}: +${sys.repairAmount} durability`;
+      case 'ritual':
+        return sys.ritualSkillId
+          ? `${effectLabel}: encoded skill ${sys.ritualSkillId} (${sys.charges?.value ?? 0}/${sys.charges?.max ?? 0} charges)`
+          : `${effectLabel}: (no skill encoded)`;
       default:
         return effectLabel;
     }

@@ -62,6 +62,13 @@ export class ConsumableData extends foundry.abstract.TypeDataModel {
 
       // Repair Kit: how much durability is restored per use.
       repairAmount: new fields.NumberField({ initial: 0, min: 0, integer: true }),
+
+      // Ritual: a physical item (gem, inscribed circle, etc.) that encodes a
+      // ritual skill. Activated in-combat by consuming one charge; fires the
+      // referenced skill with granted-skill timing (1/3 reference round).
+      // Charges track uses remaining; when value hits 0 the item is depleted.
+      // See design-ritual-subsystem.md.
+      ritualSkillId: new fields.StringField({ initial: '' }),
     };
   }
 }

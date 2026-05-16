@@ -51,6 +51,7 @@
       "aura": "Aura",
       "social": "Social",
       "retaliation": "Retaliation",
+      "ritual": "Ritual",
       "craft": "Craft",
       "gather": "Gather",
       "refine": "Refine",
@@ -602,6 +603,7 @@
       "bomb": "Bomb",
       "barrier": "Barrier",
       "repairKit": "Repair Kit",
+      "ritual": "Ritual",
       "none": "None"
     }
   },

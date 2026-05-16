@@ -542,6 +542,11 @@ ASPECTSOFPOWER.combatTags = {
   // for the future reaction subsystem; currently a queryable category
   // (Shocking Retort, Retaliatory Strike, etc.).
   retaliation: 'ASPECTSOFPOWER.Tag.retaliation',
+  // Ritual: skill that's encoded into a physical item out-of-combat
+  // (gem, circle, inscription) and activated in-combat by consuming a
+  // charge. Activation uses the granted skill timing (1/3 reference
+  // round). See design-ritual-subsystem.md.
+  ritual:      'ASPECTSOFPOWER.Tag.ritual',
   // Descriptors.
   magic:       'ASPECTSOFPOWER.Tag.magic',
   physical:    'ASPECTSOFPOWER.Tag.physical',
@@ -1003,6 +1008,7 @@ ASPECTSOFPOWER.consumableEffectTypes = {
   bomb:        'ASPECTSOFPOWER.ConsumableEffect.bomb',
   barrier:     'ASPECTSOFPOWER.ConsumableEffect.barrier',
   repairKit:   'ASPECTSOFPOWER.ConsumableEffect.repairKit',
+  ritual:      'ASPECTSOFPOWER.ConsumableEffect.ritual',
   none:        'ASPECTSOFPOWER.ConsumableEffect.none',
 };
 
