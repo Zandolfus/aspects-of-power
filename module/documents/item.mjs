@@ -745,23 +745,25 @@ export class AspectsofPowerItem extends Item {
    *   - defenseLine, reactionLine: HTML fragments for the chat result block
    */
   /**
-   * Passive retaliation auto-fire (Phase B). Scans the target actor's
-   * `skillType: 'Passive'` skills tagged `retaliation` whose
-   * `tagConfig.reactionTrigger` matches `triggerKey`. Each match fires
-   * automatically — no player prompt, no reactions-budget consumption,
-   * no cooldown enforcement. Author sets cost=0 for free-fire (Thorns);
-   * non-zero cost still gets deducted by the standard roll path.
+   * Passive reaction auto-fire. Scans `reactorActor`'s `skillType: 'Passive'`
+   * skills tagged `retaliation` whose `tagConfig.reactionTrigger` matches
+   * `triggerKey`. Each match fires automatically — no player prompt, no
+   * reactions-budget consumption, no cooldown enforcement. Author sets
+   * cost=0 for free-fire (Thorns); non-zero cost still gets deducted by
+   * the standard roll path.
    *
    * Distinct from the Reactive flow which prompts the player and is
    * gated by budget + cooldown. Passives are always-on.
    *
-   * @param {Actor} targetActor   The actor being attacked.
-   * @param {Token|null} attackerToken  The attacker's token (target of the retaliation).
-   * @param {string} triggerKey   The event key (e.g. 'self_attacked').
+   * @param {Actor} reactorActor   The actor whose passives may fire.
+   * @param {Token|null} targetToken   The token to target with the retaliation
+   *                                   (typically the attacker).
+   * @param {string} triggerKey    The event key (e.g. 'self_attacked',
+   *                               'ally_attacked', 'self_damage_taken').
    */
-  async _firePassiveRetaliations(targetActor, attackerToken, triggerKey) {
-    if (!targetActor || !attackerToken) return;
-    const passives = targetActor.items.filter(s =>
+  async _firePassiveReactions(reactorActor, targetToken, triggerKey) {
+    if (!reactorActor || !targetToken) return;
+    const passives = reactorActor.items.filter(s =>
       s.type === 'skill' &&
       s.system.skillType === 'Passive' &&
       (s.system.tags ?? []).includes('retaliation') &&
@@ -769,15 +771,20 @@ export class AspectsofPowerItem extends Item {
     );
     for (const skill of passives) {
       try {
-        await skill.roll({ executeDeferred: true, preTargetIds: [attackerToken.id] });
+        await skill.roll({ executeDeferred: true, preTargetIds: [targetToken.id] });
         ChatMessage.create({
-          speaker: ChatMessage.getSpeaker({ actor: targetActor }),
-          content: `<p><em>${targetActor.name}'s <strong>${skill.name}</strong> retaliates!</em></p>`,
+          speaker: ChatMessage.getSpeaker({ actor: reactorActor }),
+          content: `<p><em>${reactorActor.name}'s <strong>${skill.name}</strong> triggers (${triggerKey})!</em></p>`,
         });
       } catch (err) {
-        console.warn('[reactions] passive retaliation roll failed:', skill.name, err);
+        console.warn('[reactions] passive reaction roll failed:', skill.name, triggerKey, err);
       }
     }
+  }
+
+  /** @deprecated Use `_firePassiveReactions` directly. */
+  async _firePassiveRetaliations(targetActor, attackerToken, triggerKey) {
+    return this._firePassiveReactions(targetActor, attackerToken, triggerKey);
   }
 
   async _resolveDefenseCheck(item, targetActor, defKey, hitTotal, attackerToken = null) {
@@ -929,12 +936,57 @@ export class AspectsofPowerItem extends Item {
     let primaryResult   = { isHit: true, damageMultiplier: 1, defenseLine: '', reactionLine: '' };
     let secondaryResult = null;
 
-    // ── Passive retaliation auto-fire (Phase B) ──
+    // ── Passive retaliation auto-fire: self_attacked (Phase B) ──
     // Before the defense check, scan target's Passive + retaliation skills
     // matching the `self_attacked` trigger. They fire automatically — no
     // budget, no cooldown enforcement, no player prompt. Author sets cost=0
     // for free-fire passives (Thorns-style); non-zero cost is still paid.
-    await this._firePassiveRetaliations(targetActor, attackerToken, 'self_attacked');
+    await this._firePassiveReactions(targetActor, attackerToken, 'self_attacked');
+
+    // ── Ally-attacked passive auto-fire (Phase C) ──
+    // Scan friendly actors with `ally_attacked` passives within their
+    // configured `reactionTriggerRange` of `targetActor`. Each fires
+    // automatically against the attacker. Savior's Slash is the canonical
+    // case (15ft, non-hostile triggers fire from a reactor in range).
+    if (attackerToken && targetToken && game.combat?.started) {
+      const gridSize = canvas.grid.size;
+      const gridDist = canvas.grid.distance;
+      const pxPerFt = gridSize / gridDist;
+      const targetCenter = targetToken.center;
+      for (const cm of game.combat.combatants) {
+        const reactor = cm.actor;
+        const rTok = cm.token?.object;
+        if (!reactor || !rTok) continue;
+        if (reactor.id === targetActor.id) continue;
+        if (reactor.id === this.actor?.id) continue; // attacker can't react on its own attack
+        // Only same-disposition (friendly) reactors trigger.
+        if (cm.token.disposition !== targetToken.document.disposition) continue;
+        // Find matching skills + check range.
+        const candidates = reactor.items.filter(s =>
+          s.type === 'skill' &&
+          s.system.skillType === 'Passive' &&
+          (s.system.tags ?? []).includes('retaliation') &&
+          (s.system.tagConfig?.reactionTrigger ?? '') === 'ally_attacked'
+        );
+        if (candidates.length === 0) continue;
+        const dx = targetCenter.x - rTok.center.x;
+        const dy = targetCenter.y - rTok.center.y;
+        const distFt = Math.hypot(dx, dy) / pxPerFt;
+        for (const skill of candidates) {
+          const range = skill.system.tagConfig?.reactionTriggerRange ?? 0;
+          if (range > 0 && distFt > range) continue;
+          try {
+            await skill.roll({ executeDeferred: true, preTargetIds: [attackerToken.id] });
+            ChatMessage.create({
+              speaker: ChatMessage.getSpeaker({ actor: reactor }),
+              content: `<p><em>${reactor.name}'s <strong>${skill.name}</strong> triggers (${targetActor.name} attacked within ${Math.round(distFt)}ft)!</em></p>`,
+            });
+          } catch (err) {
+            console.warn('[reactions] ally_attacked roll failed:', skill.name, err);
+          }
+        }
+      }
+    }
 
     if (hitRoll && targetDefKey) {
       primaryResult = await this._resolveDefenseCheck(item, targetActor, targetDefKey, hitTotal, attackerToken);
@@ -986,6 +1038,15 @@ export class AspectsofPowerItem extends Item {
     const preToughnessDmg = Math.max(0, afterBarrier - mitigation);
     const finalDamage     = isHit ? Math.max(0, preToughnessDmg - effectiveToughness) : 0;
     const displayDamage   = finalDamage;
+
+    // ── self_damage_taken passive auto-fire (Phase C) ──
+    // Fires after the full damage pipeline computes the final number but
+    // before the apply-damage button is generated (and before HP is
+    // actually deducted by the GM click). Only when there IS damage to
+    // take — pure misses don't trigger this hook.
+    if (finalDamage > 0 && isHit) {
+      await this._firePassiveReactions(targetActor, attackerToken, 'self_damage_taken');
+    }
 
     // Dual-defense status badge: full HIT only if both halves landed; PARTIAL
     // if exactly one landed; MISS if neither did. Single-defense uses the
