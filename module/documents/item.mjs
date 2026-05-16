@@ -2946,21 +2946,21 @@ export class AspectsofPowerItem extends Item {
    * Inscribe tag: profession-style action that encodes a ritual skill into a
    * raw gem from inventory, producing a consumable with effectType='ritual'
    * that activates the encoded skill in-combat. Phase 2 of design-ritual-
-   * subsystem.md; closes the player-facing loop so players don't need GM
-   * seeding via sandbox scripts.
+   * subsystem.md.
    *
-   * Charges per inscribed gem are fixed at 3 for first cut — roll quality is
-   * logged in chat for transparency but doesn't drive the count. Tune later.
+   * Walks the user through the same sequential-button pattern the craft
+   * pipeline uses: material → ritual subset → confirm. Each step cancels
+   * cleanly. Roll has already happened upstream; quality is logged but
+   * doesn't drive the charge count (fixed at 3 for first cut; tune later).
    */
   async _handleInscribeTag(item, rollData, dmgRoll, speaker, rollMode, label) {
     const actor = this.actor;
     if (!actor) return;
 
-    // ── Source-gem candidates: raw gems in inventory ──
-    // A "raw gem" is any consumable item with consumableType='gem' that
-    // hasn't already been inscribed (effectType != 'ritual'). This keeps
-    // the pattern simple — the player marks an item as a gem via its
-    // consumableType field, no separate item-type required.
+    // ── Step 1: Material picker (raw gems in inventory) ──
+    // A "raw gem" is any consumable with consumableType='gem' that hasn't
+    // already been inscribed (effectType != 'ritual'). Player marks an
+    // item as a gem via its consumableType field — no separate item type.
     const rawGems = actor.items.filter(i =>
       i.type === 'consumable'
       && i.system?.consumableType === 'gem'
@@ -2972,10 +2972,25 @@ export class AspectsofPowerItem extends Item {
         content: `<p><em>${actor.name} has no raw gems in inventory to inscribe.</em></p>` });
       return;
     }
+    const gemButtons = rawGems.map(g => {
+      const qty = g.system.quantity ?? 1;
+      const rare = g.system.rarity ?? 'common';
+      return { action: g.id, label: `${g.name} [${rare}]${qty > 1 ? ` ×${qty}` : ''}` };
+    });
+    gemButtons.push({ action: 'cancel', label: 'Cancel' });
+    const gemChoice = await foundry.applications.api.DialogV2.wait({
+      window: { title: `${item.name} — Select Material` },
+      content: '<p>Pick a raw gem to inscribe:</p>',
+      buttons: gemButtons,
+      close: () => 'cancel',
+    });
+    if (gemChoice === 'cancel') return;
+    const sourceGem = actor.items.get(gemChoice);
+    if (!sourceGem) return;
 
-    // ── Ritual-skill candidates: skills on the actor with the ritual tag ──
+    // ── Step 2: Ritual subset (skills on the actor with the `ritual` tag) ──
     // The inscribing skill itself (carrying `inscribe`) is excluded so the
-    // dropdown isn't polluted with profession actions.
+    // list isn't polluted with profession actions.
     const ritualSkills = actor.items.filter(i =>
       i.type === 'skill'
       && (i.system?.tags ?? []).includes('ritual')
@@ -2986,62 +3001,58 @@ export class AspectsofPowerItem extends Item {
         content: `<p><em>${actor.name} knows no ritual skills to inscribe.</em></p>` });
       return;
     }
+    const ritualButtons = ritualSkills.map(s => ({ action: s.id, label: s.name }));
+    ritualButtons.push({ action: 'cancel', label: 'Cancel' });
+    const ritualChoice = await foundry.applications.api.DialogV2.wait({
+      window: { title: `${item.name} — Select Ritual` },
+      content: `<p>Pick which ritual to encode into <strong>${sourceGem.name}</strong>:</p>`,
+      buttons: ritualButtons,
+      close: () => 'cancel',
+    });
+    if (ritualChoice === 'cancel') return;
+    const ritualSkill = actor.items.get(ritualChoice);
+    if (!ritualSkill) return;
 
-    // ── Single dialog with both pickers ──
-    const gemOptions = rawGems.map(g =>
-      `<option value="${g.id}">${g.name} (${g.system.rarity ?? 'common'})${(g.system.quantity ?? 1) > 1 ? ` ×${g.system.quantity}` : ''}</option>`
-    ).join('');
-    const ritualOptions = ritualSkills.map(s =>
-      `<option value="${s.id}">${s.name}</option>`
-    ).join('');
-
-    const result = await foundry.applications.api.DialogV2.wait({
-      window: { title: `${item.name} — Inscribe Ritual` },
+    // ── Step 3: Combined Setup confirm ──
+    const newCharges = 3;
+    const inscribedName = `Inscribed ${sourceGem.name.replace(/^Raw\s+/i, '')} (${ritualSkill.name})`;
+    const confirmChoice = await foundry.applications.api.DialogV2.wait({
+      window: { title: `${item.name} — Confirm Inscription` },
       content: `
-        <p>Encode a ritual skill into a raw gem. The gem is consumed; the inscribed item carries 3 charges.</p>
-        <div class="form-group">
-          <label>Raw Gem</label>
-          <select name="gemId">${gemOptions}</select>
-        </div>
-        <div class="form-group">
-          <label>Ritual to Encode</label>
-          <select name="ritualId">${ritualOptions}</select>
+        <div class="craft-setup">
+          <p><strong>Skill:</strong> ${item.name}</p>
+          <p><strong>Material:</strong> ${sourceGem.name} (one ${(sourceGem.system.quantity ?? 1) > 1 ? `of ×${sourceGem.system.quantity}` : ''} consumed)</p>
+          <p><strong>Ritual:</strong> ${ritualSkill.name}</p>
+          <p><strong>Output:</strong> ${inscribedName} (${newCharges} charges)</p>
+          <p class="hint">Roll quality: ${Math.round(dmgRoll?.total ?? 0)}</p>
         </div>
       `,
       buttons: [
-        { action: 'inscribe', label: 'Inscribe', icon: 'fas fa-gem', default: true, callback: (event, button, dialog) => {
-          const form = dialog.element.querySelector('form') ?? dialog.element;
-          return {
-            gemId:    form.querySelector('[name="gemId"]').value,
-            ritualId: form.querySelector('[name="ritualId"]').value,
-          };
-        } },
+        { action: 'inscribe', label: 'Inscribe', icon: 'fas fa-gem', default: true },
         { action: 'cancel', label: 'Cancel' },
       ],
       close: () => 'cancel',
     });
-    if (!result || result === 'cancel') return;
+    if (confirmChoice !== 'inscribe') return;
 
-    const sourceGem = actor.items.get(result.gemId);
-    const ritualSkill = actor.items.get(result.ritualId);
-    if (!sourceGem || !ritualSkill) {
+    // Re-fetch source gem in case state changed during dialog walk.
+    const liveSrc = actor.items.get(sourceGem.id);
+    if (!liveSrc) {
       ChatMessage.create({ speaker, rollMode,
-        content: '<p><em>Inscribe failed: gem or ritual no longer available.</em></p>' });
+        content: '<p><em>Inscribe failed: gem no longer available.</em></p>' });
       return;
     }
 
     // ── Create the inscribed gem consumable ──
-    const inscribedName = `Inscribed ${sourceGem.name.replace(/^Raw\s+/i, '')} (${ritualSkill.name})`;
-    const newCharges = 3;
     const [inscribed] = await actor.createEmbeddedDocuments('Item', [{
       name: inscribedName,
       type: 'consumable',
-      img: sourceGem.img,
+      img: liveSrc.img,
       system: {
         description: `<p>A gem inscribed with the sigils of ${ritualSkill.name}. Activating it consumes one charge to invoke the encoded ritual.</p>`,
         quantity: 1,
-        weight: sourceGem.system.weight ?? 0.1,
-        rarity: sourceGem.system.rarity ?? 'common',
+        weight: liveSrc.system.weight ?? 0.1,
+        rarity: liveSrc.system.rarity ?? 'common',
         consumableType: 'gem',
         effectType: 'ritual',
         ritualSkillId: ritualSkill.uuid,
@@ -3050,18 +3061,18 @@ export class AspectsofPowerItem extends Item {
     }]);
 
     // ── Consume one of the source gem ──
-    const srcQty = sourceGem.system.quantity ?? 1;
+    const srcQty = liveSrc.system.quantity ?? 1;
     if (srcQty <= 1) {
-      await sourceGem.delete();
+      await liveSrc.delete();
     } else {
-      await sourceGem.update({ 'system.quantity': srcQty - 1 });
+      await liveSrc.update({ 'system.quantity': srcQty - 1 });
     }
 
     ChatMessage.create({ speaker, rollMode,
       content: `<div class="craft-result">
         <h3>${item.name} — Inscription Complete</h3>
         <hr>
-        <p><strong>${actor.name}</strong> inscribes <strong>${ritualSkill.name}</strong> into <strong>${sourceGem.name}</strong>.</p>
+        <p><strong>${actor.name}</strong> inscribes <strong>${ritualSkill.name}</strong> into <strong>${liveSrc.name}</strong>.</p>
         <p>Result: <strong>${inscribed.name}</strong> (${newCharges} charges).</p>
         <p class="hint">Roll quality: ${Math.round(dmgRoll?.total ?? 0)}.</p>
       </div>` });
