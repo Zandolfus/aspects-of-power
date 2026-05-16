@@ -6018,6 +6018,9 @@ export class AspectsofPowerItem extends Item {
         case 'refine':
           await this._handleRefineTag(item, rollData, dmgRoll, speaker, rollMode, label);
           break;
+        case 'inscribe':
+          await this._handleInscribeTag(item, rollData, dmgRoll, speaker, rollMode, label);
+          break;
         case 'teleport':
           await this._handleTeleportTag(item, rollData, speaker, rollMode, label, options.preTeleportDestination ?? null);
           break;
