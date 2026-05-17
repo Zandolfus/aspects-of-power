@@ -5242,10 +5242,15 @@ export class AspectsofPowerItem extends Item {
 
     // ── Fire-time target prompt (ranged) ──
     // Ranged skills defer the target pick until the cast actually fires.
-    // If the player declared without a target snapshot AND the skill is
-    // ranged, prompt them now. They'll see the current battlefield and
-    // pick whatever's optimal at this moment.
-    if (options.executeDeferred && targetsAtFire && game.user.targets.size === 0) {
+    // The intent signal comes from declare: empty preTargetIds means
+    // "no target chosen yet, prompt me at fire." Current game.user.targets
+    // can't be the gate — the player may have T-keyed a different token
+    // for an unrelated reason between declare and fire, and we'd fire at
+    // that stale selection instead of prompting. `selectTargetOnCanvas`
+    // clears targets internally before opening the picker, so the stale
+    // selection is harmless.
+    const _noSnapshotTarget = !Array.isArray(options.preTargetIds) || options.preTargetIds.length === 0;
+    if (options.executeDeferred && targetsAtFire && _noSnapshotTarget) {
       const picked = await selectTargetOnCanvas({
         message: `Click target for ${this.name} (Esc to abort)`,
       });
