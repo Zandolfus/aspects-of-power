@@ -488,11 +488,30 @@ export class CelerityCombatTracker extends ParentTracker {
       return;
     }
 
-    const nextTick = queued[0].declared.scheduledTick;
+    const next = queued[0];
+    const nextTick = next.declared.scheduledTick;
     const deltaTicks = Math.max(0, nextTick - clock);
     const fastest = this._fastestRoundLen(combat);
     const secsPerRound = this.constructor.REALTIME_FASTEST_ROUND_SECONDS;
     const realtimeMs = Math.max(0, deltaTicks * (secsPerRound * 1000) / fastest);
+
+    // For MOVEMENT actions, kick off a Foundry token animation NOW that runs
+    // for the full realtime wait. The token slides smoothly across the wait
+    // instead of staying frozen and jumping at the end. _celerityCommit
+    // suppresses the _preUpdateMovement declare-and-cancel handler so this
+    // doesn't re-declare the move. _onCelAdvance at fire time will fire its
+    // own zero-duration animation to the same endPos (no-op) and run the
+    // post-fire bookkeeping.
+    if (next.declared.itemId === MOVEMENT_ITEM_ID && next.declared.endPos && realtimeMs > 50) {
+      const tok = next.c.token;
+      const ep = next.declared.endPos;
+      if (tok && Number.isFinite(ep.x) && Number.isFinite(ep.y)) {
+        tok.update(
+          { x: ep.x, y: ep.y },
+          { animation: { duration: realtimeMs }, _celerityCommit: true }
+        ).catch(e => console.warn('[TRIAL-REALTIME] movement animate failed:', e));
+      }
+    }
 
     this._realtimeTimeoutId = setTimeout(async () => {
       this._realtimeTimeoutId = null;
