@@ -9,7 +9,12 @@
  */
 
 import { getClockTick, referenceRoundLength, runRoundStart, MOVEMENT_ITEM_ID, BREAK_FREE_ITEM_ID, interpolateMovementPosition, declareMovement } from '../systems/celerity.mjs';
-import { checkEngagementHalts } from '../systems/engagement-halts.mjs';
+// TRIAL-REALTIME: engagement-halts disabled for the real-time-advance trial.
+// If trial reverts, restore this import + the checkEngagementHalts call in
+// _onCelAdvance (search "TRIAL-REALTIME" for both sites). If trial succeeds,
+// delete the commented call + this import + the engagement-halts module +
+// its first-contact / dashing utilities (audit refs first).
+// import { checkEngagementHalts } from '../systems/engagement-halts.mjs';
 
 const MAX_ROUND_BOUNDARIES_PER_ADVANCE = 5; // safety cap on multi-round catches
 
@@ -63,12 +68,17 @@ async function _onCelAdvance(event, target) {
     });
   }
 
-  // Engagement halts: before animating, check if any in-flight movement
-  // should be truncated due to melee engagement (entering enemy reach with
-  // LOS) or first-contact LOS (newly spotting / being spotted by an enemy).
-  // Truncates declaredAction in-place; the next animation pass slides to
-  // the new (shorter) endPos. Per design 2026-05-10.
-  await checkEngagementHalts(combat, newClock);
+  // TRIAL-REALTIME: engagement-halts + first-contact-LOS halts disabled for
+  // the real-time-advance trial. The whole point of real-time is "game flows
+  // naturally; movement passes through threat zones without interrupting."
+  // The celerity reaction budget covers opportunity-cost on its own.
+  //
+  // If trial reverts, restore this call + the engagement-halts import above.
+  // If trial succeeds, delete the comment + audit the engagement-halts
+  // module for any remaining utility refs (actorIsDashing, getThreatRadiusFt
+  // are used elsewhere in item.mjs — keep those).
+  //
+  // await checkEngagementHalts(combat, newClock);
 
   // Persistent AOE re-tick scan. Tokens standing inside a persistent AOE
   // get re-ticked when (newClock - lastTickedAt) >= the AOE's caster
@@ -365,6 +375,15 @@ async function _scanPersistentAoeReticks(combat, newClock) {
   }
 }
 
+// TRIAL-REALTIME: action handler bound via DEFAULT_OPTIONS. Toggles the
+// auto-advance loop on the tracker app instance. If the trial reverts,
+// delete this function + its actions binding + the class methods +
+// the button in the template.
+async function _onCelRealtimeToggle(event, target) {
+  if (this._realtimeRunning) this._realtimeStop();
+  else this._realtimeStart();
+}
+
 async function _onCelReset(event, target) {
   const combat = this.viewed;
   if (!combat?.started) return;
@@ -390,11 +409,102 @@ export class CelerityCombatTracker extends ParentTracker {
 
   static DEFAULT_OPTIONS = {
     actions: {
-      celAdvance: _onCelAdvance,
-      celReset:   _onCelReset,
-      celCancel:  _onCelCancel,
+      celAdvance:         _onCelAdvance,
+      celReset:           _onCelReset,
+      celCancel:          _onCelCancel,
+      // TRIAL-REALTIME (remove on trial success/revert)
+      celRealtimeToggle:  _onCelRealtimeToggle,
     },
   };
+
+  // ── TRIAL-REALTIME: auto-advance loop ──────────────────────────────
+  // Calibration: the FASTEST combatant's reference round = N real seconds
+  // (default 5). Real-time delay between cast declare and fire scales with
+  // the celerity tick distance using this ratio. Auto-pauses on action fire
+  // so the player can re-queue. Re-schedules if any declaredAction changes
+  // mid-wait (a fresh earlier-tick declare takes priority).
+  static REALTIME_FASTEST_ROUND_SECONDS = 5;
+  _realtimeRunning = false;
+  _realtimeTimeoutId = null;
+  _realtimeHookId = null;
+
+  _fastestRoundLen(combat) {
+    let min = Infinity;
+    for (const cm of combat?.combatants ?? []) {
+      const rl = cm.actor?.system?.attributes?.race?.level ?? 1;
+      const len = referenceRoundLength(rl);
+      if (Number.isFinite(len) && len > 0 && len < min) min = len;
+    }
+    return Number.isFinite(min) ? min : 1000;
+  }
+
+  _realtimeStart() {
+    if (this._realtimeRunning) return;
+    this._realtimeRunning = true;
+    // Hook into combatant updates so a new earlier-scheduled declare
+    // pre-empts the in-flight timeout.
+    if (!this._realtimeHookId) {
+      this._realtimeHookId = Hooks.on('updateCombatant', (cm, changes) => {
+        if (!this._realtimeRunning) return;
+        const declaredPath = `flags.${FLAG_NS}.declaredAction`;
+        const declaredChanged = foundry.utils.hasProperty(changes, declaredPath);
+        if (declaredChanged) this._scheduleNextFire();
+      });
+    }
+    this._scheduleNextFire();
+    this.render();
+  }
+
+  _realtimeStop() {
+    this._realtimeRunning = false;
+    if (this._realtimeTimeoutId) {
+      clearTimeout(this._realtimeTimeoutId);
+      this._realtimeTimeoutId = null;
+    }
+    if (this._realtimeHookId) {
+      Hooks.off('updateCombatant', this._realtimeHookId);
+      this._realtimeHookId = null;
+    }
+    this.render();
+  }
+
+  _scheduleNextFire() {
+    if (this._realtimeTimeoutId) {
+      clearTimeout(this._realtimeTimeoutId);
+      this._realtimeTimeoutId = null;
+    }
+    if (!this._realtimeRunning) return;
+    const combat = this.viewed;
+    if (!combat?.started) { this._realtimeStop(); return; }
+
+    const clock = getClockTick(combat);
+    const queued = [...combat.combatants]
+      .map(c => ({ c, declared: c.flags?.[FLAG_NS]?.declaredAction ?? null }))
+      .filter(e => e.declared && typeof e.declared.scheduledTick === 'number' && e.declared.scheduledTick > clock)
+      .sort((a, b) => a.declared.scheduledTick - b.declared.scheduledTick);
+    if (queued.length === 0) {
+      // No queued actions — wait for one to be declared. The updateCombatant
+      // hook will reschedule when one appears.
+      return;
+    }
+
+    const nextTick = queued[0].declared.scheduledTick;
+    const deltaTicks = Math.max(0, nextTick - clock);
+    const fastest = this._fastestRoundLen(combat);
+    const secsPerRound = this.constructor.REALTIME_FASTEST_ROUND_SECONDS;
+    const realtimeMs = Math.max(0, deltaTicks * (secsPerRound * 1000) / fastest);
+
+    this._realtimeTimeoutId = setTimeout(async () => {
+      this._realtimeTimeoutId = null;
+      if (!this._realtimeRunning) return;
+      try {
+        await _onCelAdvance.call(this);
+      } catch (e) { console.error('[TRIAL-REALTIME] advance failed:', e); }
+      // Auto-pause on fire per user spec — player can re-queue then resume.
+      this._realtimeStop();
+    }, realtimeMs);
+  }
+  // ── /TRIAL-REALTIME ────────────────────────────────────────────────
 
   // Inherit header/footer; replace tracker part with our celerity template.
   static PARTS = {
@@ -439,6 +549,9 @@ export class CelerityCombatTracker extends ParentTracker {
     await super._prepareTrackerContext(context, options);
     const combat = context.combat ?? this.viewed;
     context.celerityClockTick = getClockTick(combat);
+    // TRIAL-REALTIME: surface play/pause state so the template button can
+    // swap between fa-play and fa-pause icons.
+    context.celerityRealtimeRunning = this._realtimeRunning;
     if (Array.isArray(context.turns)) {
       // Player visibility: per design-celerity.md "Public allies, opaque
       // enemies", non-GM users only see PC-owned combatants in the tracker.
@@ -470,5 +583,12 @@ export class CelerityCombatTracker extends ParentTracker {
       }
     }
     return context;
+  }
+
+  // TRIAL-REALTIME: stop the loop + remove the hook when the tracker closes
+  // so we don't leak timers or stale listeners.
+  async _onClose(options) {
+    this._realtimeStop();
+    return super._onClose?.(options);
   }
 }

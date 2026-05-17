@@ -2,6 +2,11 @@
   <div class="cel-clock-row" style="display:flex;justify-content:space-between;align-items:center;padding:4px 8px;background:#222;color:#eee;border-radius:3px;margin-bottom:6px;font-size:12px;">
     <span><strong>Clock:</strong> tick {{celerityClockTick}}</span>
     <span class="cel-buttons">
+      {{!-- TRIAL-REALTIME: play/pause auto-advance. Removes the need to
+            click Advance per action. Pauses on every action fire so the
+            player can re-queue. Calibrated to fastest-actor reference
+            round = REALTIME_FASTEST_ROUND_SECONDS (default 5s). --}}
+      <button type="button" class="inline-control icon fa-solid {{#if celerityRealtimeRunning}}fa-pause{{else}}fa-play{{/if}}" data-action="celRealtimeToggle" data-tooltip="{{#if celerityRealtimeRunning}}Pause real-time advance{{else}}Resume real-time advance (auto-pauses on action fire){{/if}}" aria-label="Toggle real-time advance"></button>
       <button type="button" class="inline-control icon fa-solid fa-forward" data-action="celAdvance" data-tooltip="Advance to next scheduled action" aria-label="Advance"></button>
       <button type="button" class="inline-control icon fa-solid fa-rotate-left" data-action="celReset" data-tooltip="Reset clock and clear all celerity flags" aria-label="Reset"></button>
     </span>
