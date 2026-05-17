@@ -1263,6 +1263,21 @@ export class AspectsofPowerItem extends Item {
     const reactionLine     = (primaryResult.reactionLine ?? '')
                            + (secondaryResult ? secondaryResult.reactionLine : '');
 
+    // ── self_struck passive auto-fire (defense-pool failure) ──
+    // "Struck" semantically means the defense pool didn't fully absorb the
+    // hit. Fires when isHit (defense check passed → hit landed) regardless
+    // of whether armor/veil/barrier further reduces HP loss. Distinct from
+    // self_damage_taken (which requires finalDamage > 0 past armor) and
+    // hp_threshold (HP transition, still at apply-damage button).
+    //
+    // Was previously in the apply-damage handler (aspects-of-power.mjs)
+    // gated by actualHpLoss > 0 — that was effectively "got hit AND
+    // armor didn't fully soak it." Moved here to match the user's intent:
+    // Shocking Retort fires when the melee pool fails, not when HP drops.
+    if (isHit) {
+      await this._firePassiveReactions(targetActor, attackerToken, 'self_struck');
+    }
+
     // Damage pipeline: raw → AOE-overlap fraction → per-half defense
     // pool % → barrier (pre-armor) → armor/veil → toughness.
     //
