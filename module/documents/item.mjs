@@ -5847,7 +5847,16 @@ export class AspectsofPowerItem extends Item {
       // Snapshot picked target IDs at declare time so the deferred fire
       // can restore game.user.targets — the player may deselect between
       // declare and fire (typical celerity gap of seconds-to-minutes).
-      const targetIds = [...game.user.targets].map(t => t.id);
+      //
+      // EXCEPTION: ranged skills (`skillTargetsAtFire`) defer target
+      // selection entirely to fire-time. Snapshotting here would capture
+      // a stale pre-selection (e.g., John was selected for a prior cast,
+      // player queues Full Moon Bolt without re-targeting) and shoot the
+      // wrong actor at fire when the prompt should have appeared instead.
+      // Empty array → restore branch is a no-op, fire-time prompt fires.
+      const targetIds = skillTargetsAtFire(this)
+        ? []
+        : [...game.user.targets].map(t => t.id);
       const declared = await declareAction(this.actor, this, {
         investAmount: investedAmount,
         manaInvestAmount: infusedManaCost > 0 ? infusedManaCost : null,
