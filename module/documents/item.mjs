@@ -795,6 +795,36 @@ export class AspectsofPowerItem extends Item {
     return filter === attackerType;
   }
 
+  /**
+   * Classify a skill's AOE context for Phase F dispatch routing.
+   *   'not-aoe'         — single-target attack, normal pipeline
+   *   'aoe-shrapnel'    — AOE with `shrapnel` tag; uses ranged-attack
+   *                       pipeline (per design-aoe-dispatch.md). Dodge/
+   *                       parry/barrier can apply.
+   *   'aoe-mental'      — AOE debuff targeting mind/soul defense; uses
+   *                       ablative pool depletion (already handled in
+   *                       persistent-region behavior, but flagged here
+   *                       for routing distinctness).
+   *   'aoe-volumetric'  — AOE attack with no shrapnel or mental subtype.
+   *                       Bypasses physical defense pools — "you can't
+   *                       dodge gas." Dodge/parry/barrier reactions skip.
+   *                       Per the design memo, this is the default AOE
+   *                       case unless tagged otherwise.
+   */
+  static _classifyAoeContext(skill) {
+    if (!skill) return 'not-aoe';
+    const sys = skill.system ?? {};
+    const tags = sys.tags ?? [];
+    const isAoe = sys.aoe?.enabled === true
+                || tags.includes('aoe')
+                || (sys.alterations ?? []).some(a => (a.id ?? a) === 'aoe');
+    if (!isAoe) return 'not-aoe';
+    if (tags.includes('shrapnel')) return 'aoe-shrapnel';
+    const def = sys.roll?.targetDefense;
+    if (def === 'mind' || def === 'soul') return 'aoe-mental';
+    return 'aoe-volumetric';
+  }
+
   async _promptReactiveChoice(reactorActor, triggerKey, ctx) {
     if (!reactorActor) return null;
     const reactions = reactorActor.system.reactions ?? { value: 0, max: 1 };
@@ -1194,11 +1224,33 @@ export class AspectsofPowerItem extends Item {
       }
     }
 
-    if (hitRoll && targetDefKey) {
-      primaryResult = await this._resolveDefenseCheck(item, targetActor, targetDefKey, hitTotal, attackerToken);
-    }
-    if (hasDualDefense && hitRoll) {
-      secondaryResult = await this._resolveDefenseCheck(item, targetActor, secondaryDefKey, hitTotal, attackerToken);
+    // Phase F: volumetric AOEs bypass physical defense pools — "you can't
+    // dodge gas." `_classifyAoeContext` returns 'aoe-volumetric' for any
+    // AOE attack-tagged skill without `shrapnel` and not targeting mind/
+    // soul defense (those have their own pipelines). Skip the pool prompt
+    // (and therefore the reactive dodge/parry/barrier choice, which lives
+    // in `_promptDefensePool` inside `_resolveDefenseCheck`). Damage flows
+    // straight through to armor/veil/toughness at fraction-scaled full.
+    // Shrapnel AOEs and single-target attacks keep their existing pipeline.
+    const aoeContext = this.constructor._classifyAoeContext(this);
+    const bypassPool = aoeContext === 'aoe-volumetric';
+    const _defLabel = (k) => (k ?? '').charAt(0).toUpperCase() + (k ?? '').slice(1);
+    if (bypassPool) {
+      primaryResult = { isHit: true, damageMultiplier: 1,
+        defenseLine: `<p><em>${_defLabel(targetDefKey)} pool bypassed (volumetric AOE — can't dodge gas).</em></p>`,
+        reactionLine: '' };
+      if (hasDualDefense) {
+        secondaryResult = { isHit: true, damageMultiplier: 1,
+          defenseLine: `<p><em>${_defLabel(secondaryDefKey)} pool bypassed.</em></p>`,
+          reactionLine: '' };
+      }
+    } else {
+      if (hitRoll && targetDefKey) {
+        primaryResult = await this._resolveDefenseCheck(item, targetActor, targetDefKey, hitTotal, attackerToken);
+      }
+      if (hasDualDefense && hitRoll) {
+        secondaryResult = await this._resolveDefenseCheck(item, targetActor, secondaryDefKey, hitTotal, attackerToken);
+      }
     }
 
     const halfFactor = hasDualDefense ? 0.5 : 1.0;
