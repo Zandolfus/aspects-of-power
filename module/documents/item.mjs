@@ -678,7 +678,11 @@ export class AspectsofPowerItem extends Item {
       const sw = rollData.roll.secondaryWeight ?? 0;
       ab = Math.round(primaryMod * pw + secondaryMod * sw);
     }
-    const db  = rollData.roll.diceBonus;
+    // diceBonus null/undefined produces a `* null` term in the dmg formula
+    // → Foundry parses as StringTerm("null") → "Unresolved StringTerm null"
+    // crash on roll evaluation. Default to 1 (the schema initial), matching
+    // the dice fallback below. Old skills with null diceBonus stop crashing.
+    const db  = rollData.roll.diceBonus ?? 1;
     const dic = rollData.roll.dice || '0';
     const typ = rollData.roll.type;
 
