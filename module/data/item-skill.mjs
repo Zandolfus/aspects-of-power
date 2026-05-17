@@ -233,6 +233,20 @@ export class SkillData extends foundry.abstract.TypeDataModel {
         // override the roll.type classification when present.
         reactionAttackType:    new fields.StringField({ initial: 'any', choices: ['any', 'melee', 'ranged'] }),
 
+        // ── Phase E: buff-carries-reaction config ──
+        // When an Active `buff`-tagged skill applies its buff, propagate
+        // these onto the spawned effect's `system.reaction*` fields so
+        // `_firePassiveReactions` can scan and fire the buff-carried
+        // reaction. Use case: Shocking Retort applies an armor buff to
+        // self; the buff carries `buffReactionTrigger='self_struck'`,
+        // `buffReactionAttackType='melee'`, `buffReactionSkillId=<UUID of
+        // Shocking Retort Counter>`. When the bearer is hit in melee, the
+        // counter skill fires at the attacker. Empty trigger = no reaction
+        // config propagated (most buffs are plain stat changes).
+        buffReactionTrigger:    new fields.StringField({ initial: '' }),
+        buffReactionAttackType: new fields.StringField({ initial: 'any', choices: ['any', 'melee', 'ranged'] }),
+        buffReactionSkillId:    new fields.StringField({ initial: '' }),
+
         // Debuff: subtype (root, stun, blind, etc.) + stat entries + duration + optional DoT.
         debuffType: new fields.StringField({ initial: 'none' }),
         debuffEntries: new fields.ArrayField(new fields.SchemaField({

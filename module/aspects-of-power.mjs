@@ -2123,6 +2123,28 @@ Hooks.on('renderChatMessageHTML', (message, html) => {
               });
             } catch (err) { console.warn('[reactions] self_struck failed:', skill.name, err); }
           }
+          // Phase E: buff-carried self_struck reactions. Scan active effects
+          // whose system.reactionTrigger matches and attack-type filter passes.
+          const effects = target.allApplicableEffects?.() ?? target.effects ?? [];
+          for (const eff of effects) {
+            if (eff.disabled) continue;
+            const sys = eff.system;
+            if (!sys || (sys.reactionTrigger ?? '') !== 'self_struck') continue;
+            const effAttackType = sys.reactionAttackType ?? 'any';
+            if (effAttackType !== 'any' && effAttackType !== attackerType) continue;
+            const skillUuid = sys.reactionSkillId;
+            if (!skillUuid) continue;
+            let counterSkill = null;
+            try { counterSkill = await fromUuid(skillUuid); } catch (e) { /* not found */ }
+            if (!counterSkill || counterSkill.type !== 'skill') continue;
+            try {
+              await counterSkill.roll({ executeDeferred: true, preTargetIds: [attackerToken.id] });
+              ChatMessage.create({
+                speaker: ChatMessage.getSpeaker({ actor: target }),
+                content: `<p><em>${target.name}'s <strong>${eff.name}</strong> triggers <strong>${counterSkill.name}</strong> (self_struck)!</em></p>`,
+              });
+            } catch (err) { console.warn('[reactions] buff self_struck failed:', eff.name, err); }
+          }
         }
         // hp_threshold: per-skill crossing check (oldFrac >= T, newFrac < T).
         const maxHp = health.max || 1;

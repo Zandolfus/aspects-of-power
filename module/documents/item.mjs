@@ -931,6 +931,39 @@ export class AspectsofPowerItem extends Item {
         console.warn('[reactions] passive reaction roll failed:', skill.name, triggerKey, err);
       }
     }
+
+    // ── Phase E: buff-carried reactions ──
+    // Scan the reactor's active effects for matching reactionTrigger + attack
+    // type. Each carrier effect's reactionSkillId points to the skill that
+    // fires when triggered (typically a dedicated counter skill). Use case:
+    // Shocking Retort applies an armor buff to self; while the buff is non-
+    // disabled, melee attackers eat the counter.
+    const effects = reactorActor.allApplicableEffects?.() ?? reactorActor.effects ?? [];
+    for (const eff of effects) {
+      if (eff.disabled) continue;
+      const sys = eff.system;
+      if (!sys) continue;
+      if ((sys.reactionTrigger ?? '') !== triggerKey) continue;
+      const effAttackType = sys.reactionAttackType ?? 'any';
+      if (effAttackType !== 'any' && effAttackType !== attackerType) continue;
+      const skillUuid = sys.reactionSkillId;
+      if (!skillUuid) continue;
+      let counterSkill = null;
+      try { counterSkill = await fromUuid(skillUuid); } catch (e) { /* not found */ }
+      if (!counterSkill || counterSkill.type !== 'skill') {
+        console.warn('[reactions] buff-carried reaction skill not found:', skillUuid, eff.name);
+        continue;
+      }
+      try {
+        await counterSkill.roll({ executeDeferred: true, preTargetIds: [targetToken.id] });
+        ChatMessage.create({
+          speaker: ChatMessage.getSpeaker({ actor: reactorActor }),
+          content: `<p><em>${reactorActor.name}'s <strong>${eff.name}</strong> triggers <strong>${counterSkill.name}</strong> (${triggerKey})!</em></p>`,
+        });
+      } catch (err) {
+        console.warn('[reactions] buff-carried reaction roll failed:', eff.name, counterSkill.name, triggerKey, err);
+      }
+    }
   }
 
   /** @deprecated Use `_firePassiveReactions` directly. */
@@ -2771,6 +2804,18 @@ export class AspectsofPowerItem extends Item {
     const skillTagsArr = this.system.tags ?? [];
     const propagatedTags = EFFECT_TAG_WHITELIST.filter(t => skillTagsArr.includes(t));
     if (propagatedTags.length > 0) systemOverrides.tags = propagatedTags;
+
+    // Phase E: buff-carried reaction config. When the source skill has
+    // buffReactionTrigger set, propagate the reaction fields onto the
+    // spawned effect so _firePassiveReactions / the apply-damage handler
+    // can scan it. The encoded skill at buffReactionSkillId fires when
+    // the trigger event lands on the buffed actor (typically a dedicated
+    // counter skill — Shocking Retort buff → Shocking Retort Counter).
+    if (tc.buffReactionTrigger) {
+      systemOverrides.reactionTrigger    = tc.buffReactionTrigger;
+      systemOverrides.reactionAttackType = tc.buffReactionAttackType ?? 'any';
+      systemOverrides.reactionSkillId    = tc.buffReactionSkillId ?? '';
+    }
 
     // Aura snapshot: per-tick value = rollTotal × auraScale, frozen at
     // apply time. Dispatched by auraEffectType in actor._tickActorAuras:

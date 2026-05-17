@@ -78,6 +78,27 @@ export class AopEffectData extends foundry.data.ActiveEffectTypeDataModel {
       // dispel-by-tag, status display, etc.
       tags: new fields.ArrayField(new fields.StringField(), { initial: [] }),
 
+      // ── Reaction carried by this effect (Phase E) ──
+      // Phase A-D reactions live on actor skills. Phase E lets an active
+      // effect (typically a buff applied by an active skill) ALSO carry a
+      // reaction config. Use case: "Shocking Retort" Active skill applies
+      // an armor buff to self; while the buff is active, melee attackers
+      // get countered. The buff carries reactionTrigger + reactionSkillId,
+      // and the scan in _firePassiveReactions includes effects matching
+      // the trigger.
+      //
+      // reactionTrigger    — same values as skill tagConfig.reactionTrigger
+      //                      ('self_attacked', 'self_struck', etc.). Empty = not a reaction-carrying effect.
+      // reactionAttackType — 'any' / 'melee' / 'ranged' filter on the
+      //                      incoming attack. Mirrors skill tagConfig.
+      // reactionSkillId    — UUID of the skill to fire when triggered.
+      //                      Typically a dedicated counter skill on the
+      //                      buffed actor. Skill rolls with executeDeferred
+      //                      + preTargetIds=[attackerToken.id].
+      reactionTrigger:    new fields.StringField({ initial: '' }),
+      reactionAttackType: new fields.StringField({ initial: 'any', choices: ['any', 'melee', 'ranged'] }),
+      reactionSkillId:    new fields.StringField({ initial: '' }),
+
       // ── Special flags ──
       dismemberedSlot:          new fields.StringField({ initial: '' }),
       sleepActive:              new fields.BooleanField({ initial: false }),
