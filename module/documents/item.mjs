@@ -2196,8 +2196,16 @@ export class AspectsofPowerItem extends Item {
             const attr = c.key.replace('system.', '').replace('.value', '');
             return `${attr} +${c.value}`;
           }).join(', ');
-          const sysSummary = Object.entries(sysOverrides).map(([k, v]) => `${k} ×${v}`).join(', ');
-          const fullSummary = [statSummary, sysSummary].filter(Boolean).join('; ') || 'effect';
+          // Reaction-config overrides (Phase E) are under-the-hood — don't
+          // render them in the player-facing buff chat (they're not "×N"
+          // multipliers and confuse the summary).
+          const REACTION_CFG_KEYS = new Set(['reactionTrigger', 'reactionAttackType', 'reactionSkillId']);
+          const visibleOverrides = Object.entries(sysOverrides)
+            .filter(([k]) => !REACTION_CFG_KEYS.has(k));
+          const sysSummary = visibleOverrides.map(([k, v]) => `${k} ×${v}`).join(', ');
+          const reactionSummary = Object.keys(sysOverrides).some(k => REACTION_CFG_KEYS.has(k))
+            ? `triggers ${sysOverrides.reactionTrigger}-reaction` : '';
+          const fullSummary = [statSummary, sysSummary, reactionSummary].filter(Boolean).join('; ') || 'effect';
           ChatMessage.create({ speaker: payload.speaker, ...msgWhisper,
             content: `<p><strong>${target.name}</strong> buffed: ${fullSummary} for ${payload.duration} rounds.</p>`,
           });
