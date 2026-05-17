@@ -223,6 +223,15 @@ export class SkillData extends foundry.abstract.TypeDataModel {
         // barrier=at_damage_app, retaliation=post_resolve). Set explicitly
         // for skills that need a non-default phase. Empty = use default.
         reactionPhase:         new fields.StringField({ initial: '' }),
+        // Attack-type filter on the INCOMING attack (the thing that triggered
+        // the reaction). `any` (default) = no filter, fires on any attacker.
+        // `melee` = only fires when the incoming attack was a melee strike
+        // (Thunder Puppet retaliating only against melee attackers, etc.).
+        // `ranged` = only fires when the incoming attack was ranged. The
+        // attacker's roll.type drives classification: str_weapon/dex_weapon/
+        // magic_melee → melee, others → ranged. Skill tags `melee`/`ranged`
+        // override the roll.type classification when present.
+        reactionAttackType:    new fields.StringField({ initial: 'any', choices: ['any', 'melee', 'ranged'] }),
 
         // Debuff: subtype (root, stun, blind, etc.) + stat entries + duration + optional DoT.
         debuffType: new fields.StringField({ initial: 'none' }),

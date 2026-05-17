@@ -753,6 +753,48 @@ export class AspectsofPowerItem extends Item {
    * Returns the chosen reaction skill ID (string) or null on decline /
    * timeout / no candidates.
    */
+  /**
+   * Classify an attacking skill (or raw roll.type string) as melee / ranged /
+   * any. Used by the reactionAttackType filter to skip reactions whose filter
+   * doesn't match the incoming attack.
+   *
+   * Tags `melee` / `ranged` on the skill override the roll.type heuristic.
+   * roll.type str_weapon / dex_weapon / magic_melee → melee. Everything else
+   * with a non-empty roll.type → ranged. Empty / unknown → 'any'.
+   *
+   * @param {Item|string|null} skillOrType
+   * @returns {'melee'|'ranged'|'any'}
+   */
+  static _classifyAttackType(skillOrType) {
+    if (!skillOrType) return 'any';
+    let rollType = '';
+    let tags = [];
+    if (typeof skillOrType === 'string') {
+      rollType = skillOrType;
+    } else {
+      rollType = skillOrType.system?.roll?.type ?? '';
+      tags = skillOrType.system?.tags ?? [];
+    }
+    if (tags.includes('melee')) return 'melee';
+    if (tags.includes('ranged')) return 'ranged';
+    const MELEE_TYPES = new Set(['str_weapon', 'dex_weapon', 'magic_melee']);
+    if (MELEE_TYPES.has(rollType)) return 'melee';
+    if (rollType) return 'ranged';
+    return 'any';
+  }
+
+  /**
+   * Returns true if a reaction skill's `reactionAttackType` filter matches
+   * the incoming attack. `any` matches anything; `melee`/`ranged` match only
+   * their own classification. Reactions filtered for melee will not fire
+   * against ranged attackers, and vice versa.
+   */
+  static _reactionMatchesAttackType(reactionSkill, attackerType) {
+    const filter = reactionSkill.system?.tagConfig?.reactionAttackType ?? 'any';
+    if (filter === 'any') return true;
+    return filter === attackerType;
+  }
+
   async _promptReactiveChoice(reactorActor, triggerKey, ctx) {
     if (!reactorActor) return null;
     const reactions = reactorActor.system.reactions ?? { value: 0, max: 1 };
@@ -760,11 +802,15 @@ export class AspectsofPowerItem extends Item {
     // Cooldown entries: skillId → roundsRemaining. Decremented at onStartTurn.
     // Entry present with > 0 = on cooldown. No entry = ready.
     const cooldowns = reactorActor.flags?.aspectsofpower?.reactionCooldowns ?? {};
+    // Classify the attacker once for the attack-type filter (melee/ranged/any).
+    // ctx.attackerSkill carries the originating attack item when available.
+    const attackerType = this.constructor._classifyAttackType(ctx?.attackerSkill ?? this);
     const candidates = reactorActor.items.filter(s => {
       if (s.type !== 'skill' || s.system.skillType !== 'Reaction') return false;
       const trig = s.system.tagConfig?.reactionTrigger ?? '';
       if (trig !== triggerKey) return false; // strict match — no legacy fallback for non-self_attacked
       if ((cooldowns[s.id] ?? 0) > 0) return false;
+      if (!this.constructor._reactionMatchesAttackType(s, attackerType)) return false;
       const resKey = s.system.roll?.resource;
       const cost = s.system.roll?.cost ?? 0;
       if (resKey && cost > 0) {
@@ -860,13 +906,19 @@ export class AspectsofPowerItem extends Item {
    * @param {string} triggerKey    The event key (e.g. 'self_attacked',
    *                               'ally_attacked', 'self_damage_taken').
    */
-  async _firePassiveReactions(reactorActor, targetToken, triggerKey) {
+  async _firePassiveReactions(reactorActor, targetToken, triggerKey, attackerSkill = null) {
     if (!reactorActor || !targetToken) return;
+    // Classify the incoming attack so reactionAttackType-filtered passives
+    // (e.g. Thunder Puppet, melee-only) can skip non-matching triggers.
+    // Falls back to `this` if no explicit attackerSkill passed (most callers
+    // are `this` = the attacking skill firing the trigger).
+    const attackerType = this.constructor._classifyAttackType(attackerSkill ?? this);
     const passives = reactorActor.items.filter(s =>
       s.type === 'skill' &&
       s.system.skillType === 'Passive' &&
       (s.system.tags ?? []).includes('retaliation') &&
-      (s.system.tagConfig?.reactionTrigger ?? '') === triggerKey
+      (s.system.tagConfig?.reactionTrigger ?? '') === triggerKey &&
+      this.constructor._reactionMatchesAttackType(s, attackerType)
     );
     for (const skill of passives) {
       try {
@@ -1209,8 +1261,12 @@ export class AspectsofPowerItem extends Item {
       : '';
     // Always emit attacker-token-id so the apply-damage handler can fire
     // post-resolve triggers (self_struck, hp_threshold) at the attacker.
-    // Forced-movement attrs piggyback on the same button when applicable.
-    const _atkAttr = ` data-attacker-token-id="${attackerToken?.id ?? ''}"`;
+    // Also stash the attacker's classified attack type so the apply-damage
+    // handler can apply the reactionAttackType filter (melee-only reactions
+    // shouldn't fire vs ranged attackers, etc.). Forced-movement attrs
+    // piggyback on the same button when applicable.
+    const _attackerType = this.constructor._classifyAttackType(this);
+    const _atkAttr = ` data-attacker-token-id="${attackerToken?.id ?? ''}" data-attacker-attack-type="${_attackerType}"`;
     const fmAttrs = hasForcedMovement
       ? `${_atkAttr} data-forced-dir="${fmDir}" data-forced-dist="${fmDist}" data-hit-total="${hitTotal}"`
       : _atkAttr;

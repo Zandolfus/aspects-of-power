@@ -2096,6 +2096,14 @@ Hooks.on('renderChatMessageHTML', (message, html) => {
       // update commits. Reaches the attacker via the button's data attr.
       const attackerTokenId = btn.dataset.attackerTokenId;
       const attackerToken = attackerTokenId ? canvas.tokens?.get(attackerTokenId) : null;
+      // Stashed on the apply-damage button at item.mjs button-construction —
+      // gates reactionAttackType-filtered passives (Thunder Puppet melee-only).
+      // Default 'any' if missing so older damage messages still process normally.
+      const attackerType = btn.dataset.attackerAttackType || 'any';
+      const matchesAttackType = (s) => {
+        const filter = s.system.tagConfig?.reactionAttackType ?? 'any';
+        return filter === 'any' || filter === attackerType;
+      };
       if (attackerToken) {
         // self_struck: only if HP loss occurred.
         if (actualHpLoss > 0) {
@@ -2103,7 +2111,8 @@ Hooks.on('renderChatMessageHTML', (message, html) => {
             s.type === 'skill' &&
             s.system.skillType === 'Passive' &&
             (s.system.tags ?? []).includes('retaliation') &&
-            (s.system.tagConfig?.reactionTrigger ?? '') === 'self_struck'
+            (s.system.tagConfig?.reactionTrigger ?? '') === 'self_struck' &&
+            matchesAttackType(s)
           );
           for (const skill of struckPassives) {
             try {
@@ -2123,7 +2132,8 @@ Hooks.on('renderChatMessageHTML', (message, html) => {
           s.type === 'skill' &&
           s.system.skillType === 'Passive' &&
           (s.system.tags ?? []).includes('retaliation') &&
-          (s.system.tagConfig?.reactionTrigger ?? '') === 'hp_threshold'
+          (s.system.tagConfig?.reactionTrigger ?? '') === 'hp_threshold' &&
+          matchesAttackType(s)
         );
         for (const skill of hpThreshPassives) {
           const threshold = skill.system.tagConfig?.reactionThresholdPct ?? 0;
