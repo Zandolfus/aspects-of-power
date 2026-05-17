@@ -6302,8 +6302,21 @@ export class AspectsofPowerItem extends Item {
     }
 
     // ── Dispatch to each tag handler (single-target) ─────────────────────
+    // Movement tags (teleport / leap) fire FIRST so the token's position
+    // updates before any attack/damage/etc. tags resolve at the new
+    // location. Step-and-strike skills (e.g. Subtle Step: teleport in a
+    // flash of lightning) should arrive at the destination before the
+    // strike resolves, not strike from the original position then teleport.
+    const MOVEMENT_TAGS_FIRST = new Set(['teleport', 'leap']);
+    const orderedTags = [...tags].sort((a, b) => {
+      const aMove = MOVEMENT_TAGS_FIRST.has(a);
+      const bMove = MOVEMENT_TAGS_FIRST.has(b);
+      if (aMove && !bMove) return -1;
+      if (!aMove && bMove) return 1;
+      return 0;
+    });
     const hitResults = new Map();
-    for (const tag of tags) {
+    for (const tag of orderedTags) {
       switch (tag) {
         case 'attack': {
           const result = await this._handleAttackTag(item, rollData, hitRoll, dmgRoll, speaker, rollMode, label);
