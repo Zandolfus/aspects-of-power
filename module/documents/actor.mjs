@@ -81,10 +81,20 @@ export class AspectsofPowerActor extends Actor {
 
     // --- Stat breakdown: classify effect contributions by source ---
     // Titles are additive to base; blessings MULTIPLY (base + titles).
+    // Passives (effectCategory === 'passive') behave like blessings: their
+    // additive changes go to passiveAdd, multiplier changes compose into
+    // passiveMultiplier. Used by racial passives like Scaled Hide (toughness
+    // ×1.15) and Eagle Eye (perception ×1.15).
     const abilityKeys = Object.keys(systemData.abilities);
     const contributions = {};
     for (const key of abilityKeys) {
-      contributions[key] = { equipment: 0, blessingAdd: 0, blessingMultiplier: 1, title: 0, other: 0 };
+      contributions[key] = {
+        equipment: 0,
+        blessingAdd: 0, blessingMultiplier: 1,
+        passiveAdd: 0,  passiveMultiplier: 1,
+        title: 0,
+        other: 0,
+      };
     }
     // Active loadout determines which equipment effects apply.
     // 'combat' loadout: only items in combat slots contribute.
@@ -123,23 +133,33 @@ export class AspectsofPowerActor extends Actor {
           if (c.type === 'multiply') contributions[k].blessingMultiplier *= val;
           else                       contributions[k].blessingAdd += val;
         }
+        else if (e.system?.effectCategory === 'passive') {
+          if (c.type === 'multiply') contributions[k].passiveMultiplier *= val;
+          else                       contributions[k].passiveAdd += val;
+        }
         else if (e.system?.effectCategory === 'title')    contributions[k].title += val;
         else                                               contributions[k].other += val;
       }
     }
 
-    // Per-ability breakdown: base → +titles → ×blessings → +equipment → +other.
+    // Per-ability breakdown:
+    //   base → +titles → ×blessings → ×passives → +blessingAdd + passiveAdd → calculated
+    //   calculated + equipmentCapped + effectBonus (other) → final
     for (const [key, ability] of Object.entries(systemData.abilities)) {
       const base = Math.round(this._source.system.abilities[key].value ?? 0);
       const c = contributions[key];
       const afterTitles = base + c.title;
-      const calculated = Math.round(afterTitles * c.blessingMultiplier) + Math.round(c.blessingAdd);
+      const calculated = Math.round(afterTitles * c.blessingMultiplier * c.passiveMultiplier)
+        + Math.round(c.blessingAdd)
+        + Math.round(c.passiveAdd);
       const effectBonus = Math.round(c.other);
       ability.breakdown = {
         base,
         titleBonus: Math.round(c.title),
         blessingMultiplier: c.blessingMultiplier,
         blessingAdd: Math.round(c.blessingAdd),
+        passiveMultiplier: c.passiveMultiplier,
+        passiveAdd: Math.round(c.passiveAdd),
         calculated,
         effectBonus,
         equipmentBonusRaw: Math.round(c.equipment),
