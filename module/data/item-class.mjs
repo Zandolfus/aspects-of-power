@@ -37,6 +37,10 @@ export class ClassData extends foundry.abstract.TypeDataModel {
         id:    new fields.StringField({ initial: '' }),
         value: new fields.NumberField({ initial: 0 }),
       }), { initial: [] }),
+
+      // UUIDs of compendium skill items this class grants. Mirrors the
+      // profession + equipment grantedSkills pattern.
+      grantedSkills: new fields.ArrayField(new fields.StringField(), { initial: [] }),
     };
   }
 }

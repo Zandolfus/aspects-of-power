@@ -64,6 +64,11 @@ export class RaceData extends foundry.abstract.TypeDataModel {
         id:    new fields.StringField({ initial: '' }),
         value: new fields.NumberField({ initial: 0 }),
       }), { initial: [] }),
+
+      // UUIDs of compendium skill items this race grants (racial passives
+      // like Snake Eater, Sky Serpent, One Step for Man). Mirrors profession
+      // + equipment grantedSkills pattern.
+      grantedSkills: new fields.ArrayField(new fields.StringField(), { initial: [] }),
     };
   }
 }

@@ -37,6 +37,13 @@ export class ProfessionData extends foundry.abstract.TypeDataModel {
         id:    new fields.StringField({ initial: '' }),
         value: new fields.NumberField({ initial: 0 }),
       }), { initial: [] }),
+
+      // UUIDs of compendium skill items this profession grants. Authoritative
+      // list of skills a character receives upon taking this profession.
+      // Wired via a sync utility / level-up hook (see migration/local/
+      // sync_granted_skills.js). Mirrors the equipment-item grantedSkills
+      // pattern in item-item.mjs:66.
+      grantedSkills: new fields.ArrayField(new fields.StringField(), { initial: [] }),
     };
   }
 }
