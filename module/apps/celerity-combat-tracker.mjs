@@ -319,61 +319,115 @@ async function _onCelAdvance(event, target) {
 }
 
 /**
- * Idempotent canvas turn-marker sync for celerity.
+ * Sync canvas turn-marker rings to AOP's predicate (every combatant token
+ * gets a refresh flag; the patched _refreshTurnMarker decides what paints).
  *
- * Target set = (every combatant with no scheduled action) ∪ (the soonest-
- * queued combatant, i.e. combat.combatant after _onCelAdvance's turn sync).
- *
- * Walks every token on the combat's scene: tokens in the set get a
- * TokenTurnMarker instantiated; tokens not in the set have their existing
- * marker destroyed. Foundry core only paints the marker on combat.combatant,
- * so we get the soonest-queued's ring "for free" and only add the unqueued
- * extras here (the destroy branch still runs for anything stale).
- *
- * No-op if no canvas scene or the marker class isn't loaded.
+ * Used at fire-time as a backup for the case where combat.turn doesn't
+ * change (no one queued → no combatTurnChange → no built-in
+ * _updateTurnMarkers cascade). When combat.turn DOES change, the patched
+ * _updateTurnMarkers below handles the refresh.
  */
 function _aopSyncTurnMarkers(combat) {
   if (!combat) return;
-  const scene = combat.scene ?? canvas?.scene;
-  if (!scene) return;
-  const TokenTurnMarker = foundry?.canvas?.placeables?.tokens?.TokenTurnMarker;
-  if (!TokenTurnMarker) return;
-  const clockTick = getClockTick(combat);
-
-  const targetTokenIds = new Set();
-  const queued = [];
   for (const cm of combat.combatants) {
-    const tokenDoc = cm.token;
-    if (!tokenDoc || tokenDoc.parent?.id !== scene.id) continue;
-    const declared = cm.flags?.[FLAG_NS]?.declaredAction;
-    const nextTick = declared?.scheduledTick ?? null;
-    if (nextTick == null) {
-      targetTokenIds.add(tokenDoc.id);
-    } else if (nextTick > clockTick) {
-      queued.push({ tokenDocId: tokenDoc.id, nextTick });
-    }
+    const tok = cm.token?.object;
+    if (tok) tok.renderFlags.set({ refreshTurnMarker: true });
   }
-  if (queued.length > 0) {
-    queued.sort((a, b) => a.nextTick - b.nextTick);
-    targetTokenIds.add(queued[0].tokenDocId);
-  }
+}
 
-  for (const tokenDoc of scene.tokens) {
-    const tok = tokenDoc.object;
-    if (!tok) continue;
-    const want = targetTokenIds.has(tokenDoc.id);
-    if (want && !tok.turnMarker) {
-      const marker = new TokenTurnMarker(tok);
-      tok.turnMarker = marker;
-      marker.draw().then(() => {
-        tok.renderFlags.set({ refreshTurnMarker: true });
-      }).catch(e => console.warn('[AOP] turnMarker.draw failed:', e));
-    } else if (!want && tok.turnMarker) {
-      tok.turnMarker.destroy();
-      tok.turnMarker = null;
-      tok.renderFlags.set({ refreshTurnMarker: true });
-    }
+/**
+ * Predicate: should this token currently display a turn-marker ring?
+ *
+ * True iff the token's combatant has no scheduled action OR is the soonest-
+ * scheduled combatant (after the clock). Mirrors the target set computed
+ * in _onCelAdvance + the sidebar indicator.
+ */
+function _aopIsInTurnMarkerSet(token, combat) {
+  const cm = combat.combatants.find(c => c.tokenId === token.id);
+  if (!cm) return false;
+  const declared = cm.flags?.[FLAG_NS]?.declaredAction;
+  const nextTick = declared?.scheduledTick ?? null;
+  if (nextTick == null) return true;
+  const clockTick = getClockTick(combat);
+  let soonestTokenId = null;
+  let soonestTick = Infinity;
+  for (const c2 of combat.combatants) {
+    const t = c2.flags?.[FLAG_NS]?.declaredAction?.scheduledTick ?? null;
+    if (t === null || t <= clockTick) continue;
+    if (t < soonestTick) { soonestTick = t; soonestTokenId = c2.tokenId; }
   }
+  return soonestTokenId === token.id;
+}
+
+function _aopCelerityActive() {
+  return CONFIG.ui.combat?.name === 'CelerityCombatTracker';
+}
+
+/**
+ * Patch Foundry's turn-marker machinery so it can paint markers on multiple
+ * tokens (every unqueued combatant + soonest-queued) instead of just the
+ * one combat.combatant. Two overrides:
+ *
+ * 1. Combat#_updateTurnMarkers — fires on combatTurnChange/combatRound/etc.
+ *    Core only sets the refresh flag on combat.combatant's token. We set it
+ *    on every combatant token so the per-token refresh evaluation reaches
+ *    all of them, plus on any orphan turn-marker tokens (cleanup).
+ *
+ * 2. Token#_refreshTurnMarker — fires from the refresh flag. Core's check
+ *    is strictly `isTurn = combat.combatant.tokenId === this.id`, which
+ *    destroys any marker we'd manually add to a non-active token. We
+ *    replace that with our set-membership predicate.
+ *
+ * Both overrides defer to the originals when celerity isn't the active
+ * combat tracker (so the system can ship alongside a vanilla combat mode
+ * if ever toggled).
+ *
+ * Called once from system init. Idempotent via a flag on the prototype.
+ */
+export function installAopTurnMarkerPatch() {
+  const CombatCls = CONFIG.Combat?.documentClass;
+  const TokenCls = CONFIG.Token?.objectClass;
+  if (!CombatCls || !TokenCls) return;
+  if (CombatCls.prototype._aopTurnMarkerPatched) return;
+
+  const origUpdate = CombatCls.prototype._updateTurnMarkers;
+  CombatCls.prototype._updateTurnMarkers = function() {
+    if (!_aopCelerityActive()) return origUpdate.call(this);
+    if (!canvas?.ready) return;
+    for (const cm of this.combatants) {
+      const tok = cm.token?._object;
+      if (tok) tok.renderFlags.set({ refreshTurnMarker: true });
+    }
+    const combatantTokenIds = new Set([...this.combatants].map(c => c.tokenId));
+    for (const tok of canvas.tokens.turnMarkers) {
+      if (!combatantTokenIds.has(tok.id)) tok.renderFlags.set({ refreshTurnMarker: true });
+    }
+  };
+
+  const origRefresh = TokenCls.prototype._refreshTurnMarker;
+  const TokenTurnMarker = foundry?.canvas?.placeables?.tokens?.TokenTurnMarker;
+  TokenCls.prototype._refreshTurnMarker = function() {
+    const c = game.combat;
+    if (!_aopCelerityActive() || !c?.started) return origRefresh.call(this);
+    if (!TokenTurnMarker) return origRefresh.call(this);
+
+    const tmConfig = this.document.turnMarker;
+    const enabled = CONFIG.Combat.settings.turnMarker.enabled
+      && (tmConfig?.mode !== CONST.TOKEN_TURN_MARKER_MODES?.DISABLED);
+    const want = enabled && _aopIsInTurnMarkerSet(this, c);
+
+    if (want) {
+      if (!this.turnMarker) this.turnMarker = this.addChildAt(new TokenTurnMarker(this), 0);
+      canvas.tokens.turnMarkers.add(this);
+      this.turnMarker.draw();
+    } else if (this.turnMarker) {
+      canvas.tokens.turnMarkers.delete(this);
+      this.turnMarker.destroy();
+      this.turnMarker = null;
+    }
+  };
+
+  CombatCls.prototype._aopTurnMarkerPatched = true;
 }
 
 async function _onCelCancel(event, target) {
