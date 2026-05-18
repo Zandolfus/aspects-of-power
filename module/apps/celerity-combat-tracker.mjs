@@ -477,24 +477,44 @@ export class CelerityCombatTracker extends ParentTracker {
     this.render();
   }
 
-  // Progressively lerp a token's document.x/y across the realtime wait.
-  // Each interval writes the next lerped position with animation: STEP_MS
-  // so Foundry smooths between writes. Document.x tracks the visual sprite,
-  // so a drag-cancel snap-back goes to where the player saw the sprite —
-  // not to a premature endPos. Auto-stops if the declared movement changes
-  // (player re-declared mid-flight) or if realtime is paused.
-  _startMovementLerp(tok, mv, realtimeMs) {
+  // Lerp ALL in-flight movement tokens concurrently during the realtime wait.
+  // Each token goes from its CURRENT doc position to where it should be at
+  // nextTick (per interpolateMovementPosition — which extrapolates linearly
+  // along the declared startPos→endPos by clock). Phil's full move and
+  // Stalker's partial step both progress visually during the same real-time
+  // window. Auto-stops on pause or if any actor re-declares.
+  _startConcurrentLerps(combat, nextTick, realtimeMs) {
     if (this._realtimeLerpIntervalId) {
       clearInterval(this._realtimeLerpIntervalId);
       this._realtimeLerpIntervalId = null;
     }
-    if (!tok || !mv?.startPos || !mv?.endPos) return;
+    if (!combat) return;
+
+    // Snapshot each in-flight movement: combatantId, token, current pos,
+    // target pos at nextTick, scheduledTick fingerprint for re-declare detection.
+    const targets = [];
+    for (const cm of combat.combatants) {
+      const mv = cm.flags?.['aspectsofpower']?.declaredAction;
+      if (!mv || mv.itemId !== MOVEMENT_ITEM_ID) continue;
+      if (!mv.startPos || !mv.endPos) continue;
+      const tok = cm.token;
+      if (!tok) continue;
+      const targetPos = interpolateMovementPosition(mv, nextTick);
+      targets.push({
+        combatantId: cm.id,
+        tok,
+        startX: tok.x,
+        startY: tok.y,
+        targetX: targetPos.x,
+        targetY: targetPos.y,
+        scheduledTickFingerprint: mv.scheduledTick,
+      });
+    }
+    if (targets.length === 0) return;
+
     const STEP_MS = this.constructor.REALTIME_MOVEMENT_LERP_STEP_MS;
-    const steps = Math.max(1, Math.floor(realtimeMs / STEP_MS));
-    const stepDuration = Math.round(realtimeMs / steps);
-    const movementSentinelId = mv.itemId; // MOVEMENT_ITEM_ID — re-checked each tick
-    const scheduledTickAtStart = mv.scheduledTick;
-    const combatantId = this.viewed?.combatants?.find(c => c.token?.id === tok.id)?.id;
+    const totalSteps = Math.max(1, Math.floor(realtimeMs / STEP_MS));
+    const stepDuration = Math.round(realtimeMs / totalSteps);
     let stepIdx = 0;
 
     this._realtimeLerpIntervalId = setInterval(async () => {
@@ -503,35 +523,37 @@ export class CelerityCombatTracker extends ParentTracker {
         this._realtimeLerpIntervalId = null;
         return;
       }
-      // Bail if the declared movement was replaced mid-flight (player
-      // re-declared). The new movement's lerp will start on the next
-      // _scheduleNextFire pass.
-      const c = combatantId ? this.viewed?.combatants?.get(combatantId) : null;
-      const liveDeclared = c?.flags?.aspectsofpower?.declaredAction;
-      if (!liveDeclared
-          || liveDeclared.itemId !== movementSentinelId
-          || liveDeclared.scheduledTick !== scheduledTickAtStart) {
-        clearInterval(this._realtimeLerpIntervalId);
-        this._realtimeLerpIntervalId = null;
-        return;
-      }
       stepIdx++;
-      if (stepIdx >= steps) {
-        // Final step — let the setTimeout's _onCelAdvance run the post-fire
-        // write. Just halt the lerp here.
+      if (stepIdx >= totalSteps) {
         clearInterval(this._realtimeLerpIntervalId);
         this._realtimeLerpIntervalId = null;
         return;
       }
-      const frac = stepIdx / steps;
-      const lerpX = Math.round(mv.startPos.x + frac * (mv.endPos.x - mv.startPos.x));
-      const lerpY = Math.round(mv.startPos.y + frac * (mv.endPos.y - mv.startPos.y));
-      try {
-        await tok.update(
-          { x: lerpX, y: lerpY },
-          { animation: { duration: stepDuration }, _celerityCommit: true }
+      const frac = stepIdx / totalSteps;
+
+      const updates = [];
+      for (const t of targets) {
+        // Skip if this combatant re-declared mid-flight (new movement
+        // started; old lerp is stale). The new declare will trigger its
+        // own _scheduleNextFire which will start a fresh concurrent-lerps
+        // cycle.
+        const cm = this.viewed?.combatants?.get(t.combatantId);
+        const live = cm?.flags?.['aspectsofpower']?.declaredAction;
+        if (!live
+            || live.itemId !== MOVEMENT_ITEM_ID
+            || live.scheduledTick !== t.scheduledTickFingerprint) {
+          continue;
+        }
+        const lerpX = Math.round(t.startX + frac * (t.targetX - t.startX));
+        const lerpY = Math.round(t.startY + frac * (t.targetY - t.startY));
+        updates.push(
+          t.tok.update(
+            { x: lerpX, y: lerpY },
+            { animation: { duration: stepDuration }, _celerityCommit: true }
+          ).catch(e => console.warn('[TRIAL-REALTIME] lerp step failed:', e))
         );
-      } catch (e) { console.warn('[TRIAL-REALTIME] lerp step failed:', e); }
+      }
+      await Promise.all(updates);
     }, STEP_MS);
   }
 
@@ -562,16 +584,15 @@ export class CelerityCombatTracker extends ParentTracker {
     const secsPerRound = this.constructor.REALTIME_FASTEST_ROUND_SECONDS;
     const realtimeMs = Math.max(0, deltaTicks * (secsPerRound * 1000) / fastest);
 
-    // For MOVEMENT actions, progressively lerp document.x/y over the wait so
-    // (a) the sprite slides smoothly across the canvas and (b) document.x
-    // tracks the visual position. Without (b), `_preUpdateMovement`'s
-    // startPos snapshot at drag-time reads the premature endPos and the
-    // sprite snap-backs to wherever Foundry last committed the document.
-    // Frequent writes with `animation: { duration: STEP_MS }` lets Foundry
-    // interpolate between writes — visual stays smooth without flooding
-    // the network with frame-rate updates.
-    if (next.declared.itemId === MOVEMENT_ITEM_ID && next.declared.endPos && realtimeMs > 50) {
-      this._startMovementLerp(next.c.token, next.declared, realtimeMs);
+    // Animate ALL in-flight movements concurrently during the wait. Phil's
+    // 1-second wait coincides with Stalker's 1 second of a 7-second walk
+    // (Stalker advances ~15%). Each token lerps from its CURRENT doc
+    // position to where it should be at nextTick (per the existing
+    // interpolateMovementPosition helper, which extrapolates by clock).
+    // When the earliest fire triggers, every token is mid-flight at the
+    // visually-correct fraction — no Phil-runs-while-others-frozen issue.
+    if (realtimeMs > 50) {
+      this._startConcurrentLerps(combat, nextTick, realtimeMs);
     }
 
     this._realtimeTimeoutId = setTimeout(async () => {
