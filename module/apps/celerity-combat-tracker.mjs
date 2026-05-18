@@ -495,13 +495,28 @@ async function _scanPersistentAoeReticks(combat, newClock) {
   }
 }
 
-// TRIAL-REALTIME: action handler bound via DEFAULT_OPTIONS. Toggles the
-// auto-advance loop on the tracker app instance. If the trial reverts,
-// delete this function + its actions binding + the class methods +
-// the button in the template.
+// TRIAL-REALTIME: action handler bound via DEFAULT_OPTIONS. The actual
+// auto-advance loop only runs on the GM client (combat.update + dispatch
+// authority must be centralized). Players route their click through the
+// system socket; GM receives, toggles on its own tracker instance, and
+// writes the realtimeRunning flag to the combat doc — which broadcasts
+// to all clients via the normal document-update hooks and updates the
+// button icon everywhere.
+//
+// Source-of-truth check is the combat flag (not this._realtimeRunning),
+// so if the GM refreshes mid-loop the new tracker instance still reflects
+// the running state and the next click correctly stops it.
 async function _onCelRealtimeToggle(event, target) {
-  if (this._realtimeRunning) this._realtimeStop();
-  else this._realtimeStart();
+  const combat = this.viewed;
+  const flagOn = !!combat?.flags?.[FLAG_NS]?.realtimeRunning;
+  if (game.user.isGM) {
+    if (flagOn || this._realtimeRunning) await this._realtimeStop();
+    else await this._realtimeStart();
+  } else {
+    game.socket.emit('system.aspects-of-power', {
+      type: 'gmCelerityRealtimeToggle',
+    });
+  }
 }
 
 async function _onCelReset(event, target) {
@@ -563,7 +578,8 @@ export class CelerityCombatTracker extends ParentTracker {
     return Number.isFinite(min) ? min : 1000;
   }
 
-  _realtimeStart() {
+  async _realtimeStart() {
+    if (!game.user.isGM) return;
     if (this._realtimeRunning) return;
     this._realtimeRunning = true;
     // Hook into combatant updates so a new earlier-scheduled declare
@@ -584,10 +600,16 @@ export class CelerityCombatTracker extends ParentTracker {
       });
     }
     this._scheduleNextFire();
-    this.render();
+    // Broadcast running state via combat flag so player tracker buttons
+    // update too. Document update auto-renders all clients' trackers.
+    if (this.viewed) {
+      try { await this.viewed.update({ [`flags.${FLAG_NS}.realtimeRunning`]: true }); }
+      catch (e) { console.warn('[TRIAL-REALTIME] flag write failed:', e); }
+    }
   }
 
-  _realtimeStop() {
+  async _realtimeStop() {
+    const wasRunning = this._realtimeRunning;
     this._realtimeRunning = false;
     if (this._realtimeTimeoutId) {
       clearTimeout(this._realtimeTimeoutId);
@@ -601,7 +623,16 @@ export class CelerityCombatTracker extends ParentTracker {
       Hooks.off('updateCombatant', this._realtimeHookId);
       this._realtimeHookId = null;
     }
-    this.render();
+    // Clear the broadcast flag so all clients' buttons flip to ▶. Only
+    // GM writes the flag (combat.update auth); player-stop is a no-op for
+    // them since they never had a local loop.
+    if (game.user.isGM && this.viewed) {
+      const flagOn = !!this.viewed.flags?.[FLAG_NS]?.realtimeRunning;
+      if (wasRunning || flagOn) {
+        try { await this.viewed.update({ [`flags.${FLAG_NS}.realtimeRunning`]: false }); }
+        catch (e) { console.warn('[TRIAL-REALTIME] flag clear failed:', e); }
+      }
+    }
   }
 
   // Lerp ALL in-flight movement tokens concurrently during the realtime wait.
@@ -778,8 +809,10 @@ export class CelerityCombatTracker extends ParentTracker {
     const combat = context.combat ?? this.viewed;
     context.celerityClockTick = getClockTick(combat);
     // TRIAL-REALTIME: surface play/pause state so the template button can
-    // swap between fa-play and fa-pause icons.
-    context.celerityRealtimeRunning = this._realtimeRunning;
+    // swap between fa-play and fa-pause icons. Read from the combat flag
+    // (shared across clients) so player trackers reflect the GM's loop
+    // state without needing their own local _realtimeRunning instance.
+    context.celerityRealtimeRunning = !!combat?.flags?.[FLAG_NS]?.realtimeRunning;
     if (Array.isArray(context.turns)) {
       // Player visibility: per design-celerity.md "Public allies, opaque
       // enemies", non-GM users only see PC-owned combatants in the tracker.

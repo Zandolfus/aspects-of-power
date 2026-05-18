@@ -982,6 +982,18 @@ Hooks.once('ready', async function () {
       });
     } else if (['gmApplyBuff', 'gmApplyDebuff', 'gmApplyRestoration', 'gmApplyRepair', 'gmApplyCleanse', 'gmUpdateDefensePool', 'gmConsumeReaction', 'gmExecuteTrade', 'gmCreateAoeRegion', 'gmDeleteAoeRegion'].includes(payload.type)) {
       await AspectsofPowerItem.executeGmAction(payload);
+    } else if (payload.type === 'gmCelerityRealtimeToggle') {
+      // TRIAL-REALTIME: player clicked the play/pause button. The real loop
+      // lives on the GM client (combat.update authority + central dispatch
+      // for socket-routed action fires). Toggle our local tracker instance;
+      // the start/stop methods write a combat flag so all clients' button
+      // icons sync via the document-update broadcast.
+      const tracker = ui.combat;
+      if (tracker?.constructor?.name === 'CelerityCombatTracker') {
+        const flagOn = !!tracker.viewed?.flags?.aspectsofpower?.realtimeRunning;
+        if (flagOn || tracker._realtimeRunning) await tracker._realtimeStop();
+        else await tracker._realtimeStart();
+      }
     }
   });
 });
