@@ -681,13 +681,16 @@ export class CelerityCombatTracker extends ParentTracker {
         const tb = b.celerity?.nextActionTick ?? Infinity;
         return ta - tb;
       });
-      // Mark next-up ONLY when an action is actually queued. When the queue
-      // is empty (everyone "ready"), nobody is highlighted — prevents the
-      // green indicator from sticking on the previously-acted combatant.
-      const firstScheduled = context.turns.find(t => t.celerity?.nextActionTick !== null);
-      if (firstScheduled) {
-        firstScheduled.celerity.nextUp = true;
-        firstScheduled.css = (firstScheduled.css + ' active').trim();
+      // Indicator highlights combatants who have NO queued action — i.e.,
+      // the ones waiting on the player's next declaration. Inverts the
+      // older "next-up = soonest queued" semantic, which is less useful in
+      // real-time mode (queued actors are mid-progress; ready actors are
+      // the ones needing input). Multiple actors can be highlighted at once.
+      for (const t of context.turns) {
+        if (t.celerity?.nextActionTick == null) {
+          t.celerity.nextUp = true;
+          t.css = (t.css + ' active').trim();
+        }
       }
     }
     return context;
