@@ -452,8 +452,15 @@ export class CelerityCombatTracker extends ParentTracker {
       this._realtimeHookId = Hooks.on('updateCombatant', (cm, changes) => {
         if (!this._realtimeRunning) return;
         const declaredPath = `flags.${FLAG_NS}.declaredAction`;
-        const declaredChanged = foundry.utils.hasProperty(changes, declaredPath);
-        if (declaredChanged) this._scheduleNextFire();
+        if (!foundry.utils.hasProperty(changes, declaredPath)) return;
+        // Only re-schedule on actual NEW declares (non-null itemId). When
+        // _onCelAdvance clears the firing combatant's declaredAction to null,
+        // this hook would otherwise fire mid-await and queue another
+        // setTimeout — which could fire a second action before our auto-pause
+        // reaches _realtimeStop. Skipping null-changes keeps fires single-shot.
+        const newDeclared = foundry.utils.getProperty(changes, declaredPath);
+        if (!newDeclared || !newDeclared.itemId) return;
+        this._scheduleNextFire();
       });
     }
     this._scheduleNextFire();
