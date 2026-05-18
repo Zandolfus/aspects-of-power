@@ -308,6 +308,72 @@ async function _onCelAdvance(event, target) {
       await combat.update({ turn: nextIdx }, { _celerityTurnSync: true });
     }
   }
+
+  // Paint canvas turn-marker rings on every combatant that's waiting for the
+  // player to declare an action, plus the singular next-soonest queued one
+  // (which is already combat.combatant after the sync above, so core's marker
+  // for it stays — we just add the extras). Runs after the combat.turn write
+  // completes so core's _updateTurnMarkers has finished and our additions
+  // aren't clobbered.
+  _aopSyncTurnMarkers(combat);
+}
+
+/**
+ * Idempotent canvas turn-marker sync for celerity.
+ *
+ * Target set = (every combatant with no scheduled action) ∪ (the soonest-
+ * queued combatant, i.e. combat.combatant after _onCelAdvance's turn sync).
+ *
+ * Walks every token on the combat's scene: tokens in the set get a
+ * TokenTurnMarker instantiated; tokens not in the set have their existing
+ * marker destroyed. Foundry core only paints the marker on combat.combatant,
+ * so we get the soonest-queued's ring "for free" and only add the unqueued
+ * extras here (the destroy branch still runs for anything stale).
+ *
+ * No-op if no canvas scene or the marker class isn't loaded.
+ */
+function _aopSyncTurnMarkers(combat) {
+  if (!combat) return;
+  const scene = combat.scene ?? canvas?.scene;
+  if (!scene) return;
+  const TokenTurnMarker = foundry?.canvas?.placeables?.tokens?.TokenTurnMarker;
+  if (!TokenTurnMarker) return;
+  const clockTick = getClockTick(combat);
+
+  const targetTokenIds = new Set();
+  const queued = [];
+  for (const cm of combat.combatants) {
+    const tokenDoc = cm.token;
+    if (!tokenDoc || tokenDoc.parent?.id !== scene.id) continue;
+    const declared = cm.flags?.[FLAG_NS]?.declaredAction;
+    const nextTick = declared?.scheduledTick ?? null;
+    if (nextTick == null) {
+      targetTokenIds.add(tokenDoc.id);
+    } else if (nextTick > clockTick) {
+      queued.push({ tokenDocId: tokenDoc.id, nextTick });
+    }
+  }
+  if (queued.length > 0) {
+    queued.sort((a, b) => a.nextTick - b.nextTick);
+    targetTokenIds.add(queued[0].tokenDocId);
+  }
+
+  for (const tokenDoc of scene.tokens) {
+    const tok = tokenDoc.object;
+    if (!tok) continue;
+    const want = targetTokenIds.has(tokenDoc.id);
+    if (want && !tok.turnMarker) {
+      const marker = new TokenTurnMarker(tok);
+      tok.turnMarker = marker;
+      marker.draw().then(() => {
+        tok.renderFlags.set({ refreshTurnMarker: true });
+      }).catch(e => console.warn('[AOP] turnMarker.draw failed:', e));
+    } else if (!want && tok.turnMarker) {
+      tok.turnMarker.destroy();
+      tok.turnMarker = null;
+      tok.renderFlags.set({ refreshTurnMarker: true });
+    }
+  }
 }
 
 async function _onCelCancel(event, target) {
