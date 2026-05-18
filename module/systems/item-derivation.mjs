@@ -119,12 +119,59 @@ export function deriveItemStats(itemOrPatch) {
   // there but we set 5 as a benign default rather than leaving it unset).
   const reach = sc.weaponReach?.[typeKey] ?? 5;
 
+  let durabilityMax = progress * 2;
+
+  // ── Augment itemBonuses ──
+  // Each augment in `system.augments` is `{ augmentId: <UUID> }`. Resolve
+  // synchronously via fromUuidSync (compendium index assumed loaded by the
+  // time auto-derive runs) and apply each augment's itemBonuses to the
+  // host item's derived fields. Supported `field` values:
+  //   - 'armorBonus' / 'veilBonus' (flat | percentage)
+  //   - 'durability.max'           (flat | percentage)
+  //   - 'statBonus.<ability>'      (flat — appends to statBonuses array)
+  // Unrecognized fields (e.g. 'damageBonus', 'damageReduction.*') are
+  // silently skipped — these need new item schema before they can propagate.
+  const augs = sys.augments ?? [];
+  for (const a of augs) {
+    if (!a?.augmentId) continue;
+    let augDoc = null;
+    try { augDoc = foundry.utils.fromUuidSync(a.augmentId); }
+    catch (e) { /* compendium not loaded yet */ }
+    if (!augDoc) continue;
+    const bonuses = augDoc.system?.itemBonuses ?? [];
+    for (const b of bonuses) {
+      const field = b.field ?? '';
+      const value = Number(b.value) || 0;
+      const mode  = b.mode ?? 'flat';
+      if (field === 'armorBonus') {
+        if (mode === 'percentage') armorBonus = Math.round(armorBonus * (1 + value / 100));
+        else                       armorBonus += Math.round(value);
+      } else if (field === 'veilBonus') {
+        if (mode === 'percentage') veilBonus = Math.round(veilBonus * (1 + value / 100));
+        else                       veilBonus += Math.round(value);
+      } else if (field === 'durability.max') {
+        if (mode === 'percentage') durabilityMax = Math.round(durabilityMax * (1 + value / 100));
+        else                       durabilityMax += Math.round(value);
+      } else if (field.startsWith('statBonus.')) {
+        const ability = field.slice('statBonus.'.length);
+        if (ABILITY_KEYS.includes(ability) && value > 0) {
+          // Merge into existing entry or append.
+          const existing = statBonuses.find(s => s.ability === ability);
+          if (existing) existing.value += value;
+          else          statBonuses.push({ ability, value });
+        }
+      }
+      // Other fields (damageBonus, damageReduction.physical, etc.) skipped
+      // until the item schema gains those concepts.
+    }
+  }
+
   return {
     statBonuses,
     armorBonus,
     veilBonus,
     augmentSlots,
-    durabilityMax: progress * 2,
+    durabilityMax,
     reach,
   };
 }

@@ -561,7 +561,7 @@ Hooks.once('init', function () {
     if (options.skipAutoDerive) return; // escape hatch
     const cs = changes.system;
     if (!cs) return;
-    const TRIGGERS = ['progress', 'slot', 'material', 'rarity', 'tags'];
+    const TRIGGERS = ['progress', 'slot', 'material', 'rarity', 'tags', 'augments'];
     if (!TRIGGERS.some(t => cs[t] !== undefined)) return;
 
     // Build the post-update view of the item to derive against.
