@@ -732,6 +732,16 @@ export class AspectsofPowerItem extends Item {
       dmgFormula = `(((${dic}/100*${ab})+${ab})*${db})`;
     }
 
+    // Augment-sourced flat damage bonus from equipped items (Sharpness, the
+    // 6 elemental affinity-binding augments, etc.). Aggregated on the actor
+    // by prepareDerivedData into system.equippedDamageBonus. Adds after the
+    // multiplier so the bonus is genuinely flat — doesn't scale with crit
+    // multipliers or invest sliders.
+    const equippedDmgBonus = this.actor.system.equippedDamageBonus ?? 0;
+    if (equippedDmgBonus !== 0) {
+      dmgFormula = `(${dmgFormula} + ${equippedDmgBonus})`;
+    }
+
     return { hitFormula, dmgFormula };
   }
 

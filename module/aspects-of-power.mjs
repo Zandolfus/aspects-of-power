@@ -580,6 +580,13 @@ Hooks.once('init', function () {
     if (!locked.has('veilBonus')     && cs.veilBonus === undefined)     cs.veilBonus = derived.veilBonus;
     if (!locked.has('augmentSlots')  && cs.augmentSlots === undefined)  cs.augmentSlots = derived.augmentSlots;
     if (!locked.has('reach')         && cs.reach === undefined)         cs.reach = derived.reach;
+    if (!locked.has('damageBonus')   && cs.damageBonus === undefined)   cs.damageBonus = derived.damageBonus;
+    if (!locked.has('damageReduction') && cs.damageReduction === undefined) {
+      cs.damageReduction = {
+        physical: derived.damageReductionPhysical,
+        magical:  derived.damageReductionMagical,
+      };
+    }
     if (!locked.has('durabilityMax')) {
       cs.durability = cs.durability ?? {};
       if (cs.durability.max === undefined) cs.durability.max = derived.durabilityMax;
@@ -2049,6 +2056,19 @@ Hooks.on('renderChatMessageHTML', (message, html) => {
         const drReduced = Math.min(effectiveDR, remaining);
         remaining = Math.max(0, remaining - effectiveDR);
         if (drReduced > 0) parts.push(`DR: −${drReduced}`);
+      }
+
+      // 3b. Augment-sourced flat damage reduction (Inscribe Physical/Magical
+      // Resist). Subtracts a flat amount based on damage type. Designed to
+      // be modest — per user note "no % reductions, way too powerful."
+      if (remaining > 0) {
+        const drKey = isPhysical ? 'physical' : 'magical';
+        const augDR = target.system.damageReduction?.[drKey] ?? 0;
+        if (augDR > 0) {
+          const augReduced = Math.min(augDR, remaining);
+          remaining = Math.max(0, remaining - augDR);
+          parts.push(`${isPhysical ? 'Phys' : 'Mag'} Resist: −${augReduced}`);
+        }
       }
 
       // 3. Overhealth absorbs next.

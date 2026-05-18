@@ -49,6 +49,22 @@ export class ItemItemData extends foundry.abstract.TypeDataModel {
       // Default 5 ft (one square). Designer-set per weapon item.
       reach: new fields.NumberField({ initial: 5, min: 5, integer: true }),
 
+      // Flat damage bonus contributed when this item is wielded (weapon).
+      // Set by augment itemBonuses (e.g. Sharpness +20, Molten +15).
+      // Summed across the actor's equipped weapons into
+      // actor.system.equippedDamageBonus and added to outgoing damage.
+      damageBonus: new fields.NumberField({ initial: 0, integer: true }),
+
+      // Flat damage reduction contributed when this item is equipped (armor).
+      // Set by augment itemBonuses (e.g. Inscribe Physical Resist +8).
+      // Summed across all equipped items into
+      // actor.system.damageReduction.{physical,magical} and subtracted
+      // from incoming damage in the apply-damage flow.
+      damageReduction: new fields.SchemaField({
+        physical: new fields.NumberField({ initial: 0, integer: true }),
+        magical:  new fields.NumberField({ initial: 0, integer: true }),
+      }),
+
       // Augment slots (auto-set from rarity, but stored for override).
       augmentSlots: new fields.NumberField({ initial: 0, min: 0, integer: true }),
       augments: new fields.ArrayField(new fields.SchemaField({

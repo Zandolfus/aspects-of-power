@@ -120,17 +120,21 @@ export function deriveItemStats(itemOrPatch) {
   const reach = sc.weaponReach?.[typeKey] ?? 5;
 
   let durabilityMax = progress * 2;
+  let damageBonus = 0;
+  let damageReductionPhysical = 0;
+  let damageReductionMagical  = 0;
 
   // ── Augment itemBonuses ──
   // Each augment in `system.augments` is `{ augmentId: <UUID> }`. Resolve
   // synchronously via fromUuidSync (compendium index assumed loaded by the
   // time auto-derive runs) and apply each augment's itemBonuses to the
   // host item's derived fields. Supported `field` values:
-  //   - 'armorBonus' / 'veilBonus' (flat | percentage)
-  //   - 'durability.max'           (flat | percentage)
-  //   - 'statBonus.<ability>'      (flat — appends to statBonuses array)
-  // Unrecognized fields (e.g. 'damageBonus', 'damageReduction.*') are
-  // silently skipped — these need new item schema before they can propagate.
+  //   - 'armorBonus' / 'veilBonus'         (flat | percentage)
+  //   - 'durability.max'                   (flat | percentage)
+  //   - 'damageBonus'                      (flat | percentage)
+  //   - 'damageReduction.physical|magical' (flat — percentage NOT supported per
+  //                                         user note "no % reductions, too powerful")
+  //   - 'statBonus.<ability>'              (flat — appends to statBonuses array)
   const augs = sys.augments ?? [];
   for (const a of augs) {
     if (!a?.augmentId) continue;
@@ -152,6 +156,15 @@ export function deriveItemStats(itemOrPatch) {
       } else if (field === 'durability.max') {
         if (mode === 'percentage') durabilityMax = Math.round(durabilityMax * (1 + value / 100));
         else                       durabilityMax += Math.round(value);
+      } else if (field === 'damageBonus') {
+        // Base damageBonus could be set explicitly on the item; augment
+        // either adds flat or scales the running total.
+        if (mode === 'percentage') damageBonus = Math.round(damageBonus * (1 + value / 100));
+        else                       damageBonus += Math.round(value);
+      } else if (field === 'damageReduction.physical') {
+        damageReductionPhysical += Math.round(value);
+      } else if (field === 'damageReduction.magical') {
+        damageReductionMagical += Math.round(value);
       } else if (field.startsWith('statBonus.')) {
         const ability = field.slice('statBonus.'.length);
         if (ABILITY_KEYS.includes(ability) && value > 0) {
@@ -161,8 +174,6 @@ export function deriveItemStats(itemOrPatch) {
           else          statBonuses.push({ ability, value });
         }
       }
-      // Other fields (damageBonus, damageReduction.physical, etc.) skipped
-      // until the item schema gains those concepts.
     }
   }
 
@@ -173,8 +184,11 @@ export function deriveItemStats(itemOrPatch) {
     augmentSlots,
     durabilityMax,
     reach,
+    damageBonus,
+    damageReductionPhysical,
+    damageReductionMagical,
   };
 }
 
 /** Fields the derivation can touch (what the lock UI shows toggles for). */
-export const DERIVABLE_FIELDS = ['statBonuses', 'armorBonus', 'veilBonus', 'augmentSlots', 'durabilityMax', 'reach'];
+export const DERIVABLE_FIELDS = ['statBonuses', 'armorBonus', 'veilBonus', 'augmentSlots', 'durabilityMax', 'reach', 'damageBonus', 'damageReduction'];

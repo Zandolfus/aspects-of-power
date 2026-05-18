@@ -374,6 +374,28 @@ export class AspectsofPowerActor extends Actor {
     }
     systemData.carryWeight = Math.round(systemData.carryWeight * 10) / 10;
     systemData.encumbered = systemData.carryWeight > systemData.carryCapacity;
+
+    // --- Augment-sourced flat bonuses from equipped items ---
+    // damageBonus: sum across equipped weapons (typically just one wielded).
+    //   Added to outgoing damage in item.mjs roll path.
+    // damageReduction.{physical,magical}: sum across all equipped items.
+    //   Subtracted from incoming damage in the apply-damage handler.
+    // Loadout filter mirrors equipment-AE logic so profession-loadout gear
+    // doesn't double-bleed into combat math.
+    let equippedDamageBonus = 0;
+    let drPhysical = 0;
+    let drMagical  = 0;
+    for (const item of this.items) {
+      if (item.type !== 'item') continue;
+      if (!item.system.equipped) continue;
+      if (!_itemMatchesLoadout(item)) continue;
+      equippedDamageBonus += Number(item.system.damageBonus ?? 0) || 0;
+      drPhysical += Number(item.system.damageReduction?.physical ?? 0) || 0;
+      drMagical  += Number(item.system.damageReduction?.magical  ?? 0) || 0;
+    }
+    systemData.equippedDamageBonus = equippedDamageBonus;
+    systemData.damageReduction = { physical: drPhysical, magical: drMagical };
+
     // Continuous encumbrance ratio (0 = empty, 1 = at cap, >1 = over-cap).
     // No cliff: every pound matters. Drives the per-ft stamina multiplier
     // applied in token._preUpdateMovement.
