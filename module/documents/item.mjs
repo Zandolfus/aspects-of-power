@@ -3617,6 +3617,145 @@ export class AspectsofPowerItem extends Item {
   }
 
   /**
+   * Augment tag: apply a linked augment to a target equipment item.
+   *
+   * Skill carries the augment UUID at `flags.aspectsofpower.appliesAugmentId`.
+   * Skill tags follow the [profession, <profession>, augment, <material?>]
+   * convention — the optional material tag (gem/metal/cloth/wood/leather)
+   * signals that the crafter must consume a matching isMaterial item from
+   * inventory before the augment is inscribed. Tagless = ex nihilo.
+   *
+   * Flow:
+   *   1. Resolve the augment doc
+   *   2. If material required, pick from crafter inventory
+   *   3. Pick target equipment item from crafter inventory
+   *   4. Verify slot headroom (augment slotCost vs target augmentSlots)
+   *   5. Push { augmentId } onto target.system.augments, consume material, chat
+   *
+   * Target item filtering is intentionally permissive — the dialog shows
+   * every equipment item the crafter holds. The flavor description on
+   * each augment tells the player what kinds of items make sense.
+   */
+  async _handleAugmentTag(item, rollData, dmgRoll, speaker, rollMode, label) {
+    const actor = this.actor;
+    if (!actor) return;
+
+    // Resolve the augment to apply (skill carries the compendium UUID).
+    const augmentUuid = item.flags?.aspectsofpower?.appliesAugmentId;
+    if (!augmentUuid) {
+      ui.notifications.warn(`${item.name}: no augment linked (flags.aspectsofpower.appliesAugmentId).`);
+      return;
+    }
+    let augmentDoc;
+    try { augmentDoc = await fromUuid(augmentUuid); }
+    catch (e) { /* unavailable */ }
+    if (!augmentDoc) {
+      ui.notifications.warn(`${item.name}: linked augment ${augmentUuid} not resolvable.`);
+      return;
+    }
+
+    // Material requirement: skill tags include a material kind that must
+    // be matched by an isMaterial item in the crafter's inventory.
+    const tags = item.system.tags ?? [];
+    const MATERIAL_TAGS = new Set(['gem', 'metal', 'cloth', 'wood', 'leather', 'crystal', 'jewelry']);
+    const requiredMaterial = tags.find(t => MATERIAL_TAGS.has(t));
+
+    let materialItem = null;
+    if (requiredMaterial) {
+      const candidates = actor.items.filter(i =>
+        i.type === 'item'
+        && i.system?.isMaterial === true
+        && (i.system?.material === requiredMaterial || i.system?.tags?.includes(requiredMaterial))
+      );
+      if (candidates.length === 0) {
+        ui.notifications.warn(`${item.name}: no ${requiredMaterial} material in ${actor.name}'s inventory.`);
+        return;
+      }
+      const matButtons = candidates.map(m => ({
+        action: m.id,
+        label: `${m.name} (${m.system.material}${m.system.materialElement ? ' / ' + m.system.materialElement : ''}, ×${m.system.quantity ?? 1})`,
+      }));
+      matButtons.push({ action: 'cancel', label: 'Cancel' });
+      const choice = await foundry.applications.api.DialogV2.wait({
+        window: { title: `${item.name} — Select ${requiredMaterial}` },
+        content: `<p>Select a ${requiredMaterial} material to inscribe with the augment:</p>`,
+        buttons: matButtons,
+        close: () => 'cancel',
+      });
+      if (choice === 'cancel') return;
+      materialItem = actor.items.get(choice);
+      if (!materialItem) return;
+    }
+
+    // Pick target equipment item (skip materials, augments, consumables,
+    // skills — only inscribable equipment).
+    const targetCandidates = actor.items.filter(i =>
+      i.type === 'item'
+      && i.system?.isMaterial !== true
+      && (i.system?.slot ?? '') !== ''
+    );
+    if (targetCandidates.length === 0) {
+      ui.notifications.warn(`${item.name}: no equipment items on ${actor.name} to augment.`);
+      return;
+    }
+    const targetButtons = targetCandidates.map(t => {
+      const free = (t.system.augmentSlots ?? 0) - (t.system.augments ?? []).length;
+      return {
+        action: t.id,
+        label: `${t.name} (${t.system.slot}, ${free}/${t.system.augmentSlots ?? 0} slots free)`,
+      };
+    });
+    targetButtons.push({ action: 'cancel', label: 'Cancel' });
+    const targetChoice = await foundry.applications.api.DialogV2.wait({
+      window: { title: `${item.name} — Select Target Item` },
+      content: `<p>Select the equipment item to inscribe <strong>${augmentDoc.name}</strong> onto:</p>`,
+      buttons: targetButtons,
+      close: () => 'cancel',
+    });
+    if (targetChoice === 'cancel') return;
+    const targetItem = actor.items.get(targetChoice);
+    if (!targetItem) return;
+
+    // Slot check.
+    const slotCost = augmentDoc.system?.slotCost ?? 1;
+    const existingAugs = targetItem.system?.augments ?? [];
+    const usedSlots = existingAugs.length;
+    const totalSlots = targetItem.system?.augmentSlots ?? 0;
+    if (usedSlots + slotCost > totalSlots) {
+      ui.notifications.warn(`${targetItem.name}: not enough augment slots (need ${slotCost}, have ${totalSlots - usedSlots}).`);
+      return;
+    }
+
+    // Apply: append augmentId, consume material if used.
+    const updatedAugs = [...existingAugs, { augmentId: augmentDoc.uuid }];
+    await targetItem.update({ 'system.augments': updatedAugs });
+
+    if (materialItem) {
+      if ((materialItem.system.quantity ?? 1) <= 1) await materialItem.delete();
+      else await materialItem.update({ 'system.quantity': materialItem.system.quantity - 1 });
+    }
+
+    // Chat message.
+    const matLine = materialItem
+      ? `<p><strong>Material:</strong> ${materialItem.name} (consumed)</p>`
+      : '';
+    const tagsLine = (augmentDoc.system?.grantsTags ?? []).length > 0
+      ? `<p><strong>Grants tags:</strong> ${augmentDoc.system.grantsTags.join(', ')}</p>`
+      : '';
+    ChatMessage.create({
+      speaker,
+      content: `<div class="augment-result">
+        <h3>${item.name}</h3>
+        <hr>
+        <p><strong>${actor.name}</strong> inscribes <strong>${augmentDoc.name}</strong> onto <strong>${targetItem.name}</strong>.</p>
+        ${matLine}
+        ${tagsLine}
+        <p class="hint">Slots used: ${updatedAugs.length} / ${totalSlots}.</p>
+      </div>`,
+    });
+  }
+
+  /**
    * Craft tag: multi-step crafting dialog.
    * Step 1: Select output slot (filtered by craft sub-type tags)
    * Step 2: Select material from inventory
@@ -6230,6 +6369,9 @@ export class AspectsofPowerItem extends Item {
             case 'inscribe':
               await this._handleInscribeTag(item, rollData, dmgRoll, speaker, rollMode, label);
               break;
+            case 'augment':
+              await this._handleAugmentTag(item, rollData, dmgRoll, speaker, rollMode, label);
+              break;
           }
         }
       }
@@ -6355,6 +6497,9 @@ export class AspectsofPowerItem extends Item {
           break;
         case 'inscribe':
           await this._handleInscribeTag(item, rollData, dmgRoll, speaker, rollMode, label);
+          break;
+        case 'augment':
+          await this._handleAugmentTag(item, rollData, dmgRoll, speaker, rollMode, label);
           break;
         case 'teleport':
           await this._handleTeleportTag(item, rollData, speaker, rollMode, label, options.preTeleportDestination ?? null);
