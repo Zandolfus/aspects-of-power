@@ -2108,6 +2108,43 @@ Hooks.on('renderChatMessageHTML', (message, html) => {
         await _applyForcedMovement(target, btn.dataset.attackerTokenId, forcedDir, forcedDist, parseInt(btn.dataset.hitTotal, 10) || 0);
       }
 
+      // ── Lifesteal → overhealth ──
+      // Any attacker passive skill carrying `flags.aspectsofpower.lifestealPct`
+      // (0..1) credits that fraction of HP damage dealt to the attacker's
+      // overhealth pool. Capped by overhealth.cap (200% max HP, enforced in
+      // actor.mjs prepareDerivedData). George's "Sanguine Tithe" is the first
+      // user; flag-based so any other actor can pick it up without schema
+      // changes. Sums across multiple lifesteal skills if present.
+      if (actualHpLoss > 0) {
+        const attackerTokenIdForLifesteal = btn.dataset.attackerTokenId;
+        const attackerForLifesteal = attackerTokenIdForLifesteal
+          ? canvas.tokens?.get(attackerTokenIdForLifesteal)?.actor
+          : null;
+        if (attackerForLifesteal?.system?.overhealth) {
+          let totalPct = 0;
+          for (const item of attackerForLifesteal.items) {
+            if (item.type !== 'skill') continue;
+            const pct = Number(item.flags?.aspectsofpower?.lifestealPct ?? 0);
+            if (pct > 0) totalPct += pct;
+          }
+          if (totalPct > 0) {
+            const oh = attackerForLifesteal.system.overhealth;
+            const gain = Math.round(actualHpLoss * totalPct);
+            const newOh = Math.min(oh.cap ?? Number.POSITIVE_INFINITY, (oh.value ?? 0) + gain);
+            const actualGain = newOh - (oh.value ?? 0);
+            if (actualGain > 0) {
+              await attackerForLifesteal.update({ 'system.overhealth.value': newOh });
+              ChatMessage.create({
+                speaker: ChatMessage.getSpeaker({ actor: attackerForLifesteal }),
+                content: `<p><em>${attackerForLifesteal.name}</em> siphons <strong>+${actualGain}</strong> overhealth `
+                       + `(${Math.round(totalPct * 100)}% of ${actualHpLoss}). `
+                       + `Overhealth: ${newOh}${oh.cap ? ` / ${oh.cap}` : ''}</p>`,
+              });
+            }
+          }
+        }
+      }
+
       // ── Post-resolve passive reactions (Phase C) ──
       // self_struck: HP damage actually dealt. hp_threshold: HP fraction
       // crossed below the per-skill threshold. Both fire AFTER the HP
