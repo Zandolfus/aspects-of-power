@@ -853,6 +853,16 @@ ASPECTSOFPOWER.craftItemTypes = {
   profLegs:    { category: 'profession', tags: ['profession', 'profLegs'],    slot: 'profLegs' },
   profBoots:   { category: 'profession', tags: ['profession', 'profBoots'],   slot: 'profBoots' },
   profGloves:  { category: 'profession', tags: ['profession', 'profGloves'],  slot: 'profGloves' },
+
+  // ── Refined material outputs (no slot — `isMaterial: true` on the created
+  // item; feeds future crafts as the material input). The material kind is
+  // resolved from these tags at craft time. Per-craft gating happens via the
+  // skill's `craftAllowedTypes`.
+  gem:    { category: 'material', tags: ['material', 'gem'],     slot: '' },
+  ingot:  { category: 'material', tags: ['material', 'metal'],   slot: '' },
+  thread: { category: 'material', tags: ['material', 'cloth'],   slot: '' },
+  hide:   { category: 'material', tags: ['material', 'leather'], slot: '' },
+  plank:  { category: 'material', tags: ['material', 'wood'],    slot: '' },
 };
 
 /**
@@ -863,6 +873,7 @@ ASPECTSOFPOWER.craftCategories = {
   armor:      { label: 'Armor' },
   jewelry:    { label: 'Jewelry' },
   profession: { label: 'Profession' },
+  material:   { label: 'Refined Material' },
 };
 
 /**

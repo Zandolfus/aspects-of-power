@@ -4481,6 +4481,70 @@ export class AspectsofPowerItem extends Item {
       const niceName = nameRoot.charAt(0).toUpperCase() + nameRoot.slice(1);
       const itemName = `${elPrefix}${niceName} - ${totalProgress}`;
 
+      // ── Material output: refined ingredient that feeds future crafts ──
+      // Picked when the chosen item type has `category: 'material'` (gem,
+      // ingot, thread, hide, plank). Skips stat/armor/augment derivation
+      // (materials don't have those) and writes an `isMaterial: true` item.
+      // Iterative rework not supported — each craft outputs a fresh material.
+      const isMaterialOutput = itemTypeDef?.category === 'material';
+      if (isMaterialOutput) {
+        const MATERIAL_KINDS = ['gem', 'metal', 'cloth', 'leather', 'wood'];
+        const matKind = (itemTypeDef.tags ?? []).find(t => MATERIAL_KINDS.includes(t)) ?? outputMaterial;
+        [createdItem] = await actor.createEmbeddedDocuments('Item', [{
+          name: itemName,
+          type: 'item',
+          img: materialItem.img,
+          system: {
+            description: `<p>Refined by ${actor.name} from ${materialItem.name}.</p>`,
+            slot: '',
+            isMaterial: true,
+            material: matKind,
+            materialElement: element && element !== 'neutral' ? element : '',
+            rarity: qualityData.rarity,
+            progress: totalProgress,
+            maxProgress: theoreticalMaxProgress,
+            quantity: 1,
+            weight: 1,
+            tags: [...staticTypeTags],
+            systemTags: craftedSystemTags,
+          },
+        }]);
+        // Consume source material (no preservation — that's alchemy/cooking only).
+        if (!reworkTarget) {
+          if ((materialItem.system.quantity ?? 1) <= 1) await materialItem.delete();
+          else await materialItem.update({ 'system.quantity': materialItem.system.quantity - 1 });
+        }
+        // d100 + Crafter + Material lines with inline (x) bonus notation.
+        const d100BonusExprM        = d100Bonus        ? ` + (${d100Bonus})`        : '';
+        const rarityFloorBonusExprM = rarityFloorBonus ? ` + (${rarityFloorBonus})` : '';
+        const skillModExprM         = skillModBonus    ? ` + (${skillModBonus})`    : '';
+        const skillRollDisplayM     = skillModBonus
+          ? `${Math.round(dmgRoll.total)}${skillModExprM} = ${skillRoll}`
+          : `${skillRoll}`;
+        const matPotencyExprM = augMaterialPotency ? ` + (${augMaterialPotency})` : '';
+        ChatMessage.create({
+          speaker,
+          content: `<div class="craft-result">
+            <h3>${item.name} — Refinement Result</h3>
+            <hr>
+            ${craftNatLine}
+            ${refineLine}
+            ${prepLine}
+            <p><strong>Source:</strong> ${materialItem.name} (${matRarity}, progress ${materialProgress})</p>
+            <p><strong>Material (50%):</strong> ${materialProgress} × 0.5${matPotencyExprM} = ${materialContribution}</p>
+            <p><strong>d100:</strong> ${d100Roll.total}${d100BonusExprM}${rarityFloorBonusExprM} + ${rarityRange.floor} = ${effectiveD100} (cap ${rarityRange.ceiling})</p>
+            <p><strong>Crafter (50%):</strong> ${skillRollDisplayM} × ${d100Pct.toFixed(2)} = ${crafterRoll} × 0.5 = ${crafterContribution}</p>
+            ${profAugLine}
+            <p><strong>Total Progress:</strong> ${materialContribution} + ${crafterContribution} + ${prepBonus}${progressBonus ? ` + (${progressBonus})` : ''} = <strong>${totalProgress}</strong></p>
+            <p><strong>Quality:</strong> ${qualityKey.charAt(0).toUpperCase() + qualityKey.slice(1)} (${qualityData.rarity})</p>
+            <p><strong>Material kind:</strong> ${matKind}${element && element !== 'neutral' ? ` (${element})` : ''}</p>
+            <p><em>Refined: ${createdItem.name}</em></p>
+          </div>`,
+        });
+        createdItem.sheet.render(true);
+        return;
+      }
+
       if (reworkTarget) {
         // Update the existing item with new totals; bump rework count.
         // maxProgress is locked at first craft and not updated.
