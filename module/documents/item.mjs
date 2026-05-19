@@ -126,7 +126,6 @@ export class AspectsofPowerItem extends Item {
     const augCritFailReduce       = augBonuses.critFailReduce || 0;
     const augCritSuccessThreshold = augBonuses.critSuccessThreshold || 0;
     const augMaterialPreservation = augBonuses.materialPreservation || 0;
-    const augMaxProgressBoost     = augBonuses.maxProgressBoost || 0;
     const augReworkDecayReduce    = augBonuses.reworkDecayReduce || 0;
 
     // d100 expectation under material's rarity range.
@@ -150,7 +149,6 @@ export class AspectsofPowerItem extends Item {
     if (augCritFailReduce)          augLines.push(`CritFailReduce ${augCritFailReduce}%`);
     if (augCritSuccessThreshold)    augLines.push(`CritSuccessThr -${augCritSuccessThreshold}`);
     if (augMaterialPreservation)    augLines.push(`MatPreserve ${augMaterialPreservation}%`);
-    if (augMaxProgressBoost)        augLines.push(`MaxProg +${augMaxProgressBoost}%`);
     if (augReworkDecayReduce)       augLines.push(`ReworkDecay -${augReworkDecayReduce}`);
     const augSummary = augLines.length > 0 ? augLines.join(', ') : '<em>None active</em>';
 
@@ -202,13 +200,11 @@ export class AspectsofPowerItem extends Item {
       const minTotal = matCtrb + minCrafterCtrb + progressBonus + prepBonusPreview;
       const maxTotal = matCtrb + maxCrafterCtrb + progressBonus + prepBonusPreview;
 
-      // Cap (theoretical max): perfect d100 outcome + maxProgressBoost % uplift.
-      // For iterative, use the existing item's stored cap (which already includes
-      // any boost baked in at creation time).
-      const baseCap = Math.round(effectiveMatProgress * 0.5) + augMaterialPotency + Math.round((avgSkillRoll + skillModBonus) * 1.0 * 0.5) + progressBonus + prepBonusPreview;
+      // Cap (theoretical max): perfect d100 outcome. For iterative, use the
+      // existing item's stored cap.
       const cap = reworkTarget
         ? (reworkTarget.system.maxProgress ?? 0)
-        : Math.round(baseCap * (1 + augMaxProgressBoost / 100));
+        : Math.round(effectiveMatProgress * 0.5) + augMaterialPotency + Math.round((avgSkillRoll + skillModBonus) * 1.0 * 0.5) + progressBonus + prepBonusPreview;
 
       const qExpected = qualityForProgress(total);
       const qCap = qualityForProgress(cap);
@@ -4094,7 +4090,6 @@ export class AspectsofPowerItem extends Item {
     const augCritFailReduce       = profAugBonuses.critFailReduce || 0;
     const augCritSuccessThreshold = profAugBonuses.critSuccessThreshold || 0;
     const augMaterialPreservation = profAugBonuses.materialPreservation || 0;
-    const augMaxProgressBoost     = profAugBonuses.maxProgressBoost || 0;
     const augReworkDecayReduce    = profAugBonuses.reworkDecayReduce || 0;
     // Apply prepBonus augment to the prep step's contribution (computed above).
     prepBonus += augPrepBonus;
@@ -4118,7 +4113,6 @@ export class AspectsofPowerItem extends Item {
     if (augCritFailReduce)          augBonusParts.push(`CritFailReduce ${augCritFailReduce}%`);
     if (augCritSuccessThreshold)    augBonusParts.push(`CritSuccessThr -${augCritSuccessThreshold}`);
     if (augMaterialPreservation)    augBonusParts.push(`MatPreserve ${augMaterialPreservation}%`);
-    if (augMaxProgressBoost)        augBonusParts.push(`MaxProg +${augMaxProgressBoost}%`);
     if (augReworkDecayReduce)       augBonusParts.push(`ReworkDecay -${augReworkDecayReduce}`);
     const profAugLine = augBonusParts.length
       ? `<p><strong>Profession Augments:</strong> ${augBonusParts.join(', ')}</p>`
@@ -4186,10 +4180,8 @@ export class AspectsofPowerItem extends Item {
 
     // Theoretical max for THIS craft: what would result if the crafter rolled a perfect d100 (=100).
     // Uses 1.0 instead of rarity ceiling so the cap doesn't swing wildly with material rarity.
-    // maxProgressBoost: % uplift on the theoretical cap, raising headroom for iteration.
     const maxCrafterRoll = skillRoll;
-    const theoreticalBase = Math.round(materialProgress * 0.5) + augMaterialPotency + Math.round(maxCrafterRoll * 0.5) + prepBonus + progressBonus;
-    const theoreticalMaxProgress = Math.round(theoreticalBase * (1 + augMaxProgressBoost / 100));
+    const theoreticalMaxProgress = Math.round(materialProgress * 0.5) + augMaterialPotency + Math.round(maxCrafterRoll * 0.5) + prepBonus + progressBonus;
 
     let totalProgress = materialContribution + crafterContribution + prepBonus + progressBonus;
 

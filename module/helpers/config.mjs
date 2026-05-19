@@ -1135,7 +1135,9 @@ ASPECTSOFPOWER.craftBonusTypes = {
   critFailReduce:       { label: 'ASPECTSOFPOWER.CraftBonus.critFailReduce',       scaling: 'magnifier-pct' },
   critSuccessThreshold: { label: 'ASPECTSOFPOWER.CraftBonus.critSuccessThreshold', scaling: 'magnifier-capped' },
   materialPreservation: { label: 'ASPECTSOFPOWER.CraftBonus.materialPreservation', scaling: 'magnifier-pct-capped' },
-  maxProgressBoost:     { label: 'ASPECTSOFPOWER.CraftBonus.maxProgressBoost',     scaling: 'magnifier-pct' },
+  // maxProgressBoost: pulled 2026-05-19. Revisit when iteration ceiling becomes
+  // a tuning lever — currently it just raised theoreticalMaxProgress (display +
+  // rework headroom) which had low impact in practice.
   reworkDecayReduce:    { label: 'ASPECTSOFPOWER.CraftBonus.reworkDecayReduce',    scaling: 'flat-per-grade-decay' },
 };
 
