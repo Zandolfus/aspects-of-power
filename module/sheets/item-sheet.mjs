@@ -236,55 +236,55 @@ export class AspectsofPowerItemSheet extends foundry.applications.api.Handlebars
         const entry = existing[i];
         const augmentId = entry?.augmentId ?? '';
         let slotData = { filled: false, augmentId: '', name: '', img: '', bonusSummary: '', isPrimary: false, isContinuation: false };
-        if (augmentId && this.item.actor) {
-          // Resolve from local actor items first (legacy path), then compendium
-          // UUID via fromUuidSync (current unified slotting). Both produce an
-          // Item document with `.system.statBonuses` / `.itemBonuses`.
-          let augItem = this.item.actor.items.get(augmentId);
-          if (!augItem) {
-            try { augItem = foundry.utils.fromUuidSync(augmentId); }
-            catch (e) { /* pack not hydrated */ }
-          }
-          if (augItem && augItem.type === 'augment' && augItem.system) {
-            const isPrimary = !seenAug.has(augmentId);
-            seenAug.add(augmentId);
-            const cost = Math.max(1, augItem.system?.slotCost ?? 1);
-            if (isPrimary) {
-              const statParts = (augItem.system.statBonuses ?? [])
-                .filter(b => b.ability && b.value)
-                .map(b => `${game.i18n.localize(CONFIG.ASPECTSOFPOWER.abilities[b.ability])} +${b.value}`);
-              const itemParts = (augItem.system.itemBonuses ?? [])
-                .filter(b => b.field && b.value)
-                .map(b => {
-                  const label = b.field === 'armorBonus' ? game.i18n.localize('ASPECTSOFPOWER.Augment.fieldArmor')
-                              : game.i18n.localize('ASPECTSOFPOWER.Augment.fieldVeil');
-                  const suffix = b.mode === 'percentage' ? '%' : '';
-                  return `${label} +${b.value}${suffix}`;
-                });
-              const bonuses = [...statParts, ...itemParts].join(', ');
-              const slotNote = cost > 1 ? ` (${cost} slots)` : '';
-              slotData = {
-                filled: true,
-                augmentId: augItem.id,
-                name: augItem.name + slotNote,
-                img: augItem.img,
-                bonusSummary: bonuses || '—',
-                isPrimary: true,
-                isContinuation: false,
-              };
-            } else {
-              // Continuation slot — same augment as the primary, render as
-              // a visual bridge so the player sees the multi-slot occupancy.
-              slotData = {
-                filled: true,
-                augmentId: augItem.id,
-                name: '↳ ' + augItem.name,
-                img: augItem.img,
-                bonusSummary: '(continued)',
-                isPrimary: false,
-                isContinuation: true,
-              };
-            }
+        if (augmentId) {
+          // Effect bonuses come from the slot SNAPSHOT (`entry.itemBonuses`)
+          // — race-free, no compendium lookup needed for the numbers.
+          // Name + icon resolve via async `fromUuid` against the compendium
+          // (cosmetic only; if it fails, the slot shows a generic label and
+          // the effect still fires from the snapshot).
+          let augName = 'Augment';
+          let augImg  = 'icons/svg/aura.svg';
+          try {
+            const augItem = await fromUuid(augmentId);
+            if (augItem) { augName = augItem.name; augImg = augItem.img; }
+          } catch (e) { /* graceful degrade */ }
+          const isPrimary = !seenAug.has(augmentId);
+          seenAug.add(augmentId);
+          const cost = 1; // slotCost not snapshotted (always 1 in practice)
+          if (isPrimary) {
+            const itemParts = (entry.itemBonuses ?? [])
+              .filter(b => b.field && b.value)
+              .map(b => {
+                if (b.field.startsWith('statBonus.')) {
+                  const ability = b.field.slice('statBonus.'.length);
+                  return `${game.i18n.localize(CONFIG.ASPECTSOFPOWER.abilities[ability] ?? ability)} +${b.value}`;
+                }
+                if (b.field === 'armorBonus') return `${game.i18n.localize('ASPECTSOFPOWER.Augment.fieldArmor')} +${b.value}${b.mode === 'percentage' ? '%' : ''}`;
+                if (b.field === 'veilBonus')  return `${game.i18n.localize('ASPECTSOFPOWER.Augment.fieldVeil')} +${b.value}${b.mode === 'percentage' ? '%' : ''}`;
+                return `${b.field} +${b.value}${b.mode === 'percentage' ? '%' : ''}`;
+              });
+            const bonuses = itemParts.join(', ');
+            const slotNote = cost > 1 ? ` (${cost} slots)` : '';
+            slotData = {
+              filled: true,
+              augmentId,
+              name: augName + slotNote,
+              img: augImg,
+              bonusSummary: bonuses || '—',
+              isPrimary: true,
+              isContinuation: false,
+            };
+          } else {
+            // Continuation slot — same augment as the primary.
+            slotData = {
+              filled: true,
+              augmentId,
+              name: '↳ ' + augName,
+              img: augImg,
+              bonusSummary: '(continued)',
+              isPrimary: false,
+              isContinuation: true,
+            };
           }
         }
         context.augmentSlots.push(slotData);
@@ -299,42 +299,52 @@ export class AspectsofPowerItemSheet extends foundry.applications.api.Handlebars
         const entry = profExisting[i];
         const augmentId = entry?.augmentId ?? '';
         let slotData = { filled: false, augmentId: '', name: '', img: '', bonusSummary: '', isPrimary: false, isContinuation: false };
-        if (augmentId && this.item.actor) {
-          let augItem = this.item.actor.items.get(augmentId);
-          if (!augItem) {
-            try { augItem = foundry.utils.fromUuidSync(augmentId); }
-            catch (e) { /* pack not hydrated */ }
-          }
-          if (augItem && augItem.type === 'augment' && augItem.system) {
-            const isPrimary = !seenProfAug.has(augmentId);
-            seenProfAug.add(augmentId);
-            const cost = Math.max(1, augItem.system?.slotCost ?? 1);
-            if (isPrimary) {
-              const craftParts = (augItem.system.craftBonuses ?? [])
-                .filter(b => b.type && b.value)
-                .map(b => `${b.type} ${b.value > 0 ? '+' : ''}${b.value}`);
-              const bonuses = craftParts.join(', ');
-              const slotNote = cost > 1 ? ` (${cost} slots)` : '';
-              slotData = {
-                filled: true,
-                augmentId: augItem.id,
-                name: augItem.name + slotNote,
-                img: augItem.img,
-                bonusSummary: bonuses || '—',
-                isPrimary: true,
-                isContinuation: false,
-              };
-            } else {
-              slotData = {
-                filled: true,
-                augmentId: augItem.id,
-                name: '↳ ' + augItem.name,
-                img: augItem.img,
-                bonusSummary: '(continued)',
-                isPrimary: false,
-                isContinuation: true,
-              };
-            }
+        if (augmentId) {
+          // Snapshot-based display (mirrors augmentSlots loop). Name + icon
+          // resolve async; bonuses read from slot snapshot.
+          let augName = 'Augment';
+          let augImg  = 'icons/svg/aura.svg';
+          try {
+            const augItem = await fromUuid(augmentId);
+            if (augItem) { augName = augItem.name; augImg = augItem.img; }
+          } catch (e) { /* graceful degrade */ }
+          const isPrimary = !seenProfAug.has(augmentId);
+          seenProfAug.add(augmentId);
+          const cost = 1;
+          if (isPrimary) {
+            const craftParts = (entry.craftBonuses ?? [])
+              .filter(b => b.type && b.value)
+              .map(b => `${b.type} ${b.value > 0 ? '+' : ''}${b.value}`);
+            const itemParts = (entry.itemBonuses ?? [])
+              .filter(b => b.field && b.value)
+              .map(b => {
+                if (b.field.startsWith('statBonus.')) {
+                  const ability = b.field.slice('statBonus.'.length);
+                  return `${game.i18n.localize(CONFIG.ASPECTSOFPOWER.abilities[ability] ?? ability)} +${b.value}`;
+                }
+                return `${b.field} ${b.value > 0 ? '+' : ''}${b.value}${b.mode === 'percentage' ? '%' : ''}`;
+              });
+            const bonuses = [...craftParts, ...itemParts].join(', ');
+            const slotNote = cost > 1 ? ` (${cost} slots)` : '';
+            slotData = {
+              filled: true,
+              augmentId,
+              name: augName + slotNote,
+              img: augImg,
+              bonusSummary: bonuses || '—',
+              isPrimary: true,
+              isContinuation: false,
+            };
+          } else {
+            slotData = {
+              filled: true,
+              augmentId,
+              name: '↳ ' + augName,
+              img: augImg,
+              bonusSummary: '(continued)',
+              isPrimary: false,
+              isContinuation: true,
+            };
           }
         }
         context.profAugmentSlots.push(slotData);

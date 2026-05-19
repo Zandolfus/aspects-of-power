@@ -67,8 +67,27 @@ export class ItemItemData extends foundry.abstract.TypeDataModel {
 
       // Augment slots (auto-set from rarity, but stored for override).
       augmentSlots: new fields.NumberField({ initial: 0, min: 0, integer: true }),
+      // Each slot entry carries:
+      //   - `augmentId`  : UUID of the source compendium template (display-only)
+      //   - snapshot of the augment's effect data (itemBonuses, craftBonuses,
+      //     grantsTags) captured at apply time. Reads at firing time go to
+      //     the snapshot — no compendium lookup needed (eliminates the
+      //     fromUuidSync / pack-hydration race). Per design memo: augment
+      //     values are frozen at craft time (future per-crafter scaling
+      //     will compute these snapshot values when player crafting ships).
       augments: new fields.ArrayField(new fields.SchemaField({
         augmentId: new fields.StringField({ initial: '' }),
+        itemBonuses: new fields.ArrayField(new fields.SchemaField({
+          field: new fields.StringField({ initial: '' }),
+          value: new fields.NumberField({ initial: 0 }),
+          mode:  new fields.StringField({ initial: 'flat' }),
+        }), { initial: [] }),
+        craftBonuses: new fields.ArrayField(new fields.SchemaField({
+          type:     new fields.StringField({ initial: '' }),
+          value:    new fields.NumberField({ initial: 0 }),
+          affinity: new fields.StringField({ initial: '' }),
+        }), { initial: [] }),
+        grantsTags: new fields.ArrayField(new fields.StringField(), { initial: [] }),
       }), { initial: [] }),
 
       // Profession augment slots — additional slots on profession gear that
@@ -76,6 +95,17 @@ export class ItemItemData extends foundry.abstract.TypeDataModel {
       profAugmentSlots: new fields.NumberField({ initial: 0, min: 0, integer: true }),
       profAugments: new fields.ArrayField(new fields.SchemaField({
         augmentId: new fields.StringField({ initial: '' }),
+        itemBonuses: new fields.ArrayField(new fields.SchemaField({
+          field: new fields.StringField({ initial: '' }),
+          value: new fields.NumberField({ initial: 0 }),
+          mode:  new fields.StringField({ initial: 'flat' }),
+        }), { initial: [] }),
+        craftBonuses: new fields.ArrayField(new fields.SchemaField({
+          type:     new fields.StringField({ initial: '' }),
+          value:    new fields.NumberField({ initial: 0 }),
+          affinity: new fields.StringField({ initial: '' }),
+        }), { initial: [] }),
+        grantsTags: new fields.ArrayField(new fields.StringField(), { initial: [] }),
       }), { initial: [] }),
 
       // Skill IDs this item grants access to when equipped.

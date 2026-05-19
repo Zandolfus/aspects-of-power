@@ -3814,8 +3814,19 @@ export class AspectsofPowerItem extends Item {
       return;
     }
 
-    // Apply: append augmentId, consume material if used.
-    const updatedAugs = [...currentList, { augmentId: augmentDoc.uuid }];
+    // Apply: append augmentId + a SNAPSHOT of the augment's effect data, then
+    // consume material if used. Snapshot makes read paths (deriveItemStats,
+    // getProfessionAugmentBonuses, grants-reconcile) independent of compendium
+    // hydration and freezes the augment's values at apply time (per design —
+    // future per-crafter scaling will compute the snapshot values at this
+    // point instead of just copying the template).
+    const snapshotEntry = {
+      augmentId: augmentDoc.uuid,
+      itemBonuses:  foundry.utils.deepClone(augmentDoc.system?.itemBonuses  ?? []),
+      craftBonuses: foundry.utils.deepClone(augmentDoc.system?.craftBonuses ?? []),
+      grantsTags:   [...(augmentDoc.system?.grantsTags ?? [])],
+    };
+    const updatedAugs = [...currentList, snapshotEntry];
     await targetItem.update({ ['system.' + slotField]: updatedAugs });
 
     if (materialItem) {

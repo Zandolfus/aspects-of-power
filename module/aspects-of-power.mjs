@@ -512,10 +512,14 @@ Hooks.once('init', function () {
     // For added augments: only record the tags this augment ACTUALLY added
     // (i.e., that weren't already on the item). That way unslot only strips
     // what slot added — manual additions of the same tag survive.
+    // Source for grantsTags is the slot entry SNAPSHOT (set at apply time),
+    // not a compendium lookup — race-free.
+    const allFutureEntries = [...futureAugs, ...futureProfAugs];
+    const entryById = new Map(allFutureEntries.map(e => [e.augmentId, e]));
     for (const addedId of addedIds) {
-      const aug = item.actor.items.get(addedId);
-      if (!aug || aug.type !== 'augment') continue;
-      const grants = aug.system?.grantsTags ?? [];
+      const entry = entryById.get(addedId);
+      if (!entry) continue;
+      const grants = entry.grantsTags ?? [];
       const actuallyAdded = [];
       for (const tag of grants) {
         if (!tags.includes(tag)) {

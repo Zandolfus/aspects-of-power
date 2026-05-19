@@ -625,26 +625,18 @@ export class AspectsofPowerActor extends Actor {
       // Item must be slottable in a profession slot (primary or additional).
       const allSlots = [item.system.slot, ...(item.system.additionalSlots ?? [])].filter(Boolean);
       if (!allSlots.some(s => s.startsWith('prof'))) continue;
-      // Collect augment references from BOTH:
-      //   - profAugments[] (legacy actor-local items, kept for back-compat)
-      //   - augments[] (current compendium-UUID slotting used by the unified
-      //     augment subsystem). Same `craftBonuses` consumption either way.
-      // Dedupe by id — multi-slot augments occupy multiple entries with the
-      // same id, but bonuses should apply once per augment.
-      const localIds = (item.system.profAugments ?? []).map(a => a.augmentId).filter(Boolean);
-      const uuidIds  = (item.system.augments     ?? []).map(a => a.augmentId).filter(Boolean);
-      const allIds   = [...new Set([...localIds, ...uuidIds])];
-      for (const id of allIds) {
-        let augment = this.items.get(id);
-        if (!augment) {
-          try { augment = foundry.utils.fromUuidSync(id); }
-          catch (e) { /* compendium not loaded */ }
-        }
-        // `fromUuidSync` may return a bare index entry (no `system`) if the
-        // compendium hasn't been hydrated yet — the ready-hook loader is
-        // async and may race with the first consumer call. Skip until cached.
-        if (!augment || augment.type !== 'augment' || !augment.system) continue;
-        for (const bonus of augment.system.craftBonuses ?? []) {
+      // Read SNAPSHOT data directly from each slot entry — no compendium
+      // lookup needed (race-free). Both combat slots (augments[]) and prof
+      // slots (profAugments[]) can carry craftBonuses on hybrid augs.
+      // Dedupe by augmentId — multi-slot augments occupy multiple entries
+      // with the same id, but bonuses should apply once per augment.
+      const allEntries = [...(item.system.augments ?? []), ...(item.system.profAugments ?? [])]
+        .filter(e => e?.augmentId);
+      const seenIds = new Set();
+      for (const entry of allEntries) {
+        if (seenIds.has(entry.augmentId)) continue;
+        seenIds.add(entry.augmentId);
+        for (const bonus of entry.craftBonuses ?? []) {
           // Affinity filter: bonus only applies if no affinity set OR matches element.
           if (bonus.affinity && bonus.affinity !== element) continue;
           totals[bonus.type] = (totals[bonus.type] || 0) + (bonus.value || 0);

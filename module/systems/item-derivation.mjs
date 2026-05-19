@@ -135,14 +135,16 @@ export function deriveItemStats(itemOrPatch) {
   //   - 'damageReduction.physical|magical' (flat — percentage NOT supported per
   //                                         user note "no % reductions, too powerful")
   //   - 'statBonus.<ability>'              (flat — appends to statBonuses array)
-  const augs = sys.augments ?? [];
+  // Augment effect data is SNAPSHOTTED on each slot entry at apply time.
+  // Read from the snapshot — no compendium lookup needed (race-free).
+  // Legacy entries with no snapshot (`itemBonuses` undefined/empty) are
+  // skipped here; they'll get backfilled by the world-augment migration.
+  // Both combat-slot (augments) and prof-slot (profAugments) entries can
+  // carry itemBonuses (hybrid augs like Engrave/Durability fit either slot).
+  const augs = [...(sys.augments ?? []), ...(sys.profAugments ?? [])];
   for (const a of augs) {
     if (!a?.augmentId) continue;
-    let augDoc = null;
-    try { augDoc = foundry.utils.fromUuidSync(a.augmentId); }
-    catch (e) { /* compendium not loaded yet */ }
-    if (!augDoc) continue;
-    const bonuses = augDoc.system?.itemBonuses ?? [];
+    const bonuses = a.itemBonuses ?? [];
     for (const b of bonuses) {
       const field = b.field ?? '';
       const value = Number(b.value) || 0;
