@@ -640,7 +640,10 @@ export class AspectsofPowerActor extends Actor {
           try { augment = foundry.utils.fromUuidSync(id); }
           catch (e) { /* compendium not loaded */ }
         }
-        if (!augment || augment.type !== 'augment') continue;
+        // `fromUuidSync` may return a bare index entry (no `system`) if the
+        // compendium hasn't been hydrated yet — the ready-hook loader is
+        // async and may race with the first consumer call. Skip until cached.
+        if (!augment || augment.type !== 'augment' || !augment.system) continue;
         for (const bonus of augment.system.craftBonuses ?? []) {
           // Affinity filter: bonus only applies if no affinity set OR matches element.
           if (bonus.affinity && bonus.affinity !== element) continue;
