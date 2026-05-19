@@ -3764,19 +3764,45 @@ export class AspectsofPowerItem extends Item {
     const targetItem = actor.items.get(targetChoice);
     if (!targetItem) return;
 
-    // Slot check.
+    // Slot routing by augment tags. The augment carries `tags` that say
+    // which slot types it fits in:
+    //   - 'combat'      → host's `augments[]`
+    //   - 'profession'  → host's `profAugments[]`
+    //   - both          → hybrid; prefer prof if open, else combat
+    // Legacy back-compat: empty `tags` falls back to `isProfessionAugment`
+    // boolean → ['profession'] or ['combat'].
     const slotCost = augmentDoc.system?.slotCost ?? 1;
-    const existingAugs = targetItem.system?.augments ?? [];
-    const usedSlots = existingAugs.length;
-    const totalSlots = targetItem.system?.augmentSlots ?? 0;
-    if (usedSlots + slotCost > totalSlots) {
-      ui.notifications.warn(`${targetItem.name}: not enough augment slots (need ${slotCost}, have ${totalSlots - usedSlots}).`);
+    let augTags = augmentDoc.system?.tags ?? [];
+    if (augTags.length === 0) {
+      augTags = augmentDoc.system?.isProfessionAugment ? ['profession'] : ['combat'];
+    }
+    const fitsCombat = augTags.includes('combat');
+    const fitsProf   = augTags.includes('profession');
+
+    const combatUsed  = (targetItem.system?.augments     ?? []).length;
+    const combatTotal = targetItem.system?.augmentSlots     ?? 0;
+    const profUsed    = (targetItem.system?.profAugments ?? []).length;
+    const profTotal   = targetItem.system?.profAugmentSlots ?? 0;
+    const combatFree  = combatTotal - combatUsed;
+    const profFree    = profTotal   - profUsed;
+
+    // Prefer prof slot for hybrids; else fall back to whichever the aug fits.
+    let slotField, currentList, totalSlots;
+    if (fitsProf && profFree >= slotCost) {
+      slotField = 'profAugments'; currentList = targetItem.system?.profAugments ?? []; totalSlots = profTotal;
+    } else if (fitsCombat && combatFree >= slotCost) {
+      slotField = 'augments';     currentList = targetItem.system?.augments     ?? []; totalSlots = combatTotal;
+    } else {
+      const wantedSlotType = fitsProf && !fitsCombat ? 'profession'
+                           : fitsCombat && !fitsProf ? 'combat'
+                           : 'either';
+      ui.notifications.warn(`${targetItem.name}: no compatible ${wantedSlotType} slot free for ${augmentDoc.name} (need ${slotCost}; combat ${combatFree}/${combatTotal}, prof ${profFree}/${profTotal}).`);
       return;
     }
 
     // Apply: append augmentId, consume material if used.
-    const updatedAugs = [...existingAugs, { augmentId: augmentDoc.uuid }];
-    await targetItem.update({ 'system.augments': updatedAugs });
+    const updatedAugs = [...currentList, { augmentId: augmentDoc.uuid }];
+    await targetItem.update({ ['system.' + slotField]: updatedAugs });
 
     if (materialItem) {
       if ((materialItem.system.quantity ?? 1) <= 1) await materialItem.delete();
@@ -3798,7 +3824,7 @@ export class AspectsofPowerItem extends Item {
         <p><strong>${actor.name}</strong> inscribes <strong>${augmentDoc.name}</strong> onto <strong>${targetItem.name}</strong>.</p>
         ${matLine}
         ${tagsLine}
-        <p class="hint">Slots used: ${updatedAugs.length} / ${totalSlots}.</p>
+        <p class="hint">${slotField === 'profAugments' ? 'Prof' : 'Combat'} slots used: ${updatedAugs.length} / ${totalSlots}.</p>
       </div>`,
     });
   }

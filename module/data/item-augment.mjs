@@ -24,7 +24,16 @@ export class AugmentData extends foundry.abstract.TypeDataModel {
       }), { initial: [] }),
 
       // Profession augment flag — only fits in profession augment slots.
+      // @deprecated — superseded by the `tags` array below. Kept readable for
+      // back-compat reads but new code should check `tags.includes('profession')`.
       isProfessionAugment: new fields.BooleanField({ initial: false }),
+
+      // Slot-eligibility tags. Read by `_handleAugmentTag` at slot time:
+      //   - 'combat'      → fits in host's `augments[]` (combat slots)
+      //   - 'profession'  → fits in host's `profAugments[]` (prof slots)
+      //   - both          → hybrid; fits either, prefers prof
+      // Empty tags falls back to legacy isProfessionAugment for back-compat.
+      tags: new fields.ArrayField(new fields.StringField(), { initial: [] }),
 
       // Craft bonuses applied when the augment is equipped on profession gear.
       // affinity (optional): only applies when material/output element matches.
