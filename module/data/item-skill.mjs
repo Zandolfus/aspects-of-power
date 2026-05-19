@@ -97,6 +97,17 @@ export class SkillData extends foundry.abstract.TypeDataModel {
         trigger:  new fields.StringField({ initial: 'always' }), // 'always', 'on-hit', 'on-miss'
       }), { initial: [] }),
 
+      // Passive craft modifiers — when the actor possesses this skill AND is
+      // in profession loadout, these bonuses are aggregated into
+      // `getProfessionAugmentBonuses` totals alongside augment-sourced
+      // bonuses. Same schema as AugmentData.craftBonuses for parallel
+      // consumption in the craft formula.
+      craftBonuses: new fields.ArrayField(new fields.SchemaField({
+        type:     new fields.StringField({ initial: 'd100Bonus' }),
+        value:    new fields.NumberField({ initial: 0 }),
+        affinity: new fields.StringField({ initial: '' }),
+      }), { initial: [] }),
+
       // AOE modifier — applies to all active tags when enabled.
       // `baseSize` is the spell's natural footprint: sizes at-or-below it
       // cost the unmodified baseMana; sizes above it incur 2^n cost growth

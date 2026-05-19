@@ -651,6 +651,18 @@ export class AspectsofPowerActor extends Actor {
         }
       }
     }
+    // Skill-sourced craft modifiers (passive). Any skill the actor possesses
+    // that carries `system.craftBonuses` contributes the same way an augment
+    // would. Used for "specialization" passives like Jewelcutting
+    // Specialization (+10 d100 on craft). No equip / loadout-slot check;
+    // already gated on the actor being in profession loadout above.
+    for (const skill of this.items) {
+      if (skill.type !== 'skill') continue;
+      for (const bonus of skill.system?.craftBonuses ?? []) {
+        if (bonus.affinity && bonus.affinity !== element) continue;
+        totals[bonus.type] = (totals[bonus.type] || 0) + (bonus.value || 0);
+      }
+    }
     return totals;
   }
 
