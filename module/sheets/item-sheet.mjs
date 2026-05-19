@@ -237,8 +237,15 @@ export class AspectsofPowerItemSheet extends foundry.applications.api.Handlebars
         const augmentId = entry?.augmentId ?? '';
         let slotData = { filled: false, augmentId: '', name: '', img: '', bonusSummary: '', isPrimary: false, isContinuation: false };
         if (augmentId && this.item.actor) {
-          const augItem = this.item.actor.items.get(augmentId);
-          if (augItem && augItem.type === 'augment') {
+          // Resolve from local actor items first (legacy path), then compendium
+          // UUID via fromUuidSync (current unified slotting). Both produce an
+          // Item document with `.system.statBonuses` / `.itemBonuses`.
+          let augItem = this.item.actor.items.get(augmentId);
+          if (!augItem) {
+            try { augItem = foundry.utils.fromUuidSync(augmentId); }
+            catch (e) { /* pack not hydrated */ }
+          }
+          if (augItem && augItem.type === 'augment' && augItem.system) {
             const isPrimary = !seenAug.has(augmentId);
             seenAug.add(augmentId);
             const cost = Math.max(1, augItem.system?.slotCost ?? 1);
@@ -293,8 +300,12 @@ export class AspectsofPowerItemSheet extends foundry.applications.api.Handlebars
         const augmentId = entry?.augmentId ?? '';
         let slotData = { filled: false, augmentId: '', name: '', img: '', bonusSummary: '', isPrimary: false, isContinuation: false };
         if (augmentId && this.item.actor) {
-          const augItem = this.item.actor.items.get(augmentId);
-          if (augItem && augItem.type === 'augment') {
+          let augItem = this.item.actor.items.get(augmentId);
+          if (!augItem) {
+            try { augItem = foundry.utils.fromUuidSync(augmentId); }
+            catch (e) { /* pack not hydrated */ }
+          }
+          if (augItem && augItem.type === 'augment' && augItem.system) {
             const isPrimary = !seenProfAug.has(augmentId);
             seenProfAug.add(augmentId);
             const cost = Math.max(1, augItem.system?.slotCost ?? 1);
