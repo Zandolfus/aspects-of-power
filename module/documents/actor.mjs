@@ -625,13 +625,21 @@ export class AspectsofPowerActor extends Actor {
       // Item must be slottable in a profession slot (primary or additional).
       const allSlots = [item.system.slot, ...(item.system.additionalSlots ?? [])].filter(Boolean);
       if (!allSlots.some(s => s.startsWith('prof'))) continue;
-      // Dedupe by augment id — multi-slot augments occupy multiple entries
-      // with the same id, but bonuses should apply once per augment.
-      const profAugIds = [...new Set(
-        (item.system.profAugments ?? []).map(a => a.augmentId).filter(Boolean)
-      )];
-      for (const augId of profAugIds) {
-        const augment = this.items.get(augId);
+      // Collect augment references from BOTH:
+      //   - profAugments[] (legacy actor-local items, kept for back-compat)
+      //   - augments[] (current compendium-UUID slotting used by the unified
+      //     augment subsystem). Same `craftBonuses` consumption either way.
+      // Dedupe by id — multi-slot augments occupy multiple entries with the
+      // same id, but bonuses should apply once per augment.
+      const localIds = (item.system.profAugments ?? []).map(a => a.augmentId).filter(Boolean);
+      const uuidIds  = (item.system.augments     ?? []).map(a => a.augmentId).filter(Boolean);
+      const allIds   = [...new Set([...localIds, ...uuidIds])];
+      for (const id of allIds) {
+        let augment = this.items.get(id);
+        if (!augment) {
+          try { augment = foundry.utils.fromUuidSync(id); }
+          catch (e) { /* compendium not loaded */ }
+        }
         if (!augment || augment.type !== 'augment') continue;
         for (const bonus of augment.system.craftBonuses ?? []) {
           // Affinity filter: bonus only applies if no affinity set OR matches element.
