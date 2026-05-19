@@ -730,6 +730,19 @@ Hooks.once('ready', async function () {
   // Register celerity tracker auto-refresh hooks (idempotent).
   registerCelerityTrackerHooks();
 
+  // Eagerly hydrate the augments compendium so `fromUuidSync` returns full
+  // system data (not just index stubs). Required by `deriveItemStats` and
+  // `getProfessionAugmentBonuses` which both resolve augment UUIDs sync.
+  // Without this, slotted augments silently produce zero bonus.
+  try {
+    for (const p of game.packs) {
+      if (p.metadata.name === 'augments' && p.metadata.packageName === 'aspects-of-power') {
+        await p.getDocuments();
+        break;
+      }
+    }
+  } catch (e) { console.warn('[aspects-of-power] augment pack hydration failed', e); }
+
   // ── Orphaned AOE region cleanup ──
   // When a combatant's declaredAction is cleared (cancel button, advance-
   // fire, reset, movement charging it away, etc.) AND the prior declared
