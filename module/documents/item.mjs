@@ -4061,6 +4061,7 @@ export class AspectsofPowerItem extends Item {
 
     // ── Execute prep (selection came from combined setup dialog) ──
     let prepBonus = 0;
+    let prepDisplayInfo = null; // { skillName, rollTotal, rollContribution } — used to rebuild prepLine after augs are read
     if (prepId) {
       const prepSkill = actor.items.get(prepId);
       if (prepSkill) {
@@ -4068,10 +4069,10 @@ export class AspectsofPowerItem extends Item {
         const { dmgFormula: prepDmgF } = prepSkill._buildRollFormulas(prepRollData);
         const prepRoll = new Roll(prepDmgF, prepRollData);
         await prepRoll.evaluate();
-        prepBonus = Math.round(Math.round(prepRoll.total) / 10);
-
-        prepLine = `<p><strong>Preparation (${prepSkill.name}):</strong> `
-                 + `Roll ${Math.round(prepRoll.total)} ÷ 10 = <strong>+${prepBonus}</strong> bonus.</p>`;
+        const prepRollContribution = Math.round(Math.round(prepRoll.total) / 10);
+        prepBonus = prepRollContribution;
+        prepDisplayInfo = { skillName: prepSkill.name, rollTotal: Math.round(prepRoll.total), rollContribution: prepRollContribution };
+        // prepLine rebuilt below after augPrepBonus is folded in.
       }
     }
 
@@ -4097,6 +4098,15 @@ export class AspectsofPowerItem extends Item {
     const augReworkDecayReduce    = profAugBonuses.reworkDecayReduce || 0;
     // Apply prepBonus augment to the prep step's contribution (computed above).
     prepBonus += augPrepBonus;
+    // Rebuild prepLine to show the prep-roll piece + the augment piece inline.
+    if (prepDisplayInfo) {
+      const augPrepExpr = augPrepBonus ? ` + (${augPrepBonus})` : '';
+      prepLine = `<p><strong>Preparation (${prepDisplayInfo.skillName}):</strong> `
+               + `Roll ${prepDisplayInfo.rollTotal} ÷ 10 = ${prepDisplayInfo.rollContribution}${augPrepExpr} = <strong>+${prepBonus}</strong></p>`;
+    } else if (augPrepBonus) {
+      // No prep skill rolled, but the augment still contributes.
+      prepLine = `<p><strong>Preparation Augment:</strong> +${augPrepBonus}</p>`;
+    }
 
     const augBonusParts = [];
     if (skillModBonus)              augBonusParts.push(`Skill +${skillModBonus}`);
@@ -4264,6 +4274,11 @@ export class AspectsofPowerItem extends Item {
 
     // ── Branch: Alchemy (consumable) vs Equipment ──
     const isAlchemy = tags.includes('alchemy');
+    // materialPreservation eligibility: alchemy or cooking. These professions
+    // craft "consumables from ingredients" where a roll-good might let you
+    // stretch one leaf into two doses. Equipment crafts (1 material → 1 piece)
+    // don't qualify — preservation there would just be a free craft.
+    const isMaterialPreservingCraft = isAlchemy || tags.includes('cooking') || tags.includes('chef');
     let createdItem;
 
     if (isAlchemy) {
@@ -4328,14 +4343,31 @@ export class AspectsofPowerItem extends Item {
       }]);
 
       // Consume material — but only on initial craft. Reworks reuse existing item, no mat cost.
-      if (!reworkTarget) {
+      // materialPreservation: % chance to save the ingredient ("stretched one
+      // leaf into two doses"). Alchemy + cooking eligible per design.
+      const alchemyMaterialPreserved = !reworkTarget
+        && isMaterialPreservingCraft
+        && augMaterialPreservation > 0
+        && Math.random() * 100 < augMaterialPreservation;
+      if (!reworkTarget && !alchemyMaterialPreserved) {
         if ((materialItem.system.quantity ?? 1) <= 1) {
           await materialItem.delete();
         } else {
           await materialItem.update({ 'system.quantity': materialItem.system.quantity - 1 });
         }
       }
+      const alchemyMatPreservedLine = alchemyMaterialPreserved
+        ? `<p style="color:#80cbc4;">&#10003; Ingredient preserved by augment (${augMaterialPreservation}% chance).</p>`
+        : '';
 
+      // d100 + Crafter + Material lines with inline (x) bonus notation.
+      const d100BonusExprA        = d100Bonus        ? ` + (${d100Bonus})`        : '';
+      const rarityFloorBonusExprA = rarityFloorBonus ? ` + (${rarityFloorBonus})` : '';
+      const skillModExprA         = skillModBonus    ? ` + (${skillModBonus})`    : '';
+      const skillRollDisplayA     = skillModBonus
+        ? `${Math.round(dmgRoll.total)}${skillModExprA} = ${skillRoll}`
+        : `${skillRoll}`;
+      const matPotencyExprA = augMaterialPotency ? ` + (${augMaterialPotency})` : '';
       ChatMessage.create({
         speaker,
         content: `<div class="craft-result">
@@ -4344,12 +4376,13 @@ export class AspectsofPowerItem extends Item {
           ${craftNatLine}
           ${refineLine}
           ${prepLine}
+          ${alchemyMatPreservedLine}
           <p><strong>Material:</strong> ${materialItem.name} (${matRarity}, progress ${materialProgress})</p>
-          <p><strong>Material (50%):</strong> ${materialProgress} × 0.5 = ${materialContribution}</p>
-          <p><strong>Crafter (50%):</strong> ${skillRoll} × ${d100Pct.toFixed(2)} = ${crafterRoll} × 0.5 = ${crafterContribution}</p>
-          <p><strong>d100:</strong> ${d100Roll.total} + ${rarityRange.floor} = ${effectiveD100} (cap ${rarityRange.ceiling})</p>
+          <p><strong>Material (50%):</strong> ${materialProgress} × 0.5${matPotencyExprA} = ${materialContribution}</p>
+          <p><strong>d100:</strong> ${d100Roll.total}${d100BonusExprA}${rarityFloorBonusExprA} + ${rarityRange.floor} = ${effectiveD100} (cap ${rarityRange.ceiling})</p>
+          <p><strong>Crafter (50%):</strong> ${skillRollDisplayA} × ${d100Pct.toFixed(2)} = ${crafterRoll} × 0.5 = ${crafterContribution}</p>
           ${profAugLine}
-          <p><strong>Total Progress:</strong> ${totalProgress}</p>
+          <p><strong>Total Progress:</strong> ${materialContribution} + ${crafterContribution} + ${prepBonus}${progressBonus ? ` + (${progressBonus})` : ''} = <strong>${totalProgress}</strong></p>
           <p><strong>Quality:</strong> ${qualityKey.charAt(0).toUpperCase() + qualityKey.slice(1)} (${qualityData.rarity})</p>
           <p><strong>Type:</strong> ${typeLabel} (${effectType})</p>
           <p><em>Created: ${createdItem.name}</em></p>
@@ -4498,13 +4531,11 @@ export class AspectsofPowerItem extends Item {
       }
 
       // Consume material — but only on initial craft. Reworks reuse existing item, no mat cost.
-      // materialPreservation: % chance to skip consumption (smith/jewelry/tailor/
-      // leatherworker only per design memo — alchemists never preserve; this branch
-      // is the equipment path so the gate is satisfied automatically).
-      const materialPreservedByAug = !reworkTarget
-        && augMaterialPreservation > 0
-        && Math.random() * 100 < augMaterialPreservation;
-      if (!reworkTarget && !materialPreservedByAug) {
+      // materialPreservation does NOT apply here: equipment crafts are 1 material
+      // → 1 piece, so preservation would just be "free craft". Per user direction,
+      // preservation only applies to alchemy/cooking (1 ingredient might cover
+      // multiple doses — the "use one leaf where two might be necessary" idea).
+      if (!reworkTarget) {
         if ((materialItem.system.quantity ?? 1) <= 1) {
           await materialItem.delete();
         } else {
@@ -4524,17 +4555,20 @@ export class AspectsofPowerItem extends Item {
         ? `<p><em>Improved: ${createdItem.name}</em></p>`
         : `<p><em>Created: ${createdItem.name}</em></p>`;
 
-      const matPotencyLine = augMaterialPotency
-        ? ` <span style="opacity:0.7;">(+${augMaterialPotency} materialPotency)</span>`
-        : '';
-      const matPreservedLine = materialPreservedByAug
-        ? `<p style="color:#80cbc4;">&#10003; Material preserved by augment (${augMaterialPreservation}% chance).</p>`
+      const matPotencyExpr = augMaterialPotency
+        ? ` + (${augMaterialPotency})`
         : '';
       const matLine = materialItem
         ? `<p><strong>Material:</strong> ${materialItem.name} (${matRarity}, progress ${materialProgress})</p>
-           <p><strong>Material (50%):</strong> ${materialProgress} × 0.5 = ${materialContribution}${matPotencyLine}</p>
-           ${matPreservedLine}`
+           <p><strong>Material (50%):</strong> ${materialProgress} × 0.5${matPotencyExpr} = ${materialContribution}</p>`
         : `<p><em>Iterative rework — no material consumed.</em></p>`;
+      // d100 + Crafter lines with inline (x) bonus notation.
+      const d100BonusExpr        = d100Bonus        ? ` + (${d100Bonus})`        : '';
+      const rarityFloorBonusExpr = rarityFloorBonus ? ` + (${rarityFloorBonus})` : '';
+      const skillModExpr         = skillModBonus    ? ` + (${skillModBonus})`    : '';
+      const skillRollDisplay     = skillModBonus
+        ? `${Math.round(dmgRoll.total)}${skillModExpr} = ${skillRoll}`
+        : `${skillRoll}`;
       ChatMessage.create({
         speaker,
         content: `<div class="craft-result">
@@ -4545,10 +4579,10 @@ export class AspectsofPowerItem extends Item {
           ${refineLine}
           ${prepLine}
           ${matLine}
-          <p><strong>Crafter (50%):</strong> ${skillRoll} × ${d100Pct.toFixed(2)} = ${crafterRoll} × 0.5 = ${crafterContribution}</p>
-          <p><strong>d100:</strong> ${d100Roll.total} + ${rarityRange.floor} = ${effectiveD100} (cap ${rarityRange.ceiling})</p>
+          <p><strong>d100:</strong> ${d100Roll.total}${d100BonusExpr}${rarityFloorBonusExpr} + ${rarityRange.floor} = ${effectiveD100} (cap ${rarityRange.ceiling})</p>
+          <p><strong>Crafter (50%):</strong> ${skillRollDisplay} × ${d100Pct.toFixed(2)} = ${crafterRoll} × 0.5 = ${crafterContribution}</p>
           ${profAugLine}
-          <p><strong>Total Progress:</strong> ${totalProgress}</p>
+          <p><strong>Total Progress:</strong> ${materialContribution} + ${crafterContribution} + ${prepBonus}${progressBonus ? ` + (${progressBonus})` : ''} = <strong>${totalProgress}</strong></p>
           <p><strong>Quality:</strong> ${qualityKey.charAt(0).toUpperCase() + qualityKey.slice(1)} (${qualityData.rarity})</p>
           ${armorBonus ? `<p><strong>Armor:</strong> ${armorBonus}</p>` : ''}
           ${veilBonus ? `<p><strong>Veil:</strong> ${veilBonus}</p>` : ''}
