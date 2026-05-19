@@ -3650,18 +3650,56 @@ export class AspectsofPowerItem extends Item {
     const actor = this.actor;
     if (!actor) return;
 
-    // Resolve the augment to apply (skill carries the compendium UUID).
-    const augmentUuid = item.flags?.aspectsofpower?.appliesAugmentId;
-    if (!augmentUuid) {
-      ui.notifications.warn(`${item.name}: no augment linked (flags.aspectsofpower.appliesAugmentId).`);
-      return;
-    }
+    // Resolve the augment to apply. Two modes:
+    //   1. Direct: skill flag `appliesAugmentId` is a fixed UUID (most augments)
+    //   2. Engrave dispatch: skill flag `engraveDispatch` is true → look up the
+    //      actor's `flags.aspectsofpower.knownEngraves` (array of ability slugs)
+    //      and either auto-pick (single known) or prompt (multiple).
     let augmentDoc;
-    try { augmentDoc = await fromUuid(augmentUuid); }
-    catch (e) { /* unavailable */ }
-    if (!augmentDoc) {
-      ui.notifications.warn(`${item.name}: linked augment ${augmentUuid} not resolvable.`);
-      return;
+    if (item.flags?.aspectsofpower?.engraveDispatch === true) {
+      const known = actor.flags?.aspectsofpower?.knownEngraves ?? [];
+      if (known.length === 0) {
+        ui.notifications.warn(`${actor.name} doesn't know any engravings yet.`);
+        return;
+      }
+      let chosenAbility = known[0];
+      if (known.length > 1) {
+        const abButtons = known.map(ab => ({
+          action: ab,
+          label: ab[0].toUpperCase() + ab.slice(1),
+        }));
+        abButtons.push({ action: 'cancel', label: 'Cancel' });
+        const ch = await foundry.applications.api.DialogV2.wait({
+          window: { title: `${item.name} — Engrave Which Stat?` },
+          content: `<p>Select an ability to engrave (+10 ${'<em>(at slot)</em>'}).</p>`,
+          buttons: abButtons,
+          close: () => 'cancel',
+        });
+        if (ch === 'cancel') return;
+        chosenAbility = ch;
+      }
+      // Resolve the matching Engrave <Ability> augment by name from the augments pack.
+      const targetName = `Engrave ${chosenAbility[0].toUpperCase()}${chosenAbility.slice(1)}`;
+      let pack = null;
+      for (const p of game.packs) {
+        if (p.metadata.name === 'augments' && p.metadata.packageName === 'aspects-of-power') { pack = p; break; }
+      }
+      if (!pack) { ui.notifications.warn('Augments compendium not found.'); return; }
+      const idx = pack.index.find(e => e.name === targetName);
+      if (!idx) { ui.notifications.warn(`Engrave augment "${targetName}" not in compendium.`); return; }
+      augmentDoc = await pack.getDocument(idx._id);
+    } else {
+      const augmentUuid = item.flags?.aspectsofpower?.appliesAugmentId;
+      if (!augmentUuid) {
+        ui.notifications.warn(`${item.name}: no augment linked (flags.aspectsofpower.appliesAugmentId or engraveDispatch).`);
+        return;
+      }
+      try { augmentDoc = await fromUuid(augmentUuid); }
+      catch (e) { /* unavailable */ }
+      if (!augmentDoc) {
+        ui.notifications.warn(`${item.name}: linked augment ${augmentUuid} not resolvable.`);
+        return;
+      }
     }
 
     // Material requirement: skill tags include a material kind that must
