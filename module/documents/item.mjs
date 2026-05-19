@@ -121,6 +121,13 @@ export class AspectsofPowerItem extends Item {
     const progressBonus    = augBonuses.craftProgress || 0;
     const skillModBonus    = augBonuses.craftSkillMod || 0;
     const rarityFloorBonus = augBonuses.rarityFloor || 0;
+    const augPrepBonus            = augBonuses.prepBonus || 0;
+    const augMaterialPotency      = augBonuses.materialPotency || 0;
+    const augCritFailReduce       = augBonuses.critFailReduce || 0;
+    const augCritSuccessThreshold = augBonuses.critSuccessThreshold || 0;
+    const augMaterialPreservation = augBonuses.materialPreservation || 0;
+    const augMaxProgressBoost     = augBonuses.maxProgressBoost || 0;
+    const augReworkDecayReduce    = augBonuses.reworkDecayReduce || 0;
 
     // d100 expectation under material's rarity range.
     const matRarity = materialItem
@@ -134,10 +141,17 @@ export class AspectsofPowerItem extends Item {
 
     // Augment summary line.
     const augLines = [];
-    if (skillModBonus)    augLines.push(`Skill +${skillModBonus}`);
-    if (d100Bonus)        augLines.push(`d100 +${d100Bonus}`);
-    if (rarityFloorBonus) augLines.push(`Floor +${rarityFloorBonus}`);
-    if (progressBonus)    augLines.push(`Progress +${progressBonus}`);
+    if (skillModBonus)              augLines.push(`Skill +${skillModBonus}`);
+    if (d100Bonus)                  augLines.push(`d100 +${d100Bonus}`);
+    if (rarityFloorBonus)           augLines.push(`Floor +${rarityFloorBonus}`);
+    if (progressBonus)              augLines.push(`Progress +${progressBonus}`);
+    if (augPrepBonus)               augLines.push(`Prep +${augPrepBonus}`);
+    if (augMaterialPotency)         augLines.push(`MatPotency +${augMaterialPotency}`);
+    if (augCritFailReduce)          augLines.push(`CritFailReduce ${augCritFailReduce}%`);
+    if (augCritSuccessThreshold)    augLines.push(`CritSuccessThr -${augCritSuccessThreshold}`);
+    if (augMaterialPreservation)    augLines.push(`MatPreserve ${augMaterialPreservation}%`);
+    if (augMaxProgressBoost)        augLines.push(`MaxProg +${augMaxProgressBoost}%`);
+    if (augReworkDecayReduce)       augLines.push(`ReworkDecay -${augReworkDecayReduce}`);
     const augSummary = augLines.length > 0 ? augLines.join(', ') : '<em>None active</em>';
 
     // Quality tiers (sorted high to low) for tier-lookup in preview.
@@ -164,15 +178,16 @@ export class AspectsofPowerItem extends Item {
           effectiveMatProgress += refineGainPreview;
         }
       }
-      const matCtrb = Math.round(effectiveMatProgress * 0.5);
+      // materialPotency adds flat to the material-contribution leg.
+      const matCtrb = Math.round(effectiveMatProgress * 0.5) + augMaterialPotency;
 
-      // Prep impact: avg prep bonus = skill / 10.
-      let prepBonusPreview = 0;
+      // Prep impact: avg prep bonus = skill / 10, plus the prepBonus augment.
+      let prepBonusPreview = augPrepBonus;
       if (prepId) {
         const prepSkill = actor.items.get(prepId);
         if (prepSkill) {
           const avgPrepSkill = avgSkillRollFor(prepSkill);
-          prepBonusPreview = Math.round(avgPrepSkill / 10);
+          prepBonusPreview += Math.round(avgPrepSkill / 10);
         }
       }
 
@@ -187,10 +202,13 @@ export class AspectsofPowerItem extends Item {
       const minTotal = matCtrb + minCrafterCtrb + progressBonus + prepBonusPreview;
       const maxTotal = matCtrb + maxCrafterCtrb + progressBonus + prepBonusPreview;
 
-      // Cap (theoretical max): perfect d100 outcome. For iterative, use the existing item's stored cap.
+      // Cap (theoretical max): perfect d100 outcome + maxProgressBoost % uplift.
+      // For iterative, use the existing item's stored cap (which already includes
+      // any boost baked in at creation time).
+      const baseCap = Math.round(effectiveMatProgress * 0.5) + augMaterialPotency + Math.round((avgSkillRoll + skillModBonus) * 1.0 * 0.5) + progressBonus + prepBonusPreview;
       const cap = reworkTarget
         ? (reworkTarget.system.maxProgress ?? 0)
-        : Math.round(effectiveMatProgress * 0.5) + Math.round((avgSkillRoll + skillModBonus) * 1.0 * 0.5) + progressBonus + prepBonusPreview;
+        : Math.round(baseCap * (1 + augMaxProgressBoost / 100));
 
       const qExpected = qualityForProgress(total);
       const qCap = qualityForProgress(cap);
@@ -4069,11 +4087,29 @@ export class AspectsofPowerItem extends Item {
     const skillModBonus = profAugBonuses.craftSkillMod || 0;
     const progressBonus = profAugBonuses.craftProgress || 0;
     const rarityFloorBonus = profAugBonuses.rarityFloor || 0;
+    // Extended craft-bonus set (design-profession-augments.md):
+    const augPrepBonus            = profAugBonuses.prepBonus || 0;
+    const augMaterialPotency      = profAugBonuses.materialPotency || 0;
+    const augCritFailReduce       = profAugBonuses.critFailReduce || 0;
+    const augCritSuccessThreshold = profAugBonuses.critSuccessThreshold || 0;
+    const augMaterialPreservation = profAugBonuses.materialPreservation || 0;
+    const augMaxProgressBoost     = profAugBonuses.maxProgressBoost || 0;
+    const augReworkDecayReduce    = profAugBonuses.reworkDecayReduce || 0;
+    // Apply prepBonus augment to the prep step's contribution (computed above).
+    prepBonus += augPrepBonus;
+
     const augBonusParts = [];
-    if (skillModBonus)    augBonusParts.push(`Skill +${skillModBonus}`);
-    if (d100Bonus)        augBonusParts.push(`d100 +${d100Bonus}`);
-    if (rarityFloorBonus) augBonusParts.push(`Floor +${rarityFloorBonus}`);
-    if (progressBonus)    augBonusParts.push(`Progress +${progressBonus}`);
+    if (skillModBonus)              augBonusParts.push(`Skill +${skillModBonus}`);
+    if (d100Bonus)                  augBonusParts.push(`d100 +${d100Bonus}`);
+    if (rarityFloorBonus)           augBonusParts.push(`Floor +${rarityFloorBonus}`);
+    if (progressBonus)              augBonusParts.push(`Progress +${progressBonus}`);
+    if (augPrepBonus)               augBonusParts.push(`Prep +${augPrepBonus}`);
+    if (augMaterialPotency)         augBonusParts.push(`MatPotency +${augMaterialPotency}`);
+    if (augCritFailReduce)          augBonusParts.push(`CritFailReduce ${augCritFailReduce}%`);
+    if (augCritSuccessThreshold)    augBonusParts.push(`CritSuccessThr -${augCritSuccessThreshold}`);
+    if (augMaterialPreservation)    augBonusParts.push(`MatPreserve ${augMaterialPreservation}%`);
+    if (augMaxProgressBoost)        augBonusParts.push(`MaxProg +${augMaxProgressBoost}%`);
+    if (augReworkDecayReduce)       augBonusParts.push(`ReworkDecay -${augReworkDecayReduce}`);
     const profAugLine = augBonusParts.length
       ? `<p><strong>Profession Augments:</strong> ${augBonusParts.join(', ')}</p>`
       : '';
@@ -4085,11 +4121,22 @@ export class AspectsofPowerItem extends Item {
       : (reworkTarget?.system.rarity || 'common');
     const rarityRange = CONFIG.ASPECTSOFPOWER.craftRarityRanges?.[matRarity]
                      ?? { floor: 0, ceiling: 100 };
-    const effectiveD100 = Math.min(d100Roll.total + rarityRange.floor + rarityFloorBonus + d100Bonus, rarityRange.ceiling);
+    // critFailReduce: roll a save. If it fires, treat d100=1 as d100=2 so the
+    // craft proceeds (and materials are preserved by virtue of not entering
+    // the fail branch). Per design memo: "Rare-but-decisive."
+    const critFailReducedFire = d100Roll.total === 1
+      && augCritFailReduce > 0
+      && Math.random() * 100 < augCritFailReduce;
+    const effectiveD100Raw = critFailReducedFire ? 2 : d100Roll.total;
+    const effectiveD100 = Math.min(effectiveD100Raw + rarityRange.floor + rarityFloorBonus + d100Bonus, rarityRange.ceiling);
     const d100Pct = effectiveD100 / 100;
+    // critSuccessThreshold: lowers the d100 needed for masterwork/crit-success.
+    // Floor at 90 (per memo cap of 10 deduction). Default threshold = 100.
+    const critSuccessThr = Math.max(90, 100 - augCritSuccessThreshold);
+    const isCritSuccess = effectiveD100Raw >= critSuccessThr;
 
     // ── Critical failure: d100 of 1 ──
-    if (d100Roll.total === 1) {
+    if (effectiveD100Raw === 1) {
       const isAlchemyFailure = (item.system.tags ?? []).includes('alchemy');
       const failureMsg = isAlchemyFailure
         ? `<p><strong>Materials destroyed!</strong> ${materialItem.name} is consumed in the failed brew.</p>`
@@ -4120,7 +4167,8 @@ export class AspectsofPowerItem extends Item {
     // 50/50 split: material quality + crafter skill.
     // Iterative reworks have no material; only crafter contributes via the rework formula below.
     const materialProgress = materialItem ? (materialItem.system.progress ?? 0) : 0;
-    const materialContribution = Math.round(materialProgress * 0.5);
+    // materialPotency: flat add on top of the half-of-progress material contribution.
+    const materialContribution = Math.round(materialProgress * 0.5) + augMaterialPotency;
 
     const skillRoll = Math.round(dmgRoll.total) + skillModBonus;
     const crafterRoll = Math.round(skillRoll * d100Pct);
@@ -4128,8 +4176,10 @@ export class AspectsofPowerItem extends Item {
 
     // Theoretical max for THIS craft: what would result if the crafter rolled a perfect d100 (=100).
     // Uses 1.0 instead of rarity ceiling so the cap doesn't swing wildly with material rarity.
+    // maxProgressBoost: % uplift on the theoretical cap, raising headroom for iteration.
     const maxCrafterRoll = skillRoll;
-    const theoreticalMaxProgress = Math.round(materialProgress * 0.5) + Math.round(maxCrafterRoll * 0.5) + prepBonus + progressBonus;
+    const theoreticalBase = Math.round(materialProgress * 0.5) + augMaterialPotency + Math.round(maxCrafterRoll * 0.5) + prepBonus + progressBonus;
+    const theoreticalMaxProgress = Math.round(theoreticalBase * (1 + augMaxProgressBoost / 100));
 
     let totalProgress = materialContribution + crafterContribution + prepBonus + progressBonus;
 
@@ -4149,7 +4199,9 @@ export class AspectsofPowerItem extends Item {
         const existingCount = reworkTarget.system.reworkCount ?? 0;
         // Divisor offset of 5 calibrated so an item maxes out in ~5 total crafts
         // (1 initial + ~4 reworks on average); see python/Test/augment_value_sim.py.
-        const divisor = existingCount + 5;
+        // reworkDecayReduce: pulls the divisor down (more progress per rework),
+        // floored at 1.1 to keep the divide stable.
+        const divisor = Math.max(1.1, existingCount + 5 - augReworkDecayReduce);
         // Crafter-only — material is not consumed and doesn't contribute on rework.
         const reworkContribution = crafterRoll + prepBonus + progressBonus;
         const rawAdd = Math.round(reworkContribution / divisor);
@@ -4182,6 +4234,16 @@ export class AspectsofPowerItem extends Item {
         break;
       }
     }
+    // critSuccess: bump quality one tier up. Quality tiers are sorted high-to-low
+    // here, so "up" is the entry BEFORE the current one in the sorted list.
+    if (isCritSuccess) {
+      const currentIdx = qualityTiers.findIndex(([k]) => k === qualityKey);
+      if (currentIdx > 0) {
+        const [bumpKey, bumpData] = qualityTiers[currentIdx - 1];
+        qualityKey = bumpKey;
+        qualityData = bumpData;
+      }
+    }
 
     // For iterative reworks (no material), extract element from reworkTarget's stored affinity tag.
     let element = materialItem ? (materialItem.system.materialElement || '') : '';
@@ -4196,7 +4258,9 @@ export class AspectsofPowerItem extends Item {
     }
     const craftNatLine = d100Roll.total === 100
       ? '<p style="color:#ffca28;font-size:1.2em;">&#9733; Masterwork! Natural 100! &#9733;</p>'
-      : '';
+      : (isCritSuccess
+          ? `<p style="color:#ffca28;font-size:1.1em;">&#9733; Crit Success (d100 ${d100Roll.total} &ge; ${critSuccessThr})! Quality bumped one tier. &#9733;</p>`
+          : '');
 
     // ── Branch: Alchemy (consumable) vs Equipment ──
     const isAlchemy = tags.includes('alchemy');
@@ -4434,7 +4498,13 @@ export class AspectsofPowerItem extends Item {
       }
 
       // Consume material — but only on initial craft. Reworks reuse existing item, no mat cost.
-      if (!reworkTarget) {
+      // materialPreservation: % chance to skip consumption (smith/jewelry/tailor/
+      // leatherworker only per design memo — alchemists never preserve; this branch
+      // is the equipment path so the gate is satisfied automatically).
+      const materialPreservedByAug = !reworkTarget
+        && augMaterialPreservation > 0
+        && Math.random() * 100 < augMaterialPreservation;
+      if (!reworkTarget && !materialPreservedByAug) {
         if ((materialItem.system.quantity ?? 1) <= 1) {
           await materialItem.delete();
         } else {
@@ -4454,9 +4524,16 @@ export class AspectsofPowerItem extends Item {
         ? `<p><em>Improved: ${createdItem.name}</em></p>`
         : `<p><em>Created: ${createdItem.name}</em></p>`;
 
+      const matPotencyLine = augMaterialPotency
+        ? ` <span style="opacity:0.7;">(+${augMaterialPotency} materialPotency)</span>`
+        : '';
+      const matPreservedLine = materialPreservedByAug
+        ? `<p style="color:#80cbc4;">&#10003; Material preserved by augment (${augMaterialPreservation}% chance).</p>`
+        : '';
       const matLine = materialItem
         ? `<p><strong>Material:</strong> ${materialItem.name} (${matRarity}, progress ${materialProgress})</p>
-           <p><strong>Material (50%):</strong> ${materialProgress} × 0.5 = ${materialContribution}</p>`
+           <p><strong>Material (50%):</strong> ${materialProgress} × 0.5 = ${materialContribution}${matPotencyLine}</p>
+           ${matPreservedLine}`
         : `<p><em>Iterative rework — no material consumed.</em></p>`;
       ChatMessage.create({
         speaker,
