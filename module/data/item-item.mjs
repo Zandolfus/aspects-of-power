@@ -63,6 +63,12 @@ export class ItemItemData extends foundry.abstract.TypeDataModel {
       damageReduction: new fields.SchemaField({
         physical: new fields.NumberField({ initial: 0, integer: true }),
         magical:  new fields.NumberField({ initial: 0, integer: true }),
+        // Per-affinity DR map: { fire: 5, ice: 3, lightning: 8, ... }
+        // Aggregated on the actor into system.damageReduction.affinities and
+        // applied as a pre-step per-segment against affinity-tagged incoming
+        // damage (augment-routed damage segments only — base weapon damage
+        // continues to flow through physical/magical).
+        affinities: new fields.ObjectField({ initial: {} }),
       }),
 
       // Augment slots (auto-set from rarity, but stored for override).
@@ -78,10 +84,11 @@ export class ItemItemData extends foundry.abstract.TypeDataModel {
       augments: new fields.ArrayField(new fields.SchemaField({
         augmentId: new fields.StringField({ initial: '' }),
         itemBonuses: new fields.ArrayField(new fields.SchemaField({
-          field:    new fields.StringField({ initial: '' }),
-          value:    new fields.NumberField({ initial: 0 }),
-          mode:     new fields.StringField({ initial: 'flat' }),
-          affinity: new fields.StringField({ initial: '' }),
+          field:      new fields.StringField({ initial: '' }),
+          value:      new fields.NumberField({ initial: 0 }),
+          mode:       new fields.StringField({ initial: 'flat' }),
+          affinity:   new fields.StringField({ initial: '' }),
+          affinities: new fields.ObjectField({ initial: {} }),
         }), { initial: [] }),
         craftBonuses: new fields.ArrayField(new fields.SchemaField({
           type:     new fields.StringField({ initial: '' }),
@@ -97,10 +104,11 @@ export class ItemItemData extends foundry.abstract.TypeDataModel {
       profAugments: new fields.ArrayField(new fields.SchemaField({
         augmentId: new fields.StringField({ initial: '' }),
         itemBonuses: new fields.ArrayField(new fields.SchemaField({
-          field:    new fields.StringField({ initial: '' }),
-          value:    new fields.NumberField({ initial: 0 }),
-          mode:     new fields.StringField({ initial: 'flat' }),
-          affinity: new fields.StringField({ initial: '' }),
+          field:      new fields.StringField({ initial: '' }),
+          value:      new fields.NumberField({ initial: 0 }),
+          mode:       new fields.StringField({ initial: 'flat' }),
+          affinity:   new fields.StringField({ initial: '' }),
+          affinities: new fields.ObjectField({ initial: {} }),
         }), { initial: [] }),
         craftBonuses: new fields.ArrayField(new fields.SchemaField({
           type:     new fields.StringField({ initial: '' }),

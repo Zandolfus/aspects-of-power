@@ -1324,6 +1324,38 @@ export class AspectsofPowerItem extends Item {
       : 0;
     const afterDefense    = primaryContrib + secondaryContrib;
 
+    // Per-affinity damage breakdown — projects this actor's augment-routed
+    // damageBonus split (equippedDamageBonusByAffinity) into the post-
+    // defense damage space, so the apply-damage handler can subtract the
+    // TARGET's per-affinity DR per slice. Untyped augment damage and base
+    // weapon damage continue to flow through the existing armor/DR pipeline
+    // — they aren't emitted in the breakdown.
+    let damageBreakdownAttr = '';
+    {
+      const equipped = this.actor?.system?.equippedDamageBonus ?? 0;
+      const breakdownRaw = this.actor?.system?.equippedDamageBonusByAffinity ?? {};
+      const ratio = (Number.isFinite(dmgRoll.total) && dmgRoll.total > 0)
+        ? afterDefense / dmgRoll.total
+        : 0;
+      if (equipped > 0 && ratio > 0) {
+        const totalAugmentAfter = equipped * ratio;
+        const totalWeight = Object.entries(breakdownRaw)
+          .filter(([k]) => k !== 'untyped')
+          .reduce((s, [, v]) => s + (Number(v) || 0), 0);
+        if (totalWeight > 0) {
+          const scaled = {};
+          for (const [k, v] of Object.entries(breakdownRaw)) {
+            if (k === 'untyped') continue;
+            const part = Math.round(totalAugmentAfter * ((Number(v) || 0) / totalWeight));
+            if (part > 0) scaled[k] = part;
+          }
+          if (Object.keys(scaled).length > 0) {
+            damageBreakdownAttr = ` data-damage-breakdown='${JSON.stringify(scaled)}'`;
+          }
+        }
+      }
+    }
+
     // Barrier absorbs before armor/veil — it takes raw (post-defense-pool) damage.
     const barrierValue = targetActor.system.barrier?.value ?? 0;
     let barrierLine = '';
@@ -1425,7 +1457,7 @@ export class AspectsofPowerItem extends Item {
              data-damage="${afterDefense}"
              data-toughness="${baseDR}"
              data-affinity-dr="${affinityDR}"
-             data-damage-type="${isPhysical ? 'physical' : 'magical'}"${fmAttrs}
+             data-damage-type="${isPhysical ? 'physical' : 'magical'}"${damageBreakdownAttr}${fmAttrs}
              style="margin-top:6px;width:100%;">
              Apply to ${targetActor.name}
            </button>
@@ -3847,11 +3879,20 @@ export class AspectsofPowerItem extends Item {
       }
       return templateValue;
     };
+    // Normalize affinity routing: legacy `affinity: 'fire'` becomes
+    // `affinities: {fire: 1}`; explicit `affinities` map wins when both set.
+    const normalizeAffinities = (b) => {
+      const explicit = b.affinities && typeof b.affinities === 'object' ? b.affinities : {};
+      if (Object.keys(explicit).length > 0) return { ...explicit };
+      if (b.affinity) return { [b.affinity]: 1 };
+      return {};
+    };
     const snapshotItemBonuses = (augmentDoc.system?.itemBonuses ?? []).map(b => ({
-      field:    b.field,
-      value:    scaleValue(b.value),
-      mode:     b.mode,
-      affinity: b.affinity ?? '',
+      field:      b.field,
+      value:      scaleValue(b.value),
+      mode:       b.mode,
+      affinity:   b.affinity ?? '',
+      affinities: normalizeAffinities(b),
     }));
     const snapshotCraftBonuses = (augmentDoc.system?.craftBonuses ?? []).map(b => ({
       type:     b.type,

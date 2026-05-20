@@ -2135,7 +2135,7 @@ Hooks.on('renderChatMessageHTML', (message, html) => {
       if (!game.user.isGM) return;
 
       const actorUuid  = btn.dataset.actorUuid;
-      const incomingDmg = parseInt(btn.dataset.damage, 10);
+      let   incomingDmg = parseInt(btn.dataset.damage, 10);
       const drValue = parseInt(btn.dataset.toughness, 10) || 0;
       const affinityDR   = parseInt(btn.dataset.affinityDr, 10) || 0;
       const damageType = btn.dataset.damageType || 'physical';
@@ -2147,11 +2147,40 @@ Hooks.on('renderChatMessageHTML', (message, html) => {
         ? (target.system.defense.armor?.value ?? 0)
         : (target.system.defense.veil?.value ?? 0);
 
-      // --- Damage routing: Barrier → Armor/Veil → Toughness → Overhealth → HP ---
-      let remaining = incomingDmg;
+      // --- Damage routing: Affinity DR → Barrier → Armor/Veil → DR → Overhealth → HP ---
       const updateData = {};
       const parts = [];
       let barrierAbsorbed = false;
+
+      // 0. Per-affinity DR pre-step. The attack chat carried a breakdown
+      // attribute describing the augment-routed damage slices that make up
+      // part of `incomingDmg`. Each slice is reduced by the target's
+      // per-affinity DR (system.damageReduction.affinities[<name>]). The
+      // sum of reductions subtracts from incomingDmg before the rest of
+      // the pipeline. Base + untyped damage is not in the breakdown — it
+      // flows through the existing armor/DR/barrier path unchanged.
+      let breakdown = {};
+      try {
+        breakdown = btn.dataset.damageBreakdown ? JSON.parse(btn.dataset.damageBreakdown) : {};
+      } catch (_) { breakdown = {}; }
+      const affinityDRMap = target.system.damageReduction?.affinities ?? {};
+      let affinityResistTotal = 0;
+      const affinityResistParts = [];
+      for (const [aff, sliceVal] of Object.entries(breakdown)) {
+        const sliceNum = Number(sliceVal) || 0;
+        if (sliceNum <= 0) continue;
+        const resist = Number(affinityDRMap[aff]) || 0;
+        if (resist <= 0) continue;
+        const reduced = Math.min(resist, sliceNum);
+        affinityResistTotal += reduced;
+        affinityResistParts.push(`${aff}: −${reduced}`);
+      }
+      if (affinityResistTotal > 0) {
+        incomingDmg = Math.max(0, incomingDmg - affinityResistTotal);
+        parts.push(`Affinity resist (${affinityResistParts.join(', ')})`);
+      }
+
+      let remaining = incomingDmg;
 
       // 1. Barrier absorbs first (if present). No toughness/DR on this portion.
       const barrier = target.system.barrier;

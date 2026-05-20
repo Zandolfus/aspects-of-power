@@ -377,24 +377,89 @@ export class AspectsofPowerActor extends Actor {
 
     // --- Augment-sourced flat bonuses from equipped items ---
     // damageBonus: sum across equipped weapons (typically just one wielded).
-    //   Added to outgoing damage in item.mjs roll path.
+    //   Added to outgoing damage in item.mjs roll path. Also broken out per
+    //   affinity (equippedDamageBonusByAffinity) by walking each item's
+    //   augment snapshots so the damage handler can route augment damage
+    //   through the target's per-affinity DR independently of base damage.
     // damageReduction.{physical,magical}: sum across all equipped items.
     //   Subtracted from incoming damage in the apply-damage handler.
+    // damageReduction.affinities: per-affinity DR map { fire: 5, ... },
+    //   summed across equipped items. Applied per-segment to incoming
+    //   affinity-tagged damage.
     // Loadout filter mirrors equipment-AE logic so profession-loadout gear
     // doesn't double-bleed into combat math.
     let equippedDamageBonus = 0;
     let drPhysical = 0;
     let drMagical  = 0;
+    const equippedDamageBonusByAffinity = {}; // { fire: 41, metal: 42, untyped: <rest> }
+    const drAffinities = {};
+    const addAffinityDmg = (name, v) => {
+      const k = name || 'untyped';
+      equippedDamageBonusByAffinity[k] = (equippedDamageBonusByAffinity[k] || 0) + v;
+    };
     for (const item of this.items) {
       if (item.type !== 'item') continue;
       if (!item.system.equipped) continue;
       if (!_itemMatchesLoadout(item)) continue;
-      equippedDamageBonus += Number(item.system.damageBonus ?? 0) || 0;
+      const itemDmgBonus = Number(item.system.damageBonus ?? 0) || 0;
+      equippedDamageBonus += itemDmgBonus;
       drPhysical += Number(item.system.damageReduction?.physical ?? 0) || 0;
       drMagical  += Number(item.system.damageReduction?.magical  ?? 0) || 0;
+
+      // Per-affinity DR map from this item.
+      const itemAffDR = item.system.damageReduction?.affinities ?? {};
+      for (const [name, val] of Object.entries(itemAffDR)) {
+        const n = Number(val) || 0;
+        if (n === 0) continue;
+        drAffinities[name] = (drAffinities[name] || 0) + n;
+      }
+
+      // Walk this item's augment snapshots and bucket each damageBonus
+      // contribution by its affinity distribution. Snapshots store
+      // `affinities: {name: weight}` — weights are RELATIVE; we normalize
+      // here so `{fire:1, metal:1}` and `{fire:0.5, metal:0.5}` both yield
+      // 50/50. Bonuses with empty affinities go to the 'untyped' bucket.
+      const allSlots = [
+        ...(item.system.augments     ?? []),
+        ...(item.system.profAugments ?? []),
+      ];
+      for (const slot of allSlots) {
+        if (!slot?.augmentId) continue;
+        for (const ib of (slot.itemBonuses ?? [])) {
+          if (ib.field !== 'damageBonus') continue;
+          // Percentage-mode damageBonus augments are folded into item.damageBonus
+          // by derive (multiplicative). Per-affinity routing only meaningful
+          // for the flat slice — skip percent here.
+          if (ib.mode === 'percentage') continue;
+          const v = Number(ib.value) || 0;
+          if (v === 0) continue;
+          const aff = (ib.affinities && typeof ib.affinities === 'object') ? ib.affinities : {};
+          const keys = Object.keys(aff);
+          if (keys.length === 0) {
+            // Legacy single-string fallback, then untyped.
+            if (ib.affinity) addAffinityDmg(ib.affinity, v);
+            else             addAffinityDmg('untyped', v);
+            continue;
+          }
+          const total = keys.reduce((s, k) => s + (Number(aff[k]) || 0), 0);
+          if (total <= 0) { addAffinityDmg('untyped', v); continue; }
+          let assigned = 0;
+          for (let i = 0; i < keys.length; i++) {
+            const k = keys[i];
+            const w = Number(aff[k]) || 0;
+            // Last key absorbs the rounding remainder so the parts sum to v.
+            const part = (i === keys.length - 1)
+              ? (v - assigned)
+              : Math.round(v * (w / total));
+            assigned += part;
+            addAffinityDmg(k, part);
+          }
+        }
+      }
     }
     systemData.equippedDamageBonus = equippedDamageBonus;
-    systemData.damageReduction = { physical: drPhysical, magical: drMagical };
+    systemData.equippedDamageBonusByAffinity = equippedDamageBonusByAffinity;
+    systemData.damageReduction = { physical: drPhysical, magical: drMagical, affinities: drAffinities };
 
     // Continuous encumbrance ratio (0 = empty, 1 = at cap, >1 = over-cap).
     // No cliff: every pound matters. Drives the per-ft stamina multiplier

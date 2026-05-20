@@ -17,15 +17,23 @@ export class AugmentData extends foundry.abstract.TypeDataModel {
 
       // Item bonuses — modify the host equipment item's own properties.
       // e.g. +5% armorBonus on the item itself, not the actor directly.
-      // `affinity` (optional) flags a portion of damage as a specific
-      // affinity — for damageBonus entries this means the bonus's
-      // contribution can route through that affinity's DR independently of
-      // the host weapon's base damage typing. Empty = untyped (follows host).
+      //
+      // Affinity routing:
+      //   - `affinities` (dictionary, preferred) maps affinity name to a
+      //     relative weight. e.g. `{fire: 0.5, metal: 0.5}` splits this
+      //     bonus 50/50; `{lightning: 1}` routes 100% through lightning.
+      //     Weights are normalized at use, so `{fire: 1, metal: 1}` and
+      //     `{fire: 0.5, metal: 0.5}` are equivalent.
+      //   - `affinity` (legacy single-string) is back-compat shorthand for
+      //     `{<affinity>: 1}`. New authoring should use `affinities`.
+      //   - Both empty → untyped bonus, routes through host's base
+      //     damage type (physical/magical).
       itemBonuses: new fields.ArrayField(new fields.SchemaField({
-        field:    new fields.StringField({ initial: 'armorBonus' }),
-        value:    new fields.NumberField({ initial: 0 }),
-        mode:     new fields.StringField({ initial: 'percentage' }),
-        affinity: new fields.StringField({ initial: '' }),
+        field:      new fields.StringField({ initial: 'armorBonus' }),
+        value:      new fields.NumberField({ initial: 0 }),
+        mode:       new fields.StringField({ initial: 'percentage' }),
+        affinity:   new fields.StringField({ initial: '' }),
+        affinities: new fields.ObjectField({ initial: {} }),
       }), { initial: [] }),
 
       // Per-craft magnifier — if > 0, the augment's bonus values are scaled
