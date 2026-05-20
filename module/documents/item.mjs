@@ -3763,8 +3763,10 @@ export class AspectsofPowerItem extends Item {
     // Use a <select> rather than one-button-per-item — equipment lists on
     // a stocked actor overflow the dialog otherwise.
     const targetOptions = targetCandidates.map(t => {
-      const combatFreeOpt = (t.system.augmentSlots     ?? 0) - (t.system.augments     ?? []).length;
-      const profFreeOpt   = (t.system.profAugmentSlots ?? 0) - (t.system.profAugments ?? []).length;
+      const combatUsedOpt = (t.system.augments     ?? []).filter(e => e.augmentId).length;
+      const profUsedOpt   = (t.system.profAugments ?? []).filter(e => e.augmentId).length;
+      const combatFreeOpt = (t.system.augmentSlots     ?? 0) - combatUsedOpt;
+      const profFreeOpt   = (t.system.profAugmentSlots ?? 0) - profUsedOpt;
       const slotsLabel = `combat ${combatFreeOpt}/${t.system.augmentSlots ?? 0}, prof ${profFreeOpt}/${t.system.profAugmentSlots ?? 0}`;
       return `<option value="${t.id}">${t.name} — ${t.system.slot} (${slotsLabel})</option>`;
     }).join('');
@@ -3802,9 +3804,11 @@ export class AspectsofPowerItem extends Item {
     const fitsCombat = augTags.includes('combat');
     const fitsProf   = augTags.includes('profession');
 
-    const combatUsed  = (targetItem.system?.augments     ?? []).length;
+    // Empty {augmentId: ''} entries represent cleared slots (the reconcile
+    // hook's convention) — don't count them as used.
+    const combatUsed  = (targetItem.system?.augments     ?? []).filter(e => e.augmentId).length;
     const combatTotal = targetItem.system?.augmentSlots     ?? 0;
-    const profUsed    = (targetItem.system?.profAugments ?? []).length;
+    const profUsed    = (targetItem.system?.profAugments ?? []).filter(e => e.augmentId).length;
     const profTotal   = targetItem.system?.profAugmentSlots ?? 0;
     const combatFree  = combatTotal - combatUsed;
     const profFree    = profTotal   - profUsed;
@@ -3860,7 +3864,9 @@ export class AspectsofPowerItem extends Item {
       craftBonuses: snapshotCraftBonuses,
       grantsTags:   [...(augmentDoc.system?.grantsTags ?? [])],
     };
-    const updatedAugs = [...currentList, snapshotEntry];
+    // Prune cleared {augmentId: ''} entries so garbage from earlier removes
+    // doesn't accumulate and the array stays aligned with actual usage.
+    const updatedAugs = [...currentList.filter(e => e.augmentId), snapshotEntry];
     await targetItem.update({ ['system.' + slotField]: updatedAugs });
 
     if (materialItem) {
