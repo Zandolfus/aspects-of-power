@@ -530,6 +530,109 @@ Hooks.once('init', function () {
       newOrigin[addedId] = actuallyAdded;
     }
 
+    // ── Augment delta: apply/reverse itemBonuses against host fields ──
+    // Snapshot-driven. When an augment is slotted, its itemBonuses are added
+    // to the host's stat/armor/damage/etc. fields. When unslotted, the
+    // SAME values (from the slot's snapshot) are subtracted. This bypasses
+    // `lockedFields` because we're writing the delta directly via this hook
+    // — the auto-derive hook (which respects locks) doesn't fire for these
+    // augment-only changes.
+    //
+    // Only `mode: 'flat'` bonuses are handled by delta. Percentage-mode
+    // bonuses (e.g. Hardening +5% armor) require a full re-derive to revert
+    // cleanly and won't auto-reverse on locked items — manual cleanup
+    // needed for those. Most existing augments are flat.
+    const priorAugList = item.system.augments ?? [];
+    const priorProfAugList = item.system.profAugments ?? [];
+    const priorEntryById = new Map();
+    for (const e of [...priorAugList, ...priorProfAugList]) {
+      if (e?.augmentId) priorEntryById.set(e.augmentId, e);
+    }
+
+    const statDelta = {};
+    let damageBonusDelta = 0;
+    let armorBonusDelta  = 0;
+    let veilBonusDelta   = 0;
+    let drPhysDelta      = 0;
+    let drMagDelta       = 0;
+    let durabilityMaxDelta = 0;
+    let percentageSkipped = false;
+
+    const applyBonusDelta = (entry, sign) => {
+      for (const ib of entry.itemBonuses ?? []) {
+        if (ib.mode !== 'flat') { percentageSkipped = true; continue; }
+        const v = sign * (Number(ib.value) || 0);
+        if      (ib.field === 'damageBonus')              damageBonusDelta += v;
+        else if (ib.field === 'armorBonus')               armorBonusDelta  += v;
+        else if (ib.field === 'veilBonus')                veilBonusDelta   += v;
+        else if (ib.field === 'damageReduction.physical') drPhysDelta      += v;
+        else if (ib.field === 'damageReduction.magical')  drMagDelta       += v;
+        else if (ib.field === 'durability.max')           durabilityMaxDelta += v;
+        else if (ib.field?.startsWith('statBonus.')) {
+          const ability = ib.field.slice('statBonus.'.length);
+          statDelta[ability] = (statDelta[ability] || 0) + v;
+        }
+      }
+    };
+
+    for (const removedId of removedIds) {
+      const entry = priorEntryById.get(removedId);
+      if (entry) applyBonusDelta(entry, -1);
+    }
+    for (const addedId of addedIds) {
+      const entry = entryById.get(addedId);
+      if (entry) applyBonusDelta(entry, +1);
+    }
+
+    // GATE: delta only writes the field if it's LOCKED. For unlocked fields
+    // the auto-derive hook (registered after this one) will re-compute the
+    // augment contribution naturally — applying the delta here would
+    // double-count or get stomped depending on order. Locked fields can't
+    // be updated by derive, so the delta is the only path that respects
+    // augment add/remove for them.
+    const locked = new Set(item.system.lockedFields ?? []);
+
+    if (damageBonusDelta !== 0 && locked.has('damageBonus')) {
+      cs.damageBonus = (cs.damageBonus ?? item.system.damageBonus ?? 0) + damageBonusDelta;
+    }
+    if (armorBonusDelta !== 0 && locked.has('armorBonus')) {
+      cs.armorBonus = Math.max(0, (cs.armorBonus ?? item.system.armorBonus ?? 0) + armorBonusDelta);
+    }
+    if (veilBonusDelta !== 0 && locked.has('veilBonus')) {
+      cs.veilBonus = Math.max(0, (cs.veilBonus ?? item.system.veilBonus ?? 0) + veilBonusDelta);
+    }
+    if ((drPhysDelta !== 0 || drMagDelta !== 0) && locked.has('damageReduction')) {
+      const curDR = cs.damageReduction ?? item.system.damageReduction ?? { physical: 0, magical: 0 };
+      cs.damageReduction = {
+        physical: Math.max(0, (curDR.physical ?? 0) + drPhysDelta),
+        magical:  Math.max(0, (curDR.magical  ?? 0) + drMagDelta),
+      };
+    }
+    if (durabilityMaxDelta !== 0 && locked.has('durabilityMax')) {
+      const curDur = cs.durability ?? item.system.durability ?? { value: 0, max: 0 };
+      const newMax = Math.max(0, (curDur.max ?? 0) + durabilityMaxDelta);
+      cs.durability = {
+        value: Math.min(curDur.value ?? 0, newMax),
+        max: newMax,
+      };
+    }
+    if (Object.keys(statDelta).length > 0 && locked.has('statBonuses')) {
+      const baseList = cs.statBonuses ?? item.system.statBonuses ?? [];
+      const newList = baseList.map(s => ({ ability: s.ability, value: s.value }));
+      for (const [ability, delta] of Object.entries(statDelta)) {
+        const existing = newList.find(s => s.ability === ability);
+        if (existing) {
+          existing.value = (existing.value || 0) + delta;
+        } else if (delta > 0) {
+          newList.push({ ability, value: delta });
+        }
+      }
+      cs.statBonuses = newList.filter(s => (s.value || 0) > 0);
+    }
+    if (percentageSkipped) {
+      console.warn(`[aspects-of-power] augment add/remove on ${item.name}: percentage-mode bonus(es) skipped by delta — re-derive needed (locked items: manual cleanup).`);
+    }
+
     // Only write cs.tags if it actually differs — otherwise we'd spuriously
     // trigger the auto-derive hook (which fires on cs.tags presence) for
     // every augment swap that doesn't change the host's effective tags.
