@@ -33,7 +33,7 @@ export class AugmentData extends foundry.abstract.TypeDataModel {
         value:      new fields.NumberField({ initial: 0 }),
         mode:       new fields.StringField({ initial: 'percentage' }),
         affinity:   new fields.StringField({ initial: '' }),
-        affinities: new fields.ObjectField({ initial: {} }),
+        affinities: new fields.ObjectField({ initial: () => ({}) }),
       }), { initial: [] }),
 
       // Per-craft magnifier — if > 0, the augment's bonus values are scaled
