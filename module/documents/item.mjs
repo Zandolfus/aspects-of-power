@@ -3760,21 +3760,30 @@ export class AspectsofPowerItem extends Item {
       ui.notifications.warn(`${item.name}: no equipment items on ${actor.name} to augment.`);
       return;
     }
-    const targetButtons = targetCandidates.map(t => {
-      const free = (t.system.augmentSlots ?? 0) - (t.system.augments ?? []).length;
-      return {
-        action: t.id,
-        label: `${t.name} (${t.system.slot}, ${free}/${t.system.augmentSlots ?? 0} slots free)`,
-      };
+    // Use a <select> rather than one-button-per-item — equipment lists on
+    // a stocked actor overflow the dialog otherwise.
+    const targetOptions = targetCandidates.map(t => {
+      const combatFreeOpt = (t.system.augmentSlots     ?? 0) - (t.system.augments     ?? []).length;
+      const profFreeOpt   = (t.system.profAugmentSlots ?? 0) - (t.system.profAugments ?? []).length;
+      const slotsLabel = `combat ${combatFreeOpt}/${t.system.augmentSlots ?? 0}, prof ${profFreeOpt}/${t.system.profAugmentSlots ?? 0}`;
+      return `<option value="${t.id}">${t.name} — ${t.system.slot} (${slotsLabel})</option>`;
+    }).join('');
+    const targetChoice = await new Promise(resolve => {
+      new foundry.applications.api.DialogV2({
+        window: { title: `${item.name} — Select Target Item` },
+        content: `<p>Select the equipment item to inscribe <strong>${augmentDoc.name}</strong> onto:</p>
+                  <div class="form-group"><label>Target:</label><select name="target">${targetOptions}</select></div>`,
+        buttons: [{
+          action: 'confirm', label: 'Confirm', default: true,
+          callback: (event, button) => resolve(button.form.elements.target?.value || null),
+        }, {
+          action: 'cancel', label: 'Cancel',
+          callback: () => resolve(null),
+        }],
+        close: () => resolve(null),
+      }).render({ force: true });
     });
-    targetButtons.push({ action: 'cancel', label: 'Cancel' });
-    const targetChoice = await foundry.applications.api.DialogV2.wait({
-      window: { title: `${item.name} — Select Target Item` },
-      content: `<p>Select the equipment item to inscribe <strong>${augmentDoc.name}</strong> onto:</p>`,
-      buttons: targetButtons,
-      close: () => 'cancel',
-    });
-    if (targetChoice === 'cancel') return;
+    if (!targetChoice) return;
     const targetItem = actor.items.get(targetChoice);
     if (!targetItem) return;
 
