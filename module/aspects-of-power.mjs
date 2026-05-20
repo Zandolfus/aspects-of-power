@@ -481,7 +481,20 @@ Hooks.once('init', function () {
       .filter(e => e.augmentId);
     const futureIds = new Set([...futureAugs, ...futureProfAugs].map(e => e.augmentId));
 
-    const priorOrigin = item.flags?.aspectsofpower?.augmentGrantedTags ?? {};
+    // Augment ids are compendium UUIDs containing dots, which Foundry's flag
+    // path resolution would expand into nested objects. Encode dots before
+    // using as flag keys; decode on read.
+    const encodeId = (id) => id.replaceAll('.', '__');
+    const decodeId = (key) => key.replaceAll('__', '.');
+    const rawOrigin = item.flags?.aspectsofpower?.augmentGrantedTags ?? {};
+    const priorOrigin = {};
+    for (const [key, tags] of Object.entries(rawOrigin)) {
+      // Skip corrupted nested entries from a prior bug where dot-notation
+      // expanded into objects (we only want flat encoded entries here).
+      if (Array.isArray(tags)) {
+        priorOrigin[decodeId(key)] = tags;
+      }
+    }
     const priorIds   = new Set(Object.keys(priorOrigin));
 
     const removedIds = [...priorIds].filter(id => !futureIds.has(id));
@@ -643,14 +656,15 @@ Hooks.once('init', function () {
     // Per-key flag patch using the V14.360+ ForcedDeletion sentinel for
     // removals (the legacy `-=ID` prefix still works but emits a deprecation
     // warning). Removed augment ids assign ForcedDeletion to that key;
-    // added/changed ids assign their tag list.
+    // added/changed ids assign their tag list. Keys are dot-encoded so the
+    // compendium UUID stays a single key (instead of nesting).
     const ForcedDeletion = foundry.data?.operators?.ForcedDeletion;
     for (const removedId of removedIds) {
-      changes[`flags.aspectsofpower.augmentGrantedTags.${removedId}`] = ForcedDeletion;
+      changes[`flags.aspectsofpower.augmentGrantedTags.${encodeId(removedId)}`] = ForcedDeletion;
     }
     for (const addedId of addedIds) {
       if (newOrigin[addedId] !== undefined) {
-        changes[`flags.aspectsofpower.augmentGrantedTags.${addedId}`] = newOrigin[addedId];
+        changes[`flags.aspectsofpower.augmentGrantedTags.${encodeId(addedId)}`] = newOrigin[addedId];
       }
     }
   });
