@@ -653,14 +653,13 @@ Hooks.once('init', function () {
     const tagsChanged = tags.length !== priorTags.length
       || tags.some((t, i) => t !== priorTags[i]);
     if (tagsChanged) cs.tags = tags;
-    // Per-key flag patch using the V14.360+ ForcedDeletion sentinel for
-    // removals (the legacy `-=ID` prefix still works but emits a deprecation
-    // warning). Removed augment ids assign ForcedDeletion to that key;
-    // added/changed ids assign their tag list. Keys are dot-encoded so the
-    // compendium UUID stays a single key (instead of nesting).
-    const ForcedDeletion = foundry.data?.operators?.ForcedDeletion;
+    // Per-key flag patch. Use the `-=KEY` deletion prefix (legacy but
+    // reliable across Foundry versions; ForcedDeletion sentinel observed
+    // to not always wipe the entry as expected). Keys are dot-encoded so
+    // the compendium UUID stays a single key (instead of nesting).
     for (const removedId of removedIds) {
-      changes[`flags.aspectsofpower.augmentGrantedTags.${encodeId(removedId)}`] = ForcedDeletion;
+      const k = encodeId(removedId);
+      changes[`flags.aspectsofpower.augmentGrantedTags.-=${k}`] = null;
     }
     for (const addedId of addedIds) {
       if (newOrigin[addedId] !== undefined) {
