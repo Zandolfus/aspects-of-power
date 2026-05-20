@@ -2159,14 +2159,14 @@ Hooks.on('renderChatMessageHTML', (message, html) => {
       // sum of reductions subtracts from incomingDmg before the rest of
       // the pipeline. Base + untyped damage is not in the breakdown — it
       // flows through the existing armor/DR/barrier path unchanged.
-      let breakdown = {};
+      let affinityBreakdown = {};
       try {
-        breakdown = btn.dataset.damageBreakdown ? JSON.parse(btn.dataset.damageBreakdown) : {};
-      } catch (_) { breakdown = {}; }
+        affinityBreakdown = btn.dataset.damageBreakdown ? JSON.parse(btn.dataset.damageBreakdown) : {};
+      } catch (_) { affinityBreakdown = {}; }
       const affinityDRMap = target.system.damageReduction?.affinities ?? {};
       let affinityResistTotal = 0;
       const affinityResistParts = [];
-      for (const [aff, sliceVal] of Object.entries(breakdown)) {
+      for (const [aff, sliceVal] of Object.entries(affinityBreakdown)) {
         const sliceNum = Number(sliceVal) || 0;
         if (sliceNum <= 0) continue;
         const resist = Number(affinityDRMap[aff]) || 0;
