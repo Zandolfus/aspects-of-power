@@ -78,9 +78,10 @@ export class ItemItemData extends foundry.abstract.TypeDataModel {
       augments: new fields.ArrayField(new fields.SchemaField({
         augmentId: new fields.StringField({ initial: '' }),
         itemBonuses: new fields.ArrayField(new fields.SchemaField({
-          field: new fields.StringField({ initial: '' }),
-          value: new fields.NumberField({ initial: 0 }),
-          mode:  new fields.StringField({ initial: 'flat' }),
+          field:    new fields.StringField({ initial: '' }),
+          value:    new fields.NumberField({ initial: 0 }),
+          mode:     new fields.StringField({ initial: 'flat' }),
+          affinity: new fields.StringField({ initial: '' }),
         }), { initial: [] }),
         craftBonuses: new fields.ArrayField(new fields.SchemaField({
           type:     new fields.StringField({ initial: '' }),
@@ -96,9 +97,10 @@ export class ItemItemData extends foundry.abstract.TypeDataModel {
       profAugments: new fields.ArrayField(new fields.SchemaField({
         augmentId: new fields.StringField({ initial: '' }),
         itemBonuses: new fields.ArrayField(new fields.SchemaField({
-          field: new fields.StringField({ initial: '' }),
-          value: new fields.NumberField({ initial: 0 }),
-          mode:  new fields.StringField({ initial: 'flat' }),
+          field:    new fields.StringField({ initial: '' }),
+          value:    new fields.NumberField({ initial: 0 }),
+          mode:     new fields.StringField({ initial: 'flat' }),
+          affinity: new fields.StringField({ initial: '' }),
         }), { initial: [] }),
         craftBonuses: new fields.ArrayField(new fields.SchemaField({
           type:     new fields.StringField({ initial: '' }),

@@ -17,11 +17,24 @@ export class AugmentData extends foundry.abstract.TypeDataModel {
 
       // Item bonuses — modify the host equipment item's own properties.
       // e.g. +5% armorBonus on the item itself, not the actor directly.
+      // `affinity` (optional) flags a portion of damage as a specific
+      // affinity — for damageBonus entries this means the bonus's
+      // contribution can route through that affinity's DR independently of
+      // the host weapon's base damage typing. Empty = untyped (follows host).
       itemBonuses: new fields.ArrayField(new fields.SchemaField({
-        field: new fields.StringField({ initial: 'armorBonus' }),
-        value: new fields.NumberField({ initial: 0 }),
-        mode:  new fields.StringField({ initial: 'percentage' }),
+        field:    new fields.StringField({ initial: 'armorBonus' }),
+        value:    new fields.NumberField({ initial: 0 }),
+        mode:     new fields.StringField({ initial: 'percentage' }),
+        affinity: new fields.StringField({ initial: '' }),
       }), { initial: [] }),
+
+      // Per-craft magnifier — if > 0, the augment's bonus values are scaled
+      // at apply time: `snapshotValue = floor(skill.dmgRoll.total × magnifierPct)`.
+      // Each `itemBonuses[i].value` (and craftBonuses[i].value) on the
+      // template represents the BASELINE — the actual snapshot value is
+      // computed per-application using the crafter's skill roll. magnifierPct
+      // of 0 means use the template value verbatim (no scaling).
+      magnifierPct: new fields.NumberField({ initial: 0, min: 0 }),
 
       // Profession augment flag — only fits in profession augment slots.
       // @deprecated — superseded by the `tags` array below. Kept readable for

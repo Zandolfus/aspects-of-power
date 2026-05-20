@@ -3817,13 +3817,38 @@ export class AspectsofPowerItem extends Item {
     // Apply: append augmentId + a SNAPSHOT of the augment's effect data, then
     // consume material if used. Snapshot makes read paths (deriveItemStats,
     // getProfessionAugmentBonuses, grants-reconcile) independent of compendium
-    // hydration and freezes the augment's values at apply time (per design —
-    // future per-crafter scaling will compute the snapshot values at this
-    // point instead of just copying the template).
+    // hydration and freezes the augment's values at apply time.
+    //
+    // Per-crafter scaling: if the template has `magnifierPct > 0`, each
+    // bonus's `value` is scaled by the crafter's skill roll for THIS
+    // application: `snapshotValue = floor(dmgRoll.total × magnifierPct)`.
+    // The "minor roll and take a percentage" model — naturally tracks
+    // crafter quality (their stat mod + dice + any active augments on the
+    // application skill itself). magnifierPct of 0 = use template values
+    // verbatim (legacy / non-scaling augments).
+    const magnifierPct = Number(augmentDoc.system?.magnifierPct ?? 0);
+    const skillRollTotal = Math.round(dmgRoll?.total ?? 0);
+    const scaleValue = (templateValue) => {
+      if (magnifierPct > 0 && skillRollTotal > 0) {
+        return Math.floor(skillRollTotal * magnifierPct);
+      }
+      return templateValue;
+    };
+    const snapshotItemBonuses = (augmentDoc.system?.itemBonuses ?? []).map(b => ({
+      field:    b.field,
+      value:    scaleValue(b.value),
+      mode:     b.mode,
+      affinity: b.affinity ?? '',
+    }));
+    const snapshotCraftBonuses = (augmentDoc.system?.craftBonuses ?? []).map(b => ({
+      type:     b.type,
+      value:    scaleValue(b.value),
+      affinity: b.affinity ?? '',
+    }));
     const snapshotEntry = {
-      augmentId: augmentDoc.uuid,
-      itemBonuses:  foundry.utils.deepClone(augmentDoc.system?.itemBonuses  ?? []),
-      craftBonuses: foundry.utils.deepClone(augmentDoc.system?.craftBonuses ?? []),
+      augmentId:    augmentDoc.uuid,
+      itemBonuses:  snapshotItemBonuses,
+      craftBonuses: snapshotCraftBonuses,
       grantsTags:   [...(augmentDoc.system?.grantsTags ?? [])],
     };
     const updatedAugs = [...currentList, snapshotEntry];
