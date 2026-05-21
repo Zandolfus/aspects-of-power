@@ -101,15 +101,21 @@ export class AopEffectData extends foundry.data.ActiveEffectTypeDataModel {
 
       // ── Marked subsystem ──
       // The target carries this effect; when the marker attacks them, the
-      // marker's incoming damage is multiplied by (1 + markedDamageBonus).
+      // mark fires one or both of:
+      //   - markedDamageBonus: multiplier on the marker's incoming DAMAGE
+      //     (Marked for Death = +25%). Applied in apply-damage handler.
+      //   - markedAttackMultiplier: multiplier on the marker's HIT TOTAL
+      //     against this target (Feint = +50% to-hit). Applied in
+      //     _handleAttackTag before the defense check.
       // markedByActorUuid identifies which attacker the bonus applies to —
       // marks from different attackers don't cross-pollinate.
-      // markedExpiresOnHit: true → effect deletes after the bonus fires once
-      // (Feint-style one-shot). False → persistent for the effect's duration
-      // (Marked for Death-style). Bonuses from the same attacker sum.
-      markedByActorUuid:    new fields.StringField({ initial: '' }),
-      markedDamageBonus:    new fields.NumberField({ initial: 0, min: 0 }),
-      markedExpiresOnHit:   new fields.BooleanField({ initial: false }),
+      // markedExpiresOnHit: true → effect deletes after the FIRST bonus
+      // (attack OR damage) fires. False → persistent for the effect's
+      // duration. Bonuses from the same attacker sum within their channel.
+      markedByActorUuid:       new fields.StringField({ initial: '' }),
+      markedDamageBonus:       new fields.NumberField({ initial: 0, min: 0 }),
+      markedAttackMultiplier:  new fields.NumberField({ initial: 0, min: 0 }),
+      markedExpiresOnHit:      new fields.BooleanField({ initial: false }),
 
       // ── Special flags ──
       dismemberedSlot:          new fields.StringField({ initial: '' }),

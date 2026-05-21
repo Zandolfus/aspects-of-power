@@ -290,6 +290,11 @@ export class SkillData extends foundry.abstract.TypeDataModel {
         //              (Feint-style one-shot). False = persistent for
         //              the effect's duration.
         markBonus:         new fields.NumberField({ initial: 0, min: 0 }),
+        // Per-attack hit-roll multiplier the spawned mark applies to the
+        // marker's NEXT attack against this target (Feint = +50% to-hit).
+        // Fires in _handleAttackTag before the defense check. If
+        // markExpiresOnHit is true, fires once then deletes the mark.
+        markAttackBonus:   new fields.NumberField({ initial: 0, min: 0 }),
         markExpiresOnHit:  new fields.BooleanField({ initial: false }),
 
         // Mine-pair tags (mine / detonate):

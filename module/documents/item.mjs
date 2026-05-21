@@ -1162,7 +1162,37 @@ export class AspectsofPowerItem extends Item {
     const secondaryDefKey = rollData.roll.secondaryTargetDefense ?? '';
     const hasDualDefense  = !!secondaryDefKey && secondaryDefKey !== targetDefKey;
 
-    const hitTotal     = hitRoll ? Math.round(hitRoll.total) : 0;
+    let   hitTotal     = hitRoll ? Math.round(hitRoll.total) : 0;
+    // ── Mark subsystem: to-hit boost ──
+    // If this attacker has any marks on the target carrying
+    // markedAttackMultiplier > 0, sum the bonuses and multiply hitTotal
+    // BEFORE the defense check runs. Per-attacker (markedByActorUuid match).
+    // Per-mark expires-on-hit consumes the mark after the boost is applied,
+    // regardless of whether the resulting attack lands or misses.
+    if (hitRoll && targetActor && this.actor?.uuid) {
+      const attackerUuid = this.actor.uuid;
+      const myAttackMarks = targetActor.effects.filter(e =>
+        !e.disabled
+        && (e.system?.markedAttackMultiplier ?? 0) > 0
+        && e.system?.markedByActorUuid === attackerUuid
+      );
+      const attackBonus = myAttackMarks.reduce(
+        (s, e) => s + (Number(e.system?.markedAttackMultiplier) || 0), 0,
+      );
+      if (attackBonus > 0) {
+        const before = hitTotal;
+        hitTotal = Math.round(hitTotal * (1 + attackBonus));
+        ChatMessage.create({
+          speaker: ChatMessage.getSpeaker({ actor: this.actor }),
+          ...(whisperGM ? { whisper: whisperGM } : {}),
+          content: `<p><em>${this.actor.name}'s attack is boosted by a mark on ${targetActor.name}: +${Math.round(attackBonus * 100)}% to-hit (${before} → ${hitTotal})</em></p>`,
+        });
+        const oneShots = myAttackMarks.filter(e => e.system?.markedExpiresOnHit === true);
+        if (oneShots.length > 0) {
+          await targetActor.deleteEmbeddedDocuments('ActiveEffect', oneShots.map(e => e.id));
+        }
+      }
+    }
     const isPhysical   = rollData.roll.damageType === 'physical';
     const mitigation   = isPhysical
       ? (targetActor.system.defense.armor?.value ?? 0)
@@ -3170,7 +3200,9 @@ export class AspectsofPowerItem extends Item {
     // effect tags the caster's UUID so apply-damage can multiply the
     // marker's incoming damage against this target.
     const markBonus        = this.system.tagConfig?.markBonus ?? 0;
+    const markAttackBonus  = this.system.tagConfig?.markAttackBonus ?? 0;
     const markExpiresOnHit = this.system.tagConfig?.markExpiresOnHit ?? false;
+    const markActive       = markBonus > 0 || markAttackBonus > 0;
     effectData.type = 'base';
     effectData.system = {
       debuffDamage: rollTotal,
@@ -3181,10 +3213,11 @@ export class AspectsofPowerItem extends Item {
       directions,
       ...(dismemberedSlot ? { dismemberedSlot } : {}),
       ...(dealsDmg ? { dot: true, dotDamage: dotDmg, dotDamageType: dmgType, applierActorUuid: this.actor.uuid } : {}),
-      ...(markBonus > 0 ? {
-        markedByActorUuid:  this.actor.uuid,
-        markedDamageBonus:  markBonus,
-        markedExpiresOnHit: markExpiresOnHit,
+      ...(markActive ? {
+        markedByActorUuid:      this.actor.uuid,
+        markedDamageBonus:      markBonus,
+        markedAttackMultiplier: markAttackBonus,
+        markedExpiresOnHit:     markExpiresOnHit,
       } : {}),
     };
 
@@ -3198,7 +3231,7 @@ export class AspectsofPowerItem extends Item {
       effectName,
       originUuid: this.uuid,
       stackable: this.system.tagConfig?.debuffStackable ?? false,
-      effectData: (changes.length > 0 || dealsDmg || debuffType !== 'none' || markBonus > 0) ? effectData : null,
+      effectData: (changes.length > 0 || dealsDmg || debuffType !== 'none' || markActive) ? effectData : null,
       dotDamage: dotDmg,
       dotDamageType: dmgType,
       duration,
