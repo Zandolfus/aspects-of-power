@@ -1324,12 +1324,19 @@ export class AspectsofPowerItem extends Item {
       : 0;
     const afterDefense    = primaryContrib + secondaryContrib;
 
-    // Per-affinity damage breakdown — projects this actor's augment-routed
-    // damageBonus split (equippedDamageBonusByAffinity) into the post-
-    // defense damage space, so the apply-damage handler can subtract the
-    // TARGET's per-affinity DR per slice. Untyped augment damage and base
-    // weapon damage continue to flow through the existing armor/DR pipeline
-    // — they aren't emitted in the breakdown.
+    // Per-affinity damage breakdown — two contributors get bucketed here
+    // so the apply-damage handler can subtract the TARGET's per-affinity
+    // DR per slice:
+    //   1) Augment-sourced damageBonus from equipped weapons, split per
+    //      augment's `affinities` distribution (via the actor's pre-derived
+    //      equippedDamageBonusByAffinity map).
+    //   2) This skill's own damage, routed through `this.system.affinities`
+    //      if the skill declares any. For pure-affinity spells (Ice Spear
+    //      → ['ice']) the whole non-augment portion of damage lands in the
+    //      skill-affinity bucket and runs through ice DR rather than
+    //      generic magical DR.
+    // Untyped damage (no skill affinity AND no augment affinity) flows
+    // through the existing armor/DR/barrier pipeline unchanged.
     let damageBreakdownAttr = '';
     {
       const equipped = this.actor?.system?.equippedDamageBonus ?? 0;
@@ -1337,22 +1344,45 @@ export class AspectsofPowerItem extends Item {
       const ratio = (Number.isFinite(dmgRoll.total) && dmgRoll.total > 0)
         ? afterDefense / dmgRoll.total
         : 0;
+      const scaled = {};
+
+      // (1) Augment damage portion.
       if (equipped > 0 && ratio > 0) {
         const totalAugmentAfter = equipped * ratio;
         const totalWeight = Object.entries(breakdownRaw)
           .filter(([k]) => k !== 'untyped')
           .reduce((s, [, v]) => s + (Number(v) || 0), 0);
         if (totalWeight > 0) {
-          const scaled = {};
           for (const [k, v] of Object.entries(breakdownRaw)) {
             if (k === 'untyped') continue;
             const part = Math.round(totalAugmentAfter * ((Number(v) || 0) / totalWeight));
-            if (part > 0) scaled[k] = part;
-          }
-          if (Object.keys(scaled).length > 0) {
-            damageBreakdownAttr = ` data-damage-breakdown='${JSON.stringify(scaled)}'`;
+            if (part > 0) scaled[k] = (scaled[k] || 0) + part;
           }
         }
+      }
+
+      // (2) Skill-affinity portion: route the non-augment damage through
+      // the skill's affinities, split evenly across multiple (the last
+      // slice absorbs rounding to keep the sum exact).
+      const skillAffinities = this.system?.affinities ?? [];
+      if (skillAffinities.length > 0 && ratio > 0) {
+        const augmentPortion = Math.round(equipped * ratio);
+        const skillPortion = Math.max(0, afterDefense - augmentPortion);
+        if (skillPortion > 0) {
+          let assigned = 0;
+          for (let i = 0; i < skillAffinities.length; i++) {
+            const aff = skillAffinities[i];
+            const part = (i === skillAffinities.length - 1)
+              ? (skillPortion - assigned)
+              : Math.round(skillPortion / skillAffinities.length);
+            assigned += part;
+            scaled[aff] = (scaled[aff] || 0) + part;
+          }
+        }
+      }
+
+      if (Object.keys(scaled).length > 0) {
+        damageBreakdownAttr = ` data-damage-breakdown='${JSON.stringify(scaled)}'`;
       }
     }
 
