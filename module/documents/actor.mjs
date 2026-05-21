@@ -279,6 +279,15 @@ export class AspectsofPowerActor extends Actor {
         case 'root':
           dexReduction += roll;
           break;
+        case 'chilled':
+          // Each chilled stack contributes its debuffDamage (per-stack dex
+          // drop) to the actor's dex reduction. Multiple stacks are parallel
+          // AEs — Foundry-style; we just sum each one's contribution here.
+          // When the total drives effectiveDex to 0, the post-apply
+          // threshold check in gmApplyDebuff spawns Frozen and clears
+          // all chilled stacks.
+          dexReduction += roll;
+          break;
         case 'blind':
           perceptionReduction += roll;
           break;

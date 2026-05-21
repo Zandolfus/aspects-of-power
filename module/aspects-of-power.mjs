@@ -2180,6 +2180,28 @@ Hooks.on('renderChatMessageHTML', (message, html) => {
         parts.push(`Affinity resist (${affinityResistParts.join(', ')})`);
       }
 
+      // 0b. Affinity-based debuff cleanse. Each affinity slice in the
+      // incoming damage that matches a debuff's cleanse-affinity strips
+      // ONE stack of that debuff. Hardcoded mapping for now (chilled ←
+      // fire); promote to CONFIG once we have more pairings.
+      const cleanseByAffinity = { fire: ['chilled'] };
+      const cleansedReports = [];
+      for (const [aff, sliceVal] of Object.entries(affinityBreakdown)) {
+        if ((Number(sliceVal) || 0) <= 0) continue;
+        const cleansableDebuffTypes = cleanseByAffinity[aff];
+        if (!cleansableDebuffTypes) continue;
+        for (const dType of cleansableDebuffTypes) {
+          const candidate = target.effects.find(e =>
+            !e.disabled && e.system?.debuffType === dType
+          );
+          if (candidate) {
+            await candidate.delete();
+            cleansedReports.push(`${aff} stripped 1 ${dType} stack`);
+          }
+        }
+      }
+      if (cleansedReports.length) parts.push(cleansedReports.join('; '));
+
       let remaining = incomingDmg;
 
       // 1. Barrier absorbs first (if present). No toughness/DR on this portion.
