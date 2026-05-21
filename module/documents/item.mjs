@@ -1456,7 +1456,8 @@ export class AspectsofPowerItem extends Item {
     // shouldn't fire vs ranged attackers, etc.). Forced-movement attrs
     // piggyback on the same button when applicable.
     const _attackerType = this.constructor._classifyAttackType(this);
-    const _atkAttr = ` data-attacker-token-id="${attackerToken?.id ?? ''}" data-attacker-attack-type="${_attackerType}"`;
+    const _attackerActorUuid = this.actor?.uuid ?? '';
+    const _atkAttr = ` data-attacker-token-id="${attackerToken?.id ?? ''}" data-attacker-actor-uuid="${_attackerActorUuid}" data-attacker-attack-type="${_attackerType}"`;
     const fmAttrs = hasForcedMovement
       ? `${_atkAttr} data-forced-dir="${fmDir}" data-forced-dist="${fmDist}" data-hit-total="${hitTotal}"`
       : _atkAttr;

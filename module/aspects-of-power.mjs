@@ -2172,10 +2172,36 @@ Hooks.on('renderChatMessageHTML', (message, html) => {
         ? (target.system.defense.armor?.value ?? 0)
         : (target.system.defense.veil?.value ?? 0);
 
-      // --- Damage routing: Affinity DR → Barrier → Armor/Veil → DR → Overhealth → HP ---
+      // --- Damage routing: Mark bonus → Affinity DR → Barrier → Armor/Veil → DR → Overhealth → HP ---
       const updateData = {};
       const parts = [];
       let barrierAbsorbed = false;
+
+      // ── Step -1: Marked subsystem ──
+      // If the target carries any "marked" effects whose `markedByActorUuid`
+      // matches THIS attacker, sum the bonus multipliers and amplify the
+      // raw incoming damage. Per-attacker summing — different markers each
+      // keep their own bonus. Effects with `markedExpiresOnHit: true` are
+      // deleted after the bonus fires (Feint-style one-shot).
+      const attackerActorUuid = btn.dataset.attackerActorUuid || '';
+      if (attackerActorUuid) {
+        const myMarks = target.effects.filter(e =>
+          !e.disabled
+          && (e.system?.markedDamageBonus ?? 0) > 0
+          && e.system?.markedByActorUuid === attackerActorUuid
+        );
+        const totalBonus = myMarks.reduce((s, e) => s + (Number(e.system?.markedDamageBonus) || 0), 0);
+        if (totalBonus > 0) {
+          const before = incomingDmg;
+          incomingDmg = Math.round(incomingDmg * (1 + totalBonus));
+          parts.push(`Marked: +${Math.round(totalBonus * 100)}% (${before} → ${incomingDmg})`);
+          // Delete expires-on-hit marks AFTER applying the bonus.
+          const oneShots = myMarks.filter(e => e.system?.markedExpiresOnHit === true);
+          if (oneShots.length > 0) {
+            await target.deleteEmbeddedDocuments('ActiveEffect', oneShots.map(e => e.id));
+          }
+        }
+      }
 
       // 0. Per-affinity DR pre-step. The attack chat carried a breakdown
       // attribute describing the augment-routed damage slices that make up

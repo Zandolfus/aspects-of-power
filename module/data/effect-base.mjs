@@ -99,6 +99,18 @@ export class AopEffectData extends foundry.data.ActiveEffectTypeDataModel {
       reactionAttackType: new fields.StringField({ initial: 'any', choices: ['any', 'melee', 'ranged'] }),
       reactionSkillId:    new fields.StringField({ initial: '' }),
 
+      // ── Marked subsystem ──
+      // The target carries this effect; when the marker attacks them, the
+      // marker's incoming damage is multiplied by (1 + markedDamageBonus).
+      // markedByActorUuid identifies which attacker the bonus applies to —
+      // marks from different attackers don't cross-pollinate.
+      // markedExpiresOnHit: true → effect deletes after the bonus fires once
+      // (Feint-style one-shot). False → persistent for the effect's duration
+      // (Marked for Death-style). Bonuses from the same attacker sum.
+      markedByActorUuid:    new fields.StringField({ initial: '' }),
+      markedDamageBonus:    new fields.NumberField({ initial: 0, min: 0 }),
+      markedExpiresOnHit:   new fields.BooleanField({ initial: false }),
+
       // ── Special flags ──
       dismemberedSlot:          new fields.StringField({ initial: '' }),
       sleepActive:              new fields.BooleanField({ initial: false }),
