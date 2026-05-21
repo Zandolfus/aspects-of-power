@@ -1305,6 +1305,31 @@ Hooks.on('deleteActiveEffect', async (effect, _options, _userId) => {
       content: `<p>Expired: <strong>${effect.name}</strong> on ${actor.name}</p>`,
     });
   }
+
+  // ── Sustain end → drop linked buff(s) ──
+  // When a sustain marker effect is removed (out of mana, actor death,
+  // manual dispel), any other AE on the same actor whose `origin` traces
+  // back to the same source skill is also removed. Without this, a buff
+  // applied alongside the sustain would outlive its upkeep.
+  // Linking: sustain stores `system.itemSource` = source skill id. Buff's
+  // `origin` is the skill UUID; we match the `.Item.<id>` suffix.
+  if (effect.system?.effectType === 'sustain') {
+    const sustainItemId = effect.system?.itemSource;
+    if (sustainItemId) {
+      const linked = actor.effects.filter(e => {
+        if (e.id === effect.id) return false;
+        const m = (e.origin ?? '').match(/\.Item\.([A-Za-z0-9]+)$/);
+        return m && m[1] === sustainItemId;
+      });
+      if (linked.length > 0) {
+        await actor.deleteEmbeddedDocuments('ActiveEffect', linked.map(e => e.id));
+        ChatMessage.create({
+          whisper: ChatMessage.getWhisperRecipients('GM'),
+          content: `<p><strong>${actor.name}</strong> — sustain ended; linked effects dropped: ${linked.map(e => e.name).join(', ')}</p>`,
+        });
+      }
+    }
+  }
 });
 
 /* -------------------------------------------- */
