@@ -3166,6 +3166,11 @@ export class AspectsofPowerItem extends Item {
       : 0;
 
     // Store debuff metadata in the AE TypeDataModel system fields.
+    // Marked subsystem: when the skill defines markBonus > 0, the spawned
+    // effect tags the caster's UUID so apply-damage can multiply the
+    // marker's incoming damage against this target.
+    const markBonus        = this.system.tagConfig?.markBonus ?? 0;
+    const markExpiresOnHit = this.system.tagConfig?.markExpiresOnHit ?? false;
     effectData.type = 'base';
     effectData.system = {
       debuffDamage: rollTotal,
@@ -3176,6 +3181,11 @@ export class AspectsofPowerItem extends Item {
       directions,
       ...(dismemberedSlot ? { dismemberedSlot } : {}),
       ...(dealsDmg ? { dot: true, dotDamage: dotDmg, dotDamageType: dmgType, applierActorUuid: this.actor.uuid } : {}),
+      ...(markBonus > 0 ? {
+        markedByActorUuid:  this.actor.uuid,
+        markedDamageBonus:  markBonus,
+        markedExpiresOnHit: markExpiresOnHit,
+      } : {}),
     };
 
     const statSummary = entries.length > 0
@@ -3188,7 +3198,7 @@ export class AspectsofPowerItem extends Item {
       effectName,
       originUuid: this.uuid,
       stackable: this.system.tagConfig?.debuffStackable ?? false,
-      effectData: (changes.length > 0 || dealsDmg || debuffType !== 'none') ? effectData : null,
+      effectData: (changes.length > 0 || dealsDmg || debuffType !== 'none' || markBonus > 0) ? effectData : null,
       dotDamage: dotDmg,
       dotDamageType: dmgType,
       duration,

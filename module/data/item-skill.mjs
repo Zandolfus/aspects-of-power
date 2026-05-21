@@ -280,6 +280,18 @@ export class SkillData extends foundry.abstract.TypeDataModel {
         // surprise sentinel is gone.
         dotScale: new fields.NumberField({ initial: 0.1, min: 0, max: 1 }),
 
+        // Marked subsystem (per [design-ice-maiden.md] / Marked for Death,
+        // Feint, etc.). When non-zero, the spawned debuff carries the
+        // caster's UUID + bonus so the apply-damage handler can multiply
+        // the marker's damage on the marked target.
+        //   markBonus: damage multiplier on the marker's incoming damage
+        //              against this target (e.g. 0.25 = +25%).
+        //   markExpiresOnHit: true → the mark deletes after one trigger
+        //              (Feint-style one-shot). False = persistent for
+        //              the effect's duration.
+        markBonus:         new fields.NumberField({ initial: 0, min: 0 }),
+        markExpiresOnHit:  new fields.BooleanField({ initial: false }),
+
         // Mine-pair tags (mine / detonate):
         //   mineCapacity: max concurrent mines per caster placed by this
         //     summon. Default 1; upgrades can raise it so the caster can
