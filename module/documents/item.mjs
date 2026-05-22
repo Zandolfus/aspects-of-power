@@ -5769,7 +5769,12 @@ export class AspectsofPowerItem extends Item {
     }
 
     // Passive skills → post description only (no roll).
-    if (this.system.skillType === 'Passive') {
+    // EXCEPTION: when executeDeferred is true, the call originated from a
+    // reaction trigger (e.g., the hp_threshold scanner firing Bloodrage).
+    // We let the roll proceed so the passive's tag handlers (buff, attack,
+    // etc.) actually fire and produce their effects. User-clicked passives
+    // still short-circuit to description.
+    if (this.system.skillType === 'Passive' && !options.executeDeferred) {
       ChatMessage.create({
         speaker,
         rollMode,
