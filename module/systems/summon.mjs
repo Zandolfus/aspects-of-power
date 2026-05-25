@@ -147,9 +147,11 @@ export class SummonHelpers {
   }
 
   /**
-   * Atomic position swap between two tokens on the same scene.
-   * Uses scene.updateEmbeddedDocuments so both updates land in a single
-   * transaction and renderers see no in-between frame.
+   * Atomic position swap between two tokens on the same scene. Uses bulk
+   * updateEmbeddedDocuments with `animate:false` so v14's movement-action
+   * pipeline doesn't queue/throttle the second update behind the first
+   * (sequential animated updates would land the second op stale-state and
+   * silently drop the swap).
    * @param {TokenDocument} tokenDocA
    * @param {TokenDocument} tokenDocB
    */
@@ -162,7 +164,7 @@ export class SummonHelpers {
     await scene.updateEmbeddedDocuments('Token', [
       { _id: tokenDocA.id, x: bx, y: by },
       { _id: tokenDocB.id, x: ax, y: ay },
-    ]);
+    ], { animate: false });
   }
 
   /**
