@@ -1046,6 +1046,8 @@ export class AspectsofPowerItem extends Item {
     let damageMultiplier = 1;
     let defenseLine = '';
     let reactionLine = '';
+    let swappedTargetActor = null;
+    let swappedTargetToken = null;
 
     if (defenseResult.defend && pool > 0) {
       if (pool >= effectiveHit) {
@@ -1129,11 +1131,37 @@ export class AspectsofPowerItem extends Item {
           ChatMessage.create({ speaker: reactionSpeaker,
             content: `<p><strong>${targetActor.name}</strong> strikes back with <strong>${reactionSkill.name}</strong>!</p>`,
           });
+        } else if (rType === 'swap') {
+          // Summon-swap reaction (per design-summon-subsystem.md). Find the
+          // actor's most recent summon, swap positions atomically. The attack
+          // is then redirected onto the clone (which now occupies the
+          // original target's square) — `isHit` stays as-resolved, but the
+          // damage application rebinds onto the clone so the original actor
+          // is safe at the swapped location. Per user 2026-05-24.
+          const { SummonHelpers } = await import('../systems/summon.mjs');
+          const summons = SummonHelpers.findSummonsOf(targetActor);
+          const targetTokenDoc = targetActor.getActiveTokens?.()?.[0]?.document ?? null;
+          if (summons.length > 0 && targetTokenDoc) {
+            const cloneTokenDoc = summons[summons.length - 1];
+            await SummonHelpers.swapPositions(targetTokenDoc, cloneTokenDoc);
+            const cloneToken = cloneTokenDoc.object;
+            const cloneActor = cloneTokenDoc.actor;
+            if (cloneToken && cloneActor) {
+              swappedTargetActor = cloneActor;
+              swappedTargetToken = cloneToken;
+            }
+            reactionLine = `<p><em>${targetActor.name} swaps places with their clone via <strong>${reactionSkill.name}</strong>!</em></p>`;
+            ChatMessage.create({ speaker: reactionSpeaker,
+              content: `<p><strong>${targetActor.name}</strong> swaps with their clone via <strong>${reactionSkill.name}</strong>! The attack lands on the clone.</p>`,
+            });
+          } else {
+            reactionLine = `<p><em>${targetActor.name} attempted <strong>${reactionSkill.name}</strong> but no clone exists.</em></p>`;
+          }
         }
       }
     }
 
-    return { isHit, damageMultiplier, defenseLine, reactionLine };
+    return { isHit, damageMultiplier, defenseLine, reactionLine, swappedTargetActor, swappedTargetToken };
   }
 
   /**
@@ -1154,8 +1182,8 @@ export class AspectsofPowerItem extends Item {
    */
   async _handleAttackTag(item, rollData, hitRoll, dmgRoll, speaker, rollMode, label, targetTokenOverride = null, aoeFraction = 1) {
     const whisperGM = !_isPlayerCharacter(this.actor) ? ChatMessage.getWhisperRecipients('GM') : undefined;
-    const targetToken  = targetTokenOverride ?? game.user.targets.first() ?? null;
-    const targetActor  = targetToken?.actor ?? null;
+    let targetToken    = targetTokenOverride ?? game.user.targets.first() ?? null;
+    let targetActor    = targetToken?.actor ?? null;
     if (!targetActor) return;
 
     const targetDefKey    = rollData.roll.targetDefense;
@@ -1309,6 +1337,15 @@ export class AspectsofPowerItem extends Item {
       if (hasDualDefense && hitRoll) {
         secondaryResult = await this._resolveDefenseCheck(item, targetActor, secondaryDefKey, hitTotal, attackerToken);
       }
+    }
+
+    // Swap-reaction (per design-summon-subsystem.md): if the defense pipeline
+    // resolved with a `swap` reaction, the in-flight attack is redirected
+    // onto the clone — rebind targetActor + targetToken for the remaining
+    // damage application + downstream tag handlers.
+    if (primaryResult.swappedTargetActor && primaryResult.swappedTargetToken) {
+      targetActor = primaryResult.swappedTargetActor;
+      targetToken = primaryResult.swappedTargetToken;
     }
 
     const halfFactor = hasDualDefense ? 0.5 : 1.0;
@@ -1633,6 +1670,74 @@ export class AspectsofPowerItem extends Item {
   }
 
   /**
+   * Summon tag (per design-summon-subsystem.md): clone the caster into a
+   * temporary world actor with HP override + drop a token at the chosen
+   * destination. If `summonSwapOnRecast` is true and a live summon of this
+   * type already exists, swap positions instead.
+   *
+   * Fires once per cast (not per target). Skill picks its own destination
+   * via destination-prompt, range = caster's `castingRange`.
+   */
+  async _handleSummonTag(item, rollData, speaker, rollMode, label) {
+    if (!this.actor) return;
+    const tc = item.system.tagConfig ?? {};
+    if (!tc.summonType) return;
+    const { SummonHelpers } = await import('../systems/summon.mjs');
+
+    const casterToken = this.actor.getActiveTokens?.()?.[0]?.document ?? null;
+    if (!casterToken) {
+      ui.notifications.warn(`${this.name}: no caster token on canvas.`);
+      return;
+    }
+
+    // Swap-on-recast: if a live summon of this type exists, swap and exit.
+    if (tc.summonSwapOnRecast) {
+      const existing = SummonHelpers.findSummonsOf(this.actor, { summonType: tc.summonType });
+      if (existing.length > 0) {
+        const cloneTokenDoc = existing[existing.length - 1];
+        await SummonHelpers.swapPositions(casterToken, cloneTokenDoc);
+        ChatMessage.create({
+          speaker, rollMode,
+          content: `<p><em>${this.actor.name} swaps places with their ${cloneTokenDoc.name} via <strong>${this.name}</strong>.</em></p>`,
+        });
+        return;
+      }
+    }
+
+    // No existing clone → pick destination + spawn.
+    const { selectDestinationOnCanvas } = await import('../canvas/destination-prompt.mjs');
+    const maxFt = this.actor.system?.castingRange ?? 40;
+    const dest = await selectDestinationOnCanvas(casterToken.object ?? casterToken, {
+      maxDistanceFt: maxFt,
+      requireSight: true,
+      snapToGrid: true,
+      label: this.name,
+      message: `Click summon destination for ${this.name} (range ${maxFt} ft; Esc cancels).`,
+    });
+    if (!dest) {
+      ui.notifications.info(`${this.name} cancelled.`);
+      return;
+    }
+
+    const spawned = await SummonHelpers.spawnSummon({
+      sourceActor:     this.actor,
+      scene:           canvas.scene,
+      position:        { x: dest.x, y: dest.y },
+      summonType:      tc.summonType,
+      sourceSkillUuid: this.uuid,
+      hpOverride:      tc.summonHpOverride,
+      capacity:        tc.summonCapacity,
+      namePrefix:      '',
+    });
+    if (spawned) {
+      ChatMessage.create({
+        speaker, rollMode,
+        content: `<p><em>${this.actor.name} conjures <strong>${spawned.tokenDoc.name}</strong> via ${this.name}.</em></p>`,
+      });
+    }
+  }
+
+  /**
    * Prompt the target's owner to choose whether to defend with their pool.
    * Player-owned targets are prompted via socket; GM-owned via direct dialog.
    */
@@ -1648,6 +1753,19 @@ export class AspectsofPowerItem extends Item {
     const reactions = targetActor.system.reactions ?? { value: 0, max: 1 };
     // Cooldown entries: skillId → roundsRemaining. Entry present with > 0 = on cooldown.
     const cooldowns = targetActor.flags?.aspectsofpower?.reactionCooldowns ?? {};
+    // Lazy summon-presence check used only by swap-typed reactions.
+    let _hasSummon = null;
+    const hasSummonPresence = () => {
+      if (_hasSummon !== null) return _hasSummon;
+      try {
+        // Sync import not possible — fall back to the scene-tokens flag check
+        // inline (same predicate as SummonHelpers.findSummonsOf).
+        const ownerUuid = targetActor.uuid;
+        const tokens = canvas.scene?.tokens?.contents ?? [];
+        _hasSummon = tokens.some(t => t.flags?.['aspects-of-power']?.summon?.ownerActorUuid === ownerUuid);
+      } catch (_e) { _hasSummon = false; }
+      return _hasSummon;
+    };
     const reactionSkills = targetActor.items.filter(s => {
       if (s.type !== 'skill' || s.system.skillType !== 'Reaction') return false;
       const trig = s.system.tagConfig?.reactionTrigger ?? '';
@@ -1662,6 +1780,8 @@ export class AspectsofPowerItem extends Item {
         const have = targetActor.system[resKey]?.value ?? 0;
         if (have < cost) return false;
       }
+      // Swap-reaction gate: hide unless the actor has a live summon to swap with.
+      if ((s.system.reactionType ?? '') === 'swap' && !hasSummonPresence()) return false;
       return true;
     });
     const reactionList = reactionSkills.map(s => ({
@@ -6969,6 +7089,9 @@ export class AspectsofPowerItem extends Item {
           break;
         case 'leap':
           await this._handleLeapTag(item, rollData, speaker, rollMode, label, options.preLeapDestination ?? null, options.preLeapApexFt ?? null);
+          break;
+        case 'summon':
+          await this._handleSummonTag(item, rollData, speaker, rollMode, label);
           break;
       }
     }

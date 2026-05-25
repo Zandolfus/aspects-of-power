@@ -642,6 +642,7 @@ ASPECTSOFPOWER.reactionTypes = {
   dodge:   'ASPECTSOFPOWER.Reaction.dodge',
   parry:   'ASPECTSOFPOWER.Reaction.parry',
   barrier: 'ASPECTSOFPOWER.Reaction.barrier',
+  swap:    'ASPECTSOFPOWER.Reaction.swap',
 };
 
 /**

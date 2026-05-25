@@ -35,6 +35,7 @@ import * as MassLeveler from './systems/mass-leveler.mjs';
 import * as TemplateMigration from './systems/template-migration.mjs';
 import * as Celerity from './systems/celerity.mjs';
 import { CelerityTracker, openTracker as openCelerityTracker, refreshTracker as refreshCelerityTracker, registerCelerityTrackerHooks } from './apps/celerity-tracker.mjs';
+import { SummonHelpers, registerSummonHooks } from './systems/summon.mjs';
 import { CelerityCombatTracker, installAopTurnMarkerPatch } from './apps/celerity-combat-tracker.mjs';
 
 /**
@@ -849,6 +850,10 @@ Hooks.on('renderCompendium', (app, html) => {
 Hooks.once('ready', async function () {
   // Register celerity tracker auto-refresh hooks (idempotent).
   registerCelerityTrackerHooks();
+
+  // Register summon-subsystem deleteToken hook (cleans up cloned actor
+  // when its token is removed). Idempotent.
+  registerSummonHooks();
 
   // Eagerly hydrate the augments compendium so `fromUuidSync` returns full
   // system data (not just index stubs). Required by `deriveItemStats` and

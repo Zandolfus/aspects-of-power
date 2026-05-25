@@ -297,6 +297,25 @@ export class SkillData extends foundry.abstract.TypeDataModel {
         markAttackBonus:   new fields.NumberField({ initial: 0, min: 0 }),
         markExpiresOnHit:  new fields.BooleanField({ initial: false }),
 
+        // ── Summon subsystem (per design-summon-subsystem.md) ────────────
+        // First user: Ice Clone (Willy). Builds a temporary world-actor clone
+        // of the caster, drops a token at the chosen destination, tracks via
+        // a `summon` flag on both token and cloned actor for later lookup.
+        //   summonType:          string key — 'ice_clone' / 'mana_minion' / etc.
+        //                        Empty = skill is not a summon (gate).
+        //   summonHpOverride:    0 = use cloned actor's full HP. >0 = force
+        //                        this as both max and current vitality (1 for
+        //                        Ice Clone — fragile decoy).
+        //   summonCapacity:      max concurrent summons of (caster × this
+        //                        skill). FIFO-evict over capacity.
+        //   summonSwapOnRecast:  if true, recasting the skill while a live
+        //                        summon exists swaps positions instead of
+        //                        spawning a new one (Mirror Ice Clone pattern).
+        summonType:         new fields.StringField({ initial: '' }),
+        summonHpOverride:   new fields.NumberField({ initial: 0, min: 0, integer: true }),
+        summonCapacity:     new fields.NumberField({ initial: 1, min: 1, max: 10, integer: true }),
+        summonSwapOnRecast: new fields.BooleanField({ initial: false }),
+
         // Mine-pair tags (mine / detonate):
         //   mineCapacity: max concurrent mines per caster placed by this
         //     summon. Default 1; upgrades can raise it so the caster can

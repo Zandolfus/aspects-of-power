@@ -203,7 +203,8 @@
     "Reaction": {
       "dodge": "Dodge",
       "parry": "Parry",
-      "barrier": "Barrier"
+      "barrier": "Barrier",
+      "swap": "Swap"
     },
     "Debuff": {
       "none": "None (Stat Only)",
