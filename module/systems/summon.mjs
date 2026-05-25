@@ -69,9 +69,9 @@ export class SummonHelpers {
     };
     delete cloneData._id;
 
-    if (hpOverride > 0 && cloneData.system?.vitality) {
-      cloneData.system.vitality.value = hpOverride;
-      cloneData.system.vitality.max   = hpOverride;
+    if (hpOverride > 0 && cloneData.system?.health) {
+      cloneData.system.health.value = hpOverride;
+      cloneData.system.health.max   = hpOverride;
     }
 
     // Create the actor doc.
@@ -81,8 +81,8 @@ export class SummonHelpers {
     // Re-assert HP override post-prep (derived data may have re-computed max).
     if (hpOverride > 0) {
       await created.update({
-        'system.vitality.value': hpOverride,
-        'system.vitality.max':   hpOverride,
+        'system.health.value': hpOverride,
+        'system.health.max':   hpOverride,
       });
     }
 
@@ -166,20 +166,16 @@ export class SummonHelpers {
   }
 
   /**
-   * Delete a summon token and (by default) its cloned actor.
+   * Delete a summon token. The deleteToken hook (registerSummonHooks) handles
+   * cleaning up the linked cloned actor when its flag says so, so this
+   * function just removes the token — manual actor deletion would race the
+   * hook and double-delete.
    * @param {TokenDocument} tokenDoc
-   * @param {object} [opts]
-   * @param {boolean} [opts.deleteActor=true]  also delete the linked world actor
    */
-  static async despawnSummon(tokenDoc, { deleteActor = true } = {}) {
+  static async despawnSummon(tokenDoc) {
     if (!tokenDoc) return;
-    const actorId = tokenDoc.actorId;
     const scene = tokenDoc.parent;
     if (scene) await scene.deleteEmbeddedDocuments('Token', [tokenDoc.id]);
-    if (deleteActor && actorId) {
-      const actor = game.actors.get(actorId);
-      if (actor) await actor.delete();
-    }
   }
 }
 
