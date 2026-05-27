@@ -3442,6 +3442,24 @@ export class AspectsofPowerItem extends Item {
     const weights = sc.ritualProgressWeights ?? { wisdom: 0.55, material: 0.30, mana: 0.15 };
     const ritualScale = sc.ritualScale ?? {};
 
+    // Scale a ritual's rarity row by its grade tag (per the 2026-05-27
+    // rescale — see [design-channel-and-tower.md] / config.mjs:1044).
+    // Base values are at gradeIndex 0 (G/F/E). D-grade rituals multiply
+    // by 1.25, C by 1.5625, etc. Same per-grade factor as the stat curve.
+    const computeScaledScale = (ritualSkill) => {
+      const rarity = ritualSkill.system?.rarity ?? 'common';
+      const grade  = ritualSkill.system?.ritualGrade ?? 'E';
+      const base   = ritualScale[rarity] ?? ritualScale.common ?? { threshold: 0, materialFloor: 0, cap: 0 };
+      const gIdx   = sc.gradeIndex?.[grade] ?? 0;
+      const gMult  = Math.pow(1.25, gIdx);
+      return {
+        threshold:     Math.round((base.threshold     ?? 0) * gMult),
+        materialFloor: Math.round((base.materialFloor ?? 0) * gMult),
+        cap:           Math.round((base.cap           ?? 0) * gMult),
+        rarity, grade, gradeMult: gMult,
+      };
+    };
+
     // ── Step 1: Material picker — gems with non-zero progress ──
     // Per the user 2026-05-16: rituals consume crafting materials (type='item',
     // isMaterial) whose `progress` value feeds the prep formula. Filter for
@@ -3487,12 +3505,12 @@ export class AspectsofPowerItem extends Item {
       return;
     }
     const ritualButtons = ritualSkills.map(s => {
-      const rarity = s.system?.rarity ?? 'common';
-      const scaleEntry = ritualScale[rarity] ?? ritualScale.common ?? { threshold: 0, cap: 0 };
+      const scaled = computeScaledScale(s);
       const charges = s.system?.tagConfig?.ritualChargesProduced ?? 1;
+      const matNote = scaled.materialFloor > 0 ? `, mat≥${scaled.materialFloor}` : '';
       return {
         action: s.id,
-        label: `${s.name} [${rarity}] — thr ${scaleEntry.threshold} / cap ${scaleEntry.cap}, ${charges} charge${charges === 1 ? '' : 's'}`,
+        label: `${s.name} [${scaled.grade}-${scaled.rarity}] — thr ${scaled.threshold}/cap ${scaled.cap}${matNote}, ${charges} charge${charges === 1 ? '' : 's'}`,
       };
     });
     ritualButtons.push({ action: 'cancel', label: 'Cancel' });
@@ -3507,10 +3525,12 @@ export class AspectsofPowerItem extends Item {
     if (!ritualSkill) return;
 
     // ── Step 3: Setup dialog — mana invest + projected progress ──
-    const rarity = ritualSkill.system?.rarity ?? 'common';
-    const scaleEntry = ritualScale[rarity] ?? ritualScale.common ?? { threshold: 0, cap: 0 };
-    const threshold = scaleEntry.threshold ?? 0;
-    const cap = scaleEntry.cap ?? 0;
+    const scaled = computeScaledScale(ritualSkill);
+    const rarity = scaled.rarity;
+    const grade  = scaled.grade;
+    const threshold = scaled.threshold;
+    const cap = scaled.cap;
+    const materialFloor = scaled.materialFloor;
     const charges = ritualSkill.system?.tagConfig?.ritualChargesProduced ?? 1;
     const minMana = ritualSkill.system?.tagConfig?.ritualMinMana ?? 0;
     const wisdomMod = Math.max(0, Math.round(actor.system?.abilities?.wisdom?.mod ?? 0));
@@ -3518,9 +3538,18 @@ export class AspectsofPowerItem extends Item {
     const currentMana = Math.round(actor.system?.mana?.value ?? 0);
     const initialMana = Math.max(minMana, Math.min(currentMana, minMana || 1));
 
+    // Material-floor gate — clean failure, NOTHING consumed. Per the
+    // 2026-05-27 rescale, high-tier rituals require an appropriately
+    // high-progress material; wisdom + mana alone can't substitute.
+    if (materialProgress < materialFloor) {
+      ChatMessage.create({ speaker, rollMode,
+        content: `<p><em>${actor.name} cannot inscribe <strong>${ritualSkill.name}</strong> [${grade}-${rarity}]: <strong>${sourceGem.name}</strong> (progress ${materialProgress}) falls below the required material floor of ${materialFloor}. Nothing consumed.</em></p>` });
+      return;
+    }
+
     if (currentMana < minMana) {
       ChatMessage.create({ speaker, rollMode,
-        content: `<p><em>${actor.name} needs at least ${minMana} mana to prepare ${ritualSkill.name} (has ${currentMana}).</em></p>` });
+        content: `<p><em>${actor.name} needs at least ${minMana} mana to prepare ${ritualSkill.name} (has ${currentMana}). Nothing consumed.</em></p>` });
       return;
     }
 
@@ -3533,8 +3562,8 @@ export class AspectsofPowerItem extends Item {
       content: `
         <div class="craft-setup">
           <p><strong>Ritualist:</strong> ${actor.name} (wisdom mod ${wisdomMod})</p>
-          <p><strong>Material:</strong> ${sourceGem.name} — progress ${materialProgress}</p>
-          <p><strong>Ritual:</strong> ${ritualSkill.name} [${rarity}] — threshold ${threshold} / cap ${cap}, produces ${charges} charge${charges === 1 ? '' : 's'}</p>
+          <p><strong>Material:</strong> ${sourceGem.name} — progress ${materialProgress}${materialFloor > 0 ? ` (floor ${materialFloor} ✓)` : ''}</p>
+          <p><strong>Ritual:</strong> ${ritualSkill.name} [${grade}-${rarity}] — threshold ${threshold} / cap ${cap}, produces ${charges} charge${charges === 1 ? '' : 's'}</p>
           <hr>
           <div class="form-group">
             <label>Mana to invest (${minMana} – ${currentMana})</label>
@@ -3627,8 +3656,8 @@ export class AspectsofPowerItem extends Item {
         content: `<div class="craft-result">
           <h3>${item.name} — Ritual Failed</h3>
           <hr>
-          <p><strong>${actor.name}</strong> attempts to inscribe <strong>${ritualSkill.name}</strong> into <strong>${liveSrc.name}</strong>, but the progress falls short.</p>
-          <p>Progress: <strong style="color:#ef5350;">${progress}</strong> / threshold ${threshold}</p>
+          <p><strong>${actor.name}</strong> attempts to inscribe <strong>${ritualSkill.name}</strong> [${grade}-${rarity}] into <strong>${liveSrc.name}</strong>, but the progress falls short.</p>
+          <p>Progress: <strong style="color:#ef5350;">${progress}</strong> / threshold ${threshold} (cap ${cap})</p>
           <p class="hint">Inputs — wis ${wisdomMod}, material ${materialProgress}, mana ${manaInvested} → consumed.</p>
         </div>` });
       return;

@@ -1041,15 +1041,31 @@ ASPECTSOFPOWER.consumableEffectTypes = {
  * Failure (progress < threshold) consumes materials + mana, no Medium.
  * Success stores Medium with ritualPower = min(progress, cap).
  */
+/**
+ * Base-grade (G/F/E, gradeIndex=0) ritual scaling. Each ritual carries
+ * BOTH a rarity (from this table) and a ritualGrade (E/D/C/B/A/S);
+ * higher grades scale these values by `1.25^gradeIndex` (same per-grade
+ * multiplier driving the stat curve at actor.mjs:78). So a D-grade epic
+ * ritual is `epic` row × 1.25 → threshold 625 / materialFloor 500 / cap
+ * 1500. C-grade epic × 1.5625, etc.
+ *
+ * Calibration (2026-05-27): peak E-grade caster (wisdom mod ~810,
+ * material ~1000 progress, mana invest ~300) produces ~790 progress —
+ * sufficient for epic, locked out of legendary. Mid-D unlocks legendary.
+ *
+ *   threshold     — min total progress for prep to succeed (else materials/mana consumed)
+ *   materialFloor — min progress of the chosen material to attempt at all (clean failure, nothing consumed)
+ *   cap           — max stored ritualPower on success
+ */
 ASPECTSOFPOWER.ritualScale = {
-  inferior:  { threshold:   0, cap:   50 },
-  common:    { threshold:  20, cap:  100 },
-  uncommon:  { threshold:  35, cap:  175 },
-  rare:      { threshold:  60, cap:  300 },
-  epic:      { threshold: 100, cap:  500 },
-  legendary: { threshold: 160, cap:  800 },
-  mythic:    { threshold: 250, cap: 1300 },
-  divine:    { threshold: 400, cap: 2100 },
+  inferior:  { threshold:    0, materialFloor:    0, cap:  100 },
+  common:    { threshold:   30, materialFloor:    0, cap:  200 },
+  uncommon:  { threshold:  100, materialFloor:    0, cap:  400 },
+  rare:      { threshold:  250, materialFloor:  200, cap:  700 },
+  epic:      { threshold:  500, materialFloor:  400, cap: 1200 },
+  legendary: { threshold: 1100, materialFloor:  800, cap: 2200 },
+  mythic:    { threshold: 2000, materialFloor: 1500, cap: 4000 },
+  divine:    { threshold: 3500, materialFloor: 2500, cap: 7500 },
 };
 
 /**

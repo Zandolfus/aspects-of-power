@@ -12,6 +12,15 @@ export class SkillData extends foundry.abstract.TypeDataModel {
       // Auto-demotes one tier on character grade-up E→D and beyond (floor at not_proficient).
       // No `choices` here so old data with off-list values doesn't reject; migration normalizes.
       rarity:      new fields.StringField({ initial: 'common' }),
+      // Ritual grade (per [design-channel-and-tower.md] rescale, 2026-05-27).
+      // Each ritual carries BOTH rarity (epic/legendary/etc.) and a grade
+      // (E/D/C/B/A/S). Grade scales the prep threshold / materialFloor /
+      // cap by `1.25^gradeIndex` — same per-grade multiplier as the stat
+      // curve (gradeIndex map at config.mjs:47). So an E-grade epic ritual
+      // uses the base ritualScale values; a D-grade epic uses ×1.25.
+      // Default 'E' for current authored content. Only consulted for
+      // skills with a `ritual` tag; ignored on non-ritual skills.
+      ritualGrade: new fields.StringField({ initial: 'E', choices: ['G', 'F', 'E', 'D', 'C', 'B', 'A', 'S'] }),
       // Alteration tags acquired through upgrades. Each entry refs an entry in
       // CONFIG.ASPECTSOFPOWER.alterationTags (which carries dmgMod/costMod/capability metadata).
       // Per-instance params (e.g. which debuff a 'debuff' alteration applies) live in `params`.
