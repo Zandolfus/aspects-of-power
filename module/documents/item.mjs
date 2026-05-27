@@ -3450,7 +3450,7 @@ export class AspectsofPowerItem extends Item {
       const rarity = ritualSkill.system?.rarity ?? 'common';
       const grade  = ritualSkill.system?.ritualGrade ?? 'E';
       const base   = ritualScale[rarity] ?? ritualScale.common ?? { threshold: 0, materialFloor: 0, cap: 0 };
-      const gIdx   = sc.gradeIndex?.[grade] ?? 0;
+      const gIdx   = sc.statCurve?.gradeIndex?.[grade] ?? 0;
       const gMult  = Math.pow(1.25, gIdx);
       return {
         threshold:     Math.round((base.threshold     ?? 0) * gMult),
