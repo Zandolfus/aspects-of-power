@@ -154,10 +154,10 @@ const primitiveProfile = {
       }
     }
 
-    // Target the chosen token (so the skill's target-resolution finds it)
-    game.user.updateTokenTargets([chosen.tokenDoc.id]);
-
-    // Fire the skill — the channel-tag handler routes to startOrContinueChannel
+    // Fire the skill — the channel-tag handler routes to startOrContinueChannel.
+    // `executeDeferred: true` + `preTargetIds` causes item.roll() to set
+    // game.user.targets to the chosen token (see item.mjs:6085) before
+    // dispatching to the tag handlers, so they see the right target.
     await skill.roll({ executeDeferred: true, preTargetIds: [chosen.tokenDoc.id] });
 
     // Schedule the next AI tick via declareAction
