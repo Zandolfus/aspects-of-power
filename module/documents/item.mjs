@@ -1719,6 +1719,41 @@ export class AspectsofPowerItem extends Item {
       return;
     }
 
+    // Tower-variant route (per plan pure-gathering-ullman.md, 2026-05-29).
+    // When `summonAsTower` is true, clone from a stub NPC + apply ritualPower
+    // × statDistribution as ability-score overrides + set AI flags. Otherwise
+    // fall through to the fragile-decoy clone path (Ice Clone).
+    if (tc.summonAsTower) {
+      // ritualPower comes from preInvestAmount when activated via a ritual
+      // Medium (item.mjs:5743 ritual-activation path).
+      const ritualPower = rollData?.preInvestAmount ?? rollData?.investAmount ?? 0;
+      if (!tc.summonStubActorUuid || ritualPower <= 0) {
+        ui.notifications.warn(`${this.name}: tower spawn requires summonStubActorUuid + non-zero ritualPower (got ${ritualPower}).`);
+        return;
+      }
+      const tower = await SummonHelpers.spawnTower({
+        stubActorUuid:    tc.summonStubActorUuid,
+        scene:            canvas.scene,
+        position:         { x: dest.x, y: dest.y },
+        ownerActorUuid:   this.actor.uuid,
+        ritualPower,
+        statDistribution: tc.summonStatDistribution ?? {},
+        aiProfile:        tc.summonAiProfile ?? 'primitive',
+        aiSkillUuid:      tc.summonAiSkillUuid ?? '',
+        summonType:       tc.summonType,
+        sourceSkillUuid:  this.uuid,
+        capacity:         tc.summonCapacity,
+        extraTags:        tc.summonExtraTags ?? [],
+      });
+      if (tower) {
+        ChatMessage.create({
+          speaker, rollMode,
+          content: `<p><em>${this.actor.name} erects <strong>${tower.tokenDoc.name}</strong> (ritualPower ${ritualPower}).</em></p>`,
+        });
+      }
+      return;
+    }
+
     const spawned = await SummonHelpers.spawnSummon({
       sourceActor:     this.actor,
       scene:           canvas.scene,
@@ -1735,6 +1770,43 @@ export class AspectsofPowerItem extends Item {
         content: `<p><em>${this.actor.name} conjures <strong>${spawned.tokenDoc.name}</strong> via ${this.name}.</em></p>`,
       });
     }
+  }
+
+  /**
+   * Channel tag (per plan pure-gathering-ullman.md, 2026-05-29). Each cast
+   * starts a new channel OR continues an existing one on the same target.
+   * Different-target re-cast resets the ramp. Damage applies via per-tick
+   * scheduler (channel.mjs), NOT here — this handler just registers state.
+   *
+   * Target resolution: preTargetIds (when invoked via AI .roll({preTargetIds}))
+   * or game.user.targets.first() for direct player cast.
+   */
+  async _handleChannelTag(item, rollData, speaker, rollMode, label) {
+    if (!this.actor) return;
+    const tc = item.system?.tagConfig ?? {};
+    if (!tc.channel) return;
+
+    const targetToken = game.user.targets.first() ?? null;
+    if (!targetToken) {
+      ui.notifications.warn(`${this.name}: no target selected.`);
+      return;
+    }
+
+    const { ChannelHelpers } = await import('../systems/channel.mjs');
+    const existing = ChannelHelpers.findChannelOf(this.actor.uuid);
+    const state = await ChannelHelpers.startOrContinueChannel(this.actor, item, targetToken);
+    if (!state) {
+      ui.notifications.warn(`${this.name}: channel could not start.`);
+      return;
+    }
+
+    const continuing = existing
+      && existing.targetTokenId === (targetToken.document?.id ?? targetToken.id)
+      && existing.targetActorUuid === (targetToken.actor?.uuid ?? '');
+    const phrase = continuing
+      ? `<em>${this.actor.name} sustains <strong>${this.name}</strong> on ${targetToken.document?.name ?? targetToken.name} (tick ${state.consecutiveOnTarget}).</em>`
+      : `<em>${this.actor.name} begins <strong>${this.name}</strong> on ${targetToken.document?.name ?? targetToken.name}.</em>`;
+    ChatMessage.create({ speaker, rollMode, content: `<p>${phrase}</p>` });
   }
 
   /**
@@ -7121,6 +7193,9 @@ export class AspectsofPowerItem extends Item {
           break;
         case 'summon':
           await this._handleSummonTag(item, rollData, speaker, rollMode, label);
+          break;
+        case 'channel':
+          await this._handleChannelTag(item, rollData, speaker, rollMode, label);
           break;
       }
     }

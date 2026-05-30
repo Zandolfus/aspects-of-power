@@ -36,6 +36,8 @@ import * as TemplateMigration from './systems/template-migration.mjs';
 import * as Celerity from './systems/celerity.mjs';
 import { CelerityTracker, openTracker as openCelerityTracker, refreshTracker as refreshCelerityTracker, registerCelerityTrackerHooks } from './apps/celerity-tracker.mjs';
 import { SummonHelpers, registerSummonHooks } from './systems/summon.mjs';
+import { ChannelHelpers, registerChannelHooks } from './systems/channel.mjs';
+import { AIProfiles, registerAIHooks } from './systems/ai.mjs';
 import { CelerityCombatTracker, installAopTurnMarkerPatch } from './apps/celerity-combat-tracker.mjs';
 
 /**
@@ -854,6 +856,13 @@ Hooks.once('ready', async function () {
   // Register summon-subsystem deleteToken hook (cleans up cloned actor
   // when its token is removed). Idempotent.
   registerSummonHooks();
+
+  // Register channel-subsystem updateCombat hook (sub-turn tick scheduler).
+  registerChannelHooks();
+
+  // Register AI dispatch hook (fires on declared-action completion → routes
+  // to the actor's `aiProfile` for next-action decision).
+  registerAIHooks();
 
   // Eagerly hydrate the augments compendium so `fromUuidSync` returns full
   // system data (not just index stubs). Required by `deriveItemStats` and

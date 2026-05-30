@@ -179,6 +179,135 @@ export class SummonHelpers {
     const scene = tokenDoc.parent;
     if (scene) await scene.deleteEmbeddedDocuments('Token', [tokenDoc.id]);
   }
+
+  /**
+   * Tower spawn (per plan pure-gathering-ullman.md, 2026-05-29). Clones from
+   * a stub NPC actor (not the summoner), applies `ritualPower × statDistribution`
+   * as ability-score overrides, sets AI flags, drops a token on the scene.
+   * Auto-registers as combatant if active combat (Foundry default behavior
+   * when a token enters a combat-active scene).
+   *
+   * Stub provides the "kind of construct" identity (token art, prototype
+   * disposition, default tags). statDistribution + ritualPower provide the
+   * "how strong" axis. AI flags provide the autonomous behavior.
+   *
+   * @param {object} opts
+   * @param {string} opts.stubActorUuid       UUID of the stub NPC to clone from
+   * @param {Scene} [opts.scene]              default canvas.scene
+   * @param {{x:number,y:number}} opts.position
+   * @param {string} opts.ownerActorUuid      summoner (for capacity tracking + summon flag)
+   * @param {number} opts.ritualPower         total stat budget
+   * @param {object} opts.statDistribution    { ability: weight }, weights ideally sum to 1.0
+   * @param {string} opts.aiProfile           AI profile key (default 'primitive')
+   * @param {string} opts.aiSkillUuid         skill UUID the AI fires each turn
+   * @param {string} opts.summonType          for findSummonsOf grouping (e.g. 'lightstream_prism')
+   * @param {string} opts.sourceSkillUuid     the summon-side skill (for capacity tracking)
+   * @param {number} [opts.capacity=1]
+   * @param {string[]} [opts.extraTags=[]]    pushed onto stub's tags (deduped)
+   * @param {string} [opts.namePrefix='']
+   * @returns {Promise<{actorClone:Actor, tokenDoc:TokenDocument}|null>}
+   */
+  static async spawnTower({ stubActorUuid, scene, position, ownerActorUuid,
+                              ritualPower, statDistribution, aiProfile = 'primitive',
+                              aiSkillUuid, summonType, sourceSkillUuid,
+                              capacity = 1, extraTags = [], namePrefix = '' }) {
+    if (!stubActorUuid || !position || !ownerActorUuid) return null;
+    scene = scene ?? canvas.scene;
+    if (!scene) return null;
+
+    const stub = await fromUuid(stubActorUuid);
+    if (!stub) {
+      ui.notifications.warn(`spawnTower: stub actor ${stubActorUuid} not found.`);
+      return null;
+    }
+
+    const ownerActor = await fromUuid(ownerActorUuid);
+    if (!ownerActor) return null;
+
+    // FIFO-evict over capacity for (owner × summonType)
+    const existing = this.findSummonsOf(ownerActor, { summonType, scene });
+    while (existing.length >= capacity) {
+      const oldest = existing.shift();
+      if (oldest) await this.despawnSummon(oldest);
+    }
+
+    // Build clone from stub. Strip the stub's _id.
+    const stubData = stub.toObject();
+    const cloneData = {
+      ...stubData,
+      _id: undefined,
+      name: `${namePrefix}${stubData.name}`,
+      ownership: foundry.utils.deepClone(ownerActor.ownership ?? {}),
+      flags: {
+        ...(stubData.flags ?? {}),
+        'aspects-of-power': {
+          ...(stubData.flags?.['aspects-of-power'] ?? {}),
+          summon: {
+            ownerActorUuid,
+            sourceSkillUuid,
+            summonType,
+            spawnedAt:            Date.now(),
+            cleanupActorOnDelete: true,
+          },
+        },
+        aspectsofpower: {
+          ...(stubData.flags?.aspectsofpower ?? {}),
+          aiProfile,
+          aiSkillUuid,
+        },
+      },
+    };
+    delete cloneData._id;
+
+    // Apply stat distribution to abilities BEFORE create — so prepareDerivedData
+    // computes mod / HP / mana / defenses against the correct values from the start.
+    cloneData.system = cloneData.system ?? {};
+    cloneData.system.abilities = { ...(cloneData.system.abilities ?? {}) };
+    for (const [ability, weight] of Object.entries(statDistribution ?? {})) {
+      const value = Math.round(ritualPower * weight);
+      cloneData.system.abilities[ability] = {
+        ...(cloneData.system.abilities[ability] ?? {}),
+        value,
+      };
+    }
+
+    // Push extra tags onto system.tags (deduped).
+    const baseTags = Array.isArray(cloneData.system.tags) ? cloneData.system.tags : [];
+    const tagSet = new Set([...baseTags, ...extraTags]);
+    cloneData.system.tags = Array.from(tagSet);
+
+    const created = await Actor.create(cloneData, { keepId: false });
+    if (!created) return null;
+
+    // Token spawn — inherit stub's prototypeToken layout; reposition to picked square.
+    const grid = scene.grid?.size ?? 100;
+    const baseTokenData = created.prototypeToken?.toObject?.() ?? {};
+    const tokenData = foundry.utils.mergeObject(baseTokenData, {
+      name: created.name,
+      actorId: created.id,
+      actorLink: true,
+      hidden: false,
+      disposition: CONST.TOKEN_DISPOSITIONS.FRIENDLY,
+      flags: {
+        'aspects-of-power': {
+          summon: {
+            ownerActorUuid,
+            sourceSkillUuid,
+            summonType,
+            spawnedAt:            Date.now(),
+            cleanupActorOnDelete: true,
+          },
+        },
+      },
+    }, { inplace: false });
+    tokenData.actorId = created.id;
+    tokenData.actorLink = true;
+    tokenData.x = position.x - (tokenData.width ?? 1) * grid / 2;
+    tokenData.y = position.y - (tokenData.height ?? 1) * grid / 2;
+
+    const [tokenDoc] = await scene.createEmbeddedDocuments('Token', [tokenData]);
+    return { actorClone: created, tokenDoc };
+  }
 }
 
 /**
@@ -192,6 +321,14 @@ export function registerSummonHooks() {
     const summonFlag = tokenDoc.flags?.['aspects-of-power']?.summon;
     if (!summonFlag?.cleanupActorOnDelete) return;
     const actor = game.actors.get(tokenDoc.actorId);
+    // Cancel any active channel the dying summon is mid-firing so the
+    // scheduler doesn't try to tick from a destroyed actor next clock advance.
+    if (actor) {
+      try {
+        const { ChannelHelpers } = await import('./channel.mjs');
+        ChannelHelpers.cancelChannel(actor.uuid);
+      } catch (_) { /* channel module not loaded — fine */ }
+    }
     if (actor && actor.flags?.['aspects-of-power']?.summon?.cleanupActorOnDelete) {
       await actor.delete();
     }

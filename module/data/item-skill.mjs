@@ -325,6 +325,47 @@ export class SkillData extends foundry.abstract.TypeDataModel {
         summonCapacity:     new fields.NumberField({ initial: 1, min: 1, max: 10, integer: true }),
         summonSwapOnRecast: new fields.BooleanField({ initial: false }),
 
+        // ── Tower variant (per [design-channel-and-tower.md] / plan
+        //    pure-gathering-ullman.md, 2026-05-29). When `summonAsTower`
+        //    is true, _handleSummonTag routes through SummonHelpers.spawnTower
+        //    instead of spawnSummon — clones from `summonStubActorUuid`,
+        //    applies `ritualPower × summonStatDistribution` as ability-score
+        //    overrides, sets the AI flags so the tower autonomously fires
+        //    `summonAiSkillUuid` each turn under `summonAiProfile`.
+        //   summonAsTower:           true → tower path (else fragile-decoy clone path)
+        //   summonStubActorUuid:     UUID of stub NPC (e.g. Magitech Construct) to clone from
+        //   summonAiProfile:         AI profile key (registered in AIProfiles), default 'primitive'
+        //   summonAiSkillUuid:       skill UUID the tower fires each AI action (typically a channel)
+        //   summonStatDistribution:  { ability: weight } map, weights ideally sum to 1.0;
+        //                            value = round(ritualPower × weight) per ability
+        //   summonExtraTags:         pushed onto stub's tags at spawn (deduped),
+        //                            e.g. ['light-affinity'] for a solar prism
+        summonAsTower:          new fields.BooleanField({ initial: false }),
+        summonStubActorUuid:    new fields.StringField({ initial: '' }),
+        summonAiProfile:        new fields.StringField({ initial: 'primitive' }),
+        summonAiSkillUuid:      new fields.StringField({ initial: '' }),
+        summonStatDistribution: new fields.ObjectField({ initial: () => ({}) }),
+        summonExtraTags:        new fields.ArrayField(new fields.StringField(), { initial: [] }),
+
+        // ── Channel primitive (per plan pure-gathering-ullman.md, 2026-05-29).
+        //    A sub-turn ticking damage skill that ramps per consecutive tick
+        //    on the same target. Used by towers and by player-cast channels.
+        //    Drives the in-memory state in ChannelHelpers (channel.mjs).
+        //   channel:              gate — skill IS a channel (else case 'channel' is a no-op)
+        //   channelTickInterval:  round-fraction between ticks (1/3 = 3 ticks per round)
+        //   channelRampMax:       peak per-tick multiplier (2.5 = tick @ rampTicks deals 2.5× base)
+        //   channelRampTicks:     ticks to reach rampMax (linear ramp from 1.0 over this many ticks)
+        //   channelTickCost:      mana per tick deducted from caster
+        //   channelMaxTicks:      hard cap (0 = unlimited until break — target dies, OOR, LOS, etc.)
+        //   channelRange:         override caster's castingRange for the channel's range check (0 = inherit)
+        channel:             new fields.BooleanField({ initial: false }),
+        channelTickInterval: new fields.NumberField({ initial: 1/3, min: 0 }),
+        channelRampMax:      new fields.NumberField({ initial: 2.5, min: 1 }),
+        channelRampTicks:    new fields.NumberField({ initial: 3, min: 1, integer: true }),
+        channelTickCost:     new fields.NumberField({ initial: 1, min: 0, integer: true }),
+        channelMaxTicks:     new fields.NumberField({ initial: 0, min: 0, integer: true }),
+        channelRange:        new fields.NumberField({ initial: 0, min: 0, integer: true }),
+
         // Mine-pair tags (mine / detonate):
         //   mineCapacity: max concurrent mines per caster placed by this
         //     summon. Default 1; upgrades can raise it so the caster can
