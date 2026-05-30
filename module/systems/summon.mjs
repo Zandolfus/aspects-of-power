@@ -279,6 +279,24 @@ export class SummonHelpers {
     const created = await Actor.create(cloneData, { keepId: false });
     if (!created) return null;
 
+    // After Actor.create, prepareDerivedData computes health.max / mana.max /
+    // stamina.max from the new ability scores — but the schema-default `value`
+    // fields stay at whatever the stub had. Push them to max so the tower
+    // spawns at full pools.
+    created.reset();
+    const fullPoolUpdate = {};
+    if (created.system?.health?.max  > 0) fullPoolUpdate['system.health.value']  = created.system.health.max;
+    if (created.system?.mana?.max    > 0) fullPoolUpdate['system.mana.value']    = created.system.mana.max;
+    if (created.system?.stamina?.max > 0) fullPoolUpdate['system.stamina.value'] = created.system.stamina.max;
+    // Defense pools: max is derived; current pool stays at 0 by default until
+    // the round-tick fills them. Stamp current = poolMax so the tower has its
+    // dodge pool immediately on spawn.
+    for (const k of ['melee', 'ranged', 'mind', 'soul']) {
+      const max = created.system?.defense?.[k]?.poolMax ?? 0;
+      if (max > 0) fullPoolUpdate[`system.defense.${k}.pool`] = max;
+    }
+    if (Object.keys(fullPoolUpdate).length > 0) await created.update(fullPoolUpdate);
+
     // Token spawn — inherit stub's prototypeToken layout; reposition to picked square.
     const grid = scene.grid?.size ?? 100;
     const baseTokenData = created.prototypeToken?.toObject?.() ?? {};
