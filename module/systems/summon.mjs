@@ -279,6 +279,32 @@ export class SummonHelpers {
     const created = await Actor.create(cloneData, { keepId: false });
     if (!created) return null;
 
+    // Grant the AI skill onto the actor so item.roll() has actor context
+    // (compendium skills have no .actor and would fail at _buildRollFormulas).
+    // Clone via toObject() + createEmbeddedDocuments, mirroring EquipmentSystem
+    // ._grantSkills pattern but for a single skill.
+    if (aiSkillUuid) {
+      const sourceSkill = await fromUuid(aiSkillUuid);
+      if (sourceSkill) {
+        const skillData = sourceSkill.toObject();
+        delete skillData._id;
+        skillData.flags = skillData.flags ?? {};
+        skillData.flags.aspectsofpower = {
+          ...(skillData.flags.aspectsofpower ?? {}),
+          grantedFrom: aiSkillUuid,
+          isAiSkill: true,
+        };
+        const [granted] = await created.createEmbeddedDocuments('Item', [skillData]);
+        // Re-flag the actor with the GRANTED (actor-embedded) skill's UUID so
+        // the AI profile can resolve via fromUuid() and get a real actor-owned doc.
+        if (granted) {
+          await created.update({
+            'flags.aspectsofpower.aiSkillUuid': granted.uuid,
+          });
+        }
+      }
+    }
+
     // After Actor.create, prepareDerivedData computes health.max / mana.max /
     // stamina.max from the new ability scores — but the schema-default `value`
     // fields stay at whatever the stub had. Push them to max so the tower
