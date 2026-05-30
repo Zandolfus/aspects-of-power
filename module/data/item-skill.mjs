@@ -436,6 +436,15 @@ export class SkillData extends foundry.abstract.TypeDataModel {
         //     no Medium produced.
         ritualChargesProduced: new fields.NumberField({ initial: 1, min: 1, integer: true }),
         ritualMinMana:         new fields.NumberField({ initial: 0, min: 0, integer: true }),
+        // Per-ritual override: which skill does the inscribed Medium fire on
+        // activation? Default empty = activate the ritual skill itself (legacy
+        // single-skill rituals like Winds of Time). Set when the ritual is a
+        // "definition" that points at a separate effect skill — e.g. Ritual
+        // of Lightstream Prism → Place Lightstream Prism. Inscribe path
+        // (item.mjs:3651) reads this and stores it on the Medium's
+        // ritualSkillId. (Per user 2026-05-30: ritualism creates Medium,
+        // Medium fires activation skill — they can be different.)
+        ritualActivationSkillId: new fields.StringField({ initial: '' }),
       }),
     };
   }

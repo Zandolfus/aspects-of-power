@@ -3736,6 +3736,15 @@ export class AspectsofPowerItem extends Item {
     }
 
     const storedPower = Math.min(progress, cap);
+    // Per-ritual override: if the ritual skill defines a separate
+    // activation skill (`ritualActivationSkillId`), the Medium points to
+    // THAT instead of the ritual definition itself. Lets ritual definitions
+    // (like Ritual of Lightstream Prism) describe a recipe while a
+    // separate effect skill (Place Lightstream Prism) does the work.
+    // Per user 2026-05-30: ritualism makes Medium, Medium fires activation
+    // skill — they can be different items.
+    const activationOverride = ritualSkill.system?.tagConfig?.ritualActivationSkillId ?? '';
+    const activationUuid = activationOverride || ritualSkill.uuid;
     const inscribedName = `Inscribed ${liveSrc.name.replace(/^Raw\s+/i, '')} (${ritualSkill.name})`;
     const [inscribed] = await actor.createEmbeddedDocuments('Item', [{
       name: inscribedName,
@@ -3748,7 +3757,7 @@ export class AspectsofPowerItem extends Item {
         rarity: liveSrc.system.rarity ?? 'common',
         consumableType: 'gem',
         effectType: 'ritual',
-        ritualSkillId: ritualSkill.uuid,
+        ritualSkillId: activationUuid,
         ritualPower: storedPower,
         mediumType: 'gem',
         charges: { value: charges, max: charges },
