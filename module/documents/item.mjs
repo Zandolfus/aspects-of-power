@@ -1678,7 +1678,7 @@ export class AspectsofPowerItem extends Item {
    * Fires once per cast (not per target). Skill picks its own destination
    * via destination-prompt, range = caster's `castingRange`.
    */
-  async _handleSummonTag(item, rollData, speaker, rollMode, label) {
+  async _handleSummonTag(item, rollData, speaker, rollMode, label, preInvestAmount = 0) {
     if (!this.actor) return;
     const tc = item.system.tagConfig ?? {};
     if (!tc.summonType) return;
@@ -1724,9 +1724,10 @@ export class AspectsofPowerItem extends Item {
     // × statDistribution as ability-score overrides + set AI flags. Otherwise
     // fall through to the fragile-decoy clone path (Ice Clone).
     if (tc.summonAsTower) {
-      // ritualPower comes from preInvestAmount when activated via a ritual
-      // Medium (item.mjs:5743 ritual-activation path).
-      const ritualPower = rollData?.preInvestAmount ?? rollData?.investAmount ?? 0;
+      // ritualPower comes from the activator's preInvestAmount (passed by the
+      // ritual-activation path at item.mjs:5852 and threaded through the
+      // dispatch loop into _handleSummonTag's preInvestAmount arg).
+      const ritualPower = preInvestAmount ?? 0;
       if (!tc.summonStubActorUuid || ritualPower <= 0) {
         ui.notifications.warn(`${this.name}: tower spawn requires summonStubActorUuid + non-zero ritualPower (got ${ritualPower}).`);
         return;
@@ -7238,7 +7239,7 @@ export class AspectsofPowerItem extends Item {
           await this._handleLeapTag(item, rollData, speaker, rollMode, label, options.preLeapDestination ?? null, options.preLeapApexFt ?? null);
           break;
         case 'summon':
-          await this._handleSummonTag(item, rollData, speaker, rollMode, label);
+          await this._handleSummonTag(item, rollData, speaker, rollMode, label, options.preInvestAmount);
           break;
         case 'channel':
           await this._handleChannelTag(item, rollData, speaker, rollMode, label);

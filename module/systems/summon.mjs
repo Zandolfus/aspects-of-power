@@ -39,6 +39,23 @@ export class SummonHelpers {
     scene = scene ?? canvas.scene;
     if (!scene) return null;
 
+    // Player-permission shim: Actor.create requires GM. If the caller isn't
+    // GM, route the request through the socket so a GM client does the work
+    // and returns the resulting actor + token UUIDs. Mirrors the GM-action
+    // pattern used for region create/delete elsewhere.
+    if (!game.user.isGM) {
+      return _requestGMSpawn('spawnSummon', {
+        sourceActorUuid: sourceActor.uuid,
+        sceneId:         scene.id,
+        position,
+        summonType,
+        sourceSkillUuid,
+        hpOverride,
+        namePrefix,
+        capacity,
+      });
+    }
+
     // FIFO-evict over capacity for (caster × summonType).
     const existing = this.findSummonsOf(sourceActor, { summonType, scene });
     while (existing.length >= capacity) {
@@ -215,6 +232,15 @@ export class SummonHelpers {
     scene = scene ?? canvas.scene;
     if (!scene) return null;
 
+    // Player-permission shim — see spawnSummon's note. Route through GM.
+    if (!game.user.isGM) {
+      return _requestGMSpawn('spawnTower', {
+        stubActorUuid, sceneId: scene.id, position, ownerActorUuid,
+        ritualPower, statDistribution, aiProfile, aiSkillUuid, summonType,
+        sourceSkillUuid, capacity, extraTags, namePrefix,
+      });
+    }
+
     const stub = await fromUuid(stubActorUuid);
     if (!stub) {
       ui.notifications.warn(`spawnTower: stub actor ${stubActorUuid} not found.`);
@@ -368,12 +394,142 @@ export class SummonHelpers {
   }
 }
 
+/* ─────────────────────────────────────────────────────────────────────────── *
+ * GM-routing for spawn requests                                                *
+ *                                                                              *
+ * Actor.create() requires GM permissions. When a non-GM player triggers a      *
+ * summon (cast Mirror Ice Clone, activate Lightstream Prism medium, etc.),    *
+ * the public SummonHelpers.spawnSummon / spawnTower methods serialize the     *
+ * request and emit it via socket. A GM client picks it up, runs the same      *
+ * spawn function locally (now with GM perms), and emits the resulting actor   *
+ * + token UUIDs back to the requester. The requester resolves them to docs    *
+ * and returns the {actorClone, tokenDoc} shape callers expect.                *
+ * ─────────────────────────────────────────────────────────────────────────── */
+
+const SOCKET_CHANNEL = 'system.aspects-of-power';
+const SPAWN_RESPONSE_TIMEOUT_MS = 15000;
+
+/**
+ * Emit a spawn request via socket and await the GM's response.
+ * Resolves to `{actorClone, tokenDoc}` (looked up by UUID on receipt) or null.
+ */
+async function _requestGMSpawn(method, payload) {
+  const requestId = foundry.utils.randomID();
+  const targetUserId = game.user.id;
+
+  return new Promise((resolve) => {
+    const timeout = setTimeout(() => { cleanup(); resolve(null); }, SPAWN_RESPONSE_TIMEOUT_MS);
+    const handler = async (response) => {
+      if (response?.type !== 'summonSpawnResponse') return;
+      if (response.requestId !== requestId) return;
+      if (response.targetUserId !== targetUserId) return;
+      cleanup();
+      if (!response.success) {
+        ui.notifications.warn(`Summon failed: ${response.error ?? 'unknown'}`);
+        resolve(null);
+        return;
+      }
+      const actorClone = response.actorUuid ? await fromUuid(response.actorUuid) : null;
+      const tokenDoc   = response.tokenUuid ? await fromUuid(response.tokenUuid) : null;
+      resolve(actorClone && tokenDoc ? { actorClone, tokenDoc } : null);
+    };
+    const cleanup = () => {
+      clearTimeout(timeout);
+      game.socket.off(SOCKET_CHANNEL, handler);
+    };
+    game.socket.on(SOCKET_CHANNEL, handler);
+    game.socket.emit(SOCKET_CHANNEL, {
+      type: 'summonSpawnRequest',
+      method,
+      payload,
+      requestId,
+      requesterId: targetUserId,
+    });
+  });
+}
+
+/**
+ * GM-side socket listener: receive spawn requests, run them locally with GM
+ * permissions, emit response with the new doc UUIDs. Registered alongside the
+ * other summon hooks below.
+ */
+function _registerGMSpawnListener() {
+  game.socket.on(SOCKET_CHANNEL, async (msg) => {
+    if (!game.user.isGM) return;
+    if (msg?.type !== 'summonSpawnRequest') return;
+    const { method, payload, requestId, requesterId } = msg;
+
+    const respond = (success, extra) => {
+      game.socket.emit(SOCKET_CHANNEL, {
+        type: 'summonSpawnResponse',
+        targetUserId: requesterId,
+        requestId,
+        success,
+        ...extra,
+      });
+    };
+
+    try {
+      // Resolve UUIDs back to docs/objects
+      let result = null;
+      if (method === 'spawnSummon') {
+        const sourceActor = await fromUuid(payload.sourceActorUuid);
+        const scene = game.scenes.get(payload.sceneId) ?? canvas.scene;
+        result = await SummonHelpers.spawnSummon({
+          sourceActor, scene,
+          position:        payload.position,
+          summonType:      payload.summonType,
+          sourceSkillUuid: payload.sourceSkillUuid,
+          hpOverride:      payload.hpOverride,
+          namePrefix:      payload.namePrefix,
+          capacity:        payload.capacity,
+        });
+      } else if (method === 'spawnTower') {
+        const scene = game.scenes.get(payload.sceneId) ?? canvas.scene;
+        result = await SummonHelpers.spawnTower({
+          stubActorUuid:    payload.stubActorUuid,
+          scene,
+          position:         payload.position,
+          ownerActorUuid:   payload.ownerActorUuid,
+          ritualPower:      payload.ritualPower,
+          statDistribution: payload.statDistribution,
+          aiProfile:        payload.aiProfile,
+          aiSkillUuid:      payload.aiSkillUuid,
+          summonType:       payload.summonType,
+          sourceSkillUuid:  payload.sourceSkillUuid,
+          capacity:         payload.capacity,
+          extraTags:        payload.extraTags,
+          namePrefix:       payload.namePrefix,
+        });
+      } else {
+        respond(false, { error: `unknown spawn method: ${method}` });
+        return;
+      }
+
+      if (!result) {
+        respond(false, { error: 'spawn returned null' });
+        return;
+      }
+      respond(true, {
+        actorUuid: result.actorClone?.uuid ?? null,
+        tokenUuid: result.tokenDoc?.uuid ?? null,
+      });
+    } catch (e) {
+      console.error('[summon] GM spawn handler error:', e);
+      respond(false, { error: e.message });
+    }
+  });
+}
+
 /**
  * deleteToken hook: when a summon token is deleted (manually or via despawn),
  * purge its linked cloned actor if the flag says so. Without this hook a GM
  * who right-clicks → delete on the token would leave the world actor behind.
  */
 export function registerSummonHooks() {
+  // GM-side spawn-request listener (player → GM socket bridge for Actor.create)
+  _registerGMSpawnListener();
+
   Hooks.on('deleteToken', async (tokenDoc, _options, _userId) => {
     if (!game.user.isGM) return;
     const summonFlag = tokenDoc.flags?.['aspects-of-power']?.summon;
