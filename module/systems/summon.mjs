@@ -419,7 +419,10 @@ async function _requestGMSpawn(method, payload) {
 
   return new Promise((resolve) => {
     const timeout = setTimeout(() => { cleanup(); resolve(null); }, SPAWN_RESPONSE_TIMEOUT_MS);
-    const handler = async (response) => {
+    // Sync handler that fires-and-forgets the async work — socket.on shouldn't
+    // receive a Promise return value (some host environments treat that as a
+    // sync-response promise that goes out of scope).
+    const handler = (response) => {
       if (response?.type !== 'summonSpawnResponse') return;
       if (response.requestId !== requestId) return;
       if (response.targetUserId !== targetUserId) return;
@@ -429,9 +432,14 @@ async function _requestGMSpawn(method, payload) {
         resolve(null);
         return;
       }
-      const actorClone = response.actorUuid ? await fromUuid(response.actorUuid) : null;
-      const tokenDoc   = response.tokenUuid ? await fromUuid(response.tokenUuid) : null;
-      resolve(actorClone && tokenDoc ? { actorClone, tokenDoc } : null);
+      (async () => {
+        const actorClone = response.actorUuid ? await fromUuid(response.actorUuid) : null;
+        const tokenDoc   = response.tokenUuid ? await fromUuid(response.tokenUuid) : null;
+        resolve(actorClone && tokenDoc ? { actorClone, tokenDoc } : null);
+      })().catch(err => {
+        console.error('[summon] response handler error:', err);
+        resolve(null);
+      });
     };
     const cleanup = () => {
       clearTimeout(timeout);
@@ -454,7 +462,9 @@ async function _requestGMSpawn(method, payload) {
  * other summon hooks below.
  */
 function _registerGMSpawnListener() {
-  game.socket.on(SOCKET_CHANNEL, async (msg) => {
+  // Sync wrapper, async work runs fire-and-forget so socket.on doesn't see
+  // a Promise return value (avoids "Promised response went out of scope").
+  game.socket.on(SOCKET_CHANNEL, (msg) => {
     if (!game.user.isGM) return;
     if (msg?.type !== 'summonSpawnRequest') return;
     const { method, payload, requestId, requesterId } = msg;
@@ -469,55 +479,56 @@ function _registerGMSpawnListener() {
       });
     };
 
-    try {
-      // Resolve UUIDs back to docs/objects
-      let result = null;
-      if (method === 'spawnSummon') {
-        const sourceActor = await fromUuid(payload.sourceActorUuid);
-        const scene = game.scenes.get(payload.sceneId) ?? canvas.scene;
-        result = await SummonHelpers.spawnSummon({
-          sourceActor, scene,
-          position:        payload.position,
-          summonType:      payload.summonType,
-          sourceSkillUuid: payload.sourceSkillUuid,
-          hpOverride:      payload.hpOverride,
-          namePrefix:      payload.namePrefix,
-          capacity:        payload.capacity,
-        });
-      } else if (method === 'spawnTower') {
-        const scene = game.scenes.get(payload.sceneId) ?? canvas.scene;
-        result = await SummonHelpers.spawnTower({
-          stubActorUuid:    payload.stubActorUuid,
-          scene,
-          position:         payload.position,
-          ownerActorUuid:   payload.ownerActorUuid,
-          ritualPower:      payload.ritualPower,
-          statDistribution: payload.statDistribution,
-          aiProfile:        payload.aiProfile,
-          aiSkillUuid:      payload.aiSkillUuid,
-          summonType:       payload.summonType,
-          sourceSkillUuid:  payload.sourceSkillUuid,
-          capacity:         payload.capacity,
-          extraTags:        payload.extraTags,
-          namePrefix:       payload.namePrefix,
-        });
-      } else {
-        respond(false, { error: `unknown spawn method: ${method}` });
-        return;
-      }
+    (async () => {
+      try {
+        let result = null;
+        if (method === 'spawnSummon') {
+          const sourceActor = await fromUuid(payload.sourceActorUuid);
+          const scene = game.scenes.get(payload.sceneId) ?? canvas.scene;
+          result = await SummonHelpers.spawnSummon({
+            sourceActor, scene,
+            position:        payload.position,
+            summonType:      payload.summonType,
+            sourceSkillUuid: payload.sourceSkillUuid,
+            hpOverride:      payload.hpOverride,
+            namePrefix:      payload.namePrefix,
+            capacity:        payload.capacity,
+          });
+        } else if (method === 'spawnTower') {
+          const scene = game.scenes.get(payload.sceneId) ?? canvas.scene;
+          result = await SummonHelpers.spawnTower({
+            stubActorUuid:    payload.stubActorUuid,
+            scene,
+            position:         payload.position,
+            ownerActorUuid:   payload.ownerActorUuid,
+            ritualPower:      payload.ritualPower,
+            statDistribution: payload.statDistribution,
+            aiProfile:        payload.aiProfile,
+            aiSkillUuid:      payload.aiSkillUuid,
+            summonType:       payload.summonType,
+            sourceSkillUuid:  payload.sourceSkillUuid,
+            capacity:         payload.capacity,
+            extraTags:        payload.extraTags,
+            namePrefix:       payload.namePrefix,
+          });
+        } else {
+          respond(false, { error: `unknown spawn method: ${method}` });
+          return;
+        }
 
-      if (!result) {
-        respond(false, { error: 'spawn returned null' });
-        return;
+        if (!result) {
+          respond(false, { error: 'spawn returned null' });
+          return;
+        }
+        respond(true, {
+          actorUuid: result.actorClone?.uuid ?? null,
+          tokenUuid: result.tokenDoc?.uuid ?? null,
+        });
+      } catch (e) {
+        console.error('[summon] GM spawn handler error:', e);
+        respond(false, { error: e.message });
       }
-      respond(true, {
-        actorUuid: result.actorClone?.uuid ?? null,
-        tokenUuid: result.tokenDoc?.uuid ?? null,
-      });
-    } catch (e) {
-      console.error('[summon] GM spawn handler error:', e);
-      respond(false, { error: e.message });
-    }
+    })();
   });
 }
 
