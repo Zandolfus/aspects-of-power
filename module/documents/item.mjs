@@ -5849,10 +5849,47 @@ export class AspectsofPowerItem extends Item {
         // power IS the invest amount. Ritual skills need to be authored as
         // variable-spell-qualifying (attack tag + spellTier + spellGrade)
         // for this to actually move the damage number.
-        await ritualSkill.roll({
-          preInvestAmount: Math.max(1, ritualPower),
-          ritualActivation: true,
-        });
+        //
+        // If the resolved ritualSkill has no actor (compendium-sourced via
+        // ritualActivationSkillId override), it can't .roll() — _isPlayerCharacter
+        // and other roll-path helpers dereference this.actor. Clone it onto the
+        // activator first, roll on the owned copy, then clean up. If the
+        // activator already has an embedded copy (legacy rituals where the
+        // skill is granted to the caster), use it directly.
+        let rollableSkill = ritualSkill;
+        let cleanupTempSkill = false;
+        if (!ritualSkill.actor) {
+          const existing = this.actor.items.find(i =>
+            i.type === 'skill'
+            && (i.flags?.aspectsofpower?.grantedFrom === ritualSkill.uuid
+              || i.name === ritualSkill.name)
+          );
+          if (existing) {
+            rollableSkill = existing;
+          } else {
+            const skillData = ritualSkill.toObject();
+            delete skillData._id;
+            skillData.flags = skillData.flags ?? {};
+            skillData.flags.aspectsofpower = {
+              ...(skillData.flags.aspectsofpower ?? {}),
+              grantedFrom: ritualSkill.uuid,
+              isRitualActivation: true,
+            };
+            const [created] = await this.actor.createEmbeddedDocuments('Item', [skillData]);
+            rollableSkill = created;
+            cleanupTempSkill = true;
+          }
+        }
+        try {
+          await rollableSkill.roll({
+            preInvestAmount: Math.max(1, ritualPower),
+            ritualActivation: true,
+          });
+        } finally {
+          if (cleanupTempSkill && rollableSkill?.id) {
+            try { await this.actor.deleteEmbeddedDocuments('Item', [rollableSkill.id]); } catch (_) { /* best-effort */ }
+          }
+        }
         break;
       }
 
