@@ -42,6 +42,16 @@ export function deriveItemStats(itemOrPatch) {
   // Without this, e.g. an item tagged [weapon,1H,shield,X-affinity] would
   // tie buckler and shield at overlap=3, and iteration order would pick
   // buckler (lower armor value) over shield.
+  //
+  // Per 2026-05-30 fix: include `system.slot` as a virtual tag so that
+  // armor pieces tagged `[armor, leather]` (without the slot in tags)
+  // still resolve to their slot's typeKey. Previously the resolver picked
+  // whichever armor-tagged type iterated first (typically 'chest'), giving
+  // bracers/gloves/back the wrong slotValue (0.5 instead of 0.2 / 0.1).
+  // Affected any leather/cloth/metal piece authored without the slot in
+  // its tag list — most of them. Stable for items that already include
+  // slot in tags (the slot becomes a duplicate, perfect-match still wins).
+  const effectiveTags = sys.slot ? [...tags, sys.slot] : tags;
   const knownTypes = Object.entries(sc.craftItemTypes ?? {});
   let typeKey = null;
   let bestScore = 0;
@@ -49,7 +59,7 @@ export function deriveItemStats(itemOrPatch) {
   for (const [k, def] of knownTypes) {
     const tk = def.tags ?? [];
     if (tk.length === 0) continue;
-    const overlap = tk.filter(t => tags.includes(t)).length;
+    const overlap = tk.filter(t => effectiveTags.includes(t)).length;
     const isPerfect = overlap === tk.length;
     if (isPerfect) {
       // Prefer perfect matches — among them, more tags = more specific.
