@@ -271,6 +271,20 @@ export class SummonHelpers {
       };
     }
 
+    // Inherit the OWNER's race level (RL) onto the tower for parity. Channel
+    // tick cadence + any other RL-derived rates use the actor's own race
+    // level — without this the tower defaults to the stub's RL (or fallback
+    // 25), ticking meaningfully slower than the summoner's natural rhythm.
+    // Per user 2026-05-30: "Willy's summoned construct exists at Willy's tier."
+    const ownerRL = ownerActor.system?.attributes?.race?.level ?? null;
+    if (ownerRL != null) {
+      cloneData.system.attributes = cloneData.system.attributes ?? {};
+      cloneData.system.attributes.race = {
+        ...(cloneData.system.attributes.race ?? {}),
+        level: ownerRL,
+      };
+    }
+
     // Push extra tags onto system.tags (deduped).
     const baseTags = Array.isArray(cloneData.system.tags) ? cloneData.system.tags : [];
     const tagSet = new Set([...baseTags, ...extraTags]);
