@@ -1,6 +1,6 @@
 import { EquipmentSystem } from '../systems/equipment.mjs';
 import { getPositionalTags } from '../helpers/positioning.mjs';
-import { recordActionFired, declareAction, isInActiveCombat, computeActionWait, referenceRoundLength } from '../systems/celerity.mjs';
+import { recordActionFired, declareAction, isInActiveCombat, computeActionWait, referenceRoundLength, computeWindupMultiplier, getScrambleStacks, addScrambleStack, applyDodgeCost } from '../systems/celerity.mjs';
 import { getThreatRadiusFt, actorIsDashing } from '../systems/engagement-halts.mjs';
 import { selectTargetOnCanvas, skillNeedsTargetPrompt, skillTargetsAtFire, selectMarkerOnCanvas } from '../canvas/target-prompt.mjs';
 import { regionTokenOverlap, segmentIntersect } from '../helpers/geometry.mjs';
@@ -1033,6 +1033,7 @@ export class AspectsofPowerItem extends Item {
     const pool    = targetActor.system.defense[defKey]?.pool ?? 0;
     const poolMax = targetActor.system.defense[defKey]?.poolMax ?? 0;
     const defLabel = defKey.charAt(0).toUpperCase() + defKey.slice(1);
+    const isPhysicalLane = defKey === 'melee' || defKey === 'ranged';
 
     const skillTags = item.system?.tags ?? [];
     const shrapnelMult = skillTags.includes('shrapnel')
@@ -1049,7 +1050,51 @@ export class AspectsofPowerItem extends Item {
     let swappedTargetActor = null;
     let swappedTargetToken = null;
 
-    if (defenseResult.defend && pool > 0) {
+    if (isPhysicalLane) {
+      // ── Active defense: DODGE (design-active-defense.md) ──
+      // Opposed house-grammar roll off defense.value, scramble-penalized.
+      // Attempt costs (scramble stack + celerity delay) apply win or lose.
+      // Graze band: a near-miss takes half damage — restores the partial-
+      // mitigation smoothing the old pools provided. No pool is touched.
+      if (defenseResult.defend) {
+        const dt = CONFIG.ASPECTSOFPOWER.defenseTuning ?? {};
+        const stacks = getScrambleStacks(targetActor);
+        const defVal = targetActor.system.defense[defKey]?.value ?? 0;
+        const dv = defVal * Math.max(0, 1 - (dt.scrambleStackPct ?? 0.15) * stacks);
+        const die = await new Roll('1d20').evaluate();
+        let droll = dv * (1 + die.total / 100);
+        // Shrapnel is hard to dodge — penalize the roll (replaces the old
+        // pool-cost multiplier for physical lanes).
+        if (shrapnelMult > 1) droll *= (1 - (dt.shrapnelDodgePenalty ?? 0.25));
+        droll = Math.round(droll);
+
+        await addScrambleStack(targetActor);
+        const cost = await applyDodgeCost(targetActor);
+        const costNote = cost > 0 ? ` — next action +${cost} ticks` : '';
+        const speaker = ChatMessage.getSpeaker({ actor: targetActor });
+
+        if (droll >= hitTotal) {
+          isHit = false;
+          defenseLine = `<p>${defLabel} dodge: <strong>success</strong> (${droll} vs ${hitTotal})${costNote}</p>`;
+          ChatMessage.create({ speaker,
+            content: `<p><strong>${targetActor.name}</strong> dodges the ${defLabel.toLowerCase()} attack! (${droll} vs ${hitTotal}) <em>May reposition 5ft.</em></p>`,
+          });
+        } else if (droll >= hitTotal * (1 - (dt.grazeBandPct ?? 0.10))) {
+          damageMultiplier = 0.5;
+          defenseLine = `<p>${defLabel} dodge: <strong>graze</strong> (${droll} vs ${hitTotal} — half damage)${costNote}</p>`;
+          ChatMessage.create({ speaker,
+            content: `<p><strong>${targetActor.name}</strong> nearly evades — grazed for half damage. (${droll} vs ${hitTotal})</p>`,
+          });
+        } else {
+          defenseLine = `<p>${defLabel} dodge: <strong>failed</strong> (${droll} vs ${hitTotal})${costNote}</p>`;
+          ChatMessage.create({ speaker,
+            content: `<p><strong>${targetActor.name}</strong> fails to dodge. (${droll} vs ${hitTotal})</p>`,
+          });
+        }
+      } else {
+        defenseLine = `<p>${defLabel} defense: takes the hit (bulk absorbs)</p>`;
+      }
+    } else if (defenseResult.defend && pool > 0) {
       if (pool >= effectiveHit) {
         isHit = false;
         const newPool = pool - effectiveHit;
@@ -1066,7 +1111,7 @@ export class AspectsofPowerItem extends Item {
       defenseLine = `<p>${defLabel} defense: no pool remaining (0 / ${poolMax})</p>`;
     }
 
-    if (defenseResult.defend && pool > 0) {
+    if (!isPhysicalLane && defenseResult.defend && pool > 0) {
       const pct = pool >= effectiveHit ? 100 : Math.round((pool / effectiveHit) * 100);
       ChatMessage.create({
         speaker: ChatMessage.getSpeaker({ actor: targetActor }),
@@ -1863,17 +1908,43 @@ export class AspectsofPowerItem extends Item {
       available: reactions.value > 0,
     }));
 
-    // If pool is empty and no reaction skills exist at all, skip prompt.
-    if (pool <= 0 && reactionList.length === 0) return { defend: false, reactionSkillId: null };
-
-    const fullDodge = pool > 0 && pool >= hitTotal;
-    let defenseText = '';
-    if (pool > 0) {
-      const outcomeText = fullDodge
-        ? `<strong>Full dodge.</strong> Pool: ${pool} → ${pool - hitTotal}`
-        : `<strong>Partial defense (${Math.round((pool / hitTotal) * 100)}% reduction).</strong> Pool: ${pool} → 0`;
-      defenseText = `<p>${defLabel} defense pool: ${pool} / ${poolMax}</p><p>If you defend: ${outcomeText}</p>`;
+    // ── Lane split (active defense, design-active-defense.md) ──
+    // Physical lanes (melee/ranged): "defend" = DODGE — an opposed roll off
+    // defense.value, scramble-penalized, blind-gated, costing celerity time.
+    // Mental lanes (mind/soul): legacy pool semantics unchanged.
+    const isPhysicalLane = defKey === 'melee' || defKey === 'ranged';
+    const dt = CONFIG.ASPECTSOFPOWER.defenseTuning ?? {};
+    let hasDefend, defendLabel, defenseText;
+    if (isPhysicalLane) {
+      // Perception gate: you can't dodge what you can't see.
+      const blinded = targetActor.effects.some(e => !e.disabled && e.system?.debuffType === 'blind');
+      const stacks = getScrambleStacks(targetActor);
+      const defVal = targetActor.system.defense[defKey]?.value ?? 0;
+      const dv = Math.round(defVal * Math.max(0, 1 - (dt.scrambleStackPct ?? 0.15) * stacks));
+      hasDefend = !blinded && dv > 0;
+      defendLabel = 'Dodge';
+      const scrambleNote = stacks >= 1
+        ? ` (scramble −${Math.round((dt.scrambleStackPct ?? 0.15) * stacks * 100)}%)`
+        : '';
+      defenseText = hasDefend
+        ? `<p>Dodge value: <strong>${dv}</strong>${scrambleNote} vs to-hit ${hitTotal}.</p>`
+          + `<p><em>Dodging delays your next action and adds a scramble stack — win or lose.</em></p>`
+        : (blinded ? `<p><em>Blinded — you cannot dodge what you cannot see.</em></p>` : '');
+    } else {
+      hasDefend = pool > 0;
+      defendLabel = 'Defend';
+      const fullDodge = pool > 0 && pool >= hitTotal;
+      defenseText = '';
+      if (pool > 0) {
+        const outcomeText = fullDodge
+          ? `<strong>Full dodge.</strong> Pool: ${pool} → ${pool - hitTotal}`
+          : `<strong>Partial defense (${Math.round((pool / hitTotal) * 100)}% reduction).</strong> Pool: ${pool} → 0`;
+        defenseText = `<p>${defLabel} defense pool: ${pool} / ${poolMax}</p><p>If you defend: ${outcomeText}</p>`;
+      }
     }
+
+    // Nothing to offer at all — eat the hit without a prompt.
+    if (!hasDefend && reactionList.length === 0) return { defend: false, reactionSkillId: null };
 
     const reactionText = reactionList.length > 0
       ? `<p>Reactions: ${reactions.value} / ${reactions.max}</p>`
@@ -1910,13 +1981,14 @@ export class AspectsofPowerItem extends Item {
           targetName: targetActor.name,
           promptContent,
           requestId,
-          hasPool: pool > 0,
+          hasDefend,
+          defendLabel,
           reactionSkills: reactionList,
         });
       });
     } else if (game.user.isGM) {
       // GM-owned target and we ARE the GM — show dialog locally.
-      result = await this._showDefenseDialog(targetActor.name, promptContent, pool > 0, reactionList);
+      result = await this._showDefenseDialog(targetActor.name, promptContent, hasDefend, reactionList, defendLabel);
     } else {
       // GM-owned target but a player is attacking — route to GM via socket.
       const requestId = foundry.utils.randomID();
@@ -1940,7 +2012,8 @@ export class AspectsofPowerItem extends Item {
             targetName: targetActor.name,
             promptContent,
             requestId,
-            hasPool: pool > 0,
+            hasDefend,
+            defendLabel,
             reactionSkills: reactionList,
           });
         });
@@ -1954,10 +2027,10 @@ export class AspectsofPowerItem extends Item {
    * Show the defense/reaction dialog locally (for GM-owned targets).
    * Returns { defend: boolean, reactionSkillId: string|null }.
    */
-  async _showDefenseDialog(targetName, promptContent, hasPool, reactionSkills) {
+  async _showDefenseDialog(targetName, promptContent, hasDefend, reactionSkills, defendLabel = 'Defend') {
     const buttons = [];
-    if (hasPool) {
-      buttons.push({ action: 'defend', label: 'Defend', icon: 'fas fa-shield-alt', default: true });
+    if (hasDefend) {
+      buttons.push({ action: 'defend', label: defendLabel, icon: 'fas fa-shield-alt', default: true });
     }
     for (const rs of reactionSkills) {
       if (rs.available) {

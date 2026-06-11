@@ -1074,8 +1074,8 @@ Hooks.once('ready', async function () {
     // --- Player-side: defense prompt ---
     if (payload.type === 'defensePrompt' && payload.targetUserId === game.userId) {
       const buttons = [];
-      if (payload.hasPool) {
-        buttons.push({ action: 'defend', label: 'Defend', icon: 'fas fa-shield-alt', default: true });
+      if (payload.hasDefend ?? payload.hasPool) {
+        buttons.push({ action: 'defend', label: payload.defendLabel ?? 'Defend', icon: 'fas fa-shield-alt', default: true });
       }
       for (const rs of (payload.reactionSkills ?? [])) {
         if (rs.available) {
