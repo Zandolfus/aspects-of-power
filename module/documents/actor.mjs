@@ -326,7 +326,12 @@ export class AspectsofPowerActor extends Actor {
     systemData.defense.veil.value  = effectBonus('system.defense.veil.value');
 
     // Base defense calculations.
-    let meleeVal  = Math.round((effectiveDex + strMod * 0.3) * 1.1) + effectBonus('system.defense.melee.value');
+    // Melee secondary = max(str, per) per design-active-defense.md perception
+    // ruling (2026-06-11): you avoid a blow by muscling the pivot (str) OR
+    // reading it early (per) — whichever you're better at. Substitutes,
+    // never stacks; melee specialists unchanged, per-primaries (rangers,
+    // magic marksmen) get melee-defense return on their main stat.
+    let meleeVal  = Math.round((effectiveDex + Math.max(strMod, effectivePer) * 0.3) * 1.1) + effectBonus('system.defense.melee.value');
     let rangedVal = Math.round((effectiveDex * 0.3 + effectivePer) * 1.1) + effectBonus('system.defense.ranged.value');
     let mindVal   = Math.round((intMod + wisMod * 0.3) * 1.1) + effectBonus('system.defense.mind.value');
     let soulVal   = Math.round((wisMod + wilMod * 0.3) * 1.1) + effectBonus('system.defense.soul.value');
