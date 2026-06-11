@@ -250,23 +250,17 @@ export class ChannelHelpers {
   }
 
   static async #applyTickDamage(targetActor, tickDmg, damageType, caster, skill, rampMult) {
-    // Defense pool (ranged for now — channels are conceptually ranged attacks)
+    // Active defense (2026-06-12): physical pools are gone, and channel
+    // ticks join the volumetric "can't dodge a sustained beam you're
+    // standing in" class — no defense prompt, no pool. Damage routes
+    // straight through mitigation: armor/veil (+ block DR for physical)
+    // → DR → overhealth → HP.
     const defKey = damageType === 'physical' ? 'armor' : 'veil';
-    const defPool = targetActor.system?.defense?.ranged ?? null;
-    let postPoolDmg = tickDmg;
-    if (defPool && defPool.pool > 0) {
-      if (defPool.pool >= tickDmg) {
-        postPoolDmg = 0;
-        await targetActor.update({ 'system.defense.ranged.pool': defPool.pool - tickDmg });
-      } else {
-        const reductionRatio = defPool.pool / tickDmg;
-        postPoolDmg = Math.round(tickDmg * (1 - reductionRatio));
-        await targetActor.update({ 'system.defense.ranged.pool': 0 });
-      }
-    }
+    const postPoolDmg = tickDmg;
 
-    // Armor/veil mitigation
-    const mitigation = targetActor.system?.defense?.[defKey]?.value ?? 0;
+    // Armor/veil mitigation (+ held-weapon block DR on the physical lane)
+    const blockDR = damageType === 'physical' ? (targetActor.system?.defense?.blockDR ?? 0) : 0;
+    const mitigation = (targetActor.system?.defense?.[defKey]?.value ?? 0) + blockDR;
     let postMitDmg = Math.max(0, postPoolDmg - mitigation);
 
     // DR
@@ -291,7 +285,7 @@ export class ChannelHelpers {
     }
 
     // Chat output (GM-whispered for tower-driven; visible for player channels)
-    const breakdown = `${tickDmg} raw × ${rampMult.toFixed(2)}× → ${postPoolDmg} after pool → ${postMitDmg} after ${defKey} → ${finalDmg} after DR`;
+    const breakdown = `${tickDmg} raw × ${rampMult.toFixed(2)}× → ${postMitDmg} after ${defKey}${damageType === 'physical' ? '+block' : ''} → ${finalDmg} after DR`;
     const whisper = !caster.hasPlayerOwner ? ChatMessage.getWhisperRecipients('GM') : undefined;
     await ChatMessage.create({
       speaker: ChatMessage.getSpeaker({ actor: caster }),

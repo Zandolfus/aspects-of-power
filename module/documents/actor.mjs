@@ -946,13 +946,17 @@ export class AspectsofPowerActor extends Actor {
     }
 
     // ── 3. Defense Pool Reset + Sleep Mechanics ──
+    // Active defense (2026-06-12): physical pools (melee/ranged) are GONE —
+    // physical defense is dodge/parry/bulk, resolved per-attack with no
+    // per-round resource. Only the mental lanes (mind/soul) keep ablative
+    // pools, reset each personal round, with sleep drain on mind.
     const sleepEffects = this.effects.filter(e =>
       !e.disabled && e.system?.debuffType === 'sleep'
     );
     const sleepDrain = sleepEffects.reduce((sum, e) =>
       sum + (e.system?.debuffDamage ?? 0), 0);
 
-    for (const defKey of ['melee', 'ranged', 'mind', 'soul']) {
+    for (const defKey of ['mind', 'soul']) {
       const poolMax = systemData.defense[defKey]?.poolMax ?? 0;
       let targetPool = poolMax;
 

@@ -6732,7 +6732,12 @@ export class AspectsofPowerItem extends Item {
         investedAmount = invested;
         rollData.roll.cost = invested;
         rollData.roll.variableWeaponInvest = invested;
-        const strikeDmg = Math.round(statBlend * multiplier * Math.pow(Math.max(invested, 1) / Math.max(baseStamina, 1), 0.2));
+        // Windup (design-active-defense.md): weight→damage coupling. Heavy
+        // weapons hit harder per swing (GS 2.0×), light hit lighter (dagger
+        // 0.6×) — raw DPS-neutral with wait ∝ weight; the defense layer
+        // (one big dodge vs many scrambling dodges) provides the archetype RPS.
+        const windup = computeWindupMultiplier(this, weapon);
+        const strikeDmg = Math.round(statBlend * multiplier * windup * Math.pow(Math.max(invested, 1) / Math.max(baseStamina, 1), 0.2));
         if (useInfused && manaInvested > 0) {
           infusedManaCost = manaInvested;
           infusedInfusionDmg = Math.round(intMod * Math.pow(Math.max(manaInvested, 1) / Math.max(infusedBaseMana, 1), 0.2));
