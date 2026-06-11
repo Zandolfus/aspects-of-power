@@ -2570,6 +2570,29 @@ export class AspectsofPowerItem extends Item {
           }
         }
 
+        // ── CC-through-veil — mind/soul debuff potency reduced by veil ──
+        // Per design-archetype-defense-gap.md: veil is the magical-effect
+        // mitigation layer. Mind/soul-targeting debuffs (sleep, charm, fear…)
+        // have their potency (debuffDamage) flat-reduced by the target's
+        // veil; fully absorbed = "warded", effect never applies. Mirrors
+        // resistance semantics exactly: only debuffDamage is reduced (stat
+        // changes stay full on partial), message only on full negation.
+        // Physical-lane debuffs (melee/ranged targetDefense) are untouched.
+        if (['mind', 'soul'].includes(payload.targetDefense) &&
+            payload.effectData?.system?.debuffDamage > 0) {
+          const veil = target.system.defense?.veil?.value ?? 0;
+          if (veil > 0) {
+            payload.effectData.system.debuffDamage = Math.max(0, payload.effectData.system.debuffDamage - veil);
+            if (payload.effectData.system.debuffDamage <= 0) {
+              ChatMessage.create({
+                speaker: payload.speaker, ...msgWhisper,
+                content: `<p><strong>${target.name}</strong> is warded against <strong>${game.i18n.localize(CONFIG.ASPECTSOFPOWER.debuffTypes[debuffTypeCheck] ?? debuffTypeCheck)}</strong>! (veil: ${veil})</p>`,
+              });
+              break;
+            }
+          }
+        }
+
         const combat = game.combat;
         const startRound = combat?.round ?? 0;
         const startTurn  = combat?.turn ?? 0;
@@ -3429,6 +3452,10 @@ export class AspectsofPowerItem extends Item {
       dotDamageType: dmgType,
       duration,
       statSummary,
+      // Mind/soul-targeting debuffs route potency through the target's veil
+      // (CC-through-veil rule, design-archetype-defense-gap.md). Empty/unset
+      // targetDefense falls through to 'melee' = not veil-gated.
+      targetDefense: rollData.roll?.targetDefense || 'melee',
       speaker, rollMode,
     });
   }

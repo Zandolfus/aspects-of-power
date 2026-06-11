@@ -1970,6 +1970,9 @@ async function _resolveMentalDebuffTick(targetActor, pd, flags, defenseKey, spea
     duration,
     stackable: pd.tagConfig.debuffStackable ?? false,
     statSummary: `${defenseKey} pool depleted — succumbs to ${debuffType}`,
+    // Mental AOE zones are mind/soul-targeting by construction — route
+    // potency through the target's veil (CC-through-veil rule).
+    targetDefense: defenseKey,
     speaker,
   });
 }
