@@ -2284,15 +2284,44 @@ Hooks.on('renderChatMessageHTML', (message, html) => {
         barrierAbsorbed = true;
 
         if (newBarrierVal === 0) {
-          // Barrier broken — delete the effect.
-          await barrierEffect.delete();
+          // Barrier broken. Reforming shells (Mana Shell) re-form to full by
+          // re-paying the original investment from the caster — the
+          // remainder of the BREAKING hit still passes through (shell broke
+          // mid-hit; the fresh shell faces the NEXT attack). If the caster
+          // can't pay, the shell dies and tears down its sustain marker.
+          const bd = barrierEffect.system?.barrierData ?? {};
+          let reformed = false;
+          if (bd.reform && bd.casterActorUuid) {
+            const payer = await fromUuid(bd.casterActorUuid);
+            const res = bd.reformResource ?? 'mana';
+            const cost = Math.max(0, Math.round(bd.reformCost ?? 0));
+            const avail = payer?.system?.[res]?.value ?? 0;
+            if (payer && cost > 0 && avail >= cost) {
+              await payer.update({ [`system.${res}.value`]: avail - cost });
+              await barrierEffect.update({ 'system.barrierData.value': bd.max ?? cost });
+              reformed = true;
+              parts.push(`Barrier: −${absorbed} (shattered — reforms, −${cost} ${res})`);
+            }
+          }
+          if (!reformed) {
+            await barrierEffect.delete();
+            // Reform failure: drop the linked sustain marker on the caster
+            // so the dead shell doesn't linger as a phantom upkeep.
+            if (bd.reform && bd.sourceSkillId && bd.casterActorUuid) {
+              const payer = await fromUuid(bd.casterActorUuid);
+              const sustain = payer?.effects?.find(e =>
+                e.system?.effectType === 'sustain' && e.system?.itemSource === bd.sourceSkillId);
+              if (sustain) await sustain.delete();
+            }
+            parts.push(`Barrier: −${absorbed} ${bd.reform ? '(shattered — too drained to reform)' : '(broken)'}`);
+          }
         } else {
           // Update the effect's barrier data.
           await barrierEffect.update({
             'system.barrierData.value': newBarrierVal,
           });
+          parts.push(`Barrier: −${absorbed}`);
         }
-        parts.push(`Barrier: −${absorbed}${newBarrierVal === 0 ? ' (broken)' : ''}`);
       }
 
       // 2. Armor/Veil reduces whatever got through the barrier.

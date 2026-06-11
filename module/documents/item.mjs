@@ -2376,12 +2376,17 @@ export class AspectsofPowerItem extends Item {
             await existingEffect.delete();
           }
 
-          // Create barrier ActiveEffect.
+          // Create barrier ActiveEffect. For reforming shells (Mana Shell),
+          // `origin` ties the effect to the source skill so sustain-end
+          // teardown drops it, and barrierData carries everything the
+          // apply-damage reform branch needs (cost, payer, resource, the
+          // sustain marker's skill id for reverse teardown).
           await target.createEmbeddedDocuments('ActiveEffect', [{
             name: `Barrier: ${source}`,
             img: 'icons/magic/defensive/shield-barrier-glowing-blue.webp',
             disabled: false,
             type: 'base',
+            ...(payload.originUuid ? { origin: payload.originUuid } : {}),
             system: {
               effectType: 'barrier',
               effectCategory: 'temporary',
@@ -2390,6 +2395,13 @@ export class AspectsofPowerItem extends Item {
                 max: barrierValue,
                 affinities,
                 source,
+                ...(payload.barrierReform ? {
+                  reform: true,
+                  reformCost: payload.reformCost ?? 0,
+                  reformResource: payload.casterResource ?? 'mana',
+                  casterActorUuid: payload.casterActorUuid ?? null,
+                  sourceSkillId: payload.sourceSkillId ?? null,
+                } : {}),
               },
             },
           }]);
@@ -2946,6 +2958,16 @@ export class AspectsofPowerItem extends Item {
       actionPayload.casterActorUuid = this.actor.uuid;
       actionPayload.casterResource = casterRes;
       actionPayload.casterCost = casterCost;
+      // Mana Shell reform: barrier re-forms on break by re-paying the
+      // original investment. originUuid links the barrier effect to the
+      // skill (sustain-end teardown matches origin); sourceSkillId lets
+      // reform-failure tear down the sustain marker in return.
+      if (this.system.tagConfig?.barrierReform) {
+        actionPayload.barrierReform = true;
+        actionPayload.reformCost = Math.round(rollData.roll.variableManaCost ?? casterCost) || 0;
+        actionPayload.originUuid = this.uuid;
+        actionPayload.sourceSkillId = this.id;
+      }
     }
 
     await this._gmAction(actionPayload);

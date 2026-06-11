@@ -383,6 +383,12 @@ export class SkillData extends foundry.abstract.TypeDataModel {
 
         // Barrier: mana-to-HP multiplier for barrier restoration skills.
         barrierMultiplier: new fields.NumberField({ initial: 1, min: 0 }),
+        // Barrier reform (Mana Shell): when the barrier breaks, it reforms
+        // to full by consuming the original mana investment from the caster
+        // again. Reform fails (barrier + linked sustain drop) if the caster
+        // can't pay. Event-driven upkeep — pair with sustain tag at
+        // sustainCost 0 so cancelling the sustain dispels the shell.
+        barrierReform: new fields.BooleanField({ initial: false }),
 
         // Repair: which material types this skill can repair.
         repairMaterials: new fields.ArrayField(new fields.StringField(), { initial: [] }),
