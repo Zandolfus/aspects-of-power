@@ -776,7 +776,11 @@ ASPECTSOFPOWER.craftSlotValues = {
   chest: 0.50, legs: 0.40, head: 0.20, bracers: 0.20, boots: 0.20,
   gloves: 0.10, back: 0.10,
   // ── Jewelry (slot = type) ──
-  necklace: 0.40, bracelet: 0.30, ring: 0.50, earring: 0.30,
+  // Ring keeps 0.50 but its EFFECTIVE contribution divides by equipped ring
+  // count (EquipmentSystem._syncEffects) — total ring budget is constant
+  // regardless of how many are worn. Jewelry budget = 0.40 + 2×0.25 + 0.50
+  // + 0.30 = 1.70 slot-weight = armor budget (design-jewelry-rebalance.md).
+  necklace: 0.40, bracelet: 0.25, ring: 0.50, earring: 0.30,
   // ── Profession (slot = type) ──
   profWeapon: 0.25, profUtility: 0.25, profHead: 0.20, profChest: 0.50,
   profLegs: 0.40, profBoots: 0.20, profGloves: 0.10,

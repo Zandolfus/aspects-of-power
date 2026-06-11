@@ -1,3 +1,5 @@
+import { deriveItemStats } from './item-derivation.mjs';
+
 /**
  * Equipment management — equip/unequip logic, ActiveEffect synchronization,
  * slot validation, and repair mechanics.
@@ -115,7 +117,61 @@ export class EquipmentSystem {
     // Build the changes array from stat bonuses + augment bonuses + armor/veil.
     const changes = [];
 
-    for (const bonus of (item.system.statBonuses ?? [])) {
+    // ── Ring division (design-jewelry-rebalance.md) ──
+    // Each equipped ring's BASE-derived contributions (statBonuses + veil)
+    // divide by the wearer's total equipped ring count — 1 ring = full,
+    // 2 = ÷2 each, etc. Total ring budget is constant; multi-ringing is for
+    // augment diversity, not stacking. Augment contributions stay FULL.
+    //
+    // Pure base is recomputed augment-free via deriveItemStats because the
+    // auto-derive hook bakes augment itemBonuses into the STORED statBonuses/
+    // veilBonus (so stored fields ≠ base). Locked fields are manual
+    // overrides — never augment-baked — so the stored value IS their base.
+    // Augment statBonus.X itemBonuses (stripped by the pure recompute) are
+    // re-added at full value from slot snapshots, mirroring the derivation
+    // merge. Augment armor/veil flat/pct apply once via the live-doc
+    // collection below — on the divided pure base, so no double-count.
+    const isRing = item.system.slot === 'ring';
+    let baseStatBonuses = item.system.statBonuses ?? [];
+    let baseArmorValue  = item.system.armorBonus ?? 0;
+    let baseVeilValue   = item.system.veilBonus ?? 0;
+    if (isRing) {
+      const ringDivisor = Math.max(1, actor.items.filter(i =>
+        i.type === 'item' && i.system.equipped && i.system.slot === 'ring'
+      ).length);
+      const locked = new Set(item.system.lockedFields ?? []);
+      const pure = deriveItemStats({ system: { ...item.system, augments: [], profAugments: [] } });
+      const pureStats = locked.has('statBonuses') ? (item.system.statBonuses ?? []) : (pure.statBonuses ?? []);
+      const pureArmor = locked.has('armorBonus')  ? (item.system.armorBonus ?? 0)   : (pure.armorBonus ?? 0);
+      const pureVeil  = locked.has('veilBonus')   ? (item.system.veilBonus ?? 0)    : (pure.veilBonus ?? 0);
+
+      const divided = pureStats
+        .map(b => ({ ability: b.ability, value: Math.round((b.value ?? 0) / ringDivisor) }))
+        .filter(b => b.ability && b.value > 0);
+
+      // Re-add augment statBonus.<ability> itemBonuses at FULL value from
+      // snapshots (both combat + profession slots, no per-augment dedupe —
+      // mirrors item-derivation.mjs).
+      for (const a of [...(item.system.augments ?? []), ...(item.system.profAugments ?? [])]) {
+        if (!a?.augmentId) continue;
+        for (const ib of (a.itemBonuses ?? [])) {
+          const field = ib.field ?? '';
+          if (!field.startsWith('statBonus.')) continue;
+          const ability = field.slice('statBonus.'.length);
+          const value = Number(ib.value) || 0;
+          if (value <= 0) continue;
+          const existing = divided.find(s => s.ability === ability);
+          if (existing) existing.value += value;
+          else divided.push({ ability, value });
+        }
+      }
+
+      baseStatBonuses = divided;
+      baseArmorValue  = Math.round(pureArmor / ringDivisor);
+      baseVeilValue   = Math.round(pureVeil / ringDivisor);
+    }
+
+    for (const bonus of baseStatBonuses) {
       if (!bonus.ability || !bonus.value) continue;
       changes.push({
         key: `system.abilities.${bonus.ability}.value`,
@@ -164,7 +220,8 @@ export class EquipmentSystem {
     }
 
     // Calculate effective armor/veil with augment item bonuses applied.
-    const baseArmor = item.system.armorBonus ?? 0;
+    // (For rings, base values are the ring-divided pure base from above.)
+    const baseArmor = baseArmorValue;
     const effectiveArmor = Math.round(baseArmor * (1 + augArmorPct / 100) + augArmorFlat);
     if (effectiveArmor > 0) {
       changes.push({
@@ -175,7 +232,7 @@ export class EquipmentSystem {
       });
     }
 
-    const baseVeil = item.system.veilBonus ?? 0;
+    const baseVeil = baseVeilValue;
     const effectiveVeil = Math.round(baseVeil * (1 + augVeilPct / 100) + augVeilFlat);
     if (effectiveVeil > 0) {
       changes.push({
@@ -508,6 +565,11 @@ export class EquipmentSystem {
       this._syncEffects(item);
       if (item.system.equipped) this._grantSkills(item);
       else this._removeGrantedSkills(item);
+      // Ring count changed → every other equipped ring's divisor changed;
+      // re-sync them all (both directions: equip shrinks shares, unequip
+      // restores them). Safe from loops — _syncEffects only touches
+      // ActiveEffects, never item.update().
+      if (item.system.slot === 'ring') this._resyncOtherRings(item.parent, item.id);
       return;
     }
 
@@ -549,6 +611,20 @@ export class EquipmentSystem {
   }
 
   /**
+   * Re-sync every OTHER equipped ring on the actor — called when the
+   * equipped-ring count changes (equip/unequip/delete) so each ring's
+   * division share is recomputed against the new divisor.
+   */
+  static async _resyncOtherRings(actor, exceptItemId) {
+    if (!actor) return;
+    for (const other of actor.items) {
+      if (other.id === exceptItemId) continue;
+      if (other.type !== 'item' || !other.system.equipped || other.system.slot !== 'ring') continue;
+      await this._syncEffects(other);
+    }
+  }
+
+  /**
    * Clean up equipment ActiveEffects when an item is deleted.
    */
   static _onItemDelete(item, _options, _userId) {
@@ -567,6 +643,8 @@ export class EquipmentSystem {
       if (toDelete.length > 0) {
         actor.deleteEmbeddedDocuments('ActiveEffect', toDelete);
       }
+      // Deleted ring frees a divisor share for the survivors.
+      if (item.system.slot === 'ring') this._resyncOtherRings(actor, item.id);
     }
 
     // Equipment deleted — also remove any skills it granted.
