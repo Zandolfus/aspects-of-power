@@ -2185,8 +2185,9 @@ Hooks.on('renderChatMessageHTML', (message, html) => {
       if (!target || isNaN(incomingDmg)) return;
 
       const isPhysical = damageType === 'physical';
+      // Physical mitigation = armor + held-weapon block DR (active defense).
       const mitigation = isPhysical
-        ? (target.system.defense.armor?.value ?? 0)
+        ? (target.system.defense.armor?.value ?? 0) + (target.system.defense.blockDR ?? 0)
         : (target.system.defense.veil?.value ?? 0);
 
       // --- Damage routing: Mark bonus → Affinity DR → Barrier → Armor/Veil → DR → Overhealth → HP ---

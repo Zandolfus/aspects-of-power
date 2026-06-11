@@ -975,15 +975,20 @@ export class AspectsofPowerActorSheet extends foundry.applications.api.Handlebar
     const wisMod = ab.wisdom?.mod ?? 0;
     const wilMod = ab.willpower?.mod ?? 0;
 
-    const meleeBase = Math.round((dexMod + strMod * 0.3) * 1.1);
+    const meleeSecondary = Math.max(strMod, perMod);
+    const meleeBase = Math.round((dexMod + meleeSecondary * 0.3) * 1.1);
     tips.melee = `<strong>Melee Defense ${def.melee?.value ?? 0}</strong><hr>`
-               + `Base: (Dex ${dexMod} + Str ${strMod} × 0.3) × 1.1 = ${meleeBase}`
-               + `<br>Pool: ${def.melee?.pool ?? 0} / ${def.melee?.poolMax ?? 0}`;
+               + `Dodge value: (Dex ${dexMod} + max(Str ${strMod}, Per ${perMod}) × 0.3) × 1.1 = ${meleeBase}`
+               + `<br>Opposed dodge roll vs incoming melee attacks.`;
 
     const rangedBase = Math.round((dexMod * 0.3 + perMod) * 1.1);
     tips.ranged = `<strong>Ranged Defense ${def.ranged?.value ?? 0}</strong><hr>`
-                + `Base: (Dex ${dexMod} × 0.3 + Per ${perMod}) × 1.1 = ${rangedBase}`
-                + `<br>Pool: ${def.ranged?.pool ?? 0} / ${def.ranged?.poolMax ?? 0}`;
+                + `Dodge value: (Dex ${dexMod} × 0.3 + Per ${perMod}) × 1.1 = ${rangedBase}`
+                + `<br>Opposed dodge roll vs incoming ranged attacks.`;
+
+    tips.block = `<strong>Block DR ${def.blockDR ?? 0}</strong><hr>`
+               + `Held weapon's passive guard — flat reduction on every physical hit, added to Armor.`
+               + `<br>coef × (weapon weight / 100) × (1 + Str ${strMod} / 1085). Shields grant Armor instead.`;
 
     const mindBase = Math.round((intMod + wisMod * 0.3) * 1.1);
     tips.mind = `<strong>Mind Defense ${def.mind?.value ?? 0}</strong><hr>`

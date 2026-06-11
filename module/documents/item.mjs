@@ -1267,8 +1267,10 @@ export class AspectsofPowerItem extends Item {
       }
     }
     const isPhysical   = rollData.roll.damageType === 'physical';
+    // Physical mitigation = armor + held-weapon block DR (active defense:
+    // the str archetype's constant-on guard). Magical = veil only.
     const mitigation   = isPhysical
-      ? (targetActor.system.defense.armor?.value ?? 0)
+      ? (targetActor.system.defense.armor?.value ?? 0) + (targetActor.system.defense.blockDR ?? 0)
       : (targetActor.system.defense.veil?.value  ?? 0);
     const attackerToken      = this.actor.getActiveTokens()[0] ?? null;
     const baseDR             = targetActor.system.defense?.dr?.value ?? 0;

@@ -112,11 +112,15 @@
           <div class="defense-row defense-pools">
             <div class="defense-item" data-tooltip="{{{tooltips.melee}}}">
               <label>Melee</label>
-              <span>{{system.defense.melee.pool}}/{{system.defense.melee.poolMax}}</span>
+              <span>{{system.defense.melee.value}}</span>
             </div>
             <div class="defense-item" data-tooltip="{{{tooltips.ranged}}}">
               <label>Ranged</label>
-              <span>{{system.defense.ranged.pool}}/{{system.defense.ranged.poolMax}}</span>
+              <span>{{system.defense.ranged.value}}</span>
+            </div>
+            <div class="defense-item" data-tooltip="{{{tooltips.block}}}">
+              <label>Block</label>
+              <span>{{system.defense.blockDR}}</span>
             </div>
             <div class="defense-item" data-tooltip="{{{tooltips.mind}}}">
               <label>Mind</label>
