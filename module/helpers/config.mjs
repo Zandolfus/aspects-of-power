@@ -309,6 +309,25 @@ ASPECTSOFPOWER.defenseTuning = {
   // Global HP multiplier (gap-analysis Family D, sim-validated 2026-06-11):
   // raises TTK floor so windup bursts don't one-shot same-rank actors.
   hpScale: 1.5,
+  // AI defense auto-policy: AI-flagged defenders dodge when their exact
+  // dodge win probability (two-d20 contest) meets this threshold; else eat.
+  aiDodgeWinProbMin: 0.35,
+};
+
+/**
+ * AI profiles (module/systems/ai.mjs). Actors opt in via
+ * flags.aspectsofpower.aiProfile; aiSkillUuid overrides skill auto-pick;
+ * aiDefense 'auto' (default for AI actors) | 'manual' controls the defense
+ * auto-policy; aiDangerFt overrides the skirmisher kite bubble.
+ */
+ASPECTSOFPOWER.ai = {
+  profiles: {
+    primitive:  'Primitive (stationary)',
+    brawler:    'Brawler (melee)',
+    skirmisher: 'Skirmisher (ranged)',
+  },
+  maxStepFt: 30,   // max movement per AI action
+  dangerFt:  15,   // skirmisher kite bubble
 };
 
 /**
