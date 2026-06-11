@@ -140,35 +140,59 @@ export class EquipmentSystem {
         i.type === 'item' && i.system.equipped && i.system.slot === 'ring'
       ).length);
       const locked = new Set(item.system.lockedFields ?? []);
-      const pure = deriveItemStats({ system: { ...item.system, augments: [], profAugments: [] } });
-      const pureStats = locked.has('statBonuses') ? (item.system.statBonuses ?? []) : (pure.statBonuses ?? []);
-      const pureArmor = locked.has('armorBonus')  ? (item.system.armorBonus ?? 0)   : (pure.armorBonus ?? 0);
-      const pureVeil  = locked.has('veilBonus')   ? (item.system.veilBonus ?? 0)    : (pure.veilBonus ?? 0);
 
-      const divided = pureStats
-        .map(b => ({ ability: b.ability, value: Math.round((b.value ?? 0) / ringDivisor) }))
-        .filter(b => b.ability && b.value > 0);
-
-      // Re-add augment statBonus.<ability> itemBonuses at FULL value from
-      // snapshots (both combat + profession slots, no per-augment dedupe —
-      // mirrors item-derivation.mjs).
+      // Snapshot augment totals (flat + pct), mirroring item-derivation's
+      // merge (no per-id dedupe — matches how stored values were baked).
+      let snapArmorFlat = 0, snapArmorPct = 0, snapVeilFlat = 0, snapVeilPct = 0;
+      const snapStatFlat = {};
       for (const a of [...(item.system.augments ?? []), ...(item.system.profAugments ?? [])]) {
         if (!a?.augmentId) continue;
         for (const ib of (a.itemBonuses ?? [])) {
           const field = ib.field ?? '';
-          if (!field.startsWith('statBonus.')) continue;
-          const ability = field.slice('statBonus.'.length);
-          const value = Number(ib.value) || 0;
-          if (value <= 0) continue;
-          const existing = divided.find(s => s.ability === ability);
-          if (existing) existing.value += value;
-          else divided.push({ ability, value });
+          const v = Number(ib.value) || 0;
+          if (field === 'armorBonus') { if (ib.mode === 'percentage') snapArmorPct += v; else snapArmorFlat += v; }
+          else if (field === 'veilBonus') { if (ib.mode === 'percentage') snapVeilPct += v; else snapVeilFlat += v; }
+          else if (field.startsWith('statBonus.')) {
+            const ability = field.slice('statBonus.'.length);
+            snapStatFlat[ability] = (snapStatFlat[ability] || 0) + v;
+          }
         }
       }
 
+      // Pure (augment-free) base. Unlocked: recompute via stripped
+      // derivation. Locked: stored values are augment-INCLUSIVE (the delta
+      // hook writes flat augment deltas into locked fields) — subtract
+      // snapshot flats to recover true base. (Percentage-mode on locked is
+      // already "manual cleanup" territory per the delta hook's warning.)
+      const pure = deriveItemStats({ system: { ...item.system, augments: [], profAugments: [] } });
+      const pureStats = locked.has('statBonuses')
+        ? (item.system.statBonuses ?? []).map(b => ({
+            ability: b.ability,
+            value: Math.max(0, (b.value ?? 0) - (snapStatFlat[b.ability] || 0)),
+          }))
+        : (pure.statBonuses ?? []);
+      const pureArmor = locked.has('armorBonus')
+        ? Math.max(0, (item.system.armorBonus ?? 0) - snapArmorFlat)
+        : (pure.armorBonus ?? 0);
+      const pureVeil = locked.has('veilBonus')
+        ? Math.max(0, (item.system.veilBonus ?? 0) - snapVeilFlat)
+        : (pure.veilBonus ?? 0);
+
+      // Divide base, re-add augment portions at FULL value (rings = augment
+      // carriers; only base power divides).
+      const divided = pureStats
+        .map(b => ({ ability: b.ability, value: Math.round((b.value ?? 0) / ringDivisor) }))
+        .filter(b => b.ability && b.value > 0);
+      for (const [ability, value] of Object.entries(snapStatFlat)) {
+        if (value <= 0) continue;
+        const existing = divided.find(s => s.ability === ability);
+        if (existing) existing.value += value;
+        else divided.push({ ability, value });
+      }
+
       baseStatBonuses = divided;
-      baseArmorValue  = Math.round(pureArmor / ringDivisor);
-      baseVeilValue   = Math.round(pureVeil / ringDivisor);
+      baseArmorValue  = Math.round(Math.round(pureArmor / ringDivisor) * (1 + snapArmorPct / 100) + snapArmorFlat);
+      baseVeilValue   = Math.round(Math.round(pureVeil / ringDivisor) * (1 + snapVeilPct / 100) + snapVeilFlat);
     }
 
     for (const bonus of baseStatBonuses) {
@@ -181,10 +205,17 @@ export class EquipmentSystem {
       });
     }
 
-    // Slotted augment stat bonuses + collect item bonuses.
-    let augArmorFlat = 0, augArmorPct = 0;
-    let augVeilFlat = 0, augVeilPct = 0;
-
+    // Slotted augment ACTOR-stat bonuses (the augment's own statBonuses
+    // channel — distinct from itemBonuses, never baked into the host item;
+    // this is its single application point).
+    //
+    // NOTE deliberately ABSENT here: augment itemBonuses armor/veil
+    // re-application. Stored armorBonus/veilBonus is ALWAYS augment-
+    // inclusive — auto-derive bakes itemBonuses into unlocked fields, and
+    // the augment-delta hook writes flat deltas into locked ones. Re-adding
+    // them at equip time double-counted (fixed 2026-06-11; rings handle
+    // their own augment re-add above because division strips to pure base).
+    //
     // Dedupe by augment id — multi-slot augments occupy multiple entries
     // with the same id, but bonuses should apply once per augment.
     const seenAugIds = new Set();
@@ -205,40 +236,24 @@ export class EquipmentSystem {
           priority: 20,
         });
       }
-
-      // Item-specific bonuses — modify the host item's armor/veil.
-      for (const ib of (augItem.system.itemBonuses ?? [])) {
-        if (!ib.field || !ib.value) continue;
-        if (ib.field === 'armorBonus') {
-          if (ib.mode === 'percentage') augArmorPct += ib.value;
-          else augArmorFlat += ib.value;
-        } else if (ib.field === 'veilBonus') {
-          if (ib.mode === 'percentage') augVeilPct += ib.value;
-          else augVeilFlat += ib.value;
-        }
-      }
     }
 
-    // Calculate effective armor/veil with augment item bonuses applied.
-    // (For rings, base values are the ring-divided pure base from above.)
-    const baseArmor = baseArmorValue;
-    const effectiveArmor = Math.round(baseArmor * (1 + augArmorPct / 100) + augArmorFlat);
-    if (effectiveArmor > 0) {
+    // Armor/veil: stored values are the augment-inclusive totals (rings:
+    // ring-divided + augment-readded above). Apply directly.
+    if (baseArmorValue > 0) {
       changes.push({
         key: 'system.defense.armor.value',
         mode: 2,
-        value: String(effectiveArmor),
+        value: String(baseArmorValue),
         priority: 20,
       });
     }
 
-    const baseVeil = baseVeilValue;
-    const effectiveVeil = Math.round(baseVeil * (1 + augVeilPct / 100) + augVeilFlat);
-    if (effectiveVeil > 0) {
+    if (baseVeilValue > 0) {
       changes.push({
         key: 'system.defense.veil.value',
         mode: 2,
-        value: String(effectiveVeil),
+        value: String(baseVeilValue),
         priority: 20,
       });
     }
