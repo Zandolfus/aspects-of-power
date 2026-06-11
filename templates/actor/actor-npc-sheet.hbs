@@ -55,6 +55,28 @@
           </div>
         </div>
 
+        <div class="resource flex-group-center" title="AI profile — this NPC acts autonomously in combat (move/attack) and auto-resolves its defense prompts">
+          <label class="resource-label">AI Profile</label>
+          <div class="resource-content flexrow flex-center flex-between">
+            <select name="flags.aspectsofpower.aiProfile">
+              <option value="">—</option>
+              {{#each config.ai.profiles as |label key|}}
+              <option value="{{key}}" {{#if (eq key ../actor.flags.aspectsofpower.aiProfile)}}selected{{/if}}>{{label}}</option>
+              {{/each}}
+            </select>
+          </div>
+        </div>
+
+        <div class="resource flex-group-center" title="AI defense — auto: dodge/eat decided by win probability, no GM dialog; manual: GM answers prompts">
+          <label class="resource-label">AI Defense</label>
+          <div class="resource-content flexrow flex-center flex-between">
+            <select name="flags.aspectsofpower.aiDefense">
+              <option value="auto" {{#if (ne actor.flags.aspectsofpower.aiDefense "manual")}}selected{{/if}}>Auto</option>
+              <option value="manual" {{#if (eq actor.flags.aspectsofpower.aiDefense "manual")}}selected{{/if}}>Manual</option>
+            </select>
+          </div>
+        </div>
+
         {{!-- Barrier --}}
         {{#if (gt system.barrier.max 0)}}
         <div class="resource flex-group-center resource-barrier">
