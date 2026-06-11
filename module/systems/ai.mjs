@@ -338,7 +338,7 @@ const brawlerProfile = {
     const gapFt = _edgeDistFt(selfTokenDoc, target.tokenDoc);
 
     if (gapFt <= reach) {
-      await skill.roll({ executeDeferred: true, preTargetIds: [target.tokenDoc.id] });
+      await skill.roll({ executeDeferred: true, aiAutoInvest: true, preTargetIds: [target.tokenDoc.id] });
       await declareAction(actor, skill, { targetIds: [target.tokenDoc.id] });
       return;
     }
@@ -393,7 +393,7 @@ const skirmisherProfile = {
       h.distPx <= rangeFt * pxPerFt && _hasLOS(h.tCenter, h.tokenDoc)
     );
     if (shootable) {
-      await skill.roll({ executeDeferred: true, preTargetIds: [shootable.tokenDoc.id] });
+      await skill.roll({ executeDeferred: true, aiAutoInvest: true, preTargetIds: [shootable.tokenDoc.id] });
       await declareAction(actor, skill, { targetIds: [shootable.tokenDoc.id] });
       return;
     }
@@ -446,22 +446,29 @@ export function registerAIHooks() {
   // the GM manually advanced — this kicks each one once. Covers towers too.
   const _kick = (combatantDoc) => {
     if (!game.user.isGM) return;
-    if (!combatantDoc.combat?.started) return;
     if (combatantDoc.flags?.aspectsofpower?.declaredAction) return;
     const actor = combatantDoc.actor;
     const profileName = actor?.flags?.aspectsofpower?.aiProfile;
     if (!profileName) return;
     const profile = AIProfiles.get(profileName);
     if (!profile?.onActionReady) return;
+    // Delay lets the combat-start update settle (combat.started flips true
+    // AFTER the combatStart hook returns; the profile's declareAction reads
+    // findCombatantForActor which needs the started combat).
     setTimeout(() => {
       profile.onActionReady(actor, { combatant: combatantDoc }).catch(err =>
         console.warn(`[ai] ${profileName} kickoff failed for ${actor.name}:`, err)
       );
-    }, 150);
+    }, 200);
   };
 
+  // combatStart fires for the whole roster; createCombatant covers mid-fight
+  // adds (e.g. a summoned tower). Guard createCombatant on an already-started
+  // combat so it doesn't double-kick everyone at combat start.
   Hooks.on('combatStart', (combat) => {
     for (const c of combat.combatants) _kick(c);
   });
-  Hooks.on('createCombatant', (combatantDoc) => _kick(combatantDoc));
+  Hooks.on('createCombatant', (combatantDoc) => {
+    if (combatantDoc.combat?.started) _kick(combatantDoc);
+  });
 }

@@ -6551,6 +6551,8 @@ export class AspectsofPowerItem extends Item {
       } else {
         invested = (options.preInvestAmount != null)
           ? Math.min(options.preInvestAmount, maxInvest)  // clamp pre-capture too
+          : options.aiAutoInvest
+          ? Math.min(baseMana, maxInvest)                  // AI: minimum cast, no prompt
           : await this._promptResourceInvest({
               baseCost: baseMana,
               safeInvest: 0,                              // hard cap = no soft zone
@@ -6748,6 +6750,10 @@ export class AspectsofPowerItem extends Item {
           if (useInfused && options.preManaInvestAmount != null) {
             manaInvested = Math.min(options.preManaInvestAmount, infusedManaPool);
           }
+        } else if (options.aiAutoInvest) {
+          // AI: minimum swing (base stamina, no over-exertion/self-damage),
+          // skip infusion (no mana gamble), no prompt.
+          invested = Math.min(baseStamina, maxPool);
         } else if (useInfused) {
           const wisMod = this.actor.system.abilities?.wisdom?.mod ?? 0;
           // Pre-compute the strike's base wait (no invest, no infusion) so the
