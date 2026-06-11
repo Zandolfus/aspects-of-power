@@ -427,6 +427,13 @@ export class AspectsofPowerActorSheet extends foundry.applications.api.Handlebar
       return;
     }
 
+    // Flag-path fields (AI dropdowns etc.) — the AppV2 fall-through doesn't
+    // commit non-schema paths on this sheet, so write them explicitly.
+    if (input.name.startsWith('flags.')) {
+      await this.document.update({ [input.name]: input.value });
+      return;
+    }
+
     if (input.type === 'number') {
       const raw = Number(input.value);
       if (!isNaN(raw) && isFinite(raw)) {
