@@ -15,6 +15,20 @@ function _isPlayerCharacter(actor) {
 }
 
 /**
+ * Exact dodge win probability against an ALREADY-ROLLED hit total: the
+ * defender's d20 is the only random part — fraction of the 20 faces where
+ * dodgeValue × (1 + d/100) ≥ hitTotal. Used by the AI defense auto-policy.
+ */
+function _dodgeWinProb(dodgeValue, hitTotal) {
+  if (dodgeValue <= 0 || hitTotal <= 0) return 0;
+  let wins = 0;
+  for (let d = 1; d <= 20; d++) {
+    if (dodgeValue * (1 + d / 100) >= hitTotal) wins++;
+  }
+  return wins / 20;
+}
+
+/**
  * Extend the basic Item with some very simple modifications.
  * @extends {Item}
  */
@@ -1943,6 +1957,35 @@ export class AspectsofPowerItem extends Item {
           : `<strong>Partial defense (${Math.round((pool / hitTotal) * 100)}% reduction).</strong> Pool: ${pool} → 0`;
         defenseText = `<p>${defLabel} defense pool: ${pool} / ${poolMax}</p><p>If you defend: ${outcomeText}</p>`;
       }
+    }
+
+    // ── AI defense auto-policy ──
+    // AI-flagged defenders decide without any dialog: physical lanes dodge
+    // when the exact win probability (single d20 vs the rolled hit total)
+    // meets the threshold, else eat through bulk; mental lanes spend pool
+    // whenever it exists. GM gets a whispered one-liner instead of a prompt.
+    // Opt out per-actor with flags.aspectsofpower.aiDefense = 'manual'.
+    const aiFlags = targetActor.flags?.aspectsofpower ?? {};
+    if (aiFlags.aiProfile && (aiFlags.aiDefense ?? 'auto') === 'auto') {
+      let defend = false;
+      let note = 'takes the hit';
+      if (isPhysicalLane && hasDefend) {
+        const aiStacks = getScrambleStacks(targetActor);
+        const aiDv = (targetActor.system.defense[defKey]?.value ?? 0) / (dt.dodgeBasisDiv ?? 1)
+                   * Math.max(0, 1 - (dt.scrambleStackPct ?? 0.15) * aiStacks);
+        const p = _dodgeWinProb(aiDv, hitTotal);
+        defend = p >= (dt.aiDodgeWinProbMin ?? 0.35);
+        note = defend ? `dodges (p≈${Math.round(p * 100)}%)` : `takes the hit (dodge p≈${Math.round(p * 100)}%)`;
+      } else if (!isPhysicalLane && pool > 0) {
+        defend = true;
+        note = 'spends pool';
+      }
+      ChatMessage.create({
+        whisper: ChatMessage.getWhisperRecipients('GM'),
+        speaker: ChatMessage.getSpeaker({ actor: targetActor }),
+        content: `<p><em>[AI] ${targetActor.name} ${note} vs ${attackName}.</em></p>`,
+      });
+      return { defend, reactionSkillId: null };
     }
 
     // Nothing to offer at all — eat the hit without a prompt.
