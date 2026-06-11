@@ -286,6 +286,11 @@ ASPECTSOFPOWER.defenseTuning = {
   // total takes HALF damage (restores the partial-mitigation smoothing the
   // pools used to provide).
   grazeBandPct: 0.10,
+  // Dodge basis divisor: the dodge ROLL uses defense.value ÷ this. The ×1.1
+  // in the defense value is pool-era inflation — rolled at full value,
+  // parity dodge sits at 91% and mirror fights never resolve (sim
+  // 2026-06-12); stripped, parity is a 54% coin flip and fights conclude.
+  dodgeBasisDiv: 1.1,
   // Windup: damage multiplier = clamp(weight × skillMult / 100, min, max).
   // UNCLAMPED-linear per 2026-06-11 ruling — dagger 0.6×, sword 1.0×,
   // greatsword 2.0×. Heavy = anti-armor burst, light = on-hit frequency.

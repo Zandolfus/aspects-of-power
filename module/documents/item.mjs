@@ -1059,7 +1059,7 @@ export class AspectsofPowerItem extends Item {
       if (defenseResult.defend) {
         const dt = CONFIG.ASPECTSOFPOWER.defenseTuning ?? {};
         const stacks = getScrambleStacks(targetActor);
-        const defVal = targetActor.system.defense[defKey]?.value ?? 0;
+        const defVal = (targetActor.system.defense[defKey]?.value ?? 0) / (dt.dodgeBasisDiv ?? 1);
         const dv = defVal * Math.max(0, 1 - (dt.scrambleStackPct ?? 0.15) * stacks);
         const die = await new Roll('1d20').evaluate();
         let droll = dv * (1 + die.total / 100);
@@ -1921,7 +1921,7 @@ export class AspectsofPowerItem extends Item {
       // Perception gate: you can't dodge what you can't see.
       const blinded = targetActor.effects.some(e => !e.disabled && e.system?.debuffType === 'blind');
       const stacks = getScrambleStacks(targetActor);
-      const defVal = targetActor.system.defense[defKey]?.value ?? 0;
+      const defVal = (targetActor.system.defense[defKey]?.value ?? 0) / (dt.dodgeBasisDiv ?? 1);
       const dv = Math.round(defVal * Math.max(0, 1 - (dt.scrambleStackPct ?? 0.15) * stacks));
       hasDefend = !blinded && dv > 0;
       defendLabel = 'Dodge';
