@@ -325,6 +325,34 @@ export class AspectsofPowerActor extends Actor {
     systemData.defense.armor.value = effectBonus('system.defense.armor.value');
     systemData.defense.veil.value  = effectBonus('system.defense.veil.value');
 
+    // Block DR — the held weapon contributes passive flat mitigation
+    // (active defense, design-active-defense.md): the str archetype's
+    // constant-on layer. blockDR = coef × (celerityWeight/100) × (1 + str/1085).
+    // Highest-weight equipped non-shield weapon counts (shields already
+    // grant armorBonus via craftShieldArmorValues — no double-dip). Broken
+    // weapons (0 durability) grant nothing. Weight via the weaponWeights
+    // tag table (inlined — no lbs fallback; untagged weapons guard nothing).
+    {
+      const dt = CONFIG.ASPECTSOFPOWER.defenseTuning ?? {};
+      const coef = dt.blockDRCoef ?? 0;
+      let bestWeight = 0;
+      if (coef > 0) {
+        const table = CONFIG.ASPECTSOFPOWER.weaponWeights ?? {};
+        for (const i of this.items) {
+          if (i.type !== 'item' || !i.system.equipped || i.system.slot !== 'weaponry') continue;
+          if ((i.system.tags ?? []).includes('shield')) continue;
+          if (i.system.durability?.value <= 0 && i.system.durability?.max > 0) continue;
+          for (const tag of (i.system.tags ?? [])) {
+            if (table[tag] != null) { bestWeight = Math.max(bestWeight, table[tag]); break; }
+          }
+        }
+      }
+      const strM = systemData.abilities.strength.mod;
+      systemData.defense.blockDR = bestWeight > 0
+        ? Math.round(coef * (bestWeight / 100) * (1 + strM / 1085))
+        : 0;
+    }
+
     // Base defense calculations.
     // Melee secondary = max(str, per) per design-active-defense.md perception
     // ruling (2026-06-11): you avoid a blow by muscling the pivot (str) OR

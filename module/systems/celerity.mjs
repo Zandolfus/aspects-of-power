@@ -233,6 +233,93 @@ export function referenceRoundLength(rl) {
   return table[keys[keys.length - 1]];
 }
 
+/* -------------------------------------------------- */
+/*  Active Defense (design-active-defense.md v2)      */
+/* -------------------------------------------------- */
+
+/**
+ * Windup damage multiplier — the weight→damage coupling. UNCLAMPED linear
+ * per the 2026-06-11 ruling: clamp(weight × skillMult / 100, min, max).
+ * Dagger 0.6×, sword 1.0×, greatsword 2.0×. Corrective, not double-dipping:
+ * weight never multiplied damage before (only blend composition + stamina
+ * pricing), making light weapons strictly DPS-superior. Spells return 1.0
+ * (mana investment is their burst dial).
+ */
+export function computeWindupMultiplier(skill, weapon = null) {
+  const dt = CONFIG.ASPECTSOFPOWER.defenseTuning ?? {};
+  const type = skill?.system?.roll?.type ?? '';
+  if (_MAGIC_TYPES.has(type)) return 1.0;
+  const weight = _resolveCelerityWeight(skill, weapon);
+  const manualMult = skill?.system?.roll?.actionWeightMultiplier ?? 1.0;
+  const altMult = skill?._resolveRarityMods?.()?.effectiveWeightMultiplier ?? 1.0;
+  const raw = (weight * manualMult * altMult) / 100;
+  return Math.min(dt.windupMax ?? 3.0, Math.max(dt.windupMin ?? 0.5, raw));
+}
+
+/**
+ * Scramble stacks with continuous decay. One float counter per combatant
+ * (defender-paced: only dodges add stacks; chip eaten through bulk costs
+ * nothing). Decays at 1 stack per ¼ personal round × decayQuarterRounds.
+ * Out of combat there is no clock — scramble reads 0 and adds are no-ops.
+ */
+export function getScrambleStacks(actor) {
+  const combatant = findCombatantForActor(actor);
+  if (!combatant) return 0;
+  const s = combatant.flags?.aspectsofpower?.scramble;
+  if (!s?.stacks) return 0;
+  const now = getClockTick(combatant.combat);
+  const quarter = Math.max(1, Math.round(actorRoundLength(actor) / 4));
+  const dt = CONFIG.ASPECTSOFPOWER.defenseTuning ?? {};
+  const ticksPerStack = quarter * (dt.scrambleDecayQuarterRounds ?? 1);
+  return Math.max(0, s.stacks - (now - (s.atTick ?? 0)) / ticksPerStack);
+}
+
+export async function addScrambleStack(actor) {
+  const combatant = findCombatantForActor(actor);
+  if (!combatant) return 0;
+  const current = getScrambleStacks(actor);
+  const now = getClockTick(combatant.combat);
+  await combatant.update({ 'flags.aspectsofpower.scramble': { stacks: current + 1, atTick: now } });
+  return current + 1;
+}
+
+/**
+ * Dodge time cost — defense steals tempo from offense. Basis is the
+ * defender's OWN action wait (self-relative across grades/archetypes):
+ * the queued action's wait when one is declared (its scheduled fire is
+ * pushed back), else the last action's wait, else a baseline-weight dex
+ * step. With no queued action the cost accrues as dodgeDebt, consumed by
+ * the next declareAction. Returns the tick cost (0 out of combat).
+ */
+export async function applyDodgeCost(actor) {
+  const dt = CONFIG.ASPECTSOFPOWER.defenseTuning ?? {};
+  const frac = dt.dodgeCostFraction ?? 0.25;
+  const combatant = findCombatantForActor(actor);
+  if (!combatant) return 0;
+  const fl = combatant.flags?.aspectsofpower ?? {};
+  const da = fl.declaredAction;
+
+  let basis;
+  if (da?.wait) basis = da.wait;
+  else if (fl.lastActionWait) basis = fl.lastActionWait;
+  else {
+    const sc = CONFIG.ASPECTSOFPOWER.celerity;
+    const dex = Math.max(1, actor.system.abilities?.dexterity?.mod ?? 1);
+    basis = Math.round(sc.BASELINE_WEIGHT * sc.SCALE / dex);
+  }
+  const cost = Math.max(1, Math.round(frac * basis));
+
+  if (da?.scheduledTick != null) {
+    await combatant.update({
+      'flags.aspectsofpower.declaredAction.scheduledTick': da.scheduledTick + cost,
+      'flags.aspectsofpower.nextActionTick': (fl.nextActionTick ?? da.scheduledTick) + cost,
+    });
+  } else {
+    await combatant.update({ 'flags.aspectsofpower.dodgeDebt': (fl.dodgeDebt ?? 0) + cost });
+  }
+  return cost;
+}
+
 /**
  * Find the actor's combatant in the active combat (if any).
  * Returns null when the actor isn't in combat or no combat is started.
@@ -356,7 +443,12 @@ export async function declareAction(actor, skill, options = {}) {
       distanceFt = px * canvas.grid.distance / canvas.grid.size;
     }
   }
-  const wait = computeActionWait(actor, skill, null, investAmount, manaInvestAmount, distanceFt);
+  let wait = computeActionWait(actor, skill, null, investAmount, manaInvestAmount, distanceFt);
+  // Consume accumulated dodge debt — dodges made while nothing was queued
+  // delay the next declaration (active defense steals tempo from offense;
+  // see applyDodgeCost).
+  const dodgeDebt = combatant.flags?.aspectsofpower?.dodgeDebt ?? 0;
+  if (dodgeDebt > 0) wait += dodgeDebt;
   const clockTick = getClockTick(combatant.combat);
   const scheduledTick = clockTick + wait;
 
@@ -387,6 +479,7 @@ export async function declareAction(actor, skill, options = {}) {
     'flags.aspectsofpower.nextActionTick': scheduledTick,
     'flags.aspectsofpower.lastActionWait': wait,
     'flags.aspectsofpower.lastActionName': skill.name + ' (queued)',
+    'flags.aspectsofpower.dodgeDebt': 0,
   });
 
   const investNote = investAmount ? ` — invest ${investAmount}` : '';

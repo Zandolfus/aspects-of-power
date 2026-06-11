@@ -267,6 +267,46 @@ ASPECTSOFPOWER.celerity = {
 };
 
 /**
+ * Active Defense tuning (design-active-defense.md v2, shipped 2026-06-12).
+ * ALL values are percentages of rolls or fractions of the actor's own
+ * tempo — never flat constants (stats span ~50→5,600 across grades; flat
+ * numbers can't survive the curve).
+ */
+ASPECTSOFPOWER.defenseTuning = {
+  // Dodge: each dodge delays the defender's next action by this fraction
+  // of their own action wait (declared action's wait when queued, else
+  // last wait, else a baseline-weight dex step).
+  dodgeCostFraction: 0.25,
+  // Scramble: consecutive dodges degrade the dodge value by this fraction
+  // per stack; stacks decay continuously (1 stack per ¼ personal round ×
+  // scrambleDecayQuarterRounds).
+  scrambleStackPct: 0.15,
+  scrambleDecayQuarterRounds: 1,
+  // Graze band: a failed dodge within this fraction of the attacker's hit
+  // total takes HALF damage (restores the partial-mitigation smoothing the
+  // pools used to provide).
+  grazeBandPct: 0.10,
+  // Windup: damage multiplier = clamp(weight × skillMult / 100, min, max).
+  // UNCLAMPED-linear per 2026-06-11 ruling — dagger 0.6×, sword 1.0×,
+  // greatsword 2.0×. Heavy = anti-armor burst, light = on-hit frequency.
+  // Spells excluded (mana investment is their burst dial).
+  windupMin: 0.5,
+  windupMax: 3.0,
+  // Block DR: held weapon contributes flat mitigation =
+  //   coef × (weight/100) × (1 + str.mod/1085).
+  // At coef 80: GS ≈ 266, sword ≈ 133, dagger ≈ 70 vs a full armor set
+  // ~364 (the 30-60% design band). Shields excluded — they already grant
+  // armorBonus via craftShieldArmorValues.
+  blockDRCoef: 80,
+  // Shrapnel: instead of the old pool-cost multiplier, shrapnel attacks
+  // penalize the dodge roll by this fraction (fragments are hard to dodge).
+  shrapnelDodgePenalty: 0.25,
+  // Global HP multiplier (gap-analysis Family D, sim-validated 2026-06-11):
+  // raises TTK floor so windup bursts don't one-shot same-rank actors.
+  hpScale: 1.5,
+};
+
+/**
  * Which ability mod is rolled to break each debuff type. Shared between the
  * auto-break loop (actor.onStartTurn) and the manual break-free flow
  * (actor-sheet → celerity declare → tracker dispatch).
