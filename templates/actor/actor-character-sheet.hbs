@@ -176,6 +176,21 @@
             <span class="identity-rank">{{system.attributes.profession.rank}}</span>
             <a class="history-edit" data-track="profession" title="Edit history"><i class="fas fa-history"></i></a>
           </div>
+          {{#if isGM}}
+          <div class="identity-row ai-row" title="AI control — for summons & allied units the GM wants acting autonomously. Targets hostiles relative to this unit's disposition; auto-resolves its own defense prompts.">
+            <label>AI</label>
+            <select name="flags.aspectsofpower.aiProfile" class="ai-profile-select">
+              <option value="">—</option>
+              {{#each config.ai.profiles as |label key|}}
+              <option value="{{key}}" {{#if (eq key ../actor.flags.aspectsofpower.aiProfile)}}selected{{/if}}>{{label}}</option>
+              {{/each}}
+            </select>
+            <select name="flags.aspectsofpower.aiDefense" class="ai-defense-select" title="Auto: dodge/eat by win probability, no prompt. Manual: GM answers.">
+              <option value="auto" {{#if (ne actor.flags.aspectsofpower.aiDefense "manual")}}selected{{/if}}>Auto Def</option>
+              <option value="manual" {{#if (eq actor.flags.aspectsofpower.aiDefense "manual")}}selected{{/if}}>Manual Def</option>
+            </select>
+          </div>
+          {{/if}}
           <div class="identity-row identity-actions">
             <button type="button" class="level-up-btn">
               <i class="fas fa-arrow-up"></i> {{localize "ASPECTSOFPOWER.Level.levelUp"}}
