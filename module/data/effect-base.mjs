@@ -38,6 +38,13 @@ export class AopEffectData extends foundry.data.ActiveEffectTypeDataModel {
         max:        new fields.NumberField({ initial: 0 }),
         affinities: new fields.ArrayField(new fields.StringField(), { initial: [] }),
         source:     new fields.StringField({ initial: '' }),
+        // Mana Shell reform-on-break: shell re-forms to full by re-paying
+        // reformCost from the caster; failure tears down shell + sustain.
+        reform:          new fields.BooleanField({ initial: false }),
+        reformCost:      new fields.NumberField({ initial: 0, min: 0, integer: true }),
+        reformResource:  new fields.StringField({ initial: 'mana' }),
+        casterActorUuid: new fields.StringField({ initial: '' }),
+        sourceSkillId:   new fields.StringField({ initial: '' }),
       }, { nullable: true, initial: null }),
 
       // ── Sustain ──
