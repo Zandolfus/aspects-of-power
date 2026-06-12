@@ -3734,10 +3734,15 @@ export class AspectsofPowerItem extends Item {
     if (!sourceGem) return;
 
     // ── Step 2: Ritual subset (ritual-tagged skills the actor knows) ──
+    // craft/profession skills can carry `ritual` as flavor (Catalyst
+    // Crafting on Witch-Wrights) — they describe ritual-adjacent crafting,
+    // not encodable rituals. Exclude them so the picker only offers real
+    // ritual definitions.
     const ritualSkills = actor.items.filter(i =>
       i.type === 'skill'
       && (i.system?.tags ?? []).includes('ritual')
       && !(i.system?.tags ?? []).includes('inscribe')
+      && !(i.system?.tags ?? []).includes('craft')
     );
     if (ritualSkills.length === 0) {
       ChatMessage.create({ speaker, rollMode,
