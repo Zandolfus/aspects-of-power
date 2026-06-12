@@ -1,6 +1,6 @@
 import { EquipmentSystem } from '../systems/equipment.mjs';
 import { getPositionalTags } from '../helpers/positioning.mjs';
-import { recordActionFired, declareAction, isInActiveCombat, computeActionWait, referenceRoundLength, computeWindupMultiplier, getScrambleStacks, addScrambleStack, applyDodgeCost } from '../systems/celerity.mjs';
+import { recordActionFired, declareAction, isInActiveCombat, computeActionWait, referenceRoundLength, computeWindupMultiplier, getScrambleStacks, addScrambleStack, applyDodgeCost, findCombatantForActor } from '../systems/celerity.mjs';
 import { getThreatRadiusFt, actorIsDashing } from '../systems/engagement-halts.mjs';
 import { selectTargetOnCanvas, skillNeedsTargetPrompt, skillTargetsAtFire, selectMarkerOnCanvas } from '../canvas/target-prompt.mjs';
 import { regionTokenOverlap, segmentIntersect } from '../helpers/geometry.mjs';
@@ -6027,10 +6027,12 @@ export class AspectsofPowerItem extends Item {
         let rollableSkill = ritualSkill;
         let cleanupTempSkill = false;
         if (!ritualSkill.actor) {
+          // Match by grantedFrom UUID ONLY — a bare name match can hijack an
+          // unrelated same-named skill (live world has two different "Gem
+          // Ritualism" items, common-jeweler vs rare-inscribe).
           const existing = this.actor.items.find(i =>
             i.type === 'skill'
-            && (i.flags?.aspectsofpower?.grantedFrom === ritualSkill.uuid
-              || i.name === ritualSkill.name)
+            && i.flags?.aspectsofpower?.grantedFrom === ritualSkill.uuid
           );
           if (existing) {
             rollableSkill = existing;
@@ -6055,7 +6057,17 @@ export class AspectsofPowerItem extends Item {
           });
         } finally {
           if (cleanupTempSkill && rollableSkill?.id) {
-            try { await this.actor.deleteEmbeddedDocuments('Item', [rollableSkill.id]); } catch (_) { /* best-effort */ }
+            // In active combat roll() DECLARES rather than executes — the
+            // clone must survive until the tracker fires it at the scheduled
+            // tick (deleting here orphaned the queued action: "queued item
+            // not found", charge wasted — live bug 2026-06-12). The dispatch
+            // sites (tracker GM-local branch + executeQueuedAction socket
+            // handler) delete isRitualActivation clones after the fire.
+            const cm = findCombatantForActor(this.actor);
+            const queuedId = cm?.flags?.aspectsofpower?.declaredAction?.itemId;
+            if (queuedId !== rollableSkill.id) {
+              try { await this.actor.deleteEmbeddedDocuments('Item', [rollableSkill.id]); } catch (_) { /* best-effort */ }
+            }
           }
         }
         break;
@@ -6948,6 +6960,9 @@ export class AspectsofPowerItem extends Item {
         teleportDestination,
         leapDestination,
         leapApexFt: leapDestination ? (this.system.tagConfig?.leapApexFt ?? 10) : null,
+        // Medium-fired ritual: persist so the deferred fire keeps cost 0
+        // (the prep mana was the only payment) — lost otherwise.
+        ritualActivation: !!options.ritualActivation,
       });
       return declared;
     }

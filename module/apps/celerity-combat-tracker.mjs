@@ -270,6 +270,7 @@ async function _onCelAdvance(event, target) {
   const teleportDestination = declared.teleportDestination ?? null;
   const leapDestination = declared.leapDestination ?? null;
   const leapApexFt = declared.leapApexFt ?? null;
+  const ritualActivation = declared.ritualActivation ?? false;
   const linkedPlayer = game.users.find(u => !u.isGM && u.active && u.character?.id === c.actor?.id);
   if (linkedPlayer) {
     game.socket.emit('system.aspects-of-power', {
@@ -285,10 +286,17 @@ async function _onCelAdvance(event, target) {
       preTeleportDestination: teleportDestination,
       preLeapDestination: leapDestination,
       preLeapApexFt: leapApexFt,
+      preRitualActivation: ritualActivation,
     });
   } else {
     // No linked player online — GM (or whoever clicked Advance) runs it.
-    await item.roll({ executeDeferred: true, preInvestAmount: investAmount, preManaInvestAmount: manaInvestAmount, preAoeRegionId: aoeRegionId, preOrbDischarging: orbDischarging, preTargetIds: targetIds, preTeleportDestination: teleportDestination, preLeapDestination: leapDestination, preLeapApexFt: leapApexFt });
+    await item.roll({ executeDeferred: true, preInvestAmount: investAmount, preManaInvestAmount: manaInvestAmount, preAoeRegionId: aoeRegionId, preOrbDischarging: orbDischarging, preTargetIds: targetIds, preTeleportDestination: teleportDestination, preLeapDestination: leapDestination, preLeapApexFt: leapApexFt, ritualActivation });
+    // Ritual temp-skill cleanup: a Medium-fired skill cloned onto the
+    // activator (compendium-sourced activation) survives the declare→fire
+    // wait by design; once the roll above resolves it's spent — remove it.
+    if (item.flags?.aspectsofpower?.isRitualActivation && c.actor?.items?.get(item.id)) {
+      try { await c.actor.deleteEmbeddedDocuments('Item', [item.id]); } catch (_) { /* best-effort */ }
+    }
   }
 
   // Sync Foundry's combat.turn pointer to the new celerity-next-up combatant

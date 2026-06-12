@@ -429,6 +429,7 @@ export async function declareAction(actor, skill, options = {}) {
   const teleportDestination = options.teleportDestination ?? null;
   const leapDestination     = options.leapDestination ?? null;
   const leapApexFt          = options.leapApexFt ?? null;
+  const ritualActivation    = options.ritualActivation ?? false;
 
   // Distance from caster to picked destination, in feet — feeds distance-
   // scaled granted-tag activation fraction (shorter teleport = faster cast).
@@ -475,6 +476,10 @@ export async function declareAction(actor, skill, options = {}) {
       leapDestination,
       leapApexFt,
       uncancellable,
+      // Ritual-via-Medium activation: the prep mana was the only payment.
+      // Must survive the declare→fire round-trip or the activator gets
+      // charged the invest as mana at fire time (live bug 2026-06-12).
+      ritualActivation,
     },
     'flags.aspectsofpower.nextActionTick': scheduledTick,
     'flags.aspectsofpower.lastActionWait': wait,

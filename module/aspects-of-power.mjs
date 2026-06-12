@@ -950,6 +950,13 @@ Hooks.once('ready', async function () {
       preTeleportDestination: data.preTeleportDestination ?? null,
       preLeapDestination: data.preLeapDestination ?? null,
       preLeapApexFt: data.preLeapApexFt ?? null,
+      ritualActivation: data.preRitualActivation ?? false,
+    }).then(() => {
+      // Ritual temp-skill cleanup: Medium-fired clones are spent once the
+      // deferred fire resolves (mirrors the GM-local branch in the tracker).
+      if (item.flags?.aspectsofpower?.isRitualActivation && actor.items.get(item.id)) {
+        actor.deleteEmbeddedDocuments('Item', [item.id]).catch(() => {});
+      }
     });
   });
 
