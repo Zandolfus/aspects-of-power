@@ -1112,14 +1112,18 @@ ASPECTSOFPOWER.consumableEffectTypes = {
 /**
  * Base-grade (G/F/E, gradeIndex=0) ritual scaling. Each ritual carries
  * BOTH a rarity (from this table) and a ritualGrade (E/D/C/B/A/S);
- * higher grades scale these values by `1.25^gradeIndex` (same per-grade
- * multiplier driving the stat curve at actor.mjs:78). So a D-grade epic
- * ritual is `epic` row × 1.25 → threshold 625 / materialFloor 500 / cap
- * 1500. C-grade epic × 1.5625, etc.
+ * higher grades scale these values by `ritualGradeStep^gradeIndex`.
  *
- * Calibration (2026-05-27): peak E-grade caster (wisdom mod ~810,
- * material ~1000 progress, mana invest ~300) produces ~790 progress —
- * sufficient for epic, locked out of legendary. Mid-D unlocks legendary.
+ * Calibration (2026-06-13, sealed-medium model — power IS the hit basis
+ * and damage basis): caps map onto live E-party combat values. rare cap
+ * 700 → hit ~770 / dmg 560: threatens E casters (HP 384-833), bounces
+ * off bruisers. epic 1200 → hit ~1326: connects on every E PC (top
+ * melee def 1124), one-shots squishies. legendary 2200 one-shots any
+ * E PC — group-masterwork tier. Creator reach: best E ritualist (wis
+ * ~750) solo-maxes ~560 progress with strong inputs — epic threshold
+ * barely solo; legendary+ thresholds require group rituals (2 parity-
+ * matched primaries for legendary, 3 for mythic, D-rank circle for
+ * divine) per the group design in design-ritual-subsystem.md.
  *
  *   threshold     — min total progress for prep to succeed (else materials/mana consumed)
  *   materialFloor — min progress of the chosen material to attempt at all (clean failure, nothing consumed)
@@ -1135,6 +1139,18 @@ ASPECTSOFPOWER.ritualScale = {
   mythic:    { threshold: 2000, materialFloor: 1500, cap: 4000 },
   divine:    { threshold: 3500, materialFloor: 2500, cap: 7500 },
 };
+
+/**
+ * Per-grade multiplier on the ritualScale rows. 2.5 (2026-06-13, was
+ * 1.25): measured actor mod growth E→D is ~2.75× (stat values roughly
+ * +1000 across D levels through the (v/1085)^0.8 curve, × the 1.25
+ * grade multiplier). Under the sealed-medium model the cap must track
+ * same-grade combat values or higher-grade rituals are useless in
+ * their own rank's fights — at 1.25/grade a D-rare cap (875) couldn't
+ * scratch D-rank defenses (~2000). No live impact at change time: all
+ * existing rituals are E-grade (gradeIndex 0 → multiplier 1).
+ */
+ASPECTSOFPOWER.ritualGradeStep = 2.5;
 
 /**
  * Progress formula weights per design-ritual-subsystem.md Phase 2.5.

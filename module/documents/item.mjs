@@ -3682,16 +3682,16 @@ export class AspectsofPowerItem extends Item {
     const weights = sc.ritualProgressWeights ?? { wisdom: 0.55, material: 0.30, mana: 0.15 };
     const ritualScale = sc.ritualScale ?? {};
 
-    // Scale a ritual's rarity row by its grade tag (per the 2026-05-27
-    // rescale — see [design-channel-and-tower.md] / config.mjs:1044).
-    // Base values are at gradeIndex 0 (G/F/E). D-grade rituals multiply
-    // by 1.25, C by 1.5625, etc. Same per-grade factor as the stat curve.
+    // Scale a ritual's rarity row by its grade tag. Base values are at
+    // gradeIndex 0 (G/F/E); higher grades multiply by ritualGradeStep
+    // per index (2.5 per the 2026-06-13 sealed-medium calibration —
+    // caps must track same-grade combat values; see config.mjs).
     const computeScaledScale = (ritualSkill) => {
       const rarity = ritualSkill.system?.rarity ?? 'common';
       const grade  = ritualSkill.system?.ritualGrade ?? 'E';
       const base   = ritualScale[rarity] ?? ritualScale.common ?? { threshold: 0, materialFloor: 0, cap: 0 };
       const gIdx   = sc.statCurve?.gradeIndex?.[grade] ?? 0;
-      const gMult  = Math.pow(1.25, gIdx);
+      const gMult  = Math.pow(sc.ritualGradeStep ?? 2.5, gIdx);
       return {
         threshold:     Math.round((base.threshold     ?? 0) * gMult),
         materialFloor: Math.round((base.materialFloor ?? 0) * gMult),
