@@ -6437,7 +6437,9 @@ export class AspectsofPowerItem extends Item {
       const { effectiveMult } = this._resolveRarityMods();
       const multiplier  = (dbVal && dbVal !== 1) ? dbVal : effectiveMult;
 
-      if (livePool < baseManaAt5ft) {
+      // Ritual activation is free (the gem is the energy source) — the
+      // activator's own mana pool is irrelevant, don't gate on it.
+      if (livePool < baseManaAt5ft && !options.ritualActivation) {
         ChatMessage.create({
           speaker, rollMode, ...(whisperGM ? { whisper: whisperGM } : {}),
           flavor: label,
@@ -6533,7 +6535,7 @@ export class AspectsofPowerItem extends Item {
       const wisCap   = Math.round(baseMana + wisMod * aboveBaseFactor);
       const maxInvest = Math.min(livePool, wisCap);
 
-      if (livePool < baseMana) {
+      if (livePool < baseMana && !options.ritualActivation) {
         ChatMessage.create({
           speaker, rollMode, ...(whisperGM ? { whisper: whisperGM } : {}),
           flavor: label,
@@ -6567,7 +6569,13 @@ export class AspectsofPowerItem extends Item {
         invested = baseMana;
       } else {
         invested = (options.preInvestAmount != null)
-          ? Math.min(options.preInvestAmount, maxInvest)  // clamp pre-capture too
+          // Ritual activation bypasses the wis-derived invest cap (F1, ruled
+          // 2026-06-13): prep already wisdom-weighted AND rarity-capped the
+          // stored power — clamping again at fire crushed the ladder (live:
+          // power 300 → invest 52). The gem's power is the gem's power.
+          ? (options.ritualActivation
+              ? Math.max(1, options.preInvestAmount)
+              : Math.min(options.preInvestAmount, maxInvest))  // clamp pre-capture too
           : options.aiAutoInvest
           ? Math.min(baseMana, maxInvest)                  // AI: minimum cast, no prompt
           : await this._promptResourceInvest({
@@ -6633,7 +6641,22 @@ export class AspectsofPowerItem extends Item {
       const effectiveInvested = hasStaff ? invested + baseMana : invested;
       // Damage uses sized base for AOE (so over-invest above sized base
       // boosts damage), original base for non-AOE.
-      dmgFormula = String(Math.round(intMod * multiplier * Math.pow(Math.max(effectiveInvested, 1) / Math.max(baseMana, 1), 0.2)));
+      if (options.ritualActivation) {
+        // SEALED-MEDIUM model (F2, ruled 2026-06-13): the Medium was written
+        // at inscription — BOTH accuracy and damage derive from the stored
+        // ritualPower, not the activator's stats. The activator contributes
+        // the action, the position, and the aim; the gem is the caster.
+        // Tower precedent: spawnTower already consumes ritualPower as the
+        // summon's whole stat budget. No grade multiplier here — the
+        // ritualScale cap table already scales thresholds/caps by grade, so
+        // stored power has grade baked in. Rarity `multiplier` stays: same
+        // grammar as spells (basis × rarity mult), basis is power not stats.
+        const power = Math.max(1, invested);
+        hitFormula = `((((d20/100)*(${power}))+(${power})))`;
+        dmgFormula = String(Math.round(power * multiplier));
+      } else {
+        dmgFormula = String(Math.round(intMod * multiplier * Math.pow(Math.max(effectiveInvested, 1) / Math.max(baseMana, 1), 0.2)));
+      }
 
       // Hand off to the AOE block below: store the pre-placed template +
       // override so the placement step there can skip re-prompting.
