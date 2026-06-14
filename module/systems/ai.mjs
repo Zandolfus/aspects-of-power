@@ -22,7 +22,14 @@
  *   { onActionReady?: async (actor, ctx) => {} }
  */
 
-import { declareAction, declareMovement, findCombatantForActor } from './celerity.mjs';
+import { declareAction, declareMovement, findCombatantForActor, getClockTick } from './celerity.mjs';
+
+// Per-combatant re-entrancy guard: an AI acts at most ONCE per celerity clock
+// tick. The legitimate loop (declare → clock advances → fire → decide) always
+// re-decides at a NEW tick, so this never blocks it — but it hard-stops any
+// machine-speed re-entry while the clock is stuck (the blocked-movement loop
+// re-declared fractional creep-moves at a non-advancing clock; live 2026-06-14).
+const _aiActedAtTick = new Map(); // combatantId → clockTick
 
 class AIProfilesRegistry {
   static #profiles = new Map();
@@ -441,6 +448,11 @@ export function registerAIHooks() {
     const profile = AIProfiles.get(profileName);
     if (!profile?.onActionReady) return;
 
+    // Once-per-tick guard: refuse to re-decide while the clock is stuck.
+    const clk = combatantDoc.combat ? getClockTick(combatantDoc.combat) : 0;
+    if (_aiActedAtTick.get(combatantDoc.id) === clk) return;
+    _aiActedAtTick.set(combatantDoc.id, clk);
+
     // Fire AI decision asynchronously so the current update cycle settles
     setTimeout(() => {
       profile.onActionReady(actor, { combatant: combatantDoc }).catch(err =>
@@ -461,6 +473,10 @@ export function registerAIHooks() {
     if (!profileName) return;
     const profile = AIProfiles.get(profileName);
     if (!profile?.onActionReady) return;
+    // Once-per-tick guard (shared with the dispatch hook).
+    const clk = combatantDoc.combat ? getClockTick(combatantDoc.combat) : 0;
+    if (_aiActedAtTick.get(combatantDoc.id) === clk) return;
+    _aiActedAtTick.set(combatantDoc.id, clk);
     // Delay lets the combat-start update settle (combat.started flips true
     // AFTER the combatStart hook returns; the profile's declareAction reads
     // findCombatantForActor which needs the started combat).
@@ -475,6 +491,7 @@ export function registerAIHooks() {
   // adds (e.g. a summoned tower). Guard createCombatant on an already-started
   // combat so it doesn't double-kick everyone at combat start.
   Hooks.on('combatStart', (combat) => {
+    _aiActedAtTick.clear(); // fresh combat — drop stale per-combatant marks
     for (const c of combat.combatants) _kick(c);
   });
   Hooks.on('createCombatant', (combatantDoc) => {
