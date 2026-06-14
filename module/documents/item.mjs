@@ -2708,8 +2708,13 @@ export class AspectsofPowerItem extends Item {
         // resistance semantics exactly: only debuffDamage is reduced (stat
         // changes stay full on partial), message only on full negation.
         // Physical-lane debuffs (melee/ranged targetDefense) are untouched.
+        // Marks (Feint, Marked for Death) are tactical setups, NOT CC potency
+        // — veil must NOT ward them, or a feint vs a veiled foe applies nothing
+        // and the next strike has no mark to consume (live bug 2026-06-14).
+        const _isMark = (payload.effectData?.system?.markedDamageBonus ?? 0) > 0
+          || (payload.effectData?.system?.markedAttackMultiplier ?? 0) > 0;
         if (['mind', 'soul'].includes(payload.targetDefense) &&
-            payload.effectData?.system?.debuffDamage > 0) {
+            payload.effectData?.system?.debuffDamage > 0 && !_isMark) {
           const veil = target.system.defense?.veil?.value ?? 0;
           if (veil > 0) {
             payload.effectData.system.debuffDamage = Math.max(0, payload.effectData.system.debuffDamage - veil);
