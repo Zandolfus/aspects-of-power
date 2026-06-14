@@ -961,6 +961,18 @@ Hooks.once('ready', async function () {
     });
   });
 
+  // Socket: a non-GM client (attacker) needs a combatant it doesn't own
+  // updated — e.g., an NPC it attacked dodged, and the scramble/dodge-cost
+  // writes hit the defender's combatant. The active GM applies it.
+  game.socket.on('system.aspects-of-power', (data) => {
+    if (data?.action !== 'gmCombatantUpdate') return;
+    if (game.users.activeGM !== game.user) return;
+    const combatant = game.combats.get(data.combatId)?.combatants.get(data.combatantId);
+    if (combatant) combatant.update(data.data).catch(err =>
+      console.warn('[aop] gmCombatantUpdate failed:', err)
+    );
+  });
+
   // ── One-time migrations ──
   if (game.user.isGM) {
     const migrationVersion = game.settings.get('aspects-of-power', 'migrationVersion') ?? '0';

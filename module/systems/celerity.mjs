@@ -274,12 +274,30 @@ export function getScrambleStacks(actor) {
   return Math.max(0, s.stacks - (now - (s.atTick ?? 0)) / ticksPerStack);
 }
 
+/**
+ * Update a combatant's flags, routing through the active GM when the current
+ * user can't modify it directly. Defender-side writes (scramble, dodge cost)
+ * run on the ATTACKER's client during defense resolution — when a player
+ * attacks an NPC that dodges, the player can't update the NPC's combatant
+ * (live bug 2026-06-14: "Gabriel lacks permission to update Combatant").
+ */
+async function _safeCombatantUpdate(combatant, data) {
+  const canModify = combatant.canUserModify?.(game.user, 'update') ?? game.user.isGM;
+  if (canModify) return combatant.update(data);
+  game.socket.emit('system.aspects-of-power', {
+    action: 'gmCombatantUpdate',
+    combatId: combatant.combat?.id,
+    combatantId: combatant.id,
+    data,
+  });
+}
+
 export async function addScrambleStack(actor) {
   const combatant = findCombatantForActor(actor);
   if (!combatant) return 0;
   const current = getScrambleStacks(actor);
   const now = getClockTick(combatant.combat);
-  await combatant.update({ 'flags.aspectsofpower.scramble': { stacks: current + 1, atTick: now } });
+  await _safeCombatantUpdate(combatant, { 'flags.aspectsofpower.scramble': { stacks: current + 1, atTick: now } });
   return current + 1;
 }
 
@@ -310,12 +328,12 @@ export async function applyDodgeCost(actor) {
   const cost = Math.max(1, Math.round(frac * basis));
 
   if (da?.scheduledTick != null) {
-    await combatant.update({
+    await _safeCombatantUpdate(combatant, {
       'flags.aspectsofpower.declaredAction.scheduledTick': da.scheduledTick + cost,
       'flags.aspectsofpower.nextActionTick': (fl.nextActionTick ?? da.scheduledTick) + cost,
     });
   } else {
-    await combatant.update({ 'flags.aspectsofpower.dodgeDebt': (fl.dodgeDebt ?? 0) + cost });
+    await _safeCombatantUpdate(combatant, { 'flags.aspectsofpower.dodgeDebt': (fl.dodgeDebt ?? 0) + cost });
   }
   return cost;
 }
