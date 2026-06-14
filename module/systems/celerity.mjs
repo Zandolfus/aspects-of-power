@@ -396,10 +396,15 @@ export async function declareAction(actor, skill, options = {}) {
       ui.notifications.warn(`${actor.name} is mid-${existing.label} — cannot redirect until it resolves.`);
       return null;
     }
+    // _aopCancelRedeclare marks this null transition as a CANCEL-to-replace,
+    // NOT an action firing. The AI dispatch hook (ai.mjs) must ignore it —
+    // otherwise re-declaring (cancel → set) reads as "action fired" and
+    // re-triggers onActionReady, an infinite machine-speed attack loop
+    // (live bug 2026-06-14: Felicia/skirmisher → 21k messages).
     await combatant.update({
       'flags.aspectsofpower.declaredAction': null,
       'flags.aspectsofpower.nextActionTick': null,
-    });
+    }, { _aopCancelRedeclare: true });
     ChatMessage.create({
       speaker: ChatMessage.getSpeaker({ actor }),
       content: `<p><em>${actor.name} cancels <strong>${existing.label}</strong> to declare <strong>${skill.name}</strong>.</em></p>`,
@@ -430,6 +435,10 @@ export async function declareAction(actor, skill, options = {}) {
   const leapDestination     = options.leapDestination ?? null;
   const leapApexFt          = options.leapApexFt ?? null;
   const ritualActivation    = options.ritualActivation ?? false;
+  // AI-declared attacks carry this so the deferred fire (tracker / socket)
+  // auto-invests base cost instead of opening a resource dialog nobody can
+  // answer for an NPC. Must survive declare→fire like ritualActivation.
+  const aiAutoInvest        = options.aiAutoInvest ?? false;
 
   // Distance from caster to picked destination, in feet — feeds distance-
   // scaled granted-tag activation fraction (shorter teleport = faster cast).
@@ -480,6 +489,7 @@ export async function declareAction(actor, skill, options = {}) {
       // Must survive the declare→fire round-trip or the activator gets
       // charged the invest as mana at fire time (live bug 2026-06-12).
       ritualActivation,
+      aiAutoInvest,
     },
     'flags.aspectsofpower.nextActionTick': scheduledTick,
     'flags.aspectsofpower.lastActionWait': wait,

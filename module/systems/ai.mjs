@@ -338,8 +338,11 @@ const brawlerProfile = {
     const gapFt = _edgeDistFt(selfTokenDoc, target.tokenDoc);
 
     if (gapFt <= reach) {
-      await skill.roll({ executeDeferred: true, aiAutoInvest: true, preTargetIds: [target.tokenDoc.id] });
-      await declareAction(actor, skill, { targetIds: [target.tokenDoc.id] });
+      // Declare-and-wait (paced by the tracker), NOT fire-immediately. Firing
+      // via executeDeferred here + declaring caused a double-fire AND the
+      // tracker's later fire prompted for invest. aiAutoInvest is threaded
+      // through declaredAction so the deferred fire auto-invests, no dialog.
+      await declareAction(actor, skill, { targetIds: [target.tokenDoc.id], aiAutoInvest: true });
       return;
     }
 
@@ -393,8 +396,8 @@ const skirmisherProfile = {
       h.distPx <= rangeFt * pxPerFt && _hasLOS(h.tCenter, h.tokenDoc)
     );
     if (shootable) {
-      await skill.roll({ executeDeferred: true, aiAutoInvest: true, preTargetIds: [shootable.tokenDoc.id] });
-      await declareAction(actor, skill, { targetIds: [shootable.tokenDoc.id] });
+      // Declare-and-wait with aiAutoInvest threaded (see brawler note).
+      await declareAction(actor, skill, { targetIds: [shootable.tokenDoc.id], aiAutoInvest: true });
       return;
     }
 
@@ -418,6 +421,12 @@ AIProfiles.register('skirmisher', skirmisherProfile);
 export function registerAIHooks() {
   Hooks.on('updateCombatant', async (combatantDoc, changes, _options, _userId) => {
     if (!game.user.isGM) return;
+
+    // CANCEL-to-redeclare also nulls declaredAction but is NOT an action
+    // firing — ignoring it is what stops the infinite re-trigger loop
+    // (declareAction cancels existing → null → would re-fire onActionReady →
+    // declares → cancels → … machine-speed; live bug 2026-06-14).
+    if (_options?._aopCancelRedeclare) return;
 
     // We care about declaredAction transitions from set → null (action fired)
     const declaredChange = changes?.flags?.['aspectsofpower']?.declaredAction;
