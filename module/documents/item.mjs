@@ -1321,6 +1321,11 @@ export class AspectsofPowerItem extends Item {
     // for free-fire passives (Thorns-style); non-zero cost is still paid.
     await this._firePassiveReactions(targetActor, attackerToken, 'self_attacked');
 
+    // Guardian-cover (P2b): when a guardian chooses cover, the defense check
+    // below runs vs the GUARDIAN (coverGuardian) instead of the ally — their
+    // dodge/pools/cost — while damage still lands on the ally with the ally's
+    // own barrier/armor/DR. Null = no cover this attack.
+    let coverGuardian = null;
     // ── Ally-attacked passive auto-fire (Phase C) ──
     // Scan friendly actors with `ally_attacked` passives within their
     // configured `reactionTriggerRange` of `targetActor`. Each fires
@@ -1403,9 +1408,23 @@ export class AspectsofPowerItem extends Item {
                 targetActor = reactor;
                 targetToken = rTok;
                 break;
+              } else if (gMode === 'cover') {
+                // Defend-for-ally (design-guardian-reactions.md): the GUARDIAN's
+                // defense roll replaces the ally's — the defense check below runs
+                // vs coverGuardian. Hit stays on the ally; guardian success
+                // negates it, failure → the ally takes it with the ally's own
+                // mitigation. Consume reaction + cooldown, break (one coverer).
+                await this._gmAction({ type: 'gmConsumeReaction', targetActorUuid: reactor.uuid });
+                const _cd = chosen.system?.tagConfig?.reactionCooldown ?? 1;
+                if (_cd > 0) await reactor.update({ [`flags.aspectsofpower.reactionCooldowns.${chosen.id}`]: _cd });
+                coverGuardian = reactor;
+                ChatMessage.create({
+                  speaker: ChatMessage.getSpeaker({ actor: reactor }),
+                  content: `<p><em><strong>${reactor.name}</strong> covers ${targetActor.name} with <strong>${chosen.name}</strong> — defending the blow in their stead!</em></p>`,
+                });
+                break;
               } else if (gMode) {
-                // cover / redirect — wired in P2b / P2c. Consume the reaction and
-                // note it; do NOT counterstrike (not their role).
+                // redirect — wired in P2c. Consume the reaction + note; no counterstrike.
                 await this._gmAction({ type: 'gmConsumeReaction', targetActorUuid: reactor.uuid });
                 ChatMessage.create({
                   speaker: ChatMessage.getSpeaker({ actor: reactor }),
@@ -1441,11 +1460,14 @@ export class AspectsofPowerItem extends Item {
           reactionLine: '' };
       }
     } else {
+      // Guardian-cover: defend with the guardian's roll/pools/cost when set;
+      // damage still applies to the ally (targetActor) downstream.
+      const _defender = coverGuardian ?? targetActor;
       if (hitRoll && targetDefKey) {
-        primaryResult = await this._resolveDefenseCheck(item, targetActor, targetDefKey, hitTotal, attackerToken);
+        primaryResult = await this._resolveDefenseCheck(item, _defender, targetDefKey, hitTotal, attackerToken);
       }
       if (hasDualDefense && hitRoll) {
-        secondaryResult = await this._resolveDefenseCheck(item, targetActor, secondaryDefKey, hitTotal, attackerToken);
+        secondaryResult = await this._resolveDefenseCheck(item, _defender, secondaryDefKey, hitTotal, attackerToken);
       }
     }
 
