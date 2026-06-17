@@ -82,16 +82,17 @@ export class AspectsofPowerToken extends foundry.documents.TokenDocument {
     // preUpdateCombatant orphan-cleanup will dispose of any AOE region
     // that was placed by the prior action when declaredAction flips.
     const existing = combatant.flags?.aspectsofpower?.declaredAction;
-    if (existing && existing.itemId) {
-      if (existing.uncancellable) {
-        ui.notifications.warn(`${actor.name} is mid-${existing.label} — cannot redirect until it resolves.`);
-        return false;
-      }
-      combatant.update({
-        'flags.aspectsofpower.declaredAction': null,
-        'flags.aspectsofpower.nextActionTick': null,
-      }).catch(err => console.warn('[celerity] override-clear failed:', err));
+    if (existing && existing.itemId && existing.uncancellable) {
+      ui.notifications.warn(`${actor.name} is mid-${existing.label} — cannot redirect until it resolves.`);
+      return false;
     }
+    // A cancellable existing declaration is overwritten wholesale by the
+    // declareMovement call below (a single atomic combatant.update). The old
+    // code ALSO fired an un-awaited null-clear here; that raced the (also
+    // un-awaited) declareMovement write on the same flag, and the clear won —
+    // so re-declares cancelled the move without ever writing the replacement.
+    // declareMovement overwrites declaredAction + nextActionTick outright, so
+    // the separate clear was redundant; removing it eliminates the race.
 
     // Stamina cost from Foundry's movement-cost calculator. Our cost fn
     // (canvas/token._getMovementCostFunction) already applies mode and
