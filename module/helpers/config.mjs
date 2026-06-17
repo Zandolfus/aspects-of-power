@@ -707,6 +707,21 @@ ASPECTSOFPOWER.reactionTypes = {
   parry:   'ASPECTSOFPOWER.Reaction.parry',
   barrier: 'ASPECTSOFPOWER.Reaction.barrier',
   swap:    'ASPECTSOFPOWER.Reaction.swap',
+  guardian: 'ASPECTSOFPOWER.Reaction.guardian',
+};
+
+// Guardian-reaction behavior modes (per design-guardian-reactions.md).
+// Apply when reactionType === 'guardian' on an `ally_attacked` reaction:
+//   intercept — redirect the attack onto the guardian, who defends it with
+//               their own active defense + armor/veil/HP (bodyguard).
+//   cover     — the guardian's defense roll replaces the ally's; success
+//               negates, fail → the ally takes it (defend-for-ally).
+//   redirect  — attack resolves on the ally, then guardianRedirectPct of the
+//               LANDED damage transfers raw onto the guardian (bloodbond).
+ASPECTSOFPOWER.guardianModes = {
+  intercept: 'ASPECTSOFPOWER.Guardian.intercept',
+  cover:     'ASPECTSOFPOWER.Guardian.cover',
+  redirect:  'ASPECTSOFPOWER.Guardian.redirect',
 };
 
 /**

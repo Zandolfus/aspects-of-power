@@ -204,7 +204,13 @@
       "dodge": "Dodge",
       "parry": "Parry",
       "barrier": "Barrier",
-      "swap": "Swap"
+      "swap": "Swap",
+      "guardian": "Guardian"
+    },
+    "Guardian": {
+      "intercept": "Intercept (take the hit)",
+      "cover": "Cover (defend for ally)",
+      "redirect": "Redirect (share damage)"
     },
     "Debuff": {
       "none": "None (Stat Only)",

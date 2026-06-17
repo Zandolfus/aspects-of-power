@@ -253,6 +253,18 @@ export class SkillData extends foundry.abstract.TypeDataModel {
         // override the roll.type classification when present.
         reactionAttackType:    new fields.StringField({ initial: 'any', choices: ['any', 'melee', 'ranged'] }),
 
+        // ── Guardian reactions (per design-guardian-reactions.md) ──
+        // When reactionType === 'guardian' on an `ally_attacked` reaction, the
+        // mode selects what the guardian does for the attacked ally:
+        //   intercept — redirect the attack onto the guardian (they defend it)
+        //   cover     — the guardian's defense roll replaces the ally's
+        //   redirect  — post-resolve, share guardianRedirectPct of landed dmg
+        guardianMode:        new fields.StringField({ initial: 'intercept', choices: ['intercept', 'cover', 'redirect'] }),
+        // Fraction of the ally's LANDED damage transferred to the guardian in
+        // 'redirect' mode (Option A: raw post-mitigation share — the guardian's
+        // own armor is NOT re-applied). 0..1.
+        guardianRedirectPct: new fields.NumberField({ initial: 0.5, min: 0, max: 1 }),
+
         // ── Phase E: buff-carries-reaction config ──
         // When an Active `buff`-tagged skill applies its buff, propagate
         // these onto the spawned effect's `system.reaction*` fields so
