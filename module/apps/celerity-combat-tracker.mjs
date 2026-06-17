@@ -405,7 +405,7 @@ export function installAopTurnMarkerPatch() {
     if (!_aopCelerityActive()) return origUpdate.call(this);
     if (!canvas?.ready) return;
     for (const cm of this.combatants) {
-      const tok = cm.token?._object;
+      const tok = cm.token?.object;
       if (tok) tok.renderFlags.set({ refreshTurnMarker: true });
     }
     const combatantTokenIds = new Set([...this.combatants].map(c => c.tokenId));
@@ -436,6 +436,27 @@ export function installAopTurnMarkerPatch() {
       this.turnMarker = null;
     }
   };
+
+  // Repaint triggers. The patched _updateTurnMarkers above only fires on
+  // combat.turn / round changes (core's cascade); declaring or cancelling an
+  // action doesn't move combat.turn, so without these hooks a token's ring
+  // never updates outside a clock advance — which is why the rings vanished.
+  // Each is client-local (render flags are per-canvas) — no GM gate. Covers
+  // _onCelCancel automatically (its declaredAction→null write fires updateCombatant).
+  Hooks.on('updateCombatant', (combatant, changes) => {
+    if (!_aopCelerityActive()) return;
+    const combat = combatant.parent;
+    if (!combat?.started) return;
+    if (foundry.utils.hasProperty(changes, `flags.${FLAG_NS}.declaredAction`)) {
+      _aopSyncTurnMarkers(combat);
+    }
+  });
+  Hooks.on('createCombatant', (combatant) => {
+    if (_aopCelerityActive() && combatant.parent?.started) _aopSyncTurnMarkers(combatant.parent);
+  });
+  Hooks.on('deleteCombatant', (combatant) => {
+    if (_aopCelerityActive() && combatant.parent?.started) _aopSyncTurnMarkers(combatant.parent);
+  });
 
   CombatCls.prototype._aopTurnMarkerPatched = true;
 }
