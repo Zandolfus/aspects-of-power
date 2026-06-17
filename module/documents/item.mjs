@@ -953,7 +953,23 @@ export class AspectsofPowerItem extends Item {
       });
     }
     if (attackerToken) {
-      await reactionSkill.roll({ executeDeferred: true, preTargetIds: [attackerToken.id] });
+      // Owner-route: a counterstrike reaction's roll (and any variable-invest
+      // dialog) must run on the REACTOR's owning player's client, not on
+      // whoever drove the attack resolution (the GM, for NPC attacks). Mirrors
+      // the celerity executeQueuedAction routing — fixes the invest-dialog-on-GM
+      // bug for variable-invest ally reactions. No online owner → run locally.
+      const owner = game.users.find(u => u.active && !u.isGM && u.character?.id === reactorActor.id);
+      if (owner && owner.id !== game.user.id) {
+        game.socket.emit('system.aspects-of-power', {
+          action: 'executeQueuedAction',
+          actorId: reactorActor.id,
+          itemId: reactionSkill.id,
+          targetUserId: owner.id,
+          preTargetIds: [attackerToken.id],
+        });
+      } else {
+        await reactionSkill.roll({ executeDeferred: true, preTargetIds: [attackerToken.id] });
+      }
     }
     ChatMessage.create({
       speaker: ChatMessage.getSpeaker({ actor: reactorActor }),
@@ -1365,7 +1381,40 @@ export class AspectsofPowerItem extends Item {
           const chosenId = await this._promptReactiveChoice(reactor, 'ally_attacked', { promptText, attackerToken, attackedActor: targetActor });
           if (chosenId) {
             const chosen = reactor.items.get(chosenId);
-            if (chosen) await this._commitReactiveFire(reactor, chosen, attackerToken);
+            if (chosen) {
+              const gMode = chosen.system?.reactionType === 'guardian'
+                ? (chosen.system?.tagConfig?.guardianMode ?? 'intercept')
+                : null;
+              if (gMode === 'intercept') {
+                // Purely-defensive bodyguard (design-guardian-reactions.md).
+                // Consume the reactor's reaction + stamp cooldown, then REDIRECT
+                // the in-flight attack onto the guardian — done BEFORE the
+                // defense check below (~the _resolveDefenseCheck call), so it
+                // resolves vs the GUARDIAN's own dodge/parry/armor/veil/HP. No
+                // skill roll, no counterstrike (the skill is the trigger). One
+                // interceptor per attack → break the ally scan.
+                await this._gmAction({ type: 'gmConsumeReaction', targetActorUuid: reactor.uuid });
+                const _cd = chosen.system?.tagConfig?.reactionCooldown ?? 1;
+                if (_cd > 0) await reactor.update({ [`flags.aspectsofpower.reactionCooldowns.${chosen.id}`]: _cd });
+                ChatMessage.create({
+                  speaker: ChatMessage.getSpeaker({ actor: reactor }),
+                  content: `<p><em><strong>${reactor.name}</strong> intercepts the attack on ${targetActor.name} with <strong>${chosen.name}</strong> — they take the hit!</em></p>`,
+                });
+                targetActor = reactor;
+                targetToken = rTok;
+                break;
+              } else if (gMode) {
+                // cover / redirect — wired in P2b / P2c. Consume the reaction and
+                // note it; do NOT counterstrike (not their role).
+                await this._gmAction({ type: 'gmConsumeReaction', targetActorUuid: reactor.uuid });
+                ChatMessage.create({
+                  speaker: ChatMessage.getSpeaker({ actor: reactor }),
+                  content: `<p><em>${reactor.name}'s <strong>${chosen.name}</strong> (guardian: ${gMode}) — not yet wired.</em></p>`,
+                });
+              } else {
+                await this._commitReactiveFire(reactor, chosen, attackerToken);
+              }
+            }
           }
         }
       }
