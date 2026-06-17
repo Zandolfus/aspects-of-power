@@ -1326,6 +1326,12 @@ export class AspectsofPowerItem extends Item {
     // dodge/pools/cost — while damage still lands on the ally with the ally's
     // own barrier/armor/DR. Null = no cover this attack.
     let coverGuardian = null;
+    // Guardian-redirect (P2c): when a guardian chooses redirect, the attack
+    // resolves on the ally normally; then redirectPct of the LANDED (final)
+    // damage transfers RAW onto the guardian (Option A — no guardian armor
+    // re-applied). Null = no redirect this attack.
+    let redirectGuardian = null;
+    let redirectPct = 0;
     // ── Ally-attacked passive auto-fire (Phase C) ──
     // Scan friendly actors with `ally_attacked` passives within their
     // configured `reactionTriggerRange` of `targetActor`. Each fires
@@ -1423,12 +1429,27 @@ export class AspectsofPowerItem extends Item {
                   content: `<p><em><strong>${reactor.name}</strong> covers ${targetActor.name} with <strong>${chosen.name}</strong> — defending the blow in their stead!</em></p>`,
                 });
                 break;
+              } else if (gMode === 'redirect') {
+                // Bloodbond: the attack resolves on the ally; a share of the
+                // LANDED damage transfers raw to the guardian, applied via the
+                // redirect button on the result card (below). Consume reaction +
+                // cooldown, break (one redirector per attack).
+                await this._gmAction({ type: 'gmConsumeReaction', targetActorUuid: reactor.uuid });
+                const _cd = chosen.system?.tagConfig?.reactionCooldown ?? 1;
+                if (_cd > 0) await reactor.update({ [`flags.aspectsofpower.reactionCooldowns.${chosen.id}`]: _cd });
+                redirectGuardian = reactor;
+                redirectPct = Math.max(0, Math.min(1, chosen.system?.tagConfig?.guardianRedirectPct ?? 0.5));
+                ChatMessage.create({
+                  speaker: ChatMessage.getSpeaker({ actor: reactor }),
+                  content: `<p><em><strong>${reactor.name}</strong> bonds with ${targetActor.name} via <strong>${chosen.name}</strong> — they will share the blow!</em></p>`,
+                });
+                break;
               } else if (gMode) {
-                // redirect — wired in P2c. Consume the reaction + note; no counterstrike.
+                // Unknown guardian mode — consume + note, no counterstrike.
                 await this._gmAction({ type: 'gmConsumeReaction', targetActorUuid: reactor.uuid });
                 ChatMessage.create({
                   speaker: ChatMessage.getSpeaker({ actor: reactor }),
-                  content: `<p><em>${reactor.name}'s <strong>${chosen.name}</strong> (guardian: ${gMode}) — not yet wired.</em></p>`,
+                  content: `<p><em>${reactor.name}'s <strong>${chosen.name}</strong> (guardian: ${gMode}) — unknown mode.</em></p>`,
                 });
               } else {
                 await this._commitReactiveFire(reactor, chosen, attackerToken);
@@ -1667,6 +1688,36 @@ export class AspectsofPowerItem extends Item {
       ? `<p>Defense reduction: −${Math.round((1 - damageMultiplier) * 100)}%</p>`
       : '';
 
+    // Guardian-redirect (P2c): split the LANDED final damage — the ally keeps
+    // (1−pct), the guardian takes pct RAW (Option A: no guardian armor). Override
+    // the ally button to the kept amount with toughness/affinity 0 so the handler
+    // doesn't re-mitigate (mitigation already applied at resolve); keep fmAttrs so
+    // the ally's self_struck/hp_threshold still fire. Add a guardian apply button.
+    let allyApplyAttr = `data-damage="${afterDefense}"
+             data-toughness="${baseDR}"
+             data-affinity-dr="${affinityDR}"
+             data-damage-type="${isPhysical ? 'physical' : 'magical'}"${damageBreakdownAttr}${fmAttrs}`;
+    let redirectLine = '';
+    let redirectButton = '';
+    if (redirectGuardian && isHit && finalDamage > 0) {
+      const share = Math.round(finalDamage * redirectPct);
+      const keep  = Math.max(0, finalDamage - share);
+      allyApplyAttr = `data-damage="${keep}"
+             data-toughness="0"
+             data-affinity-dr="0"
+             data-damage-type="${isPhysical ? 'physical' : 'magical'}"${fmAttrs}`;
+      redirectLine = `<p><em>Redirected ${share} of ${finalDamage} to ${redirectGuardian.name} (${Math.round(redirectPct * 100)}%).</em></p>`;
+      redirectButton = `<button class="apply-damage"
+             data-actor-uuid="${redirectGuardian.uuid}"
+             data-damage="${share}"
+             data-toughness="0"
+             data-affinity-dr="0"
+             data-damage-type="${isPhysical ? 'physical' : 'magical'}"
+             style="margin-top:6px;width:100%;">
+             Apply redirected ${share} to ${redirectGuardian.name}
+           </button>`;
+    }
+
     const gmContent = isHit
       ? `<div class="combat-result">
            <h3>${item.name} — ${resultBadge}</h3>
@@ -1681,16 +1732,15 @@ export class AspectsofPowerItem extends Item {
            ${barrierLine}
            ${toughnessLine}
            <p><strong>Final damage: ${displayDamage}</strong></p>
+           ${redirectLine}
            ${fmLine}
            <button class="apply-damage"
              data-actor-uuid="${targetActor.uuid}"
-             data-damage="${afterDefense}"
-             data-toughness="${baseDR}"
-             data-affinity-dr="${affinityDR}"
-             data-damage-type="${isPhysical ? 'physical' : 'magical'}"${damageBreakdownAttr}${fmAttrs}
+             ${allyApplyAttr}
              style="margin-top:6px;width:100%;">
              Apply to ${targetActor.name}
            </button>
+           ${redirectButton}
          </div>`
       : `<div class="combat-result">
            <h3>${item.name} — ${resultBadge}</h3>
