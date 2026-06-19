@@ -497,4 +497,34 @@ export function registerAIHooks() {
   Hooks.on('createCombatant', (combatantDoc) => {
     if (combatantDoc.combat?.started) _kick(combatantDoc);
   });
+
+  // ── Round-start re-trigger: recover INERT AI ──
+  // ROOT CAUSE FIX (2026-06-19): the dispatch hook fires only on a
+  // declaredAction set→null TRANSITION. An AI whose decision produced NO
+  // declaredAction (no affordable skill — common after stamina drain — no
+  // reachable target, or a move that left it null across a clock jump) sits
+  // at null forever: it never transitions, so it never re-decides, even once
+  // stamina has regenerated. celerity.runRoundStart emits `aopRoundStart`
+  // AFTER onStartTurn (post-regen) once per actor reference round; re-fire
+  // onActionReady for any INERT (null-declaredAction) AI combatant so it gets
+  // another chance. Skips combatants that already have a declared action
+  // (the firing combatant still holds its action when round-start runs).
+  Hooks.on('aopRoundStart', (combat, combatantDoc) => {
+    if (!game.user.isGM) return;
+    if (combatantDoc.flags?.aspectsofpower?.declaredAction) return; // not inert
+    const actor = combatantDoc.actor;
+    const profileName = actor?.flags?.aspectsofpower?.aiProfile;
+    if (!profileName) return;
+    const profile = AIProfiles.get(profileName);
+    if (!profile?.onActionReady) return;
+    // Share the once-per-tick guard so we never stack with a same-tick dispatch.
+    const clk = combatantDoc.combat ? getClockTick(combatantDoc.combat) : 0;
+    if (_aiActedAtTick.get(combatantDoc.id) === clk) return;
+    _aiActedAtTick.set(combatantDoc.id, clk);
+    setTimeout(() => {
+      profile.onActionReady(actor, { combatant: combatantDoc }).catch(err =>
+        console.warn(`[ai] ${profileName} round-start re-trigger failed for ${actor.name}:`, err)
+      );
+    }, 100);
+  });
 }

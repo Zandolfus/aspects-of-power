@@ -602,6 +602,14 @@ export async function runRoundStart(combat, combatant) {
       console.error('Celerity round-start onStartTurn failed for', actor.name, e);
     }
   }
+
+  // 3. Round-start re-evaluation beat. Fires AFTER onStartTurn (so regen has
+  //    landed). AI listens for this to recover INERT combatants — ones whose
+  //    last decision produced no declaredAction (no affordable skill, no
+  //    reachable target, or a move that left declaredAction null). The
+  //    dispatch hook only fires on a declaredAction set→null TRANSITION, so an
+  //    already-null AI never re-evaluates on its own; this is its safety net.
+  Hooks.callAll('aopRoundStart', combat, combatant);
 }
 
 /** Backward-compat alias for the renamed function — anything importing the
