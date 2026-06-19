@@ -232,14 +232,9 @@ ASPECTSOFPOWER.celerity = {
   //               (3 stamina per 5 ft).
   // The anchors swap between the two dimensions — walking is slow but
   // cheap, sprinting is fast but expensive. Default is Walk; Shift = Sprint.
-  // staminaMult halved 2026-06-19 (walk 1.0→0.5, sprint 3.0→1.5) to moderate
-  // movement stamina consumption — AI units were gassing out and stalling.
-  // Per-30ft now: walk 3 (was 6), sprint 9 (was 18). Ratio (3:1) preserved so
-  // sprint stays the burst-but-pricier mode. Shared by player (canvas/token
-  // _getMovementCostFunction) and AI (ai.mjs _declareStepToward).
   MOVEMENT_MODES: {
-    walk:   { celerityMult: 2.0, staminaMult: 0.5, label: 'walk'   },
-    sprint: { celerityMult: 1.0, staminaMult: 1.5, label: 'sprint' },
+    walk:   { celerityMult: 2.0, staminaMult: 1.0, label: 'walk'   },
+    sprint: { celerityMult: 1.0, staminaMult: 3.0, label: 'sprint' },
   },
   DEFAULT_MOVEMENT_MODE: 'walk',
   // Walk-mode bonus to the relevant defense roll when triggering terrain
