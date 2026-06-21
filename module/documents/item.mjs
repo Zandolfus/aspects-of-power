@@ -6473,9 +6473,30 @@ export class AspectsofPowerItem extends Item {
     // the celerity dispatch socket).
     if (options.executeDeferred && Array.isArray(options.preTargetIds) && options.preTargetIds.length > 0) {
       for (const t of game.user.targets) t.setTarget(false, { releaseOthers: false, groupSelection: false });
+      let liveTargets = 0;
       for (const id of options.preTargetIds) {
         const tok = canvas.tokens?.get(id);
-        if (tok) tok.setTarget(true, { releaseOthers: false, groupSelection: false });
+        if (!tok) continue;
+        // Stale-target guard: a target that died in the declare→fire window is
+        // still a live canvas token (not yet deleted), so the old code happily
+        // re-targeted the corpse — applying a full hit AND re-triggering its
+        // on-death effects (e.g. detonating Death Bloom on an already-dead
+        // creature). Don't swing at the dead.
+        const hp = tok.actor?.system?.health?.value;
+        if (typeof hp === 'number' && hp <= 0) continue;
+        tok.setTarget(true, { releaseOthers: false, groupSelection: false });
+        liveTargets++;
+      }
+      // If every snapshotted target died before the action resolved, the
+      // attack whiffs. Fizzle before damage / on-death re-triggers, mirroring
+      // the no-target-picked abort below. Area skills are exempt — they resolve
+      // on their template/centroid, not a single living token, so a dead anchor
+      // token shouldn't cancel the blast.
+      const _isAreaSkill = (this.system.tags ?? []).includes('aoe')
+        || (this.system.alterations ?? []).some(a => a.id === 'cleave');
+      if (liveTargets === 0 && !_isAreaSkill) {
+        ui.notifications.info(`${this.name} fizzles — its target is already down.`);
+        return;
       }
     }
 

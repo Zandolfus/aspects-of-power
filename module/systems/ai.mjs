@@ -209,25 +209,57 @@ const primitiveProfile = {
       return;
     }
 
-    // Sort closest first
-    candidates.sort((a, b) => a.distPx - b.distPx);
-    const minDist = candidates[0].distPx;
-    const ties = candidates.filter(c => Math.abs(c.distPx - minDist) < 0.5); // within half a pixel
+    // ── Per-round target lock ──
+    // The tower commits to one target for the duration of its reference round,
+    // then re-acquires the closest enemy at the next round boundary. Without
+    // this the tower re-evaluated "nearest" on every shot, so two foes trading
+    // the closest spot (or two exactly-equidistant ones) made it flip-flop and
+    // never settle. We mark the round by the actor's `lastRoundEndAt` boundary
+    // tick (set in _onCelAdvance); when that advances, the lock refreshes.
+    const combat = _ctx?.combat ?? game.combat;
+    const combatant = combat?.combatants?.find(c => c.actor?.id === actor.id);
+    const roundMarker = combatant?.flags?.aspectsofpower?.lastRoundEndAt ?? 0;
+    const lockedId = combatant?.flags?.aspectsofpower?.aiLockedTargetId ?? null;
+    const lockRound = combatant?.flags?.aspectsofpower?.aiLockRoundAt ?? null;
 
-    // Sticky tiebreak: prefer current channel target if in the tied set
-    let chosen = ties[0];
-    if (ties.length > 1) {
-      const { ChannelHelpers } = await import('./channel.mjs');
-      const currentChannel = ChannelHelpers.findChannelOf(actor.uuid);
-      if (currentChannel) {
-        const sticky = ties.find(c => c.tokenDoc.id === currentChannel.targetTokenId);
-        if (sticky) chosen = sticky;
+    let chosen = null;
+    if (lockedId && lockRound === roundMarker) {
+      // Hold the locked target if it's still a valid candidate this round
+      // (alive, in range, in LOS — candidates already enforces all three).
+      chosen = candidates.find(c => c.tokenDoc.id === lockedId) ?? null;
+    }
+
+    if (!chosen) {
+      // (Re)acquire: closest first, with a deterministic tiebreak among
+      // exactly-equidistant foes. The old code broke ties with `Date.now() %
+      // 1000`, re-picking every millisecond. Prefer the current channel target
+      // if tied (sticky), else lowest-HP (focus-fire), else lowest token id.
+      candidates.sort((a, b) => a.distPx - b.distPx);
+      const minDist = candidates[0].distPx;
+      const ties = candidates.filter(c => Math.abs(c.distPx - minDist) < 0.5); // within half a pixel
+      chosen = ties[0];
+      if (ties.length > 1) {
+        const { ChannelHelpers } = await import('./channel.mjs');
+        const currentChannel = ChannelHelpers.findChannelOf(actor.uuid);
+        if (currentChannel) {
+          const sticky = ties.find(c => c.tokenDoc.id === currentChannel.targetTokenId);
+          if (sticky) chosen = sticky;
+        }
+        if (chosen === ties[0]) {
+          chosen = [...ties].sort((a, b) => {
+            const ha = a.tokenDoc.actor?.system?.health?.value ?? Infinity;
+            const hb = b.tokenDoc.actor?.system?.health?.value ?? Infinity;
+            if (ha !== hb) return ha - hb;
+            return a.tokenDoc.id.localeCompare(b.tokenDoc.id);
+          })[0];
+        }
       }
-      if (chosen === ties[0] && ties.length > 1) {
-        // Coinflip among ties
-        chosen = ties[Math.floor(((selfTokenDoc.id.charCodeAt(0) + Date.now() % 1000) % ties.length))];
-        // Date.now() is not allowed in workflow agents but is fine here; just need
-        // a non-deterministic pick. Fall back: ties[0].
+      // Persist the fresh lock for the rest of this round.
+      if (combatant) {
+        await combatant.update({
+          'flags.aspectsofpower.aiLockedTargetId': chosen.tokenDoc.id,
+          'flags.aspectsofpower.aiLockRoundAt': roundMarker,
+        });
       }
     }
 
