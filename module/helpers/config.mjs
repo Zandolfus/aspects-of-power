@@ -326,6 +326,14 @@ ASPECTSOFPOWER.ai = {
     brawler:    'Brawler (melee)',
     skirmisher: 'Skirmisher (ranged)',
   },
+  // Per-NPC `flags.aspectsofpower.aiPathMode` — how the unit routes to its
+  // destination. 'direct' charges straight (ignores AOE). 'smart' deviates the
+  // heading to skirt harmful persistent-AOE regions (ai.mjs _declareStepToward).
+  pathModes: {
+    direct: 'Direct (charge straight)',
+    smart:  'Smart (avoid area effects)',
+  },
+  defaultPathMode: 'direct',
   maxStepFt: 30,   // max movement per AI action
   dangerFt:  15,   // skirmisher kite bubble
 };

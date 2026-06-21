@@ -261,16 +261,57 @@ async function _pickAttackSkill(actor, rollTypes) {
 }
 
 /**
+ * Persistent-AOE regions on the actor's scene that would HARM this unit:
+ * damaging / debuff zones that target it. A zone is a hazard if its
+ * `targetingMode` is 'all', or it's an 'enemies' zone cast by the opposite
+ * side (casterDisposition ≠ self). 'allies' zones (heals/buffs) and zones
+ * cast by our own side are ignored. Read by 'smart' path mode to route around
+ * standing hazards. (persistentData shape: item.mjs region creation ~5624.)
+ */
+function _hazardRegionsFor(selfTokenDoc) {
+  const scene = selfTokenDoc.parent;
+  if (!scene) return [];
+  const selfDisp = selfTokenDoc.disposition;
+  const out = [];
+  for (const region of (scene.regions ?? [])) {
+    const f = region.flags?.['aspects-of-power'];
+    if (!f?.persistent || !f.persistentData) continue;
+    const mode = f.persistentData.targetingMode ?? 'all';
+    if (mode === 'allies') continue;                                   // heal/buff zone
+    if (mode === 'enemies' && f.persistentData.casterDisposition === selfDisp) continue; // our side's zone
+    out.push(region);
+  }
+  return out;
+}
+
+/** True if the straight segment a→b passes through any hazard region
+ *  (sampled at a handful of points, endpoints included). */
+function _segmentCrossesHazard(a, b, hazards) {
+  if (!hazards.length) return false;
+  const STEPS = 6;
+  for (let i = 0; i <= STEPS; i++) {
+    const t = i / STEPS;
+    const p = { x: a.x + (b.x - a.x) * t, y: a.y + (b.y - a.y) * t, elevation: 0 };
+    for (const r of hazards) { if (r.testPoint(p)) return true; }
+  }
+  return false;
+}
+
+/**
  * Declare a straight-line movement step from the actor's token toward (or
  * away from — pass a negative-direction destPoint) a destination point.
  * Wall-checked center-to-center; on collision the step halves (2 retries).
  * Stamina-gated: shrinks the step to what the actor can afford; below 5ft
  * gives up. Returns true if a movement was declared.
  *
- * v1 limitations (documented): straight-line only, no pathfinding, flat
- * stamina cost (ceil(ft/5) × mode mult — no terrain surcharges).
+ * pathMode: 'direct' charges straight at the destination (ignores AOE);
+ * 'smart' deviates the heading to skirt harmful persistent-AOE regions
+ * (notes area effects and goes around them) before the wall-halving runs.
+ *
+ * v1 limitations (documented): no wall pathfinding (straight-line; smart mode
+ * only avoids AOE, not walls), flat stamina cost (ceil(ft/5) × mode mult).
  */
-async function _declareStepToward(actor, selfTokenDoc, destPoint, wantFt, mode) {
+async function _declareStepToward(actor, selfTokenDoc, destPoint, wantFt, mode, pathMode = 'direct') {
   const ai = CONFIG.ASPECTSOFPOWER.ai ?? {};
   const modes = CONFIG.ASPECTSOFPOWER.celerity?.MOVEMENT_MODES ?? {};
   const m = modes[mode] ?? modes.walk ?? { staminaMult: 1 };
@@ -287,10 +328,37 @@ async function _declareStepToward(actor, selfTokenDoc, destPoint, wantFt, mode) 
   if (stepFt < 5) return false;
 
   const selfCenter = _centerOf(selfTokenDoc);
-  const dx = destPoint.x - selfCenter.x;
-  const dy = destPoint.y - selfCenter.y;
-  const dist = Math.hypot(dx, dy) || 1;
-  const ux = dx / dist, uy = dy / dist;
+  let ux, uy;
+  {
+    const dx = destPoint.x - selfCenter.x;
+    const dy = destPoint.y - selfCenter.y;
+    const dist = Math.hypot(dx, dy) || 1;
+    ux = dx / dist; uy = dy / dist;
+  }
+
+  // SMART path: if the direct step would cross a harmful AOE, deviate the
+  // heading. Sample increasing left/right offsets off the direct bearing and
+  // take the smallest that clears (cos(80°)≈0.17 > 0, so every candidate still
+  // advances toward the target). If none clears, fall through and charge the
+  // direct heading — moving beats freezing; the next decision re-evaluates.
+  if (pathMode === 'smart') {
+    const hazards = _hazardRegionsFor(selfTokenDoc);
+    if (hazards.length) {
+      const travelPx = stepFt * pxPerFt;
+      const directEnd = { x: selfCenter.x + ux * travelPx, y: selfCenter.y + uy * travelPx };
+      if (_segmentCrossesHazard(selfCenter, directEnd, hazards)) {
+        const base = Math.atan2(uy, ux);
+        const DEG = Math.PI / 180;
+        for (const off of [20, -20, 40, -40, 60, -60, 80, -80]) {
+          const a = base + off * DEG;
+          const cand = { x: selfCenter.x + Math.cos(a) * travelPx, y: selfCenter.y + Math.sin(a) * travelPx };
+          if (_segmentCrossesHazard(selfCenter, cand, hazards)) continue;
+          ux = Math.cos(a); uy = Math.sin(a);
+          break;
+        }
+      }
+    }
+  }
 
   // Wall check center-to-center; halve twice on collision.
   for (let attempt = 0; attempt < 3; attempt++) {
@@ -355,9 +423,10 @@ const brawlerProfile = {
 
     // Close the gap: stop a hair inside reach; sprint when far, walk when close.
     const ai = CONFIG.ASPECTSOFPOWER.ai ?? {};
+    const pathMode = actor.flags?.aspectsofpower?.aiPathMode ?? 'direct';
     const wantFt = Math.max(5, gapFt - Math.max(0, reach - 2));
     const mode = gapFt > 2 * (ai.maxStepFt ?? 30) ? 'sprint' : 'walk';
-    const moved = await _declareStepToward(actor, selfTokenDoc, target.tCenter, wantFt, mode);
+    const moved = await _declareStepToward(actor, selfTokenDoc, target.tCenter, wantFt, mode, pathMode);
     if (!moved) return _idle(actor, skill, 'path blocked or out of stamina');
   },
 };
@@ -379,6 +448,7 @@ const skirmisherProfile = {
     if (!skill) return _idle(actor, null, 'no affordable ranged attack skill');
 
     const ai = CONFIG.ASPECTSOFPOWER.ai ?? {};
+    const pathMode = actor.flags?.aspectsofpower?.aiPathMode ?? 'direct';
     const pxPerFt = canvas.grid.size / canvas.grid.distance;
     const skillRange = skill.system?.castingRange ?? 0;
     const rangeFt = skillRange > 0 ? skillRange : (actor.system?.castingRange ?? 60);
@@ -393,7 +463,7 @@ const skirmisherProfile = {
         x: selfCenter.x + (selfCenter.x - nearest.tCenter.x),
         y: selfCenter.y + (selfCenter.y - nearest.tCenter.y),
       };
-      const moved = await _declareStepToward(actor, selfTokenDoc, away, 20, 'walk');
+      const moved = await _declareStepToward(actor, selfTokenDoc, away, 20, 'walk', pathMode);
       if (moved) return;
       // Cornered — fall through and shoot point-blank instead.
     }
@@ -409,7 +479,7 @@ const skirmisherProfile = {
     }
 
     // Nobody shootable — advance toward the nearest hostile to gain range/LOS.
-    const moved = await _declareStepToward(actor, selfTokenDoc, nearest.tCenter, 30, 'walk');
+    const moved = await _declareStepToward(actor, selfTokenDoc, nearest.tCenter, 30, 'walk', pathMode);
     if (!moved) return _idle(actor, skill, 'no shot and path blocked');
   },
 };
