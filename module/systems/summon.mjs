@@ -76,7 +76,6 @@ export class SummonHelpers {
         ...(sourceData.flags ?? {}),
         'aspects-of-power': {
           ...(sourceData.flags?.['aspects-of-power'] ?? {}),
-          ...(aiFlags ?? {}),   // AI behavior flags (aiProfile/aiPathfind/…) onto the clone
           summon: {
             ownerActorUuid:       sourceActor.uuid,
             sourceSkillUuid,
@@ -84,6 +83,16 @@ export class SummonHelpers {
             spawnedAt:            Date.now(),
             cleanupActorOnDelete: true,
           },
+        },
+        // AI behavior flags MUST live under the NON-hyphenated `aspectsofpower`
+        // namespace — that is what the AI engine (ai.mjs profiles + dispatch
+        // hooks) reads. They were previously written to the hyphenated
+        // system-id key (`aspects-of-power`), so summoned creatures were
+        // brain-dead — the engine never saw their aiProfile. spawnTower already
+        // uses the correct key; this matches it.
+        aspectsofpower: {
+          ...(sourceData.flags?.aspectsofpower ?? {}),
+          ...(aiFlags ?? {}),
         },
       },
     };
@@ -137,7 +146,34 @@ export class SummonHelpers {
     merged.y = position.y - (merged.height ?? 1) * grid / 2;
 
     const [tokenDoc] = await scene.createEmbeddedDocuments('Token', [merged]);
+    await this._joinActiveCombat(scene, tokenDoc);
     return { actorClone: created, tokenDoc };
+  }
+
+  /**
+   * Add a freshly-spawned AI summon/tower to the running combat so its brain
+   * actually takes turns. Creating the combatant fires the createCombatant
+   * kickoff hook (registerAIHooks), which schedules the unit's first decision.
+   * No-op for passive summons (no aiProfile — e.g. decoy Ice Clones), when no
+   * combat is running, when the combat is on a different scene, or if the token
+   * is somehow already a combatant. Runs GM-side (the spawn pipeline already
+   * routes creation to a GM), where Combatant creation is permitted.
+   * @param {Scene} scene
+   * @param {TokenDocument} tokenDoc
+   */
+  static async _joinActiveCombat(scene, tokenDoc) {
+    const prof = tokenDoc?.actor?.flags?.aspectsofpower?.aiProfile;
+    if (!prof) return; // only AI-brained units take turns
+    const combat = game.combats?.active ?? null;
+    if (!combat?.started) return;
+    // A combat with a null scene applies everywhere; otherwise it must match.
+    if (combat.scene && combat.scene.id !== scene.id) return;
+    if (combat.combatants.some(c => c.tokenId === tokenDoc.id)) return;
+    try {
+      await combat.createEmbeddedDocuments('Combatant', [{ tokenId: tokenDoc.id, sceneId: scene.id }]);
+    } catch (e) {
+      console.warn('[summon] failed to add summon to active combat:', e);
+    }
   }
 
   /**
@@ -204,8 +240,9 @@ export class SummonHelpers {
    * Tower spawn (per plan pure-gathering-ullman.md, 2026-05-29). Clones from
    * a stub NPC actor (not the summoner), applies `ritualPower × statDistribution`
    * as ability-score overrides, sets AI flags, drops a token on the scene.
-   * Auto-registers as combatant if active combat (Foundry default behavior
-   * when a token enters a combat-active scene).
+   * Joins the running combat via _joinActiveCombat (so the tower's AI takes
+   * turns) — Foundry does NOT auto-add tokens to combat on creation, so this is
+   * explicit.
    *
    * Stub provides the "kind of construct" identity (token art, prototype
    * disposition, default tags). statDistribution + ritualPower provide the
@@ -394,6 +431,7 @@ export class SummonHelpers {
     tokenData.y = position.y - (tokenData.height ?? 1) * grid / 2;
 
     const [tokenDoc] = await scene.createEmbeddedDocuments('Token', [tokenData]);
+    await this._joinActiveCombat(scene, tokenDoc);
     return { actorClone: created, tokenDoc };
   }
 }
