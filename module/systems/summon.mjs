@@ -230,7 +230,7 @@ export class SummonHelpers {
   static async spawnTower({ stubActorUuid, scene, position, ownerActorUuid,
                               ritualPower, statDistribution, aiProfile = 'primitive',
                               aiSkillUuid, summonType, sourceSkillUuid,
-                              capacity = 1, extraTags = [], namePrefix = '' }) {
+                              capacity = 1, extraTags = [], namePrefix = '', aiFlags = null }) {
     if (!stubActorUuid || !position || !ownerActorUuid) return null;
     scene = scene ?? canvas.scene;
     if (!scene) return null;
@@ -240,7 +240,7 @@ export class SummonHelpers {
       return _requestGMSpawn('spawnTower', {
         stubActorUuid, sceneId: scene.id, position, ownerActorUuid,
         ritualPower, statDistribution, aiProfile, aiSkillUuid, summonType,
-        sourceSkillUuid, capacity, extraTags, namePrefix,
+        sourceSkillUuid, capacity, extraTags, namePrefix, aiFlags,
       });
     }
 
@@ -283,6 +283,7 @@ export class SummonHelpers {
           ...(stubData.flags?.aspectsofpower ?? {}),
           aiProfile,
           aiSkillUuid,
+          ...(aiFlags ?? {}),   // granular behavior faculties (aiPathfind/…); aiProfile here wins if set
         },
       },
     };
@@ -514,6 +515,7 @@ function _registerGMSpawnListener() {
             capacity:         payload.capacity,
             extraTags:        payload.extraTags,
             namePrefix:       payload.namePrefix,
+            aiFlags:          payload.aiFlags,
           });
         } else {
           respond(false, { error: `unknown spawn method: ${method}` });

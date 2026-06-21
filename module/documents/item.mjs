@@ -1909,11 +1909,22 @@ export class AspectsofPowerItem extends Item {
       // ritualPower comes from the activator's preInvestAmount (passed by the
       // ritual-activation path at item.mjs:5852 and threaded through the
       // dispatch loop into _handleSummonTag's preInvestAmount arg).
-      const ritualPower = preInvestAmount ?? 0;
-      if (!tc.summonStubActorUuid || ritualPower <= 0) {
-        ui.notifications.warn(`${this.name}: tower spawn requires summonStubActorUuid + non-zero ritualPower (got ${ritualPower}).`);
+      const rawRitualPower = preInvestAmount ?? 0;
+      if (!tc.summonStubActorUuid || rawRitualPower <= 0) {
+        ui.notifications.warn(`${this.name}: tower spawn requires summonStubActorUuid + non-zero ritualPower (got ${rawRitualPower}).`);
         return;
       }
+      // AI behavior brain: summonBehaviors (new) supersedes summonAiProfile. The
+      // behavior tier DILUTES effective ritualPower — a smarter conjuration needs
+      // a stronger medium for the same stats ("higher ritualPower" cost, per the
+      // unified per-subsystem cost ruling). [[design-ai-behavior-tags]]
+      let aiFlags = null, costMult = 1;
+      if ((tc.summonBehaviors ?? []).length) {
+        const { resolveAiBehaviors } = await import('/systems/aspects-of-power/module/systems/ai.mjs');
+        const b = resolveAiBehaviors(tc.summonBehaviors);
+        aiFlags = b.flags; costMult = b.costMult;
+      }
+      const ritualPower = Math.max(1, Math.round(rawRitualPower / costMult));
       const tower = await SummonHelpers.spawnTower({
         stubActorUuid:    tc.summonStubActorUuid,
         scene:            canvas.scene,
@@ -1921,8 +1932,9 @@ export class AspectsofPowerItem extends Item {
         ownerActorUuid:   this.actor.uuid,
         ritualPower,
         statDistribution: tc.summonStatDistribution ?? {},
-        aiProfile:        tc.summonAiProfile ?? 'primitive',
+        aiProfile:        aiFlags?.aiProfile ?? tc.summonAiProfile ?? 'primitive',
         aiSkillUuid:      tc.summonAiSkillUuid ?? '',
+        aiFlags,
         summonType:       tc.summonType,
         sourceSkillUuid:  this.uuid,
         capacity:         tc.summonCapacity,

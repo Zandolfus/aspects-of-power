@@ -525,6 +525,29 @@ async function _idle(actor, skill, note) {
   });
 }
 
+/** Self-preservation faculty (aiSelfPreserve): true when the actor is below the
+ *  retreat HP fraction AND a threat sits within ~2× its danger bubble. */
+function _shouldRetreat(actor, hostiles, selfTokenDoc) {
+  if (!actor.flags?.aspectsofpower?.aiSelfPreserve) return false;
+  const hp = actor.system?.health?.value ?? 0;
+  const max = actor.system?.health?.max ?? 1;
+  if (max <= 0 || hp / max >= (CONFIG.ASPECTSOFPOWER.ai?.retreatHpPct ?? 0.25)) return false;
+  const nearest = hostiles[0];
+  if (!nearest) return false;
+  const dangerFt = actor.flags?.aspectsofpower?.aiDangerFt ?? CONFIG.ASPECTSOFPOWER.ai?.dangerFt ?? 15;
+  return _edgeDistFt(selfTokenDoc, nearest.tokenDoc) < dangerFt * 2;
+}
+
+/** Flee directly away from the nearest threat (sprint). Returns true if a
+ *  retreat move was declared. Reuses _declareStepToward so a smart retreater
+ *  still routes around walls/AOE while fleeing. */
+async function _fleeFrom(actor, selfTokenDoc, hostiles) {
+  const sc = _centerOf(selfTokenDoc);
+  const nc = hostiles[0].tCenter;
+  const away = { x: sc.x + (sc.x - nc.x), y: sc.y + (sc.y - nc.y) };
+  return _declareStepToward(actor, selfTokenDoc, away, 30, 'sprint');
+}
+
 /* ---------------------------------------------------------------------------- */
 /*  'brawler' — mobile melee: close to reach, then swing                         */
 /* ---------------------------------------------------------------------------- */
@@ -538,6 +561,9 @@ const brawlerProfile = {
     const hostiles = _aliveHostilesOf(selfTokenDoc);
     if (hostiles.length === 0) return _idle(actor, skill, 'no targets on scene');
     if (!skill) return _idle(actor, null, 'no affordable melee attack skill');
+
+    // SELF-PRESERVATION faculty: flee when low on HP with a threat nearby.
+    if (_shouldRetreat(actor, hostiles, selfTokenDoc) && await _fleeFrom(actor, selfTokenDoc, hostiles)) return;
 
     const ai = CONFIG.ASPECTSOFPOWER.ai ?? {};
     const f = actor.flags?.aspectsofpower ?? {};
@@ -555,6 +581,11 @@ const brawlerProfile = {
     if (Array.isArray(set) && set.length) {
       const inSet = hostiles.filter(h => set.includes(h.tokenDoc.id));
       if (inSet.length) candidates = inSet;
+    }
+    // FOCUS-WEAKEST faculty: order candidates by lowest current HP (else nearest).
+    if (f.aiFocusWeakest) {
+      candidates = [...candidates].sort((a, b) =>
+        (a.tokenDoc.actor?.system?.health?.value ?? 0) - (b.tokenDoc.actor?.system?.health?.value ?? 0));
     }
 
     // Target selection. SMART-TARGET faculty → path-aware, NO lock: walk the
@@ -609,6 +640,9 @@ const skirmisherProfile = {
     if (hostiles.length === 0) return _idle(actor, skill, 'no targets on scene');
     if (!skill) return _idle(actor, null, 'no affordable ranged attack skill');
 
+    // SELF-PRESERVATION faculty: flee far when low on HP with a threat nearby.
+    if (_shouldRetreat(actor, hostiles, selfTokenDoc) && await _fleeFrom(actor, selfTokenDoc, hostiles)) return;
+
     const ai = CONFIG.ASPECTSOFPOWER.ai ?? {};
     const pxPerFt = canvas.grid.size / canvas.grid.distance;
     const skillRange = skill.system?.castingRange ?? 0;
@@ -629,8 +663,12 @@ const skirmisherProfile = {
       // Cornered — fall through and shoot point-blank instead.
     }
 
-    // Shoot the nearest target in range with LOS.
-    const shootable = hostiles.find(h =>
+    // Shoot a target in range with LOS — nearest by default, or lowest-HP with
+    // the FOCUS-WEAKEST faculty.
+    const shootList = (actor.flags?.aspectsofpower?.aiFocusWeakest)
+      ? [...hostiles].sort((a, b) => (a.tokenDoc.actor?.system?.health?.value ?? 0) - (b.tokenDoc.actor?.system?.health?.value ?? 0))
+      : hostiles;
+    const shootable = shootList.find(h =>
       h.distPx <= rangeFt * pxPerFt && _hasLOS(h.tCenter, h.tokenDoc)
     );
     if (shootable) {

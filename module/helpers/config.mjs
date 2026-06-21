@@ -336,6 +336,7 @@ ASPECTSOFPOWER.ai = {
   defaultPathMode: 'direct',
   maxStepFt: 30,   // max movement per AI action
   dangerFt:  15,   // skirmisher kite bubble
+  retreatHpPct: 0.25,  // self-preservation faculty: flee when HP fraction < this
 };
 
 /**
@@ -359,18 +360,21 @@ ASPECTSOFPOWER.aiBehaviors = {
   hazardAvoid: { label: 'Hazard avoidance', category: 'faculty', tier: 1, flags: { aiHazardAvoid: true } },
   smartTarget: { label: 'Smart targeting', category: 'faculty', tier: 1, flags: { aiSmartTarget: true } },
   autoDefense: { label: 'Self defense',   category: 'faculty', tier: 1, flags: { aiDefense: 'auto' } },
+  focusWeakest:     { label: 'Focus weakest',     category: 'faculty', tier: 1, flags: { aiFocusWeakest: true } },
+  selfPreservation: { label: 'Self-preservation', category: 'faculty', tier: 1, flags: { aiSelfPreserve: true } },
 };
 
 // tier → cost multiplier (index = summed behavior tier, clamped to last entry).
-// Tier 0 mindless = baseline; tier 5 genius = ×3. Tunable.
-ASPECTSOFPOWER.aiBrainTierCost = [1.0, 1.3, 1.6, 2.0, 2.5, 3.0];
+// Tier 0 mindless = baseline; tier 7 (melee + all 6 faculties) = ×4.3. Tunable.
+ASPECTSOFPOWER.aiBrainTierCost = [1.0, 1.3, 1.6, 2.0, 2.5, 3.0, 3.6, 4.3];
 
 // Convenience faculty bundles, applied ON TOP of a chosen brain. Expanded by
 // resolveAiBehaviors(); a summon lists e.g. ['melee', 'tactical'].
 ASPECTSOFPOWER.aiBehaviorPresets = {
-  mindless: [],                                                   // brain only — locks nearest, charges
-  trained:  ['smartTarget', 'autoDefense'],                       // picks reachable targets, defends
-  tactical: ['pathfind', 'hazardAvoid', 'smartTarget', 'autoDefense'], // full navigation + defense
+  mindless: [],                                                            // brain only — locks nearest, charges
+  trained:  ['smartTarget', 'autoDefense'],                                // picks reachable targets, defends
+  tactical: ['pathfind', 'hazardAvoid', 'smartTarget', 'autoDefense'],     // full navigation + defense
+  elite:    ['pathfind', 'hazardAvoid', 'smartTarget', 'autoDefense', 'focusWeakest', 'selfPreservation'], // everything
 };
 
 /**
