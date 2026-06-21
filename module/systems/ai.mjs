@@ -92,6 +92,38 @@ export function resolveAiBehaviors(keys = []) {
   return { flags, tier, costMult: costTable[tier] ?? 1, resolved };
 }
 
+/**
+ * Shared, PROFILE-AGNOSTIC target ordering. ANY AI profile — current or future
+ * — calls this to get its candidate list already governed by the universal
+ * targeting flags: `aiTargetSet` (restrict to a set), `aiFocusWeakest` (lowest
+ * HP first), and the commanded `aiFocusTarget` (jumped to the front). A new
+ * profile that uses this inherits all of them, plus any future command that
+ * sets one of these flags, with zero extra code.
+ */
+export function aiOrderTargets(actor, hostiles) {
+  const f = actor.flags?.aspectsofpower ?? {};
+  let list = hostiles;
+  const set = f.aiTargetSet;
+  if (Array.isArray(set) && set.length) {
+    const inSet = list.filter(h => set.includes(h.tokenDoc.id));
+    if (inSet.length) list = inSet;
+  }
+  if (f.aiFocusWeakest) {
+    list = [...list].sort((a, b) =>
+      (a.tokenDoc.actor?.system?.health?.value ?? 0) - (b.tokenDoc.actor?.system?.health?.value ?? 0));
+  }
+  if (f.aiFocusTarget) {
+    const fi = list.findIndex(h => h.tokenDoc.id === f.aiFocusTarget);
+    if (fi > 0) list = [list[fi], ...list.slice(0, fi), ...list.slice(fi + 1)];
+  }
+  return list;
+}
+
+/** Profile-agnostic command check: is this unit commanded to hold position? */
+export function aiHoldsPosition(actor) {
+  return !!actor.flags?.aspectsofpower?.aiHold;
+}
+
 /* ---------------------------------------------------------------------------- */
 /*  Built-in 'primitive' profile                                                */
 /* ---------------------------------------------------------------------------- */
@@ -574,19 +606,10 @@ const brawlerProfile = {
     const selfCenter = _centerOf(selfTokenDoc);
     const moveBlocked = (a, b) => CONFIG.Canvas.polygonBackends?.move?.testCollision?.(a, b, { type: 'move', mode: 'any' });
 
-    // Optional target SET: restrict candidates to configured token ids when the
-    // `aiTargetSet` flag is present and matches live hostiles (else full set).
-    let candidates = hostiles;
-    const set = f.aiTargetSet;
-    if (Array.isArray(set) && set.length) {
-      const inSet = hostiles.filter(h => set.includes(h.tokenDoc.id));
-      if (inSet.length) candidates = inSet;
-    }
-    // FOCUS-WEAKEST faculty: order candidates by lowest current HP (else nearest).
-    if (f.aiFocusWeakest) {
-      candidates = [...candidates].sort((a, b) =>
-        (a.tokenDoc.actor?.system?.health?.value ?? 0) - (b.tokenDoc.actor?.system?.health?.value ?? 0));
-    }
+    // Universal target ordering — target-set restriction, focus-weakest, and the
+    // commanded focus, all applied by the shared aiOrderTargets() so this and
+    // every future profile share one implementation.
+    const candidates = aiOrderTargets(actor, hostiles);
 
     // Target selection. SMART-TARGET faculty → path-aware, NO lock: walk the
     // nearest-sorted set and take the first we can act on (in reach / straight-
@@ -615,6 +638,10 @@ const brawlerProfile = {
       await declareAction(actor, skill, { targetIds: [target.tokenDoc.id], aiAutoInvest: true });
       return;
     }
+
+    // HOLD POSITION (summoner order): never advance — idle in place and only
+    // strike when a target comes into reach.
+    if (aiHoldsPosition(actor)) return _idle(actor, skill, 'holding position');
 
     // Close the gap: stop a hair inside reach; sprint when far, walk when close.
     const wantFt = Math.max(5, targetGap - Math.max(0, reach - 2));
@@ -648,11 +675,13 @@ const skirmisherProfile = {
     const skillRange = skill.system?.castingRange ?? 0;
     const rangeFt = skillRange > 0 ? skillRange : (actor.system?.castingRange ?? 60);
     const dangerFt = actor.flags?.aspectsofpower?.aiDangerFt ?? ai.dangerFt ?? 15;
+    const hold = aiHoldsPosition(actor);
 
-    // Kite first: nearest threat inside the danger bubble → back away.
+    // Kite first: nearest threat inside the danger bubble → back away (unless
+    // commanded to hold position).
     const nearest = hostiles[0];
     const nearestFt = _edgeDistFt(selfTokenDoc, nearest.tokenDoc);
-    if (nearestFt < dangerFt) {
+    if (!hold && nearestFt < dangerFt) {
       const selfCenter = _centerOf(selfTokenDoc);
       const away = {
         x: selfCenter.x + (selfCenter.x - nearest.tCenter.x),
@@ -665,9 +694,9 @@ const skirmisherProfile = {
 
     // Shoot a target in range with LOS — nearest by default, or lowest-HP with
     // the FOCUS-WEAKEST faculty.
-    const shootList = (actor.flags?.aspectsofpower?.aiFocusWeakest)
-      ? [...hostiles].sort((a, b) => (a.tokenDoc.actor?.system?.health?.value ?? 0) - (b.tokenDoc.actor?.system?.health?.value ?? 0))
-      : hostiles;
+    // Universal target ordering (focus-weakest / commanded focus / target-set),
+    // shared via aiOrderTargets() so the shoot pick matches every other profile.
+    const shootList = aiOrderTargets(actor, hostiles);
     const shootable = shootList.find(h =>
       h.distPx <= rangeFt * pxPerFt && _hasLOS(h.tCenter, h.tokenDoc)
     );
@@ -677,6 +706,8 @@ const skirmisherProfile = {
       return;
     }
 
+    // HOLD POSITION: don't advance for a shot — idle and wait.
+    if (hold) return _idle(actor, skill, 'holding position');
     // Nobody shootable — advance toward the nearest hostile to gain range/LOS.
     const moved = await _declareStepToward(actor, selfTokenDoc, nearest.tCenter, 30, 'walk');
     if (!moved) return _idle(actor, skill, 'no shot and path blocked');
@@ -684,6 +715,21 @@ const skirmisherProfile = {
 };
 
 AIProfiles.register('skirmisher', skirmisherProfile);
+
+/**
+ * Summoner MOVE order: command a one-step move toward a destination center,
+ * respecting the actor's pathfind/hazard faculties + walls + stamina (reuses
+ * _declareStepToward, so capped at ai.maxStepFt per click). Returns true if a
+ * move was declared. Used by the token-HUD command surface.
+ */
+export async function aiCommandMove(actor, destCenter) {
+  const selfTokenDoc = _selfTokenDoc(actor);
+  if (!selfTokenDoc) return false;
+  const c = _centerOf(selfTokenDoc);
+  const want = Math.hypot(destCenter.x - c.x, destCenter.y - c.y) / (canvas.grid.size / canvas.grid.distance);
+  if (want < 1) return false;
+  return _declareStepToward(actor, selfTokenDoc, destCenter, want, 'walk');
+}
 
 /* ---------------------------------------------------------------------------- */
 /*  Dispatch hook                                                                */
@@ -716,6 +762,8 @@ export function registerAIHooks() {
     if (!profileName) return;
     const profile = AIProfiles.get(profileName);
     if (!profile?.onActionReady) return;
+    // MANUAL command (summoner driving it directly): the AI stands down.
+    if (actor.flags?.aspectsofpower?.aiCommand === 'manual') return;
 
     // Once-per-tick guard: refuse to re-decide while the clock is stuck.
     const clk = combatantDoc.combat ? getClockTick(combatantDoc.combat) : 0;
@@ -742,6 +790,7 @@ export function registerAIHooks() {
     if (!profileName) return;
     const profile = AIProfiles.get(profileName);
     if (!profile?.onActionReady) return;
+    if (actor.flags?.aspectsofpower?.aiCommand === 'manual') return; // owner-driven
     // Once-per-tick guard (shared with the dispatch hook).
     const clk = combatantDoc.combat ? getClockTick(combatantDoc.combat) : 0;
     if (_aiActedAtTick.get(combatantDoc.id) === clk) return;
@@ -786,6 +835,7 @@ export function registerAIHooks() {
     if (!profileName) return;
     const profile = AIProfiles.get(profileName);
     if (!profile?.onActionReady) return;
+    if (actor.flags?.aspectsofpower?.aiCommand === 'manual') return; // owner-driven
     // Share the once-per-tick guard so we never stack with a same-tick dispatch.
     const clk = combatantDoc.combat ? getClockTick(combatantDoc.combat) : 0;
     if (_aiActedAtTick.get(combatantDoc.id) === clk) return;

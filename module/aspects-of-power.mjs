@@ -38,6 +38,7 @@ import { CelerityTracker, openTracker as openCelerityTracker, refreshTracker as 
 import { SummonHelpers, registerSummonHooks } from './systems/summon.mjs';
 import { ChannelHelpers, registerChannelHooks } from './systems/channel.mjs';
 import { AIProfiles, registerAIHooks } from './systems/ai.mjs';
+import { registerSummonHud } from './canvas/summon-hud.mjs';
 import { CelerityCombatTracker, installAopTurnMarkerPatch } from './apps/celerity-combat-tracker.mjs';
 
 /**
@@ -863,6 +864,9 @@ Hooks.once('ready', async function () {
   // Register AI dispatch hook (fires on declared-action completion → routes
   // to the actor's `aiProfile` for next-action decision).
   registerAIHooks();
+
+  // Token-HUD command buttons (Hold / Manual / Focus / Move) for owned AI units.
+  registerSummonHud();
 
   // Eagerly hydrate the augments compendium so `fromUuidSync` returns full
   // system data (not just index stubs). Required by `deriveItemStats` and
