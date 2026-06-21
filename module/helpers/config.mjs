@@ -331,7 +331,7 @@ ASPECTSOFPOWER.ai = {
   // heading to skirt harmful persistent-AOE regions (ai.mjs _declareStepToward).
   pathModes: {
     direct: 'Direct (charge straight)',
-    smart:  'Smart (avoid area effects)',
+    smart:  'Smart (route around walls & area effects)',
   },
   defaultPathMode: 'direct',
   maxStepFt: 30,   // max movement per AI action

@@ -298,6 +298,91 @@ function _segmentCrossesHazard(a, b, hazards) {
 }
 
 /**
+ * Wall pathfinding — bounded coarse-grid A* that routes AROUND movement walls.
+ * Returns the next waypoint (center coords) to head toward; the caller then
+ * does the usual stamina-clamp + step + wall-halving toward it. Returns
+ * goalCenter unchanged if the straight line is already clear (common — cheap
+ * early out), or if no route is found within the search box (caller then
+ * charges/halves/idles as before — a genuinely walled-off target).
+ *
+ * Foundry's native drag pathfinder is private (Token.#recalculatePlannedMovementPath),
+ * and public Token#findMovementPath only CONSTRAINS (clips at walls) without
+ * routing — hence this. 8-neighbour grid at the scene cell size; box = start+
+ * goal bbox expanded by `margin`; LOS-smoothed so we return the FARTHEST path
+ * node still directly reachable (no jittery one-cell creeping). Cost-capped.
+ */
+function _findWallPath(selfCenter, goalCenter) {
+  const move = CONFIG.Canvas.polygonBackends?.move;
+  if (!move?.testCollision) return goalCenter;
+  const blocked = (a, b) => move.testCollision(a, b, { type: 'move', mode: 'any' });
+  if (!blocked(selfCenter, goalCenter)) return goalCenter; // straight line already clear
+
+  const cell = canvas.grid?.size || 100;
+  const margin = 14 * cell;
+  const minX = Math.min(selfCenter.x, goalCenter.x) - margin;
+  const minY = Math.min(selfCenter.y, goalCenter.y) - margin;
+  const maxX = Math.max(selfCenter.x, goalCenter.x) + margin;
+  const maxY = Math.max(selfCenter.y, goalCenter.y) + margin;
+  const cols = Math.max(1, Math.ceil((maxX - minX) / cell));
+  const rows = Math.max(1, Math.ceil((maxY - minY) / cell));
+  const MAX_CELLS = 4000;
+  if (cols * rows > MAX_CELLS) return goalCenter; // search box too large — bail to direct
+
+  const ptOf = (c, r) => ({ x: minX + c * cell + cell / 2, y: minY + r * cell + cell / 2 });
+  const idx = (c, r) => r * cols + c;
+  const clamp = (v, hi) => Math.max(0, Math.min(hi - 1, v));
+  const sC = clamp(Math.floor((selfCenter.x - minX) / cell), cols), sR = clamp(Math.floor((selfCenter.y - minY) / cell), rows);
+  const gC = clamp(Math.floor((goalCenter.x - minX) / cell), cols), gR = clamp(Math.floor((goalCenter.y - minY) / cell), rows);
+  const h = (c, r) => Math.hypot(c - gC, r - gR);
+
+  const open = [{ c: sC, r: sR, g: 0, f: h(sC, sR) }];
+  const gScore = new Map([[idx(sC, sR), 0]]);
+  const came = new Map();
+  const closed = new Set();
+  const NB = [[1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [1, -1], [-1, 1], [-1, -1]];
+  let found = false, iters = 0;
+
+  while (open.length && iters++ < MAX_CELLS) {
+    let bi = 0;
+    for (let i = 1; i < open.length; i++) if (open[i].f < open[bi].f) bi = i;
+    const cur = open.splice(bi, 1)[0];
+    const ci = idx(cur.c, cur.r);
+    if (cur.c === gC && cur.r === gR) { found = true; break; }
+    if (closed.has(ci)) continue;
+    closed.add(ci);
+    const curPt = ptOf(cur.c, cur.r);
+    for (const [dc, dr] of NB) {
+      const nc = cur.c + dc, nr = cur.r + dr;
+      if (nc < 0 || nr < 0 || nc >= cols || nr >= rows) continue;
+      const ni = idx(nc, nr);
+      if (closed.has(ni)) continue;
+      if (blocked(curPt, ptOf(nc, nr))) continue; // wall between adjacent cells
+      const tentative = cur.g + Math.hypot(dc, dr);
+      if (tentative < (gScore.get(ni) ?? Infinity)) {
+        gScore.set(ni, tentative);
+        came.set(ni, ci);
+        open.push({ c: nc, r: nr, g: tentative, f: tentative + h(nc, nr) });
+      }
+    }
+  }
+  if (!found) return goalCenter; // no route within the box — caller falls back
+
+  // Reconstruct start→goal cell order (excluding the start cell).
+  const path = [];
+  let cur = idx(gC, gR);
+  const startIdx = idx(sC, sR);
+  while (cur !== undefined && cur !== startIdx) { path.push(cur); cur = came.get(cur); }
+  path.reverse();
+
+  // LOS smoothing: head toward the FARTHEST path node still directly reachable.
+  for (let i = path.length - 1; i >= 0; i--) {
+    const p = ptOf(path[i] % cols, Math.floor(path[i] / cols));
+    if (!blocked(selfCenter, p)) return p;
+  }
+  return goalCenter;
+}
+
+/**
  * Declare a straight-line movement step from the actor's token toward (or
  * away from — pass a negative-direction destPoint) a destination point.
  * Wall-checked center-to-center; on collision the step halves (2 retries).
@@ -328,19 +413,27 @@ async function _declareStepToward(actor, selfTokenDoc, destPoint, wantFt, mode, 
   if (stepFt < 5) return false;
 
   const selfCenter = _centerOf(selfTokenDoc);
+
+  // SMART path step 1 — WALL ROUTING: aim toward the next waypoint of an A*
+  // route around movement walls (returns destPoint unchanged when the straight
+  // line is already clear, so this is cheap in open fights). DIRECT mode skips
+  // it and charges straight at destPoint.
+  let aim = destPoint;
+  if (pathMode === 'smart') aim = _findWallPath(selfCenter, destPoint);
+
   let ux, uy;
   {
-    const dx = destPoint.x - selfCenter.x;
-    const dy = destPoint.y - selfCenter.y;
+    const dx = aim.x - selfCenter.x;
+    const dy = aim.y - selfCenter.y;
     const dist = Math.hypot(dx, dy) || 1;
     ux = dx / dist; uy = dy / dist;
   }
 
-  // SMART path: if the direct step would cross a harmful AOE, deviate the
-  // heading. Sample increasing left/right offsets off the direct bearing and
-  // take the smallest that clears (cos(80°)≈0.17 > 0, so every candidate still
-  // advances toward the target). If none clears, fall through and charge the
-  // direct heading — moving beats freezing; the next decision re-evaluates.
+  // SMART path step 2 — AOE AVOIDANCE: if the step along the (possibly
+  // wall-routed) heading would cross a harmful AOE, deviate. Sample increasing
+  // left/right offsets and take the smallest that clears (cos(80°)≈0.17 > 0, so
+  // every candidate still advances). None clears → keep the heading (moving
+  // beats freezing; next decision re-evaluates).
   if (pathMode === 'smart') {
     const hazards = _hazardRegionsFor(selfTokenDoc);
     if (hazards.length) {
