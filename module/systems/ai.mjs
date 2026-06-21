@@ -299,11 +299,12 @@ function _segmentCrossesHazard(a, b, hazards) {
 
 /**
  * Wall pathfinding — bounded coarse-grid A* that routes AROUND movement walls.
- * Returns the next waypoint (center coords) to head toward; the caller then
- * does the usual stamina-clamp + step + wall-halving toward it. Returns
- * goalCenter unchanged if the straight line is already clear (common — cheap
- * early out), or if no route is found within the search box (caller then
- * charges/halves/idles as before — a genuinely walled-off target).
+ * Returns `{waypoint, reachable}`: `waypoint` (center coords) is the next point
+ * to head toward (the caller then does the usual stamina-clamp + step +
+ * wall-halving); `reachable` is whether ANY route exists (used by path-aware
+ * target selection to skip walled-off targets). waypoint = goalCenter when the
+ * straight line is already clear (cheap early out) or when no route is found
+ * (reachable:false → caller falls back to charge/halve/idle).
  *
  * Foundry's native drag pathfinder is private (Token.#recalculatePlannedMovementPath),
  * and public Token#findMovementPath only CONSTRAINS (clips at walls) without
@@ -315,7 +316,7 @@ function _findWallPath(selfCenter, goalCenter) {
   const move = CONFIG.Canvas.polygonBackends?.move;
   if (!move?.testCollision) return goalCenter;
   const blocked = (a, b) => move.testCollision(a, b, { type: 'move', mode: 'any' });
-  if (!blocked(selfCenter, goalCenter)) return goalCenter; // straight line already clear
+  if (!blocked(selfCenter, goalCenter)) return { waypoint: goalCenter, reachable: true }; // straight line clear
 
   const cell = canvas.grid?.size || 100;
   const margin = 14 * cell;
@@ -326,7 +327,7 @@ function _findWallPath(selfCenter, goalCenter) {
   const cols = Math.max(1, Math.ceil((maxX - minX) / cell));
   const rows = Math.max(1, Math.ceil((maxY - minY) / cell));
   const MAX_CELLS = 4000;
-  if (cols * rows > MAX_CELLS) return goalCenter; // search box too large — bail to direct
+  if (cols * rows > MAX_CELLS) return { waypoint: goalCenter, reachable: true }; // box too large — assume reachable, charge direct
 
   const ptOf = (c, r) => ({ x: minX + c * cell + cell / 2, y: minY + r * cell + cell / 2 });
   const idx = (c, r) => r * cols + c;
@@ -365,7 +366,7 @@ function _findWallPath(selfCenter, goalCenter) {
       }
     }
   }
-  if (!found) return goalCenter; // no route within the box — caller falls back
+  if (!found) return { waypoint: goalCenter, reachable: false }; // no route within the box
 
   // Reconstruct start→goal cell order (excluding the start cell).
   const path = [];
@@ -377,9 +378,9 @@ function _findWallPath(selfCenter, goalCenter) {
   // LOS smoothing: head toward the FARTHEST path node still directly reachable.
   for (let i = path.length - 1; i >= 0; i--) {
     const p = ptOf(path[i] % cols, Math.floor(path[i] / cols));
-    if (!blocked(selfCenter, p)) return p;
+    if (!blocked(selfCenter, p)) return { waypoint: p, reachable: true };
   }
-  return goalCenter;
+  return { waypoint: goalCenter, reachable: true };
 }
 
 /**
@@ -419,7 +420,7 @@ async function _declareStepToward(actor, selfTokenDoc, destPoint, wantFt, mode, 
   // line is already clear, so this is cheap in open fights). DIRECT mode skips
   // it and charges straight at destPoint.
   let aim = destPoint;
-  if (pathMode === 'smart') aim = _findWallPath(selfCenter, destPoint);
+  if (pathMode === 'smart') aim = _findWallPath(selfCenter, destPoint).waypoint;
 
   let ux, uy;
   {
@@ -496,29 +497,47 @@ const brawlerProfile = {
     if (hostiles.length === 0) return _idle(actor, skill, 'no targets on scene');
     if (!skill) return _idle(actor, null, 'no affordable melee attack skill');
 
-    // Nearest; among near-ties (within 25%) prefer one with LOS — melee
-    // pursues even without LOS (it hunts), LOS just breaks ties.
-    const nearest = hostiles[0];
-    const nearTies = hostiles.filter(h => h.distPx <= nearest.distPx * 1.25);
-    const target = nearTies.find(h => _hasLOS(h.tCenter, h.tokenDoc)) ?? nearest;
-
+    const ai = CONFIG.ASPECTSOFPOWER.ai ?? {};
+    const pathMode = actor.flags?.aspectsofpower?.aiPathMode ?? 'direct';
     const reach = skill._resolveSkillReach?.() ?? 5;
-    const gapFt = _edgeDistFt(selfTokenDoc, target.tokenDoc);
+    const selfCenter = _centerOf(selfTokenDoc);
+    const moveBlocked = (a, b) => CONFIG.Canvas.polygonBackends?.move?.testCollision?.(a, b, { type: 'move', mode: 'any' });
 
-    if (gapFt <= reach) {
-      // Declare-and-wait (paced by the tracker), NOT fire-immediately. Firing
-      // via executeDeferred here + declaring caused a double-fire AND the
-      // tracker's later fire prompted for invest. aiAutoInvest is threaded
-      // through declaredAction so the deferred fire auto-invests, no dialog.
+    // Optional target SET: restrict candidates to configured token ids when the
+    // `aiTargetSet` flag is present and matches live hostiles (else full set).
+    let candidates = hostiles;
+    const set = actor.flags?.aspectsofpower?.aiTargetSet;
+    if (Array.isArray(set) && set.length) {
+      const inSet = hostiles.filter(h => set.includes(h.tokenDoc.id));
+      if (inSet.length) candidates = inSet;
+    }
+
+    // Path-aware target selection — NO target-lock. Walk the nearest-sorted set
+    // and take the first target we can actually act on: in melee reach, or
+    // reachable on foot (straight-clear is a cheap collision test; A* runs only
+    // when smart-mode AND the straight line is blocked). Falls through to the
+    // next-nearest when a closer one is walled off, so a brawler never freezes
+    // staring at an unreachable enemy while a reachable one stands beside it.
+    let target = null, targetGap = 0, attackNow = false;
+    for (const cand of candidates) {
+      const gap = _edgeDistFt(selfTokenDoc, cand.tokenDoc);
+      if (gap <= reach) { target = cand; targetGap = gap; attackNow = true; break; }
+      if (!moveBlocked(selfCenter, cand.tCenter)) { target = cand; targetGap = gap; break; }
+      if (pathMode === 'smart' && _findWallPath(selfCenter, cand.tCenter).reachable) { target = cand; targetGap = gap; break; }
+      // unreachable from here — try the next-nearest
+    }
+    if (!target) return _idle(actor, skill, 'no reachable target');
+
+    if (attackNow) {
+      // Declare-and-wait (paced by the tracker); aiAutoInvest threaded through
+      // declaredAction so the deferred fire auto-invests (no dialog).
       await declareAction(actor, skill, { targetIds: [target.tokenDoc.id], aiAutoInvest: true });
       return;
     }
 
     // Close the gap: stop a hair inside reach; sprint when far, walk when close.
-    const ai = CONFIG.ASPECTSOFPOWER.ai ?? {};
-    const pathMode = actor.flags?.aspectsofpower?.aiPathMode ?? 'direct';
-    const wantFt = Math.max(5, gapFt - Math.max(0, reach - 2));
-    const mode = gapFt > 2 * (ai.maxStepFt ?? 30) ? 'sprint' : 'walk';
+    const wantFt = Math.max(5, targetGap - Math.max(0, reach - 2));
+    const mode = targetGap > 2 * (ai.maxStepFt ?? 30) ? 'sprint' : 'walk';
     const moved = await _declareStepToward(actor, selfTokenDoc, target.tCenter, wantFt, mode, pathMode);
     if (!moved) return _idle(actor, skill, 'path blocked or out of stamina');
   },
