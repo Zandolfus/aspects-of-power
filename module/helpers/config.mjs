@@ -339,6 +339,41 @@ ASPECTSOFPOWER.ai = {
 };
 
 /**
+ * Modular AI BEHAVIOR tags — the composable "brain" of a creature, priced by
+ * tier so a smarter conjuration (summon / ritual) costs more. Each behavior
+ * sets AI flags on the creature and contributes `tier` points; the summed tier
+ * (capped at the cost table length) selects a cost MULTIPLIER applied per
+ * subsystem (summon → mana, ritual → power/prep) via resolveAiBehaviors()
+ * (module/systems/ai.mjs). Same tags work on a GM-placed hostile (free); the
+ * cost only bites when conjured. RULED 2026-06-21 (tier multiplier / unified
+ * per-subsystem points / granular tags + presets) — see [[design-ai-behavior-tags]].
+ *
+ *   category 'brain'   — the movement/attack loop. Pick ONE (sets aiProfile).
+ *   category 'faculty' — optional smartness add-ons. Stack freely.
+ */
+ASPECTSOFPOWER.aiBehaviors = {
+  stationary:  { label: 'Stationary',     category: 'brain',   tier: 0, flags: { aiProfile: 'primitive' } },
+  melee:       { label: 'Melee brain',    category: 'brain',   tier: 1, flags: { aiProfile: 'brawler' } },
+  ranged:      { label: 'Ranged brain',   category: 'brain',   tier: 1, flags: { aiProfile: 'skirmisher' } },
+  pathfind:    { label: 'Wall pathfinding', category: 'faculty', tier: 1, flags: { aiPathfind: true } },
+  hazardAvoid: { label: 'Hazard avoidance', category: 'faculty', tier: 1, flags: { aiHazardAvoid: true } },
+  smartTarget: { label: 'Smart targeting', category: 'faculty', tier: 1, flags: { aiSmartTarget: true } },
+  autoDefense: { label: 'Self defense',   category: 'faculty', tier: 1, flags: { aiDefense: 'auto' } },
+};
+
+// tier → cost multiplier (index = summed behavior tier, clamped to last entry).
+// Tier 0 mindless = baseline; tier 5 genius = ×3. Tunable.
+ASPECTSOFPOWER.aiBrainTierCost = [1.0, 1.3, 1.6, 2.0, 2.5, 3.0];
+
+// Convenience faculty bundles, applied ON TOP of a chosen brain. Expanded by
+// resolveAiBehaviors(); a summon lists e.g. ['melee', 'tactical'].
+ASPECTSOFPOWER.aiBehaviorPresets = {
+  mindless: [],                                                   // brain only — locks nearest, charges
+  trained:  ['smartTarget', 'autoDefense'],                       // picks reachable targets, defends
+  tactical: ['pathfind', 'hazardAvoid', 'smartTarget', 'autoDefense'], // full navigation + defense
+};
+
+/**
  * Which ability mod is rolled to break each debuff type. Shared between the
  * auto-break loop (actor.onStartTurn) and the manual break-free flow
  * (actor-sheet → celerity declare → tracker dispatch).

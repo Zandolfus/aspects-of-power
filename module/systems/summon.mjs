@@ -30,11 +30,12 @@ export class SummonHelpers {
    * @param {number} [opts.hpOverride=0]    0 = use source's full HP; >0 = force max+current to this
    * @param {string} [opts.namePrefix='']
    * @param {number} [opts.capacity=1]      max concurrent of (caster × this summonType)
+   * @param {object} [opts.aiFlags=null]    AI flags (aiProfile/aiPathfind/…) to stamp on the clone, from resolveAiBehaviors
    * @returns {Promise<{actorClone:Actor, tokenDoc:TokenDocument}|null>}
    */
   static async spawnSummon({ sourceActor, scene, position, summonType,
                               sourceSkillUuid, hpOverride = 0, namePrefix = '',
-                              capacity = 1 }) {
+                              capacity = 1, aiFlags = null }) {
     if (!sourceActor || !position) return null;
     scene = scene ?? canvas.scene;
     if (!scene) return null;
@@ -53,6 +54,7 @@ export class SummonHelpers {
         hpOverride,
         namePrefix,
         capacity,
+        aiFlags,
       });
     }
 
@@ -74,6 +76,7 @@ export class SummonHelpers {
         ...(sourceData.flags ?? {}),
         'aspects-of-power': {
           ...(sourceData.flags?.['aspects-of-power'] ?? {}),
+          ...(aiFlags ?? {}),   // AI behavior flags (aiProfile/aiPathfind/…) onto the clone
           summon: {
             ownerActorUuid:       sourceActor.uuid,
             sourceSkillUuid,
@@ -493,6 +496,7 @@ function _registerGMSpawnListener() {
             hpOverride:      payload.hpOverride,
             namePrefix:      payload.namePrefix,
             capacity:        payload.capacity,
+            aiFlags:         payload.aiFlags,
           });
         } else if (method === 'spawnTower') {
           const scene = game.scenes.get(payload.sceneId) ?? canvas.scene;

@@ -54,6 +54,44 @@ class AIProfilesRegistry {
 
 export const AIProfiles = AIProfilesRegistry;
 
+/**
+ * Resolve a list of AI BEHAVIOR keys (brains, faculties, and/or preset names —
+ * see CONFIG.ASPECTSOFPOWER.aiBehaviors / aiBehaviorPresets) into the concrete
+ * AI flags to stamp on a creature plus the conjuring cost multiplier.
+ *
+ * Presets expand to their faculty lists; duplicates collapse. The summed tier
+ * (clamped to the cost table) picks the multiplier each conjurer applies to its
+ * own cost currency (summon → mana, ritual → power/prep).
+ *
+ * @param {string[]} keys
+ * @returns {{flags: object, tier: number, costMult: number, resolved: string[]}}
+ */
+export function resolveAiBehaviors(keys = []) {
+  const sc = CONFIG.ASPECTSOFPOWER;
+  const reg = sc.aiBehaviors ?? {};
+  const presets = sc.aiBehaviorPresets ?? {};
+  const costTable = sc.aiBrainTierCost ?? [1];
+
+  const expanded = [];
+  for (const k of (keys ?? [])) {
+    if (presets[k]) expanded.push(...presets[k]);
+    else expanded.push(k);
+  }
+
+  const flags = {};
+  let tier = 0;
+  const resolved = [];
+  for (const k of [...new Set(expanded)]) {
+    const b = reg[k];
+    if (!b) continue;
+    Object.assign(flags, b.flags ?? {});
+    tier += b.tier ?? 0;
+    resolved.push(k);
+  }
+  tier = Math.max(0, Math.min(tier, costTable.length - 1));
+  return { flags, tier, costMult: costTable[tier] ?? 1, resolved };
+}
+
 /* ---------------------------------------------------------------------------- */
 /*  Built-in 'primitive' profile                                                */
 /* ---------------------------------------------------------------------------- */
@@ -390,14 +428,12 @@ function _findWallPath(selfCenter, goalCenter) {
  * Stamina-gated: shrinks the step to what the actor can afford; below 5ft
  * gives up. Returns true if a movement was declared.
  *
- * pathMode: 'direct' charges straight at the destination (ignores AOE);
- * 'smart' deviates the heading to skirt harmful persistent-AOE regions
- * (notes area effects and goes around them) before the wall-halving runs.
- *
- * v1 limitations (documented): no wall pathfinding (straight-line; smart mode
- * only avoids AOE, not walls), flat stamina cost (ceil(ft/5) × mode mult).
+ * Routing is driven by the actor's BEHAVIOR FACULTY flags (set by aiBehaviors
+ * tags): `aiPathfind` → A* wall routing, `aiHazardAvoid` → AOE deviation. The
+ * legacy `aiPathMode` flag is honored as a fallback ('smart' = both on).
+ * Without them, the creature charges straight (ignores walls/AOE).
  */
-async function _declareStepToward(actor, selfTokenDoc, destPoint, wantFt, mode, pathMode = 'direct') {
+async function _declareStepToward(actor, selfTokenDoc, destPoint, wantFt, mode) {
   const ai = CONFIG.ASPECTSOFPOWER.ai ?? {};
   const modes = CONFIG.ASPECTSOFPOWER.celerity?.MOVEMENT_MODES ?? {};
   const m = modes[mode] ?? modes.walk ?? { staminaMult: 1 };
@@ -415,12 +451,18 @@ async function _declareStepToward(actor, selfTokenDoc, destPoint, wantFt, mode, 
 
   const selfCenter = _centerOf(selfTokenDoc);
 
-  // SMART path step 1 — WALL ROUTING: aim toward the next waypoint of an A*
-  // route around movement walls (returns destPoint unchanged when the straight
-  // line is already clear, so this is cheap in open fights). DIRECT mode skips
-  // it and charges straight at destPoint.
+  // Behavior faculties (granular flags; aiPathMode is the legacy fallback where
+  // 'smart' = both pathfind + hazard-avoid, 'direct'/absent = neither).
+  const _f = actor.flags?.aspectsofpower ?? {};
+  const _legacySmart = _f.aiPathMode === 'smart';
+  const wantPathfind    = _f.aiPathfind    ?? _legacySmart;
+  const wantHazardAvoid = _f.aiHazardAvoid ?? _legacySmart;
+
+  // WALL ROUTING (pathfind faculty): aim toward the next waypoint of an A* route
+  // around movement walls (returns destPoint unchanged when the straight line is
+  // already clear, so cheap in open fights). Without it, charge straight.
   let aim = destPoint;
-  if (pathMode === 'smart') aim = _findWallPath(selfCenter, destPoint).waypoint;
+  if (wantPathfind) aim = _findWallPath(selfCenter, destPoint).waypoint;
 
   let ux, uy;
   {
@@ -430,12 +472,12 @@ async function _declareStepToward(actor, selfTokenDoc, destPoint, wantFt, mode, 
     ux = dx / dist; uy = dy / dist;
   }
 
-  // SMART path step 2 — AOE AVOIDANCE: if the step along the (possibly
+  // AOE AVOIDANCE (hazard-avoid faculty): if the step along the (possibly
   // wall-routed) heading would cross a harmful AOE, deviate. Sample increasing
   // left/right offsets and take the smallest that clears (cos(80°)≈0.17 > 0, so
   // every candidate still advances). None clears → keep the heading (moving
   // beats freezing; next decision re-evaluates).
-  if (pathMode === 'smart') {
+  if (wantHazardAvoid) {
     const hazards = _hazardRegionsFor(selfTokenDoc);
     if (hazards.length) {
       const travelPx = stepFt * pxPerFt;
@@ -498,7 +540,10 @@ const brawlerProfile = {
     if (!skill) return _idle(actor, null, 'no affordable melee attack skill');
 
     const ai = CONFIG.ASPECTSOFPOWER.ai ?? {};
-    const pathMode = actor.flags?.aspectsofpower?.aiPathMode ?? 'direct';
+    const f = actor.flags?.aspectsofpower ?? {};
+    const legacySmart = f.aiPathMode === 'smart';
+    const smartTarget = f.aiSmartTarget ?? legacySmart;
+    const canPathfind = f.aiPathfind ?? legacySmart;
     const reach = skill._resolveSkillReach?.() ?? 5;
     const selfCenter = _centerOf(selfTokenDoc);
     const moveBlocked = (a, b) => CONFIG.Canvas.polygonBackends?.move?.testCollision?.(a, b, { type: 'move', mode: 'any' });
@@ -506,27 +551,32 @@ const brawlerProfile = {
     // Optional target SET: restrict candidates to configured token ids when the
     // `aiTargetSet` flag is present and matches live hostiles (else full set).
     let candidates = hostiles;
-    const set = actor.flags?.aspectsofpower?.aiTargetSet;
+    const set = f.aiTargetSet;
     if (Array.isArray(set) && set.length) {
       const inSet = hostiles.filter(h => set.includes(h.tokenDoc.id));
       if (inSet.length) candidates = inSet;
     }
 
-    // Path-aware target selection — NO target-lock. Walk the nearest-sorted set
-    // and take the first target we can actually act on: in melee reach, or
-    // reachable on foot (straight-clear is a cheap collision test; A* runs only
-    // when smart-mode AND the straight line is blocked). Falls through to the
-    // next-nearest when a closer one is walled off, so a brawler never freezes
-    // staring at an unreachable enemy while a reachable one stands beside it.
+    // Target selection. SMART-TARGET faculty → path-aware, NO lock: walk the
+    // nearest-sorted set and take the first we can act on (in reach / straight-
+    // reachable / A*-reachable when pathfind is on), falling through when one is
+    // walled off — never freezes on an unreachable enemy while a reachable one
+    // stands beside it. WITHOUT the faculty → simple lock on the nearest.
     let target = null, targetGap = 0, attackNow = false;
-    for (const cand of candidates) {
-      const gap = _edgeDistFt(selfTokenDoc, cand.tokenDoc);
-      if (gap <= reach) { target = cand; targetGap = gap; attackNow = true; break; }
-      if (!moveBlocked(selfCenter, cand.tCenter)) { target = cand; targetGap = gap; break; }
-      if (pathMode === 'smart' && _findWallPath(selfCenter, cand.tCenter).reachable) { target = cand; targetGap = gap; break; }
-      // unreachable from here — try the next-nearest
+    if (smartTarget) {
+      for (const cand of candidates) {
+        const gap = _edgeDistFt(selfTokenDoc, cand.tokenDoc);
+        if (gap <= reach) { target = cand; targetGap = gap; attackNow = true; break; }
+        if (!moveBlocked(selfCenter, cand.tCenter)) { target = cand; targetGap = gap; break; }
+        if (canPathfind && _findWallPath(selfCenter, cand.tCenter).reachable) { target = cand; targetGap = gap; break; }
+        // unreachable from here — try the next-nearest
+      }
+      if (!target) return _idle(actor, skill, 'no reachable target');
+    } else {
+      target = candidates[0];
+      targetGap = _edgeDistFt(selfTokenDoc, target.tokenDoc);
+      attackNow = targetGap <= reach;
     }
-    if (!target) return _idle(actor, skill, 'no reachable target');
 
     if (attackNow) {
       // Declare-and-wait (paced by the tracker); aiAutoInvest threaded through
@@ -538,7 +588,7 @@ const brawlerProfile = {
     // Close the gap: stop a hair inside reach; sprint when far, walk when close.
     const wantFt = Math.max(5, targetGap - Math.max(0, reach - 2));
     const mode = targetGap > 2 * (ai.maxStepFt ?? 30) ? 'sprint' : 'walk';
-    const moved = await _declareStepToward(actor, selfTokenDoc, target.tCenter, wantFt, mode, pathMode);
+    const moved = await _declareStepToward(actor, selfTokenDoc, target.tCenter, wantFt, mode);
     if (!moved) return _idle(actor, skill, 'path blocked or out of stamina');
   },
 };
@@ -560,7 +610,6 @@ const skirmisherProfile = {
     if (!skill) return _idle(actor, null, 'no affordable ranged attack skill');
 
     const ai = CONFIG.ASPECTSOFPOWER.ai ?? {};
-    const pathMode = actor.flags?.aspectsofpower?.aiPathMode ?? 'direct';
     const pxPerFt = canvas.grid.size / canvas.grid.distance;
     const skillRange = skill.system?.castingRange ?? 0;
     const rangeFt = skillRange > 0 ? skillRange : (actor.system?.castingRange ?? 60);
@@ -575,7 +624,7 @@ const skirmisherProfile = {
         x: selfCenter.x + (selfCenter.x - nearest.tCenter.x),
         y: selfCenter.y + (selfCenter.y - nearest.tCenter.y),
       };
-      const moved = await _declareStepToward(actor, selfTokenDoc, away, 20, 'walk', pathMode);
+      const moved = await _declareStepToward(actor, selfTokenDoc, away, 20, 'walk');
       if (moved) return;
       // Cornered — fall through and shoot point-blank instead.
     }
@@ -591,7 +640,7 @@ const skirmisherProfile = {
     }
 
     // Nobody shootable — advance toward the nearest hostile to gain range/LOS.
-    const moved = await _declareStepToward(actor, selfTokenDoc, nearest.tCenter, 30, 'walk', pathMode);
+    const moved = await _declareStepToward(actor, selfTokenDoc, nearest.tCenter, 30, 'walk');
     if (!moved) return _idle(actor, skill, 'no shot and path blocked');
   },
 };

@@ -1937,6 +1937,15 @@ export class AspectsofPowerItem extends Item {
       return;
     }
 
+    // Resolve AI behavior tags → flags stamped on the clone (opt-in: only when
+    // summonBehaviors is set; bare decoy clones stay passive). [[design-ai-behavior-tags]]
+    let summonAiFlags = null;
+    const behKeys = tc.summonBehaviors ?? [];
+    if (behKeys.length) {
+      const { resolveAiBehaviors } = await import('/systems/aspects-of-power/module/systems/ai.mjs');
+      summonAiFlags = resolveAiBehaviors(behKeys).flags;
+    }
+
     const spawned = await SummonHelpers.spawnSummon({
       sourceActor:     this.actor,
       scene:           canvas.scene,
@@ -1946,6 +1955,7 @@ export class AspectsofPowerItem extends Item {
       hpOverride:      tc.summonHpOverride,
       capacity:        tc.summonCapacity,
       namePrefix:      '',
+      aiFlags:         summonAiFlags,
     });
     if (spawned) {
       ChatMessage.create({
@@ -6291,6 +6301,16 @@ export class AspectsofPowerItem extends Item {
     // `let` so the detonate-redirect path can shadow rollData with the
     // summon's roll snapshot at AOE dispatch time.
     let rollData = this.getRollData();
+
+    // Summon BEHAVIOR cost: a smarter conjured brain costs more (tier multiplier
+    // on the summon's mana). resolveAiBehaviors sums the behavior tiers → mult,
+    // applied to rollData.roll.cost so affordability + deduction + display all
+    // reflect it. See [[design-ai-behavior-tags]].
+    const _summonBeh = this.system.tagConfig?.summonBehaviors ?? [];
+    if (_summonBeh.length && (rollData.roll?.cost ?? 0) > 0) {
+      const { resolveAiBehaviors } = await import('/systems/aspects-of-power/module/systems/ai.mjs');
+      rollData.roll.cost = Math.round(rollData.roll.cost * (resolveAiBehaviors(_summonBeh).costMult ?? 1));
+    }
     const speaker  = ChatMessage.getSpeaker({ actor: this.actor });
     const rollMode = game.settings.get('core', 'messageMode');
     const label    = `[${item.type}] ${item.name}`;

@@ -358,6 +358,12 @@ export class SkillData extends foundry.abstract.TypeDataModel {
         summonAiSkillUuid:      new fields.StringField({ initial: '' }),
         summonStatDistribution: new fields.ObjectField({ initial: () => ({}) }),
         summonExtraTags:        new fields.ArrayField(new fields.StringField(), { initial: [] }),
+        // AI BEHAVIOR tags (brains/faculties/presets — CONFIG.aiBehaviors) that
+        // compose the summon's "brain" and price it: resolveAiBehaviors() maps
+        // them to AI flags stamped on the clone and to a tier cost MULTIPLIER on
+        // the summon's mana. Supersedes summonAiProfile when non-empty. Empty =
+        // legacy behaviour (use summonAiProfile, ×1 cost). [[design-ai-behavior-tags]]
+        summonBehaviors:        new fields.ArrayField(new fields.StringField(), { initial: [] }),
 
         // ── Channel primitive (per plan pure-gathering-ullman.md, 2026-05-29).
         //    A sub-turn ticking damage skill that ramps per consecutive tick
