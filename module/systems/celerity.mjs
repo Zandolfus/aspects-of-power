@@ -282,8 +282,13 @@ export function getScrambleStacks(actor) {
  * (live bug 2026-06-14: "Gabriel lacks permission to update Combatant").
  */
 async function _safeCombatantUpdate(combatant, data, options = {}) {
-  const canModify = combatant.canUserModify?.(game.user, 'update') ?? game.user.isGM;
-  if (canModify) return combatant.update(data, options);
+  // Combatant updates are GM-only at the SERVER level — even a combatant whose
+  // actor the player owns is rejected ("User X lacks permission to update
+  // Combatant"). `canUserModify` lies here: it returns true for an owned
+  // combatant, so guarding on it took the direct branch and still threw (live
+  // 2026-06-22, player driving an owned summon's Move). Guard on isGM instead:
+  // the GM applies directly; every other client routes to the active GM.
+  if (game.user.isGM) return combatant.update(data, options);
   game.socket.emit('system.aspects-of-power', {
     action: 'gmCombatantUpdate',
     combatId: combatant.combat?.id,
