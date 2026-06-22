@@ -972,7 +972,7 @@ Hooks.once('ready', async function () {
     if (data?.action !== 'gmCombatantUpdate') return;
     if (game.users.activeGM !== game.user) return;
     const combatant = game.combats.get(data.combatId)?.combatants.get(data.combatantId);
-    if (combatant) combatant.update(data.data).catch(err =>
+    if (combatant) combatant.update(data.data, data.options ?? {}).catch(err =>
       console.warn('[aop] gmCombatantUpdate failed:', err)
     );
   });

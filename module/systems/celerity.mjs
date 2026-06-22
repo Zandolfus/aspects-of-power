@@ -281,14 +281,15 @@ export function getScrambleStacks(actor) {
  * attacks an NPC that dodges, the player can't update the NPC's combatant
  * (live bug 2026-06-14: "Gabriel lacks permission to update Combatant").
  */
-async function _safeCombatantUpdate(combatant, data) {
+async function _safeCombatantUpdate(combatant, data, options = {}) {
   const canModify = combatant.canUserModify?.(game.user, 'update') ?? game.user.isGM;
-  if (canModify) return combatant.update(data);
+  if (canModify) return combatant.update(data, options);
   game.socket.emit('system.aspects-of-power', {
     action: 'gmCombatantUpdate',
     combatId: combatant.combat?.id,
     combatantId: combatant.id,
     data,
+    options,
   });
 }
 
@@ -378,7 +379,7 @@ export async function recordActionFired(actor, skill) {
   const wait = computeActionWait(actor, skill);
   const clockTick = getClockTick(combatant.combat);
   const scheduledTick = clockTick + wait;
-  await combatant.update({
+  await _safeCombatantUpdate(combatant, {
     'flags.aspectsofpower.nextActionTick': scheduledTick,
     'flags.aspectsofpower.lastActionWait': wait,
     'flags.aspectsofpower.lastActionName': skill.name,
@@ -419,7 +420,7 @@ export async function declareAction(actor, skill, options = {}) {
     // otherwise re-declaring (cancel → set) reads as "action fired" and
     // re-triggers onActionReady, an infinite machine-speed attack loop
     // (live bug 2026-06-14: Felicia/skirmisher → 21k messages).
-    await combatant.update({
+    await _safeCombatantUpdate(combatant, {
       'flags.aspectsofpower.declaredAction': null,
       'flags.aspectsofpower.nextActionTick': null,
     }, { _aopCancelRedeclare: true });
@@ -487,7 +488,7 @@ export async function declareAction(actor, skill, options = {}) {
   const skillTags = skill?.system?.tags ?? [];
   const uncancellable = skillTags.includes('leap');
 
-  await combatant.update({
+  await _safeCombatantUpdate(combatant, {
     'flags.aspectsofpower.declaredAction': {
       itemId: skill.id,
       label: skill.name,
@@ -713,7 +714,7 @@ export async function declareMovement(actor, startPos, endPos, distanceFt, stami
   const scheduledTick = clockTick + wait;
   const label = `Move ${distanceFt}ft (${m.label})`;
 
-  await combatant.update({
+  await _safeCombatantUpdate(combatant, {
     'flags.aspectsofpower.declaredAction': {
       itemId: MOVEMENT_ITEM_ID,
       label,
@@ -775,7 +776,7 @@ export async function declareBreakFree(actor, effect) {
   const typeName = game.i18n.localize(CONFIG.ASPECTSOFPOWER.debuffTypes[debuffType] ?? debuffType);
   const label = `Break Free (${typeName})`;
 
-  await combatant.update({
+  await _safeCombatantUpdate(combatant, {
     'flags.aspectsofpower.declaredAction': {
       itemId: BREAK_FREE_ITEM_ID,
       label,
@@ -819,7 +820,7 @@ export async function chargeMovementCelerity(actor, distanceFt) {
   const clockTick = getClockTick(combatant.combat);
   const scheduledTick = clockTick + wait;
 
-  await combatant.update({
+  await _safeCombatantUpdate(combatant, {
     'flags.aspectsofpower.declaredAction': null,
     'flags.aspectsofpower.nextActionTick': scheduledTick,
     'flags.aspectsofpower.lastActionWait': wait,
