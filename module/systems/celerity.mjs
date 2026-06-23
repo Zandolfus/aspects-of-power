@@ -754,6 +754,52 @@ export function clampMoveNoOverlap(tokenDoc, fromPos, toPos) {
   return { x: fromPos.x, y: fromPos.y };
 }
 
+/**
+ * Equidistant bump: after movements land, symmetrically separate any tokens
+ * whose footprints ended overlapping. Two units converging on the SAME point
+ * (the stop-short clamp checks bodies at declare time, not each other's
+ * simultaneous arrival, so a small residual overlap can survive) push apart
+ * EQUALLY along their centre-line until tangent — neither claims the spot.
+ * A few relaxation passes resolve small cascades. Tokens are moved with the
+ * `_celerityCommit` flag so the move pipeline doesn't re-declare them.
+ * @param {Scene} scene
+ */
+export async function separateOverlappingTokens(scene) {
+  if (!scene) return;
+  const gs = scene.grid?.size ?? 100;
+  const info = scene.tokens.filter(t => !t.hidden).map(t => {
+    const w = (t.width ?? 1) * gs, h = (t.height ?? 1) * gs;
+    return { doc: t, x: t.x, y: t.y, cx: t.x + w / 2, cy: t.y + h / 2, r: Math.max(w, h) / 2, moved: false };
+  });
+  if (info.length < 2) return;
+  let any = false;
+  for (let iter = 0; iter < 4; iter++) {
+    let movedThisIter = false;
+    for (let a = 0; a < info.length; a++) {
+      for (let b = a + 1; b < info.length; b++) {
+        const A = info[a], B = info[b];
+        let ddx = B.cx - A.cx, ddy = B.cy - A.cy;
+        let dist = Math.hypot(ddx, ddy);
+        const min = A.r + B.r;
+        if (dist >= min - 0.5) continue; // tangent or clear
+        // Fully-coincident → pick an arbitrary axis so they still split.
+        let nx, ny;
+        if (dist < 0.001) { nx = 1; ny = 0; dist = 0; } else { nx = ddx / dist; ny = ddy / dist; }
+        const push = (min - dist) / 2 + 0.5; // half each, +0.5 to clear the threshold
+        A.cx -= nx * push; A.cy -= ny * push; A.x -= nx * push; A.y -= ny * push; A.moved = true;
+        B.cx += nx * push; B.cy += ny * push; B.x += nx * push; B.y += ny * push; B.moved = true;
+        movedThisIter = true; any = true;
+      }
+    }
+    if (!movedThisIter) break;
+  }
+  if (!any) return;
+  const updates = info.filter(i => i.moved).map(i => ({ _id: i.doc.id, x: Math.round(i.x), y: Math.round(i.y) }));
+  if (updates.length) {
+    await scene.updateEmbeddedDocuments('Token', updates, { animation: { duration: 150 }, _celerityCommit: true });
+  }
+}
+
 export async function declareMovement(actor, startPos, endPos, distanceFt, staminaCost, mode) {
   const combatant = findCombatantForActor(actor);
   if (!combatant) return null;

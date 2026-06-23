@@ -8,7 +8,7 @@
  * Wired by setting `CONFIG.ui.combat = CelerityCombatTracker` at init.
  */
 
-import { getClockTick, referenceRoundLength, runRoundStart, MOVEMENT_ITEM_ID, BREAK_FREE_ITEM_ID, interpolateMovementPosition, declareMovement } from '../systems/celerity.mjs';
+import { getClockTick, referenceRoundLength, runRoundStart, MOVEMENT_ITEM_ID, BREAK_FREE_ITEM_ID, interpolateMovementPosition, declareMovement, separateOverlappingTokens } from '../systems/celerity.mjs';
 // TRIAL-REALTIME: engagement-halts disabled for the real-time-advance trial.
 // If trial reverts, restore this import + the checkEngagementHalts call in
 // _onCelAdvance (search "TRIAL-REALTIME" for both sites). If trial succeeds,
@@ -128,6 +128,12 @@ async function _onCelAdvance(event, target) {
     }
   }
   await Promise.all(movementUpdates);
+
+  // Equidistant bump: tokens that slid onto the same point this tick push apart
+  // symmetrically so none ends stacked (the declare-time stop-short can't see
+  // simultaneous co-arrivals). Runs on the active scene's tokens.
+  try { await separateOverlappingTokens(canvas.scene); }
+  catch (e) { console.warn('[celerity] separateOverlappingTokens failed:', e); }
 
   // Commit completion: clear flags + debit stamina for any movement that
   // just landed. This includes the "fired" combatant if it was a movement.
