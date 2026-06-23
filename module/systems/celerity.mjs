@@ -709,13 +709,18 @@ export function interpolateMovementPosition(mv, currentTick) {
  * @returns {Promise<{wait, scheduledTick}|null>}
  */
 /**
- * No-stacking clamp (gridless footprint check). A move may pass THROUGH other
- * tokens during transit, but must not END with its footprint overlapping one.
- * Returns the furthest point along start→end whose footprint is clear ("stop
- * short"). If the destination is already clear, returns it unchanged. If the
- * START already overlaps (token began stacked), returns the destination so it
- * can move freely to separate. Footprints are treated as circles of radius
- * max(w,h)/2 — two tokens are "stacked" when centre distance < sum of radii.
+ * No-stacking + shared-faction passthrough clamp (gridless footprint check).
+ *
+ * Two faction rules, both on token footprints (circles of radius max(w,h)/2,
+ * "overlap" = centre distance < sum of radii):
+ *  - SHARED-FACTION (same disposition) tokens are PASSABLE: a move may pass
+ *    THROUGH them mid-transit; only the final resting footprint must be clear.
+ *  - CROSS-FACTION (different disposition) tokens are SOLID: they block transit
+ *    like a wall — the move stops just before its footprint would touch one.
+ *  - The END position must not overlap ANYONE (no stacking, either faction).
+ *
+ * Returns the furthest reachable point along start→end satisfying all three.
+ * Pre-stacked start → returns the furthest point (let it move to separate).
  * @param {TokenDocument} tokenDoc  the moving token
  * @param {{x,y}} fromPos  top-left start
  * @param {{x,y}} toPos    top-left intended destination
@@ -727,29 +732,39 @@ export function clampMoveNoOverlap(tokenDoc, fromPos, toPos) {
   const gs = scene.grid?.size ?? 100;
   const selfW = (tokenDoc.width ?? 1) * gs, selfH = (tokenDoc.height ?? 1) * gs;
   const selfR = Math.max(selfW, selfH) / 2;
+  const selfDisp = tokenDoc.disposition;
   const obstacles = [];
   for (const t of scene.tokens) {
     if (t.id === tokenDoc.id || t.hidden) continue;
     const w = (t.width ?? 1) * gs, h = (t.height ?? 1) * gs;
-    obstacles.push({ cx: t.x + w / 2, cy: t.y + h / 2, r: Math.max(w, h) / 2 });
+    obstacles.push({ cx: t.x + w / 2, cy: t.y + h / 2, r: Math.max(w, h) / 2, enemy: t.disposition !== selfDisp });
   }
   if (!obstacles.length) return toPos;
-  const clearAt = (p) => {
+  const lerp = (t) => ({ x: fromPos.x + (toPos.x - fromPos.x) * t, y: fromPos.y + (toPos.y - fromPos.y) * t });
+  const hits = (p, set) => {
     const x = p.x + selfW / 2, y = p.y + selfH / 2;
-    for (const o of obstacles) {
-      const min = o.r + selfR;
-      if ((x - o.cx) ** 2 + (y - o.cy) ** 2 < min * min - 1) return false;
-    }
-    return true;
+    for (const o of set) { const min = o.r + selfR; if ((x - o.cx) ** 2 + (y - o.cy) ** 2 < min * min - 1) return true; }
+    return false;
   };
-  if (clearAt(toPos)) return toPos;
-  if (!clearAt(fromPos)) return toPos; // pre-stacked → let it move to separate
-  // March backward from the destination to the last clear point along the path.
-  const STEPS = 32;
-  for (let i = STEPS - 1; i >= 1; i--) {
-    const t = i / STEPS;
-    const p = { x: fromPos.x + (toPos.x - fromPos.x) * t, y: fromPos.y + (toPos.y - fromPos.y) * t };
-    if (clearAt(p)) return p;
+  const enemies = obstacles.filter(o => o.enemy);
+  const STEPS = 48;
+
+  // 1. Cross-faction bodies block transit. Find the last step before the
+  //    footprint first contacts an enemy along the path (full path if none).
+  let tMax = 1;
+  if (enemies.length) {
+    for (let i = 1; i <= STEPS; i++) {
+      if (hits(lerp(i / STEPS), enemies)) { tMax = (i - 1) / STEPS; break; }
+    }
+  }
+  // 2. Within reach [0, tMax], stop at the furthest point whose resting
+  //    footprint overlaps NOBODY (passed-through allies must not be the final
+  //    resting square either). Pre-stacked start → just go as far as allowed.
+  if (hits(fromPos, obstacles)) return lerp(tMax);
+  const top = Math.round(tMax * STEPS);
+  for (let i = top; i >= 0; i--) {
+    const p = lerp(i / STEPS);
+    if (!hits(p, obstacles)) return p;
   }
   return { x: fromPos.x, y: fromPos.y };
 }
