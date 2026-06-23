@@ -1,4 +1,4 @@
-import { declareMovement, resolveMovementMode } from '../systems/celerity.mjs';
+import { declareMovement, resolveMovementMode, clampMoveNoOverlap } from '../systems/celerity.mjs';
 
 /**
  * Read the current Shift-key state from Foundry's keyboard manager. Used
@@ -46,10 +46,32 @@ export class AspectsofPowerToken extends foundry.documents.TokenDocument {
     // would queue a NEW Move on the celerity stack and skip the actual
     // relocation, leaving the token where it was).
     if (operation?._aopTeleport || operation?._aopLeap) return;
+    // Bypass the no-stacking re-issue below (avoids recursing on our own
+    // clamped update).
+    if (operation?._aopNoStackClamp) return;
 
-    // Only intercept during active combat.
     const combat = game.combat;
-    if (!combat?.started) return;
+    if (!combat?.started) {
+      // Out of combat there's no celerity declare, but the no-stacking rule
+      // still applies: a token may pass THROUGH others but must not END
+      // overlapping one. Clamp the landing (stop short) and re-issue the
+      // shortened move; passthrough during the drag animation is unaffected.
+      if (movement.chain?.length > 0) return; // only the first segment
+      const from = { x: this.x, y: this.y };
+      const dest = {
+        x: movement.destination?.x ?? movement.pending?.x ?? this.x,
+        y: movement.destination?.y ?? movement.pending?.y ?? this.y,
+      };
+      const clamped = clampMoveNoOverlap(this, from, dest);
+      if (clamped.x !== dest.x || clamped.y !== dest.y) {
+        this.update(
+          { x: clamped.x, y: clamped.y },
+          { _aopNoStackClamp: true, animation: { duration: 200 } }
+        ).catch(err => console.error('[no-stack] out-of-combat clamp failed:', err));
+        return false; // cancel the original; the clamped re-issue lands instead
+      }
+      return; // destination already clear — let Foundry commit normally
+    }
 
     // Only intervene on the first segment. Sub-segments are part of the same
     // physical drag; cancelling the first prevents any sub-segment from
