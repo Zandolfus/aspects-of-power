@@ -794,10 +794,15 @@ export async function separateOverlappingTokens(scene) {
     if (!movedThisIter) break;
   }
   if (!any) return;
-  const updates = info.filter(i => i.moved).map(i => ({ _id: i.doc.id, x: Math.round(i.x), y: Math.round(i.y) }));
-  if (updates.length) {
-    await scene.updateEmbeddedDocuments('Token', updates, { animation: { duration: 150 }, _celerityCommit: true });
-  }
+  // Per-token update (not bulk) so the `_celerityCommit` operation flag reaches
+  // each TokenDocument#_preUpdateMovement and bypasses the move-declare pipeline
+  // — mirrors the animate-on-pause path. A bulk updateEmbeddedDocuments does NOT
+  // propagate the flag, so the pipeline cancels the separation (the bump silently
+  // no-ops and units stay overlapping).
+  await Promise.all(info.filter(i => i.moved).map(i =>
+    i.doc.update({ x: Math.round(i.x), y: Math.round(i.y) }, { animation: { duration: 150 }, _celerityCommit: true })
+      .catch(e => console.warn('[celerity] bump move failed:', e))
+  ));
 }
 
 export async function declareMovement(actor, startPos, endPos, distanceFt, staminaCost, mode) {
