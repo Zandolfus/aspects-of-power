@@ -129,12 +129,6 @@ async function _onCelAdvance(event, target) {
   }
   await Promise.all(movementUpdates);
 
-  // Equidistant bump: tokens that slid onto the same point this tick push apart
-  // symmetrically so none ends stacked (the declare-time stop-short can't see
-  // simultaneous co-arrivals). Runs on the active scene's tokens.
-  try { await separateOverlappingTokens(canvas.scene); }
-  catch (e) { console.warn('[celerity] separateOverlappingTokens failed:', e); }
-
   // Commit completion: clear flags + debit stamina for any movement that
   // just landed. This includes the "fired" combatant if it was a movement.
   // After clearing, if the movement was a halt (truncated short of its
@@ -212,6 +206,15 @@ async function _onCelAdvance(event, target) {
   // above; for skill-action firings we still need to clear the firer's
   // flags before dispatching so a follow-up can re-queue.)
   await combat.update({ [`flags.${FLAG_NS}.clockTick`]: newClock });
+
+  // Equidistant bump: AFTER the clock advances + completions clear, symmetrically
+  // separate any RESTING/arrived tokens that ended overlapping (two units that
+  // converged on the same point push apart equally). Tokens still in transit are
+  // excluded inside the helper — they pass THROUGH others mid-flight; only their
+  // final landing separates. Runs here (post-completion) so just-arrived tokens
+  // have their movement flag cleared and count as resting.
+  try { await separateOverlappingTokens(canvas.scene); }
+  catch (e) { console.warn('[celerity] separateOverlappingTokens failed:', e); }
 
   // Movement-completion branch: the action that drove this advance was a
   // movement, so there's no skill roll to dispatch. The position update +

@@ -767,7 +767,22 @@ export function clampMoveNoOverlap(tokenDoc, fromPos, toPos) {
 export async function separateOverlappingTokens(scene) {
   if (!scene) return;
   const gs = scene.grid?.size ?? 100;
-  const info = scene.tokens.filter(t => !t.hidden).map(t => {
+  // Tokens still IN TRANSIT (a pending movement that hasn't reached its tick yet)
+  // are exempt — they pass THROUGH others during flight; only their final landing
+  // separates. Without this the bump fights the per-tick interpolation (push out,
+  // slide back toward the unchanged endPos), so mid-flight overlaps reappear.
+  const combat = game.combat;
+  const inFlight = new Set();
+  if (combat?.started) {
+    const clock = getClockTick(combat);
+    for (const cm of combat.combatants) {
+      const da = cm.flags?.aspectsofpower?.declaredAction;
+      if (da?.itemId === MOVEMENT_ITEM_ID && typeof da.scheduledTick === 'number' && da.scheduledTick > clock) {
+        inFlight.add(cm.tokenId);
+      }
+    }
+  }
+  const info = scene.tokens.filter(t => !t.hidden && !inFlight.has(t.id)).map(t => {
     const w = (t.width ?? 1) * gs, h = (t.height ?? 1) * gs;
     return { doc: t, x: t.x, y: t.y, cx: t.x + w / 2, cy: t.y + h / 2, r: Math.max(w, h) / 2, moved: false };
   });
