@@ -708,10 +708,72 @@ export function interpolateMovementPosition(mv, currentTick) {
  * @param {string} [mode]                   Movement mode key ('walk' | 'sprint'); defaults to walk.
  * @returns {Promise<{wait, scheduledTick}|null>}
  */
+/**
+ * No-stacking clamp (gridless footprint check). A move may pass THROUGH other
+ * tokens during transit, but must not END with its footprint overlapping one.
+ * Returns the furthest point along start→end whose footprint is clear ("stop
+ * short"). If the destination is already clear, returns it unchanged. If the
+ * START already overlaps (token began stacked), returns the destination so it
+ * can move freely to separate. Footprints are treated as circles of radius
+ * max(w,h)/2 — two tokens are "stacked" when centre distance < sum of radii.
+ * @param {TokenDocument} tokenDoc  the moving token
+ * @param {{x,y}} fromPos  top-left start
+ * @param {{x,y}} toPos    top-left intended destination
+ * @returns {{x,y}} clamped top-left destination
+ */
+export function clampMoveNoOverlap(tokenDoc, fromPos, toPos) {
+  const scene = tokenDoc?.parent;
+  if (!scene) return toPos;
+  const gs = scene.grid?.size ?? 100;
+  const selfW = (tokenDoc.width ?? 1) * gs, selfH = (tokenDoc.height ?? 1) * gs;
+  const selfR = Math.max(selfW, selfH) / 2;
+  const obstacles = [];
+  for (const t of scene.tokens) {
+    if (t.id === tokenDoc.id || t.hidden) continue;
+    const w = (t.width ?? 1) * gs, h = (t.height ?? 1) * gs;
+    obstacles.push({ cx: t.x + w / 2, cy: t.y + h / 2, r: Math.max(w, h) / 2 });
+  }
+  if (!obstacles.length) return toPos;
+  const clearAt = (p) => {
+    const x = p.x + selfW / 2, y = p.y + selfH / 2;
+    for (const o of obstacles) {
+      const min = o.r + selfR;
+      if ((x - o.cx) ** 2 + (y - o.cy) ** 2 < min * min - 1) return false;
+    }
+    return true;
+  };
+  if (clearAt(toPos)) return toPos;
+  if (!clearAt(fromPos)) return toPos; // pre-stacked → let it move to separate
+  // March backward from the destination to the last clear point along the path.
+  const STEPS = 32;
+  for (let i = STEPS - 1; i >= 1; i--) {
+    const t = i / STEPS;
+    const p = { x: fromPos.x + (toPos.x - fromPos.x) * t, y: fromPos.y + (toPos.y - fromPos.y) * t };
+    if (clearAt(p)) return p;
+  }
+  return { x: fromPos.x, y: fromPos.y };
+}
+
 export async function declareMovement(actor, startPos, endPos, distanceFt, staminaCost, mode) {
   const combatant = findCombatantForActor(actor);
   if (!combatant) return null;
   if (distanceFt <= 0) return null;
+
+  // No-stacking: a move may pass through others but must not END overlapping
+  // one. Stop short at the last clear point; rescale distance + stamina to the
+  // shortened path. A move fully blocked by overlap (no clear ground gained)
+  // is dropped.
+  if (combatant.token) {
+    const clamped = clampMoveNoOverlap(combatant.token, startPos, endPos);
+    if (clamped.x !== endPos.x || clamped.y !== endPos.y) {
+      const pxPerFt = canvas.grid.size / canvas.grid.distance;
+      const newFt = Math.round(Math.hypot(clamped.x - startPos.x, clamped.y - startPos.y) / pxPerFt);
+      if (newFt <= 0) return null;
+      staminaCost = Math.max(0, Math.round(staminaCost * (newFt / distanceFt)));
+      distanceFt = newFt;
+      endPos = clamped;
+    }
+  }
 
   const m = resolveMovementMode(mode);
   const wait = computeMovementWait(actor, distanceFt, m.key);
