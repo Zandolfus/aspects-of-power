@@ -340,6 +340,20 @@ ASPECTSOFPOWER.ai = {
 };
 
 /**
+ * Movement / token-collision tuning. Footprints are axis-aligned boxes from each
+ * token's width × height (handles 1x1, large, and rectangular tokens uniformly).
+ * Shared by the no-stacking clamp + enemy-block (clampMoveNoOverlap) and the
+ * equidistant bump (separateOverlappingTokens) in celerity.mjs.
+ */
+ASPECTSOFPOWER.movement = {
+  // Per-side spacing gap in PIXELS beyond edge-touching. 0 = tokens may stand
+  // edge-adjacent (touching). Raise for breathing room between bodies; the gap
+  // applies on top of each token's own footprint, so it reads the same for big
+  // and small tokens.
+  tokenGapPx: 0,
+};
+
+/**
  * Modular AI BEHAVIOR tags — the composable "brain" of a creature, priced by
  * tier so a smarter conjuration (summon / ritual) costs more. Each behavior
  * sets AI flags on the creature and contributes `tier` points; the summed tier

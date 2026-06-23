@@ -726,24 +726,41 @@ export function interpolateMovementPosition(mv, currentTick) {
  * @param {{x,y}} toPos    top-left intended destination
  * @returns {{x,y}} clamped top-left destination
  */
+/** Per-side token spacing gap in px beyond edge-touching — tunable breathing
+ *  room. 0 (default) = tokens may stand edge-adjacent. */
+function _tokenGapPx() { return CONFIG.ASPECTSOFPOWER?.movement?.tokenGapPx ?? 0; }
+
+/** Axis-aligned footprint overlap of two boxes (top-left x/y + size w/h),
+ *  inflated by a per-side gap g. Returns the centre-overlap on each axis;
+ *  the boxes intersect (within the gap) iff BOTH ox AND oy are > 0. Uses width
+ *  AND height — NOT a single radius — so rectangular + large tokens space
+ *  correctly. The same predicate drives the no-overlap clamp AND the bump, and
+ *  the per-axis overlaps feed the bump's minimum-translation separation. */
+function _boxOverlap(ax, ay, aw, ah, bx, by, bw, bh, g) {
+  const ox = (aw + bw) / 2 + g - Math.abs((ax + aw / 2) - (bx + bw / 2));
+  const oy = (ah + bh) / 2 + g - Math.abs((ay + ah / 2) - (by + bh / 2));
+  return { ox, oy };
+}
+
 export function clampMoveNoOverlap(tokenDoc, fromPos, toPos) {
   const scene = tokenDoc?.parent;
   if (!scene) return toPos;
   const gs = scene.grid?.size ?? 100;
   const selfW = (tokenDoc.width ?? 1) * gs, selfH = (tokenDoc.height ?? 1) * gs;
-  const selfR = Math.max(selfW, selfH) / 2;
   const selfDisp = tokenDoc.disposition;
+  const g = _tokenGapPx();
   const obstacles = [];
   for (const t of scene.tokens) {
     if (t.id === tokenDoc.id || t.hidden) continue;
-    const w = (t.width ?? 1) * gs, h = (t.height ?? 1) * gs;
-    obstacles.push({ cx: t.x + w / 2, cy: t.y + h / 2, r: Math.max(w, h) / 2, enemy: t.disposition !== selfDisp });
+    obstacles.push({ x: t.x, y: t.y, w: (t.width ?? 1) * gs, h: (t.height ?? 1) * gs, enemy: t.disposition !== selfDisp });
   }
   if (!obstacles.length) return toPos;
   const lerp = (t) => ({ x: fromPos.x + (toPos.x - fromPos.x) * t, y: fromPos.y + (toPos.y - fromPos.y) * t });
   const hits = (p, set) => {
-    const x = p.x + selfW / 2, y = p.y + selfH / 2;
-    for (const o of set) { const min = o.r + selfR; if ((x - o.cx) ** 2 + (y - o.cy) ** 2 < min * min - 1) return true; }
+    for (const o of set) {
+      const { ox, oy } = _boxOverlap(p.x, p.y, selfW, selfH, o.x, o.y, o.w, o.h, g);
+      if (ox > 0.5 && oy > 0.5) return true;
+    }
     return false;
   };
   const enemies = obstacles.filter(o => o.enemy);
@@ -774,9 +791,11 @@ export function clampMoveNoOverlap(tokenDoc, fromPos, toPos) {
  * whose footprints ended overlapping. Two units converging on the SAME point
  * (the stop-short clamp checks bodies at declare time, not each other's
  * simultaneous arrival, so a small residual overlap can survive) push apart
- * EQUALLY along their centre-line until tangent — neither claims the spot.
- * A few relaxation passes resolve small cascades. Tokens are moved with the
- * `_celerityCommit` flag so the move pipeline doesn't re-declare them.
+ * EQUALLY — neither claims the spot. Separation is the axis-aligned minimum
+ * translation (push along the axis of least overlap, half each), using each
+ * token's width × height, so large + rectangular tokens carve out the right
+ * room. A few relaxation passes resolve small cascades. Tokens are moved with
+ * the `_celerityCommit` flag so the move pipeline doesn't re-declare them.
  * @param {Scene} scene
  */
 export async function separateOverlappingTokens(scene) {
@@ -797,10 +816,10 @@ export async function separateOverlappingTokens(scene) {
       }
     }
   }
-  const info = scene.tokens.filter(t => !t.hidden && !inFlight.has(t.id)).map(t => {
-    const w = (t.width ?? 1) * gs, h = (t.height ?? 1) * gs;
-    return { doc: t, x: t.x, y: t.y, cx: t.x + w / 2, cy: t.y + h / 2, r: Math.max(w, h) / 2, moved: false };
-  });
+  const g = _tokenGapPx();
+  const info = scene.tokens.filter(t => !t.hidden && !inFlight.has(t.id)).map(t => ({
+    doc: t, x: t.x, y: t.y, w: (t.width ?? 1) * gs, h: (t.height ?? 1) * gs, moved: false,
+  }));
   if (info.length < 2) return;
   let any = false;
   for (let iter = 0; iter < 4; iter++) {
@@ -808,17 +827,20 @@ export async function separateOverlappingTokens(scene) {
     for (let a = 0; a < info.length; a++) {
       for (let b = a + 1; b < info.length; b++) {
         const A = info[a], B = info[b];
-        let ddx = B.cx - A.cx, ddy = B.cy - A.cy;
-        let dist = Math.hypot(ddx, ddy);
-        const min = A.r + B.r;
-        if (dist >= min - 0.5) continue; // tangent or clear
-        // Fully-coincident → pick an arbitrary axis so they still split.
-        let nx, ny;
-        if (dist < 0.001) { nx = 1; ny = 0; dist = 0; } else { nx = ddx / dist; ny = ddy / dist; }
-        const push = (min - dist) / 2 + 0.5; // half each, +0.5 to clear the threshold
-        A.cx -= nx * push; A.cy -= ny * push; A.x -= nx * push; A.y -= ny * push; A.moved = true;
-        B.cx += nx * push; B.cy += ny * push; B.x += nx * push; B.y += ny * push; B.moved = true;
-        movedThisIter = true; any = true;
+        const { ox, oy } = _boxOverlap(A.x, A.y, A.w, A.h, B.x, B.y, B.w, B.h, g);
+        if (ox <= 0.5 || oy <= 0.5) continue; // separated on an axis → no overlap
+        // Minimum-translation separation: push along the axis of LEAST overlap
+        // (smallest move that frees them), half each (equidistant). +0.5 clears
+        // the threshold. Uses footprint w/h, so big/rectangular tokens carve out
+        // the right amount of room on each axis.
+        if (ox < oy) {
+          const dir = (A.x + A.w / 2) <= (B.x + B.w / 2) ? -1 : 1;
+          const s = ox / 2 + 0.5; A.x += dir * s; B.x -= dir * s;
+        } else {
+          const dir = (A.y + A.h / 2) <= (B.y + B.h / 2) ? -1 : 1;
+          const s = oy / 2 + 0.5; A.y += dir * s; B.y -= dir * s;
+        }
+        A.moved = B.moved = true; movedThisIter = true; any = true;
       }
     }
     if (!movedThisIter) break;
