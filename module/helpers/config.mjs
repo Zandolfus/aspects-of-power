@@ -344,6 +344,9 @@ ASPECTSOFPOWER.ai = {
   maxStepFt: 30,   // max movement per AI action
   dangerFt:  15,   // skirmisher kite bubble
   retreatHpPct: 0.25,  // self-preservation faculty: flee when HP fraction < this
+  // Hostile NPCs at 0 HP auto-mark defeated (skull overlay, tracker strike)
+  // without GM action (updateActor death hook). Player-owned actors exempt.
+  autoDefeatHostiles: true,
 };
 
 /**

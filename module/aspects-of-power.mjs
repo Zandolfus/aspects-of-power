@@ -2678,6 +2678,28 @@ Hooks.on('updateActor', async (actor, changes, _options, userId) => {
         content: `<p><em>${actor.name}'s queued <strong>${declared.label}</strong> is cancelled — incapacitated.</em></p>`,
       });
     }
+
+    // Auto-death for hostiles (pending-combat-ai-backlog): hostile NPCs at
+    // 0 HP are marked defeated + skulled without GM action. Player-owned
+    // actors are exempt — downed PCs stay a GM/narrative call.
+    if ((CONFIG.ASPECTSOFPOWER.ai?.autoDefeatHostiles ?? true) && !actor.hasPlayerOwner) {
+      const isHostile = actor.getActiveTokens(true, true)
+        .some(d => d.disposition === CONST.TOKEN_DISPOSITIONS.HOSTILE);
+      if (isHostile) {
+        for (const combat of game.combats) {
+          const cm = combat.combatants.find(c => c.actorId === actor.id);
+          if (cm && !cm.defeated) await cm.update({ defeated: true });
+        }
+        try {
+          const deadId = CONFIG.specialStatusEffects?.DEFEATED ?? 'dead';
+          if (!actor.statuses?.has(deadId)) {
+            await actor.toggleStatusEffect(deadId, { active: true, overlay: true });
+          }
+        } catch (e) {
+          console.warn('[auto-death] could not apply dead overlay:', e);
+        }
+      }
+    }
   }
 
   const threshold = game.settings.get('aspects-of-power', 'woundedTokenThreshold');
