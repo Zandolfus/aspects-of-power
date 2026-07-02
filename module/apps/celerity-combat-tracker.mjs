@@ -261,7 +261,15 @@ async function _onCelAdvance(event, target) {
   }, { _aopFireDispatch: true });
   const item = c.actor?.items?.get(declared.itemId);
   if (!item) {
-    ui.notifications.warn(`${c.name}: queued item not found (id=${declared.itemId}); action skipped.`);
+    // Orphaned action: the queued item no longer exists (deleted, ritual
+    // clone cleaned up, etc.). The declaredAction flag was already cleared
+    // above — post a chat notice so the OWNER sees why the turn fizzled,
+    // not just a GM-side toast (pending-combat-ai-backlog).
+    ui.notifications.warn(`${c.name}: queued item not found (id=${declared.itemId}); action cancelled.`);
+    ChatMessage.create({
+      speaker: ChatMessage.getSpeaker({ actor: c.actor }),
+      content: `<p><em>${c.name}'s queued <strong>${declared.label ?? 'action'}</strong> is cancelled — the skill or item no longer exists.</em></p>`,
+    });
     return;
   }
   ui.notifications.info(`Clock → ${declared.scheduledTick}. ${c.name} fires "${declared.label}".`);

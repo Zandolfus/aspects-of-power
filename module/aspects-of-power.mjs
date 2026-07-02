@@ -942,6 +942,9 @@ Hooks.once('ready', async function () {
     const item  = actor?.items?.get(data.itemId);
     if (!item) {
       console.warn('[celerity] executeQueuedAction: item not found', data);
+      // Surface the orphan to the player this was dispatched to — a silent
+      // skip reads as a hang from their side (pending-combat-ai-backlog).
+      ui.notifications.warn(`Your queued action could not fire — the skill or item no longer exists. It has been cancelled.`);
       return;
     }
     item.roll({
