@@ -959,9 +959,11 @@ Hooks.once('ready', async function () {
       preLeapApexFt: data.preLeapApexFt ?? null,
       ritualActivation: data.preRitualActivation ?? false,
       aiAutoInvest: data.preAiAutoInvest ?? false,
-    }).then(() => {
+    }).finally(() => {
       // Ritual temp-skill cleanup: Medium-fired clones are spent once the
-      // deferred fire resolves (mirrors the GM-local branch in the tracker).
+      // deferred fire returns (mirrors the GM-local branch in the tracker).
+      // .finally (not .then) so an AOE-branch abort or a thrown roll still
+      // removes the clone — the queued action was consumed either way.
       if (item.flags?.aspectsofpower?.isRitualActivation && actor.items.get(item.id)) {
         actor.deleteEmbeddedDocuments('Item', [item.id]).catch(() => {});
       }
@@ -1858,7 +1860,17 @@ async function _triggerPersistentAoe(tokenDoc, force = false) {
       });
     }
 
-    if (tagSet.has('debuff') && pd.tagConfig?.debuffType && pd.tagConfig.debuffType !== 'none') {
+    // Zone-debuff gate must mirror _handleDebuffTag's semantics (item.mjs):
+    // a debuff is "real" when it has a CC subtype OR stat-reduction entries
+    // OR deals DoT damage. The old gate required debuffType !== 'none',
+    // which silently skipped every pure stat-reduction zone debuff — the
+    // "AOE zone-debuff never applies" bug (design-class-spell-libraries).
+    const zoneDebuffCfg = pd.tagConfig ?? {};
+    const zoneHasDebuffPayload =
+      (zoneDebuffCfg.debuffType && zoneDebuffCfg.debuffType !== 'none')
+      || (zoneDebuffCfg.debuffEntries?.length > 0)
+      || !!zoneDebuffCfg.debuffDealsDamage;
+    if (tagSet.has('debuff') && zoneHasDebuffPayload) {
       // Debuff AOE.
       // - Mental (targetDefense mind/soul): ablative pool depletion. Each
       //   tick subtracts debuffPoolCost from target's mind/soul pool. When

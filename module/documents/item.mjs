@@ -7510,11 +7510,19 @@ export class AspectsofPowerItem extends Item {
       // Execute chained skills after all parent tags have resolved.
       await this._executeChainedSkills(hitResults, targets, speaker, rollMode);
 
-      // Mark initial targets as affected this round on persistent AOEs.
+      // Mark initial targets as affected on persistent AOEs. Keys are token
+      // ids and values are CLOCK TICKS — the re-tick eligibility check
+      // (_triggerPersistentAoe) compares affectedTokens[tokenId] against
+      // clockTick. The old code keyed by `t.id` (undefined — targets are
+      // {token, fraction} wrappers) and stored combat ROUND numbers, which
+      // corrupted the per-token re-tick cadence.
       if (persistFlags?.persistent) {
-        const currentRound = game.combat?.round ?? 0;
+        const currentTick = game.combat?.flags?.aspectsofpower?.clockTick ?? 0;
         const affectedMap = {};
-        for (const t of targets) affectedMap[t.id] = currentRound;
+        for (const t of targets) {
+          const tokenId = t.token?.id ?? t.id;
+          if (tokenId) affectedMap[tokenId] = currentTick;
+        }
         await templateDoc.update({ 'flags.aspects-of-power.persistentData.affectedTokens': affectedMap });
       }
 

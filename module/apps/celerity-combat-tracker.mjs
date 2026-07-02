@@ -309,12 +309,17 @@ async function _onCelAdvance(event, target) {
     });
   } else {
     // No linked player online — GM (or whoever clicked Advance) runs it.
-    await item.roll({ executeDeferred: true, preInvestAmount: investAmount, preManaInvestAmount: manaInvestAmount, preAoeRegionId: aoeRegionId, preOrbDischarging: orbDischarging, preTargetIds: targetIds, preTeleportDestination: teleportDestination, preLeapDestination: leapDestination, preLeapApexFt: leapApexFt, ritualActivation, aiAutoInvest });
-    // Ritual temp-skill cleanup: a Medium-fired skill cloned onto the
-    // activator (compendium-sourced activation) survives the declare→fire
-    // wait by design; once the roll above resolves it's spent — remove it.
-    if (item.flags?.aspectsofpower?.isRitualActivation && c.actor?.items?.get(item.id)) {
-      try { await c.actor.deleteEmbeddedDocuments('Item', [item.id]); } catch (_) { /* best-effort */ }
+    try {
+      await item.roll({ executeDeferred: true, preInvestAmount: investAmount, preManaInvestAmount: manaInvestAmount, preAoeRegionId: aoeRegionId, preOrbDischarging: orbDischarging, preTargetIds: targetIds, preTeleportDestination: teleportDestination, preLeapDestination: leapDestination, preLeapApexFt: leapApexFt, ritualActivation, aiAutoInvest });
+    } finally {
+      // Ritual temp-skill cleanup: a Medium-fired skill cloned onto the
+      // activator (compendium-sourced activation) survives the declare→fire
+      // wait by design; the queued action is consumed either way once the
+      // roll returns — remove the clone even when the AOE branch aborts
+      // early (placement cancelled, declared region gone) or roll() throws.
+      if (item.flags?.aspectsofpower?.isRitualActivation && c.actor?.items?.get(item.id)) {
+        try { await c.actor.deleteEmbeddedDocuments('Item', [item.id]); } catch (_) { /* best-effort */ }
+      }
     }
   }
 
