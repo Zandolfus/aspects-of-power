@@ -8,7 +8,7 @@
  * Wired by setting `CONFIG.ui.combat = CelerityCombatTracker` at init.
  */
 
-import { getClockTick, referenceRoundLength, runRoundStart, MOVEMENT_ITEM_ID, BREAK_FREE_ITEM_ID, interpolateMovementPosition, declareMovement, separateOverlappingTokens } from '../systems/celerity.mjs';
+import { getClockTick, referenceRoundLength, runRoundStart, MOVEMENT_ITEM_ID, BREAK_FREE_ITEM_ID, interpolateMovementPosition, declareMovement, separateOverlappingTokens, formatTicksAsTime } from '../systems/celerity.mjs';
 // TRIAL-REALTIME: engagement-halts disabled for the real-time-advance trial.
 // If trial reverts, restore this import + the checkEngagementHalts call in
 // _onCelAdvance (search "TRIAL-REALTIME" for both sites). If trial succeeds,
@@ -839,6 +839,12 @@ export class CelerityCombatTracker extends ParentTracker {
       nextRoundTick,
       ticksUntilRound,
       roundLen,
+      // Real-time display strings (design-celerity-realtime.md) — world
+      // time alongside raw ticks so hard time references are visible.
+      lastActionWaitTime: f.lastActionWait != null ? formatTicksAsTime(f.lastActionWait) : null,
+      timeUntil:          next === null ? null : formatTicksAsTime(Math.max(0, next - clockTick)),
+      timeUntilRound:     formatTicksAsTime(ticksUntilRound),
+      roundLenTime:       formatTicksAsTime(roundLen),
     };
     return turn;
   }
@@ -848,6 +854,8 @@ export class CelerityCombatTracker extends ParentTracker {
     await super._prepareTrackerContext(context, options);
     const combat = context.combat ?? this.viewed;
     context.celerityClockTick = getClockTick(combat);
+    // World time elapsed since combat start (design-celerity-realtime.md).
+    context.celerityClockTime = formatTicksAsTime(context.celerityClockTick);
     // TRIAL-REALTIME: surface play/pause state so the template button can
     // swap between fa-play and fa-pause icons. Read from the combat flag
     // (shared across clients) so player trackers reflect the GM's loop

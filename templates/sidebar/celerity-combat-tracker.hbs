@@ -1,6 +1,6 @@
 <section class="celerity-tracker-root" data-application-part="tracker">
   <div class="cel-clock-row" style="display:flex;justify-content:space-between;align-items:center;padding:4px 8px;background:#222;color:#eee;border-radius:3px;margin-bottom:6px;font-size:12px;">
-    <span><strong>Clock:</strong> tick {{celerityClockTick}}</span>
+    <span><strong>Clock:</strong> {{celerityClockTime}} <span style="color:#888;">(tick {{celerityClockTick}})</span></span>
     <span class="cel-buttons">
       {{!-- TRIAL-REALTIME: play/pause auto-advance. Removes the need to
             click Advance per action. Pauses on every action fire so the
@@ -62,7 +62,7 @@
           {{! Celerity status — last action (history) + scheduled tick / time-until-next }}
           <div class="cel-status" style="font-size:10px;color:#bbb;margin-top:2px;line-height:1.3;">
             {{#if t.celerity.lastActionName}}
-              <span title="Last completed action" style="color:#888;">Last: {{t.celerity.lastActionName}} ({{t.celerity.lastActionWait}}t)</span>
+              <span title="Last completed action" style="color:#888;">Last: {{t.celerity.lastActionName}} ({{t.celerity.lastActionWaitTime}})</span>
             {{else}}
               <span style="color:#888;">no action declared</span>
             {{/if}}
@@ -70,10 +70,10 @@
             {{#if t.celerity.ready}}
               <span style="color:#6c6;">ready</span>
             {{else}}
-              <span style="color:#fc6;"><strong>queued</strong> next @ {{t.celerity.nextActionTick}} (in {{t.celerity.ticksUntil}}t)</span>
+              <span style="color:#fc6;"><strong>queued</strong> fires in {{t.celerity.timeUntil}} <span style="color:#997;">({{t.celerity.ticksUntil}}t)</span></span>
             {{/if}}
             <br>
-            <span title="Next reference round starts: DoTs tick, regen, sustain upkeep, debuff break rolls, effect expiry" style="color:#8ad;">round @ {{t.celerity.nextRoundTick}} (in {{t.celerity.ticksUntilRound}}t)</span>
+            <span title="Next reference round starts: DoTs tick, regen, sustain upkeep, debuff break rolls, effect expiry. Round length {{t.celerity.roundLenTime}}" style="color:#8ad;">round in {{t.celerity.timeUntilRound}} <span style="color:#688;">({{t.celerity.ticksUntilRound}}t)</span></span>
           </div>
         </div>
       </li>

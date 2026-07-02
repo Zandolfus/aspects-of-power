@@ -213,6 +213,13 @@ ASPECTSOFPOWER.celerity = {
   ROUND_K:            3_000_000,
   BASELINE_WEIGHT:    100,    // sword reference
   ACTIONS_PER_ROUND:  3,      // by-construction target swings/round
+  // Real-time anchor (design-celerity-realtime.md, RULED 2026-07-02):
+  // 1 tick ≡ TICK_MS milliseconds of world time. Calibrated so a G1/mundane
+  // human (ref_mod 36) takes 2.0s per sword swing (27,778 ticks) and has a
+  // 6.0s reference round. DISPLAY-ONLY — waits, rounds, and all balance
+  // math stay in ticks; this converts for presentation. Published Celerity
+  // rating = mod × 1000 / (SCALE × TICK_MS) action-points per second.
+  TICK_MS:            0.072,
   // Orb implement: cumulative spell weight required to discharge the next
   // spell cast as free + fast. Set at Major-tier weight (400) so:
   //   Basic spam (banks 130/cast):  every 4th cast discharges

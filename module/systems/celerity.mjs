@@ -234,6 +234,46 @@ export function referenceRoundLength(rl) {
 }
 
 /* -------------------------------------------------- */
+/*  Real-time display (design-celerity-realtime.md)   */
+/* -------------------------------------------------- */
+
+/**
+ * World-time milliseconds represented by a tick count. Display-only —
+ * the anchor TICK_MS (1 tick ≡ 0.072 ms; G1 human = 2.0s sword swing)
+ * never feeds back into wait/round math.
+ */
+export function ticksToMs(ticks) {
+  const sc = CONFIG.ASPECTSOFPOWER.celerity;
+  return ticks * (sc.TICK_MS ?? 0.072);
+}
+
+/**
+ * Human-readable world time for a tick count: "83ms", "2.35s", "1m 23s",
+ * "2h 05m". Sub-alpha-grade combat lives in the ms/s bands; crafting and
+ * downtime activities will use the m/h bands.
+ */
+export function formatTicksAsTime(ticks) {
+  if (!Number.isFinite(ticks) || ticks < 0) return '—';
+  const ms = ticksToMs(ticks);
+  if (ms < 100) return `${ms.toFixed(ms < 10 ? 1 : 0)}ms`;
+  const s = ms / 1000;
+  if (s < 60) return `${s.toFixed(2)}s`;
+  if (s < 3600) return `${Math.floor(s / 60)}m ${String(Math.round(s % 60)).padStart(2, '0')}s`;
+  return `${Math.floor(s / 3600)}h ${String(Math.floor((s % 3600) / 60)).padStart(2, '0')}m`;
+}
+
+/**
+ * Published Celerity rating for a mod: action-points per second. A sword
+ * swing costs BASELINE_WEIGHT (100) points, so rating/100 = swings per
+ * second. Grows with RL — the "hard number" players watch (G1 ≈ 50,
+ * E-top ≈ 1,683, S-top ≈ 47,807).
+ */
+export function celerityRating(mod) {
+  const sc = CONFIG.ASPECTSOFPOWER.celerity;
+  return mod * 1000 / (sc.SCALE * (sc.TICK_MS ?? 0.072));
+}
+
+/* -------------------------------------------------- */
 /*  Active Defense (design-active-defense.md v2)      */
 /* -------------------------------------------------- */
 
