@@ -579,6 +579,23 @@
           <option value='at_damage_app' {{#if (eq system.tagConfig.reactionPhase "at_damage_app")}}selected{{/if}}>At-damage-application</option>
           <option value='post_resolve' {{#if (eq system.tagConfig.reactionPhase "post_resolve")}}selected{{/if}}>Post-resolve</option>
         </select>
+
+        {{#if (eq system.reactionType "guardian")}}
+        <label class='resource-label'>Guardian Mode</label>
+        <select name='system.tagConfig.guardianMode'
+                title='Intercept: the attack is redirected onto you. Cover: your defense roll replaces the ally&apos;s. Redirect: you absorb a share of the damage that lands.'>
+          {{#each config.guardianModes as |label key|}}
+            <option value='{{key}}' {{#if (eq key ../system.tagConfig.guardianMode)}}selected{{/if}}>{{localize label}}</option>
+          {{/each}}
+        </select>
+
+        {{#if (eq system.tagConfig.guardianMode "redirect")}}
+        <label class='resource-label'>Redirect Share (fraction)</label>
+        <input type='number' name='system.tagConfig.guardianRedirectPct'
+               value='{{system.tagConfig.guardianRedirectPct}}' min='0' max='1' step='0.05'
+               title='Fraction of the landed damage the guardian absorbs instead of the ally. 0.5 = half.' />
+        {{/if}}
+        {{/if}}
       </div>
       {{/if}}
 

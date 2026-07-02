@@ -567,6 +567,12 @@ export class AspectsofPowerItemSheet extends foundry.applications.api.Handlebars
         reactionThresholdPct:  (() => { const el = form.querySelector('[name="system.tagConfig.reactionThresholdPct"]'); if (!el) return 0; const v = Number(el.value); return Number.isFinite(v) ? Math.max(0, Math.min(1, v)) : 0; })(),
         reactionCooldown:      (() => { const el = form.querySelector('[name="system.tagConfig.reactionCooldown"]'); if (!el) return 1; const v = Number(el.value); return Number.isFinite(v) ? Math.max(0, v) : 1; })(),
         reactionPhase:         form.querySelector('[name="system.tagConfig.reactionPhase"]')?.value ?? '',
+        // Guardian fields render only when reactionType === 'guardian' —
+        // fall back to the stored value (not a static default) so editing
+        // other fields on a non-guardian skill never clobbers them.
+        guardianMode:          form.querySelector('[name="system.tagConfig.guardianMode"]')?.value
+                                 ?? this.item.system.tagConfig?.guardianMode ?? 'intercept',
+        guardianRedirectPct:   (() => { const el = form.querySelector('[name="system.tagConfig.guardianRedirectPct"]'); if (!el) return this.item.system.tagConfig?.guardianRedirectPct ?? 0.5; const v = Number(el.value); return Number.isFinite(v) ? Math.max(0, Math.min(1, v)) : 0.5; })(),
         debuffEntries,
         debuffType:        form.querySelector('[name="system.tagConfig.debuffType"]')?.value ?? 'none',
         debuffDuration:    Number(form.querySelector('[name="system.tagConfig.debuffDuration"]')?.value) || 1,
