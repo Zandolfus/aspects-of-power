@@ -775,14 +775,57 @@ ASPECTSOFPOWER.debuffSubtypeTags = {
 };
 
 /**
- * Affinity skill tags — auto-populate the skill's affinities array.
+ * THE AFFINITY DICTIONARY (expanded 2026-07-03, design-affinity-dictionary.md).
+ * One rich entry per mana affinity — replaces the old flat Set as the single
+ * source of truth (`affinityTags` below is DERIVED from these keys, so every
+ * existing consumer is unchanged).
+ *
+ * Per-affinity fields:
+ *   label     i18n key (ASPECTSOFPOWER.Affinity.<key>).
+ *   statGain  { primary, secondary } — the ability pair this affinity TRAINS.
+ *             Substrate for roadmap pillar 3 (affinities as learning-rate
+ *             systems): familiarity accrual grants growth in these stats, and
+ *             they define each affinity's natural hybrid identity (metal →
+ *             str/tough battle-smith, wind → dex/per skirmisher-caster...).
+ *             DATA ONLY for now — no mechanics read statGain yet; magnitudes
+ *             + accrual model need a ruling (see the design memo).
+ *   opposed   Affinity keys this one opposes (future: resist/counter logic,
+ *             dual-affinity gating, enemy-weakness authoring).
+ *   lane      'elemental' → damage mitigated by armor+DR (the 2026-07-02
+ *             ruling: elemental NEVER hits veil); 'mental' → mind/soul
+ *             POTENCY routed through veil; 'hybrid' → case-by-case per skill.
  */
-ASPECTSOFPOWER.affinityTags = new Set([
-  'fire', 'heat', 'ice', 'lightning', 'earth', 'water', 'wind', 'metal',
-  'lunar', 'solar', 'space', 'shadow', 'light', 'nature',
-  'poison', 'blood', 'necromantic', 'holy', 'arcane', 'psychic',
-  'time', 'karma',
-]);
+ASPECTSOFPOWER.affinities = {
+  fire:        { label: 'ASPECTSOFPOWER.Affinity.fire',        statGain: { primary: 'intelligence', secondary: 'willpower' },  opposed: ['ice', 'water'],      lane: 'elemental' },
+  heat:        { label: 'ASPECTSOFPOWER.Affinity.heat',        statGain: { primary: 'intelligence', secondary: 'endurance' },  opposed: ['ice'],               lane: 'elemental' },
+  ice:         { label: 'ASPECTSOFPOWER.Affinity.ice',         statGain: { primary: 'intelligence', secondary: 'wisdom' },     opposed: ['fire', 'heat'],      lane: 'elemental' },
+  lightning:   { label: 'ASPECTSOFPOWER.Affinity.lightning',   statGain: { primary: 'intelligence', secondary: 'dexterity' },  opposed: ['earth'],             lane: 'elemental' },
+  earth:       { label: 'ASPECTSOFPOWER.Affinity.earth',       statGain: { primary: 'toughness',    secondary: 'endurance' },  opposed: ['lightning', 'wind'], lane: 'elemental' },
+  water:       { label: 'ASPECTSOFPOWER.Affinity.water',       statGain: { primary: 'wisdom',       secondary: 'endurance' },  opposed: ['fire'],              lane: 'elemental' },
+  wind:        { label: 'ASPECTSOFPOWER.Affinity.wind',        statGain: { primary: 'dexterity',    secondary: 'perception' }, opposed: ['earth'],             lane: 'elemental' },
+  metal:       { label: 'ASPECTSOFPOWER.Affinity.metal',       statGain: { primary: 'strength',     secondary: 'toughness' },  opposed: [],                    lane: 'elemental' },
+  lunar:       { label: 'ASPECTSOFPOWER.Affinity.lunar',       statGain: { primary: 'wisdom',       secondary: 'perception' }, opposed: ['solar'],             lane: 'elemental' },
+  solar:       { label: 'ASPECTSOFPOWER.Affinity.solar',       statGain: { primary: 'willpower',    secondary: 'vitality' },   opposed: ['lunar'],             lane: 'elemental' },
+  space:       { label: 'ASPECTSOFPOWER.Affinity.space',       statGain: { primary: 'intelligence', secondary: 'perception' }, opposed: [],                    lane: 'elemental' },
+  shadow:      { label: 'ASPECTSOFPOWER.Affinity.shadow',      statGain: { primary: 'dexterity',    secondary: 'willpower' },  opposed: ['light', 'holy'],     lane: 'elemental' },
+  light:       { label: 'ASPECTSOFPOWER.Affinity.light',       statGain: { primary: 'perception',   secondary: 'willpower' },  opposed: ['shadow'],            lane: 'elemental' },
+  nature:      { label: 'ASPECTSOFPOWER.Affinity.nature',      statGain: { primary: 'vitality',     secondary: 'wisdom' },     opposed: ['necromantic'],       lane: 'elemental' },
+  poison:      { label: 'ASPECTSOFPOWER.Affinity.poison',      statGain: { primary: 'intelligence', secondary: 'vitality' },   opposed: ['holy'],              lane: 'elemental' },
+  blood:       { label: 'ASPECTSOFPOWER.Affinity.blood',       statGain: { primary: 'vitality',     secondary: 'strength' },   opposed: ['holy'],              lane: 'elemental' },
+  necromantic: { label: 'ASPECTSOFPOWER.Affinity.necromantic', statGain: { primary: 'willpower',    secondary: 'intelligence' }, opposed: ['nature', 'holy'],  lane: 'hybrid' },
+  holy:        { label: 'ASPECTSOFPOWER.Affinity.holy',        statGain: { primary: 'willpower',    secondary: 'wisdom' },     opposed: ['necromantic', 'shadow', 'blood', 'poison'], lane: 'hybrid' },
+  arcane:      { label: 'ASPECTSOFPOWER.Affinity.arcane',      statGain: { primary: 'intelligence', secondary: 'wisdom' },     opposed: [],                    lane: 'elemental' },
+  psychic:     { label: 'ASPECTSOFPOWER.Affinity.psychic',     statGain: { primary: 'willpower',    secondary: 'perception' }, opposed: [],                    lane: 'mental' },
+  time:        { label: 'ASPECTSOFPOWER.Affinity.time',        statGain: { primary: 'wisdom',       secondary: 'intelligence' }, opposed: [],                  lane: 'hybrid' },
+  karma:       { label: 'ASPECTSOFPOWER.Affinity.karma',       statGain: { primary: 'wisdom',       secondary: 'willpower' },  opposed: [],                    lane: 'hybrid' },
+};
+
+/**
+ * Affinity skill tags — auto-populate the skill's affinities array.
+ * DERIVED from the dictionary above (identical membership to the
+ * pre-2026-07-03 flat Set). Do NOT add names here; add a dictionary entry.
+ */
+ASPECTSOFPOWER.affinityTags = new Set(Object.keys(ASPECTSOFPOWER.affinities));
 
 /**
  * Size tag scaling — multipliers applied to ability mods and defense values.

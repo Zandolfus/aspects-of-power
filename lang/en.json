@@ -1,15 +1,42 @@
 {
   "ASPECTSOFPOWER": {
     "Ability": {
-      "vitality": { "long": "Vitality", "abbr": "vit" },
-      "endurance": { "long": "Endurance", "abbr": "end" },
-      "strength": { "long": "Strength", "abbr": "str" },
-      "dexterity": { "long": "Dexterity", "abbr": "dex" },
-      "toughness": { "long": "Toughness", "abbr": "tgh" },
-      "intelligence": { "long": "Intelligence", "abbr": "int" },
-      "willpower": { "long": "Willpower", "abbr": "wil" },
-      "wisdom": { "long": "Wisdom", "abbr": "wis" },
-      "perception": { "long": "Perception", "abbr": "prc" }
+      "vitality": {
+        "long": "Vitality",
+        "abbr": "vit"
+      },
+      "endurance": {
+        "long": "Endurance",
+        "abbr": "end"
+      },
+      "strength": {
+        "long": "Strength",
+        "abbr": "str"
+      },
+      "dexterity": {
+        "long": "Dexterity",
+        "abbr": "dex"
+      },
+      "toughness": {
+        "long": "Toughness",
+        "abbr": "tgh"
+      },
+      "intelligence": {
+        "long": "Intelligence",
+        "abbr": "int"
+      },
+      "willpower": {
+        "long": "Willpower",
+        "abbr": "wil"
+      },
+      "wisdom": {
+        "long": "Wisdom",
+        "abbr": "wis"
+      },
+      "perception": {
+        "long": "Perception",
+        "abbr": "prc"
+      }
     },
     "SheetLabels": {
       "Actor": "AspectsofPower Actor Sheet",
@@ -19,7 +46,6 @@
       "Skill": {
         "skillType": "{type} Skill",
         "addType": "Add type {type}"
-
       }
     },
     "SkillCategory": {
@@ -303,75 +329,282 @@
         "size": "Size",
         "path": "Path Structure"
       },
-      "fire": { "label": "Fire", "desc": "Fire elemental affinity" },
-      "heat": { "label": "Heat", "desc": "Heat/thermal affinity" },
-      "ice": { "label": "Ice", "desc": "Ice elemental affinity" },
-      "lightning": { "label": "Lightning", "desc": "Lightning elemental affinity" },
-      "earth": { "label": "Earth", "desc": "Earth elemental affinity" },
-      "water": { "label": "Water", "desc": "Water elemental affinity" },
-      "wind": { "label": "Wind", "desc": "Wind elemental affinity" },
-      "metal": { "label": "Metal", "desc": "Metal elemental affinity" },
-      "lunar": { "label": "Lunar", "desc": "Lunar affinity" },
-      "solar": { "label": "Solar", "desc": "Solar affinity" },
-      "space": { "label": "Space", "desc": "Space affinity" },
-      "shadow": { "label": "Shadow", "desc": "Shadow affinity" },
-      "light": { "label": "Light", "desc": "Light affinity" },
-      "nature": { "label": "Nature", "desc": "Nature affinity" },
-      "poison": { "label": "Poison", "desc": "Poison affinity" },
-      "blood": { "label": "Blood", "desc": "Blood affinity" },
-      "necromantic": { "label": "Necromantic", "desc": "Necromantic affinity" },
-      "holy": { "label": "Holy", "desc": "Holy affinity" },
-      "arcane": { "label": "Arcane", "desc": "Arcane affinity" },
-      "psychic": { "label": "Psychic", "desc": "Psychic affinity" },
-      "stunImmune": { "label": "Stun Immune", "desc": "Immune to stun effects" },
-      "paralysisImmune": { "label": "Paralysis Immune", "desc": "Immune to paralysis" },
-      "sleepImmune": { "label": "Sleep Immune", "desc": "Immune to sleep effects" },
-      "poisonImmune": { "label": "Poison Immune", "desc": "Immune to poison effects" },
-      "fearImmune": { "label": "Fear Immune", "desc": "Immune to fear effects" },
-      "charmImmune": { "label": "Charm Immune", "desc": "Immune to charm effects" },
-      "blindImmune": { "label": "Blind Immune", "desc": "Immune to blind effects" },
-      "rootImmune": { "label": "Root Immune", "desc": "Immune to root effects" },
-      "frozenImmune": { "label": "Frozen Immune", "desc": "Immune to frozen effects" },
-      "silenceImmune": { "label": "Silence Immune", "desc": "Immune to silence effects" },
-      "dismemberedImmune": { "label": "Dismember Immune", "desc": "Immune to dismemberment" },
-      "fireImmune": { "label": "Fire Immune", "desc": "Immune to fire damage" },
-      "iceImmune": { "label": "Ice Immune", "desc": "Immune to ice damage" },
-      "lightningImmune": { "label": "Lightning Immune", "desc": "Immune to lightning damage" },
-      "fireResist": { "label": "Fire Resistance", "desc": "Flat reduction to fire damage" },
-      "iceResist": { "label": "Ice Resistance", "desc": "Flat reduction to ice damage" },
-      "lightningResist": { "label": "Lightning Resistance", "desc": "Flat reduction to lightning damage" },
-      "poisonResist": { "label": "Poison Resistance", "desc": "Flat reduction to poison damage" },
-      "stunResist": { "label": "Stun Resistance", "desc": "Flat reduction to stun duration" },
-      "fearResist": { "label": "Fear Resistance", "desc": "Flat reduction to fear duration" },
-      "noMagic": { "label": "No Magic", "desc": "Cannot use magical skills" },
-      "noRanged": { "label": "No Ranged", "desc": "Cannot use ranged skills" },
-      "meleeOnly": { "label": "Melee Only", "desc": "Can only use melee skills" },
-      "noStamina": { "label": "No Stamina Skills", "desc": "Cannot use stamina-based skills" },
-      "magicOnly": { "label": "Magic Only", "desc": "Can only use magical skills" },
-      "noPhysical": { "label": "No Physical", "desc": "Cannot use physical skills" },
-      "armored": { "label": "Armored", "desc": "Grants flat armor bonus" },
-      "ethereal": { "label": "Ethereal", "desc": "Grants flat veil bonus" },
-      "heavy": { "label": "Heavy", "desc": "Movement speed penalty" },
-      "flying": { "label": "Flying", "desc": "Can fly" },
-      "aquatic": { "label": "Aquatic", "desc": "Can breathe underwater" },
-      "darkvision": { "label": "Darkvision", "desc": "Can see in darkness" },
-      "noncorporeal": { "label": "Noncorporeal", "desc": "Lacks a physical form" },
-      "cleaveExpansion": { "label": "Cleave Expansion", "desc": "Unlocks Cleave cone scaling beyond 5ft up to the wielded weapon's reach. Without it, Cleave is capped at a 5ft cone regardless of weapon." },
-      "humanoid": { "label": "Humanoid", "desc": "Humanoid creature type" },
-      "beast": { "label": "Beast", "desc": "Beast creature type" },
-      "elemental": { "label": "Elemental", "desc": "Elemental creature — immune to poison and charm" },
-      "demon": { "label": "Demon", "desc": "Demon creature type" },
-      "undead": { "label": "Undead", "desc": "Immune to poison and charm" },
-      "construct": { "label": "Construct", "desc": "Immune to stun, poison, and charm" },
-      "tiny": { "label": "Tiny", "desc": "Tiny creature size" },
-      "small": { "label": "Small", "desc": "Small creature size" },
-      "medium": { "label": "Medium", "desc": "Medium creature size" },
-      "large": { "label": "Large", "desc": "Large creature size" },
-      "huge": { "label": "Huge", "desc": "Huge creature size" },
-      "gargantuan": { "label": "Gargantuan", "desc": "Gargantuan creature size" },
-      "threefoldPath": { "label": "Threefold-Path", "desc": "Race + Class + Profession; race derives at half the rate of combined class/profession gains" },
-      "twofoldPath": { "label": "Twofold-Path", "desc": "Race + one secondary path (class, profession, or player choice — configured on the race item); race derives 1:1 from the chosen path" },
-      "onefoldPath": { "label": "Onefold-Path", "desc": "Race only (e.g., dragons, monsters); race level driven directly, not derived" }
+      "fire": {
+        "label": "Fire",
+        "desc": "Fire elemental affinity"
+      },
+      "heat": {
+        "label": "Heat",
+        "desc": "Heat/thermal affinity"
+      },
+      "ice": {
+        "label": "Ice",
+        "desc": "Ice elemental affinity"
+      },
+      "lightning": {
+        "label": "Lightning",
+        "desc": "Lightning elemental affinity"
+      },
+      "earth": {
+        "label": "Earth",
+        "desc": "Earth elemental affinity"
+      },
+      "water": {
+        "label": "Water",
+        "desc": "Water elemental affinity"
+      },
+      "wind": {
+        "label": "Wind",
+        "desc": "Wind elemental affinity"
+      },
+      "metal": {
+        "label": "Metal",
+        "desc": "Metal elemental affinity"
+      },
+      "lunar": {
+        "label": "Lunar",
+        "desc": "Lunar affinity"
+      },
+      "solar": {
+        "label": "Solar",
+        "desc": "Solar affinity"
+      },
+      "space": {
+        "label": "Space",
+        "desc": "Space affinity"
+      },
+      "shadow": {
+        "label": "Shadow",
+        "desc": "Shadow affinity"
+      },
+      "light": {
+        "label": "Light",
+        "desc": "Light affinity"
+      },
+      "nature": {
+        "label": "Nature",
+        "desc": "Nature affinity"
+      },
+      "poison": {
+        "label": "Poison",
+        "desc": "Poison affinity"
+      },
+      "blood": {
+        "label": "Blood",
+        "desc": "Blood affinity"
+      },
+      "necromantic": {
+        "label": "Necromantic",
+        "desc": "Necromantic affinity"
+      },
+      "holy": {
+        "label": "Holy",
+        "desc": "Holy affinity"
+      },
+      "arcane": {
+        "label": "Arcane",
+        "desc": "Arcane affinity"
+      },
+      "psychic": {
+        "label": "Psychic",
+        "desc": "Psychic affinity"
+      },
+      "stunImmune": {
+        "label": "Stun Immune",
+        "desc": "Immune to stun effects"
+      },
+      "paralysisImmune": {
+        "label": "Paralysis Immune",
+        "desc": "Immune to paralysis"
+      },
+      "sleepImmune": {
+        "label": "Sleep Immune",
+        "desc": "Immune to sleep effects"
+      },
+      "poisonImmune": {
+        "label": "Poison Immune",
+        "desc": "Immune to poison effects"
+      },
+      "fearImmune": {
+        "label": "Fear Immune",
+        "desc": "Immune to fear effects"
+      },
+      "charmImmune": {
+        "label": "Charm Immune",
+        "desc": "Immune to charm effects"
+      },
+      "blindImmune": {
+        "label": "Blind Immune",
+        "desc": "Immune to blind effects"
+      },
+      "rootImmune": {
+        "label": "Root Immune",
+        "desc": "Immune to root effects"
+      },
+      "frozenImmune": {
+        "label": "Frozen Immune",
+        "desc": "Immune to frozen effects"
+      },
+      "silenceImmune": {
+        "label": "Silence Immune",
+        "desc": "Immune to silence effects"
+      },
+      "dismemberedImmune": {
+        "label": "Dismember Immune",
+        "desc": "Immune to dismemberment"
+      },
+      "fireImmune": {
+        "label": "Fire Immune",
+        "desc": "Immune to fire damage"
+      },
+      "iceImmune": {
+        "label": "Ice Immune",
+        "desc": "Immune to ice damage"
+      },
+      "lightningImmune": {
+        "label": "Lightning Immune",
+        "desc": "Immune to lightning damage"
+      },
+      "fireResist": {
+        "label": "Fire Resistance",
+        "desc": "Flat reduction to fire damage"
+      },
+      "iceResist": {
+        "label": "Ice Resistance",
+        "desc": "Flat reduction to ice damage"
+      },
+      "lightningResist": {
+        "label": "Lightning Resistance",
+        "desc": "Flat reduction to lightning damage"
+      },
+      "poisonResist": {
+        "label": "Poison Resistance",
+        "desc": "Flat reduction to poison damage"
+      },
+      "stunResist": {
+        "label": "Stun Resistance",
+        "desc": "Flat reduction to stun duration"
+      },
+      "fearResist": {
+        "label": "Fear Resistance",
+        "desc": "Flat reduction to fear duration"
+      },
+      "noMagic": {
+        "label": "No Magic",
+        "desc": "Cannot use magical skills"
+      },
+      "noRanged": {
+        "label": "No Ranged",
+        "desc": "Cannot use ranged skills"
+      },
+      "meleeOnly": {
+        "label": "Melee Only",
+        "desc": "Can only use melee skills"
+      },
+      "noStamina": {
+        "label": "No Stamina Skills",
+        "desc": "Cannot use stamina-based skills"
+      },
+      "magicOnly": {
+        "label": "Magic Only",
+        "desc": "Can only use magical skills"
+      },
+      "noPhysical": {
+        "label": "No Physical",
+        "desc": "Cannot use physical skills"
+      },
+      "armored": {
+        "label": "Armored",
+        "desc": "Grants flat armor bonus"
+      },
+      "ethereal": {
+        "label": "Ethereal",
+        "desc": "Grants flat veil bonus"
+      },
+      "heavy": {
+        "label": "Heavy",
+        "desc": "Movement speed penalty"
+      },
+      "flying": {
+        "label": "Flying",
+        "desc": "Can fly"
+      },
+      "aquatic": {
+        "label": "Aquatic",
+        "desc": "Can breathe underwater"
+      },
+      "darkvision": {
+        "label": "Darkvision",
+        "desc": "Can see in darkness"
+      },
+      "noncorporeal": {
+        "label": "Noncorporeal",
+        "desc": "Lacks a physical form"
+      },
+      "cleaveExpansion": {
+        "label": "Cleave Expansion",
+        "desc": "Unlocks Cleave cone scaling beyond 5ft up to the wielded weapon's reach. Without it, Cleave is capped at a 5ft cone regardless of weapon."
+      },
+      "humanoid": {
+        "label": "Humanoid",
+        "desc": "Humanoid creature type"
+      },
+      "beast": {
+        "label": "Beast",
+        "desc": "Beast creature type"
+      },
+      "elemental": {
+        "label": "Elemental",
+        "desc": "Elemental creature — immune to poison and charm"
+      },
+      "demon": {
+        "label": "Demon",
+        "desc": "Demon creature type"
+      },
+      "undead": {
+        "label": "Undead",
+        "desc": "Immune to poison and charm"
+      },
+      "construct": {
+        "label": "Construct",
+        "desc": "Immune to stun, poison, and charm"
+      },
+      "tiny": {
+        "label": "Tiny",
+        "desc": "Tiny creature size"
+      },
+      "small": {
+        "label": "Small",
+        "desc": "Small creature size"
+      },
+      "medium": {
+        "label": "Medium",
+        "desc": "Medium creature size"
+      },
+      "large": {
+        "label": "Large",
+        "desc": "Large creature size"
+      },
+      "huge": {
+        "label": "Huge",
+        "desc": "Huge creature size"
+      },
+      "gargantuan": {
+        "label": "Gargantuan",
+        "desc": "Gargantuan creature size"
+      },
+      "threefoldPath": {
+        "label": "Threefold-Path",
+        "desc": "Race + Class + Profession; race derives at half the rate of combined class/profession gains"
+      },
+      "twofoldPath": {
+        "label": "Twofold-Path",
+        "desc": "Race + one secondary path (class, profession, or player choice — configured on the race item); race derives 1:1 from the chosen path"
+      },
+      "onefoldPath": {
+        "label": "Onefold-Path",
+        "desc": "Race only (e.g., dragons, monsters); race level driven directly, not derived"
+      }
     },
     "Effect": {
       "Source": "Source",
@@ -571,15 +804,15 @@
       "fieldVeil": "Veil"
     },
     "CraftBonus": {
-      "d100Bonus":            "d100 Bonus (per-grade flat)",
-      "craftProgress":        "Craft Progress (flat)",
-      "prepBonus":            "Prep Bonus (flat)",
-      "materialPotency":      "Material Potency (flat to material)",
-      "critFailReduce":       "Crit Fail Reduce (% proc on d100<=1, sets to 2 + saves mat)",
+      "d100Bonus": "d100 Bonus (per-grade flat)",
+      "craftProgress": "Craft Progress (flat)",
+      "prepBonus": "Prep Bonus (flat)",
+      "materialPotency": "Material Potency (flat to material)",
+      "critFailReduce": "Crit Fail Reduce (% proc on d100<=1, sets to 2 + saves mat)",
       "critSuccessThreshold": "Crit Success Threshold (lowers crit success target, floor 90)",
       "materialPreservation": "Material Preservation (% mat saved on crit fail; smith/jewel/tailor/leather only)",
-      "maxProgressBoost":     "Max Progress Boost (% lift to craft cap)",
-      "reworkDecayReduce":    "Rework Decay Reduce (per-grade, smoother iterative rework curve)"
+      "maxProgressBoost": "Max Progress Boost (% lift to craft cap)",
+      "reworkDecayReduce": "Rework Decay Reduce (per-grade, smoother iterative rework curve)"
     },
     "Consumable": {
       "sectionTitle": "Consumables",
@@ -615,12 +848,35 @@
       "none": "None"
     },
     "MediumType": {
-      "gem":    "Gem (held / touch)",
+      "gem": "Gem (held / touch)",
       "circle": "Inscribed Circle (scene-anchored)",
-      "pylon":  "Pylon (long-range node)"
+      "pylon": "Pylon (long-range node)"
+    },
+    "Affinity": {
+      "fire": "Fire",
+      "heat": "Heat",
+      "ice": "Ice",
+      "lightning": "Lightning",
+      "earth": "Earth",
+      "water": "Water",
+      "wind": "Wind",
+      "metal": "Metal",
+      "lunar": "Lunar",
+      "solar": "Solar",
+      "space": "Space",
+      "shadow": "Shadow",
+      "light": "Light",
+      "nature": "Nature",
+      "poison": "Poison",
+      "blood": "Blood",
+      "necromantic": "Necromantic",
+      "holy": "Holy",
+      "arcane": "Arcane",
+      "psychic": "Psychic",
+      "time": "Time",
+      "karma": "Karma"
     }
   },
-
   "TYPES": {
     "Actor": {
       "character": "Character",
