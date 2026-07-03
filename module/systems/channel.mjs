@@ -28,7 +28,6 @@
 import { getClockTick, referenceRoundLength } from './celerity.mjs';
 import { isActingGM } from '../helpers/gm.mjs';
 
-const COMBAT_FLAG_TICK = 'aspectsofpower.clockTick';
 
 /** @type {Map<string, ChannelState>} key = caster actor UUID */
 const channels = new Map();
@@ -311,8 +310,15 @@ export class ChannelHelpers {
 export function registerChannelHooks() {
   Hooks.on('updateCombat', async (combat, changes) => {
     if (!isActingGM()) return;
-    if (!changes?.flags?.['aspects-of-power']) return;
-    const newTick = combat.flags?.['aspects-of-power']?.clockTick ?? 0;
+    // NAMESPACE FIX (live-verified 2026-07-03): the celerity tracker writes
+    // the clock to the NON-hyphenated engine namespace
+    // (flags.aspectsofpower.clockTick — live combat shows clockTick there and
+    // flags['aspects-of-power'] === null). This guard read the hyphenated
+    // namespace, so it returned on every advance and channel ticks NEVER
+    // fired (no drain, no tick damage, no natural end). The hyphenated
+    // namespace is for token/region/effect docs only.
+    if (changes?.flags?.aspectsofpower?.clockTick === undefined) return;
+    const newTick = combat.flags?.aspectsofpower?.clockTick ?? 0;
     // Iterate a snapshot since fireTick may mutate the channels map (cancel)
     const casterUuids = Array.from(channels.keys());
     for (const casterUuid of casterUuids) {
