@@ -526,91 +526,132 @@ export class AspectsofPowerItemSheet extends foundry.applications.api.Handlebars
     if (this.item.type === 'skill' && (event.target?.name?.startsWith('system.tagConfig.') || event.target?.classList?.contains('attr-value'))) {
       const form = this.element.querySelector('form');
 
-      // Buff entries: collect checked attributes + their multiplier inputs.
-      const buffEntries = [];
-      form.querySelectorAll('input[name="system.tagConfig.buffEntries"]:checked').forEach(cb => {
-        const valInput = form.querySelector(`.attr-value[data-attr="${cb.value}"][data-target="buff"]`);
-        buffEntries.push({ attribute: cb.value, value: Number(valInput?.value) || 1 });
-      });
+      // ── THE STORED-FALLBACK RULE (data-loss fix, 2026-07-03) ──
+      // tagConfig sections render CONDITIONALLY (by tag / skillType), so most
+      // inputs are usually ABSENT from the DOM. The old collector fell back to
+      // literal defaults for absent inputs, meaning: editing ANY tagConfig
+      // field silently reset every hidden section's fields (auraScale → 0.3,
+      // dotScale → 0.1, reactionTrigger → '', buffEntries → [], …). The rule
+      // now: input present in DOM → collect it; absent → keep the STORED
+      // value; nothing stored → schema default. (This generalizes the pattern
+      // the guardian fields and the system.roll collector already used.)
+      const stored = this.item.system.tagConfig ?? {};
+      const q = (key) => form.querySelector(`[name="system.tagConfig.${key}"]`);
+      // String select/text field.
+      const str = (key, dflt) => { const el = q(key); return el ? el.value : (stored[key] ?? dflt); };
+      // Checkbox.
+      const bool = (key, dflt) => { const el = q(key); return el ? el.checked : (stored[key] ?? dflt); };
+      // Number with `|| dflt` semantics when present (blank/0/NaN → dflt).
+      const numOr = (key, dflt) => { const el = q(key); return el ? (Number(el.value) || dflt) : (stored[key] ?? dflt); };
+      // Number with `|| zeroVal` semantics when present but a DIFFERENT
+      // absent-default (dotScale: present-blank → 0, absent → stored ?? 0.1).
+      const numOrZero = (key, absentDflt) => { const el = q(key); return el ? (Number(el.value) || 0) : (stored[key] ?? absentDflt); };
+      // Clamped finite number (the IIFE pattern): present → clamp(Number),
+      // non-finite → dflt; absent → stored ?? dflt.
+      const numClamp = (key, dflt, min = null, max = null) => {
+        const el = q(key);
+        if (!el) return stored[key] ?? dflt;
+        let v = Number(el.value);
+        if (!Number.isFinite(v)) return dflt;
+        if (min !== null) v = Math.max(min, v);
+        if (max !== null) v = Math.min(max, v);
+        return v;
+      };
 
-      // Debuff entries: same pattern.
-      const debuffEntries = [];
-      form.querySelectorAll('input[name="system.tagConfig.debuffEntries"]:checked').forEach(cb => {
-        const valInput = form.querySelector(`.attr-value[data-attr="${cb.value}"][data-target="debuff"]`);
-        debuffEntries.push({ attribute: cb.value, value: Number(valInput?.value) || 1 });
-      });
+      // Buff/debuff entries: the checkbox LISTS also render conditionally —
+      // only collect when the list exists in the DOM, else keep stored.
+      const collectEntries = (name, target) => {
+        if (!form.querySelector(`input[name="system.tagConfig.${name}"]`)) return stored[name] ?? [];
+        const out = [];
+        form.querySelectorAll(`input[name="system.tagConfig.${name}"]:checked`).forEach(cb => {
+          const valInput = form.querySelector(`.attr-value[data-attr="${cb.value}"][data-target="${target}"]`);
+          out.push({ attribute: cb.value, value: Number(valInput?.value) || 1 });
+        });
+        return out;
+      };
 
       const tagConfigData = {
-        restorationTarget:   form.querySelector('[name="system.tagConfig.restorationTarget"]')?.value ?? 'selected',
-        restorationResource: form.querySelector('[name="system.tagConfig.restorationResource"]')?.value ?? 'health',
-        restorationOverhealth: form.querySelector('[name="system.tagConfig.restorationOverhealth"]')?.checked ?? false,
-        buffEntries,
-        buffDuration:      Number(form.querySelector('[name="system.tagConfig.buffDuration"]')?.value) || 1,
-        buffStackable:     form.querySelector('[name="system.tagConfig.buffStackable"]')?.checked ?? false,
-        buffTarget:        form.querySelector('[name="system.tagConfig.buffTarget"]')?.value ?? 'selected',
-        movementSpeedBuff: Number(form.querySelector('[name="system.tagConfig.movementSpeedBuff"]')?.value ?? 1) || 1,
-        movementStaminaBuff: Number(form.querySelector('[name="system.tagConfig.movementStaminaBuff"]')?.value ?? 1) || 1,
-        auraRadius:        Number(form.querySelector('[name="system.tagConfig.auraRadius"]')?.value ?? 0) || 0,
-        auraEffectType:    form.querySelector('[name="system.tagConfig.auraEffectType"]')?.value ?? 'damage',
-        auraDamageType:    form.querySelector('[name="system.tagConfig.auraDamageType"]')?.value ?? 'physical',
-        auraTargeting:     form.querySelector('[name="system.tagConfig.auraTargeting"]')?.value ?? 'enemies',
-        auraScale:         Number(form.querySelector('[name="system.tagConfig.auraScale"]')?.value ?? 0.3) || 0.3,
-        auraHealResource:  form.querySelector('[name="system.tagConfig.auraHealResource"]')?.value ?? 'health',
-        auraHealOverhealth: form.querySelector('[name="system.tagConfig.auraHealOverhealth"]')?.checked ?? false,
-        teleportMaxDistance: (() => { const el = form.querySelector('[name="system.tagConfig.teleportMaxDistance"]'); if (!el) return 0; const v = Number(el.value); return Number.isFinite(v) ? Math.max(0, v) : 0; })(),
-        leapMaxDistance:     (() => { const el = form.querySelector('[name="system.tagConfig.leapMaxDistance"]');     if (!el) return 20; const v = Number(el.value); return Number.isFinite(v) ? Math.max(5, v) : 20; })(),
-        leapApexFt:          (() => { const el = form.querySelector('[name="system.tagConfig.leapApexFt"]');          if (!el) return 10; const v = Number(el.value); return Number.isFinite(v) ? Math.max(0, v) : 10; })(),
-        grantedActivationFraction: (() => { const el = form.querySelector('[name="system.tagConfig.grantedActivationFraction"]'); return el ? (Number(el.value) || (1/3)) : (1/3); })(),
-        grantedMinActivationFraction: (() => { const el = form.querySelector('[name="system.tagConfig.grantedMinActivationFraction"]'); return el ? (Number(el.value) || (1/9)) : (1/9); })(),
-        reactionTrigger:       form.querySelector('[name="system.tagConfig.reactionTrigger"]')?.value ?? '',
-        reactionTriggerRange:  (() => { const el = form.querySelector('[name="system.tagConfig.reactionTriggerRange"]'); if (!el) return 0; const v = Number(el.value); return Number.isFinite(v) ? Math.max(0, v) : 0; })(),
-        reactionThresholdPct:  (() => { const el = form.querySelector('[name="system.tagConfig.reactionThresholdPct"]'); if (!el) return 0; const v = Number(el.value); return Number.isFinite(v) ? Math.max(0, Math.min(1, v)) : 0; })(),
-        reactionCooldown:      (() => { const el = form.querySelector('[name="system.tagConfig.reactionCooldown"]'); if (!el) return 1; const v = Number(el.value); return Number.isFinite(v) ? Math.max(0, v) : 1; })(),
-        reactionPhase:         form.querySelector('[name="system.tagConfig.reactionPhase"]')?.value ?? '',
-        // Guardian fields render only when reactionType === 'guardian' —
-        // fall back to the stored value (not a static default) so editing
-        // other fields on a non-guardian skill never clobbers them.
-        guardianMode:          form.querySelector('[name="system.tagConfig.guardianMode"]')?.value
-                                 ?? this.item.system.tagConfig?.guardianMode ?? 'intercept',
-        guardianRedirectPct:   (() => { const el = form.querySelector('[name="system.tagConfig.guardianRedirectPct"]'); if (!el) return this.item.system.tagConfig?.guardianRedirectPct ?? 0.5; const v = Number(el.value); return Number.isFinite(v) ? Math.max(0, Math.min(1, v)) : 0.5; })(),
-        debuffEntries,
-        debuffType:        form.querySelector('[name="system.tagConfig.debuffType"]')?.value ?? 'none',
-        debuffDuration:    Number(form.querySelector('[name="system.tagConfig.debuffDuration"]')?.value) || 1,
-        debuffStackable:   form.querySelector('[name="system.tagConfig.debuffStackable"]')?.checked ?? false,
-        debuffScaleWithAttack: Number(form.querySelector('[name="system.tagConfig.debuffScaleWithAttack"]')?.value) || 0,
-        debuffDealsDamage: form.querySelector('[name="system.tagConfig.debuffDealsDamage"]')?.checked ?? false,
-        debuffDamageType:  form.querySelector('[name="system.tagConfig.debuffDamageType"]')?.value ?? 'physical',
-        debuffDirectional: form.querySelector('[name="system.tagConfig.debuffDirectional"]')?.checked ?? false,
-        dotScale:          (() => { const el = form.querySelector('[name="system.tagConfig.dotScale"]'); return el ? (Number(el.value) || 0) : 0.1; })(),
-        mineCapacity:      Number(form.querySelector('[name="system.tagConfig.mineCapacity"]')?.value) || 1,
+        restorationTarget:   str('restorationTarget', 'selected'),
+        restorationResource: str('restorationResource', 'health'),
+        restorationOverhealth: bool('restorationOverhealth', false),
+        buffEntries:       collectEntries('buffEntries', 'buff'),
+        buffDuration:      numOr('buffDuration', 1),
+        buffStackable:     bool('buffStackable', false),
+        buffTarget:        str('buffTarget', 'selected'),
+        movementSpeedBuff: numOr('movementSpeedBuff', 1),
+        movementStaminaBuff: numOr('movementStaminaBuff', 1),
+        auraRadius:        numOrZero('auraRadius', 0),
+        auraEffectType:    str('auraEffectType', 'damage'),
+        auraDamageType:    str('auraDamageType', 'physical'),
+        auraTargeting:     str('auraTargeting', 'enemies'),
+        auraScale:         numOr('auraScale', 0.3),
+        auraHealResource:  str('auraHealResource', 'health'),
+        auraHealOverhealth: bool('auraHealOverhealth', false),
+        teleportMaxDistance: numClamp('teleportMaxDistance', 0, 0),
+        leapMaxDistance:     numClamp('leapMaxDistance', 20, 5),
+        leapApexFt:          numClamp('leapApexFt', 10, 0),
+        grantedActivationFraction: numOr('grantedActivationFraction', 1 / 3),
+        grantedMinActivationFraction: numOr('grantedMinActivationFraction', 1 / 9),
+        reactionTrigger:       str('reactionTrigger', ''),
+        reactionTriggerRange:  numClamp('reactionTriggerRange', 0, 0),
+        reactionThresholdPct:  numClamp('reactionThresholdPct', 0, 0, 1),
+        reactionCooldown:      numClamp('reactionCooldown', 1, 0),
+        reactionPhase:         str('reactionPhase', ''),
+        guardianMode:          str('guardianMode', 'intercept'),
+        guardianRedirectPct:   numClamp('guardianRedirectPct', 0.5, 0, 1),
+        debuffEntries:     collectEntries('debuffEntries', 'debuff'),
+        debuffType:        str('debuffType', 'none'),
+        debuffDuration:    numOr('debuffDuration', 1),
+        debuffStackable:   bool('debuffStackable', false),
+        debuffScaleWithAttack: numOrZero('debuffScaleWithAttack', 0),
+        debuffDealsDamage: bool('debuffDealsDamage', false),
+        debuffDamageType:  str('debuffDamageType', 'physical'),
+        debuffDirectional: bool('debuffDirectional', false),
+        dotScale:          numOrZero('dotScale', 0.1),
+        mineCapacity:      numOr('mineCapacity', 1),
 
         // Forced movement.
-        forcedMovement:     form.querySelector('[name="system.tagConfig.forcedMovement"]')?.checked ?? false,
-        forcedMovementDir:  form.querySelector('[name="system.tagConfig.forcedMovementDir"]')?.value ?? 'push',
-        forcedMovementDist: Number(form.querySelector('[name="system.tagConfig.forcedMovementDist"]')?.value) || 5,
+        forcedMovement:     bool('forcedMovement', false),
+        forcedMovementDir:  str('forcedMovementDir', 'push'),
+        forcedMovementDist: numOr('forcedMovementDist', 5),
 
         // Barrier multiplier (mana-to-HP ratio).
-        barrierMultiplier: Number(form.querySelector('[name="system.tagConfig.barrierMultiplier"]')?.value) || 1,
+        barrierMultiplier: numOr('barrierMultiplier', 1),
 
-        // Repair: collect checked material types.
-        repairMaterials: [...form.querySelectorAll('input[name="system.tagConfig.repairMaterials"]:checked')]
-          .map(el => el.value),
+        // Repair: collect checked material types (list renders conditionally).
+        repairMaterials: form.querySelector('input[name="system.tagConfig.repairMaterials"]')
+          ? [...form.querySelectorAll('input[name="system.tagConfig.repairMaterials"]:checked')].map(el => el.value)
+          : (stored.repairMaterials ?? []),
 
         // Sustain.
-        sustainCost:     Number(form.querySelector('[name="system.tagConfig.sustainCost"]')?.value) || 0,
-        sustainResource: form.querySelector('[name="system.tagConfig.sustainResource"]')?.value ?? 'mana',
+        sustainCost:     numOrZero('sustainCost', 0),
+        sustainResource: str('sustainResource', 'mana'),
 
         // Shrapnel.
-        shrapnelMultiplier: Number(form.querySelector('[name="system.tagConfig.shrapnelMultiplier"]')?.value) || 1.5,
+        shrapnelMultiplier: numOr('shrapnelMultiplier', 1.5),
 
         // Craft.
-        craftOutputSlot:     form.querySelector('[name="system.tagConfig.craftOutputSlot"]')?.value ?? '',
-        craftOutputMaterial: form.querySelector('[name="system.tagConfig.craftOutputMaterial"]')?.value ?? '',
+        craftOutputSlot:     str('craftOutputSlot', ''),
+        craftOutputMaterial: str('craftOutputMaterial', ''),
 
         // Gather.
-        gatherMaterial: form.querySelector('[name="system.tagConfig.gatherMaterial"]')?.value ?? '',
-        gatherElement:  form.querySelector('[name="system.tagConfig.gatherElement"]')?.value ?? '',
+        gatherMaterial: str('gatherMaterial', ''),
+        gatherElement:  str('gatherElement', ''),
       };
+
+      // ── Generic catch-all for tagConfig inputs the list above doesn't
+      // enumerate (e.g. weaponBuffScale, or any future template-only field).
+      // Previously such inputs were silently DROPPED by this branch — the
+      // "template-only fields never persist" gotcha. Coercion mirrors the
+      // simple-field handler: checkbox → checked, number → Number, else raw.
+      for (const el of form.querySelectorAll('[name^="system.tagConfig."]')) {
+        const key = el.name.slice('system.tagConfig.'.length);
+        if (!key || key.includes('.') || key in tagConfigData) continue;
+        if (el.type === 'checkbox') tagConfigData[key] = el.checked;
+        else if (el.type === 'number') tagConfigData[key] = Number(el.value) || 0;
+        else tagConfigData[key] = el.value;
+      }
+
       await this.document.update({ 'system.tagConfig': tagConfigData });
       return;
     }
