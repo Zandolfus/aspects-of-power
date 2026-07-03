@@ -1631,13 +1631,35 @@ export class AspectsofPowerItem extends Item {
         }
       }
 
-      // (2) Skill-affinity portion: route the non-augment damage through
-      // the skill's affinities, split evenly across multiple (the last
-      // slice absorbs rounding to keep the sum exact).
+      // (1b) Weapon-buff portion (Flameblade): the flat affinity damage a
+      // weapon-buff effect adds to WEAPON strikes only (recorded on rollData
+      // by the strike path). Route its post-defense share through the buff's
+      // affinities. Gated on the skill actually being a weapon strike so a
+      // spell cast while buffed doesn't wrongly attribute buff damage it never
+      // received.
+      let weaponBuffAfter = 0;
+      const weaponBuffRaw = rollData?.roll?.weaponBuffDamage ?? 0;
+      const weaponBuffAff = rollData?.roll?.weaponBuffAffinities ?? [];
+      if (weaponBuffRaw > 0 && weaponBuffAff.length > 0 && ratio > 0) {
+        weaponBuffAfter = Math.round(weaponBuffRaw * ratio);
+        let assigned = 0;
+        for (let i = 0; i < weaponBuffAff.length; i++) {
+          const aff = weaponBuffAff[i];
+          const part = (i === weaponBuffAff.length - 1)
+            ? (weaponBuffAfter - assigned)
+            : Math.round(weaponBuffAfter / weaponBuffAff.length);
+          assigned += part;
+          if (part > 0) scaled[aff] = (scaled[aff] || 0) + part;
+        }
+      }
+
+      // (2) Skill-affinity portion: route the non-augment, non-weapon-buff
+      // damage through the skill's affinities, split evenly across multiple
+      // (the last slice absorbs rounding to keep the sum exact).
       const skillAffinities = this.system?.affinities ?? [];
       if (skillAffinities.length > 0 && ratio > 0) {
         const augmentPortion = Math.round(equipped * ratio);
-        const skillPortion = Math.max(0, afterDefense - augmentPortion);
+        const skillPortion = Math.max(0, afterDefense - augmentPortion - weaponBuffAfter);
         if (skillPortion > 0) {
           let assigned = 0;
           for (let i = 0; i < skillAffinities.length; i++) {
@@ -3638,6 +3660,17 @@ export class AspectsofPowerItem extends Item {
       systemOverrides.auraEffectType    = tc.auraEffectType ?? 'damage';
       systemOverrides.auraHealResource  = tc.auraHealResource ?? 'health';
       systemOverrides.auraHealOverhealth = tc.auraHealOverhealth ?? false;
+    }
+
+    // Weapon buff snapshot (Flameblade — design-spellstriker.md). Flat
+    // per-strike affinity damage = rollTotal × weaponBuffScale, frozen at
+    // apply time (based on the buff skill's own power, not the strike). Read
+    // by the wearer's weapon strike path via system.weaponStrikeBuff; typed by
+    // the skill's affinities so it routes through the target's per-affinity DR.
+    const weaponBuffScale = tc.weaponBuffScale ?? 0;
+    if (weaponBuffScale > 0) {
+      systemOverrides.weaponBuffDamage = Math.max(0, Math.round(rollTotal * weaponBuffScale));
+      systemOverrides.weaponBuffAffinities = [...(this.system.affinities ?? [])];
     }
 
     // If the only thing this skill does is set system overrides (no stat
@@ -7115,7 +7148,19 @@ export class AspectsofPowerItem extends Item {
           const infusionCoef = sc.spellstrike?.infusionCoef ?? 0.7;
           infusedInfusionDmg = Math.round(intMod * infusionCoef * Math.pow(Math.max(manaInvested, 1) / Math.max(infusedDmgRef, 1), 0.2));
         }
-        dmgFormula = String(strikeDmg + infusedInfusionDmg);
+        // Weapon buff (Flameblade — design-spellstriker.md): flat affinity
+        // damage added to WEAPON strikes while a weapon-buff effect is active
+        // (aggregated on the actor by prepareDerivedData). Recorded on rollData
+        // so the per-affinity damage breakdown routes this portion through the
+        // buff's affinity DR. Applies to melee AND ranged strikes (flaming
+        // arrows), NOT to spells/vehicle-spellstrikes.
+        const weaponBuff = this.actor.system?.weaponStrikeBuff ?? null;
+        const weaponBuffDmg = Math.max(0, Math.round(weaponBuff?.damage ?? 0));
+        if (weaponBuffDmg > 0) {
+          rollData.roll.weaponBuffDamage = weaponBuffDmg;
+          rollData.roll.weaponBuffAffinities = [...(weaponBuff.affinities ?? [])];
+        }
+        dmgFormula = String(strikeDmg + infusedInfusionDmg + weaponBuffDmg);
 
         const excess = Math.max(0, invested - (baseStamina + safeInvest));
         if (excess > 0 && safeInvest > 0) {

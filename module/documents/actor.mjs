@@ -533,6 +533,23 @@ export class AspectsofPowerActor extends Actor {
     systemData.movementSpeedMultiplier = _moveSpeed;
     systemData.movementStaminaMultiplier = _moveStamina;
 
+    // --- Weapon buff aggregation (Flameblade etc. — design-spellstriker.md) ---
+    // Active (non-disabled) effects carrying weaponBuffDamage add a flat,
+    // affinity-typed bonus to the actor's WEAPON strikes (applied in the item
+    // strike path — NOT to spells, unlike equippedDamageBonus). Summed across
+    // stacked buffs; affinities unioned so the bonus routes through each
+    // affinity's DR in the per-affinity damage breakdown.
+    let _weaponBuffDamage = 0;
+    const _weaponBuffAffinities = new Set();
+    for (const effect of this.effects) {
+      if (effect.disabled) continue;
+      const wb = Number(effect.system?.weaponBuffDamage ?? 0) || 0;
+      if (wb <= 0) continue;
+      _weaponBuffDamage += wb;
+      for (const a of (effect.system?.weaponBuffAffinities ?? [])) _weaponBuffAffinities.add(a);
+    }
+    systemData.weaponStrikeBuff = { damage: _weaponBuffDamage, affinities: [..._weaponBuffAffinities] };
+
     // --- Barrier: aggregate from ActiveEffects ---
     // Find the active barrier effect and populate system.barrier for the sheet.
     if (systemData.barrier) {

@@ -182,6 +182,18 @@ export class SkillData extends foundry.abstract.TypeDataModel {
         auraHealResource:  new fields.StringField({ initial: 'health' }), // 'health' | 'mana' | 'stamina'
         auraHealOverhealth: new fields.BooleanField({ initial: false }),
 
+        // Weapon buff (Flameblade etc. — design-spellstriker.md). When a buff
+        // with weaponBuffScale > 0 is applied, the casting skill's rollTotal ×
+        // weaponBuffScale is snapshotted (FLAT, based on the buff skill's own
+        // power) into the effect's system.weaponBuffDamage. While the effect is
+        // active, that flat bonus is added to the wearer's WEAPON strikes and
+        // typed with the skill's `affinities` (feeds the per-affinity DR path:
+        // affinity-DR-strip + elemental-weakness). Low proportion by design —
+        // the bonus rides EVERY strike for the duration, so a small scale
+        // compounds; cost + duration + buff slot are the gates. Affinity comes
+        // from the skill's `affinities` (like the aura block).
+        weaponBuffScale:   new fields.NumberField({ initial: 0, min: 0, max: 5 }),
+
         // Teleport (per design-movement-skills.md Phase C). Max distance
         // from caster's token center to destination. Default 0 = inherit
         // the caster's `system.castingRange` (40 + Per.mod/10) so teleport

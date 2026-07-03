@@ -124,6 +124,16 @@ export class AopEffectData extends foundry.data.ActiveEffectTypeDataModel {
       markedAttackMultiplier:  new fields.NumberField({ initial: 0, min: 0 }),
       markedExpiresOnHit:      new fields.BooleanField({ initial: false }),
 
+      // ── Weapon buff (Flameblade etc. — design-spellstriker.md) ──
+      // A buff effect with weaponBuffDamage > 0 adds that FLAT amount (typed
+      // by weaponBuffAffinities) to the wearer's weapon strikes while active.
+      // Snapshotted from the casting skill (rollTotal × weaponBuffScale) at
+      // apply time. Aggregated into the actor's system.weaponStrikeBuff by
+      // prepareDerivedData; the weapon strike path adds it and routes the
+      // portion through the target's per-affinity DR.
+      weaponBuffDamage:     new fields.NumberField({ initial: 0, min: 0 }),
+      weaponBuffAffinities: new fields.ArrayField(new fields.StringField(), { initial: [] }),
+
       // ── Special flags ──
       dismemberedSlot:          new fields.StringField({ initial: '' }),
       sleepActive:              new fields.BooleanField({ initial: false }),
