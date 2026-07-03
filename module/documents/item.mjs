@@ -451,12 +451,16 @@ export class AspectsofPowerItem extends Item {
    * @param {string} args.label        Skill name for dialog title.
    * @returns {Promise<number|null>}   Selected invest amount, or null on cancel.
    */
-  async _promptResourceInvest({ baseCost, safeInvest, maxPool, potency, multiplier, resourceLabel, potencyLabel, label, channelStat = null, channelFactor = null, hardCap = false }) {
+  async _promptResourceInvest({ baseCost, safeInvest, maxPool, potency, multiplier, resourceLabel, potencyLabel, label, channelStat = null, channelFactor = null, hardCap = false, damageRef = null }) {
     const safeCeiling = baseCost + safeInvest;
     const startInvest = baseCost;
-    // Damage curve: potency × multiplier × (invested/base)^0.2 — very flat,
+    // Damage curve: potency × multiplier × (invested/ref)^0.2 — very flat,
     // invest is a small lever. Self-damage: linear in excess/safeInvest.
-    const computeDmg = (v) => Math.round(potency * multiplier * Math.pow(Math.max(v, 1) / Math.max(baseCost, 1), 0.2));
+    // `damageRef` overrides the denominator so this preview matches the actual
+    // roll: spells normalize by a fixed grade-relative ref (item.mjs:6837), not
+    // their own baseMana; weapons pass none and keep baseCost.
+    const dmgRef = Math.max(1, damageRef ?? baseCost);
+    const computeDmg = (v) => Math.round(potency * multiplier * Math.pow(Math.max(v, 1) / dmgRef, 0.2));
     const computeSelfDmg = (v) => {
       const excess = Math.max(0, v - safeCeiling);
       if (excess <= 0 || safeInvest <= 0) return 0;
@@ -6766,6 +6770,7 @@ export class AspectsofPowerItem extends Item {
               channelStat: wisMod,
               channelFactor: sc.celerity?.CHANNEL_FACTOR ?? null,
               hardCap: true,                              // hide safe-ceiling/self-damage rows
+              damageRef: Math.max(1, Math.round((sc.spellTierFactors?.basic ?? 2) * gradeFactor)),
             });
         if (invested === null) {
           if (preplacedTemplateDoc) await this._gmDeleteRegion(canvas.scene, preplacedTemplateDoc.id);
