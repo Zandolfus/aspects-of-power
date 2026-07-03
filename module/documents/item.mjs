@@ -6834,7 +6834,18 @@ export class AspectsofPowerItem extends Item {
         hitFormula = `((((d20/100)*(${power}))+(${power})))`;
         dmgFormula = String(Math.round(power * multiplier));
       } else {
-        dmgFormula = String(Math.round(intMod * multiplier * Math.pow(Math.max(effectiveInvested, 1) / Math.max(baseMana, 1), 0.2)));
+        // Invest normalized by a GRADE-RELATIVE FIXED reference (the basic
+        // tier's baseMana at this grade), NOT the spell's own baseMana.
+        // Normalizing by the spell's own baseMana cancelled tier out of damage
+        // entirely — every tier dealt the same base (int×mult) and higher tiers
+        // actually did LESS at safe invest (bigger denominator). With a fixed
+        // reference, ABSOLUTE mana invested drives damage, so higher tiers
+        // (which inherently commit more mana) hit harder. Grade-relative so the
+        // ratio is grade-invariant (tier scaling identical at every grade; the
+        // grade power-jump comes purely from the int stat curve). Still ^0.2
+        // concave → dumping the pool is inefficient, no alpha strike.
+        const spellDmgRef = Math.max(1, Math.round((sc.spellTierFactors?.basic ?? 2) * gradeFactor));
+        dmgFormula = String(Math.round(intMod * multiplier * Math.pow(Math.max(effectiveInvested, 1) / spellDmgRef, 0.2)));
       }
 
       // Hand off to the AOE block below: store the pre-placed template +
