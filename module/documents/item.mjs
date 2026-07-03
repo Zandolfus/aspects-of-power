@@ -2855,12 +2855,19 @@ export class AspectsofPowerItem extends Item {
           // render them in the player-facing buff chat (they're not "×N"
           // multipliers and confuse the summary).
           const REACTION_CFG_KEYS = new Set(['reactionTrigger', 'reactionAttackType', 'reactionSkillId']);
+          // Weapon-buff overrides render as a clean player-facing line, not raw
+          // field names ("weaponBuffDamage ×79" → "+79 fire on strikes").
+          const WEAPONBUFF_KEYS = new Set(['weaponBuffDamage', 'weaponBuffAffinities']);
+          const HIDDEN_KEYS = new Set([...REACTION_CFG_KEYS, ...WEAPONBUFF_KEYS]);
           const visibleOverrides = Object.entries(sysOverrides)
-            .filter(([k]) => !REACTION_CFG_KEYS.has(k));
+            .filter(([k]) => !HIDDEN_KEYS.has(k));
           const sysSummary = visibleOverrides.map(([k, v]) => `${k} ×${v}`).join(', ');
           const reactionSummary = Object.keys(sysOverrides).some(k => REACTION_CFG_KEYS.has(k))
             ? `triggers ${sysOverrides.reactionTrigger}-reaction` : '';
-          const fullSummary = [statSummary, sysSummary, reactionSummary].filter(Boolean).join('; ') || 'effect';
+          const weaponBuffSummary = (sysOverrides.weaponBuffDamage ?? 0) > 0
+            ? `+${sysOverrides.weaponBuffDamage} ${(sysOverrides.weaponBuffAffinities ?? []).join('/') || 'weapon'} on strikes`
+            : '';
+          const fullSummary = [statSummary, sysSummary, weaponBuffSummary, reactionSummary].filter(Boolean).join('; ') || 'effect';
           ChatMessage.create({ speaker: payload.speaker, ...msgWhisper,
             content: `<p><strong>${target.name}</strong> buffed: ${fullSummary} for ${payload.duration} rounds.</p>`,
           });
