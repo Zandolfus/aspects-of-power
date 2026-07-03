@@ -17,6 +17,7 @@
  */
 
 import { AspectsofPowerItem } from '../documents/item.mjs';
+import { weaponStatBlend } from '../helpers/formulas.mjs';
 
 const HYBRID_60_40_WIS_DEX = (a) => 0.6 * (a.wisdom?.mod ?? 0) + 0.4 * (a.dexterity?.mod ?? 0);
 const _MAGIC_TYPES_FOR_SPEED = new Set(['magic', 'magic_melee', 'magic_projectile']);
@@ -51,10 +52,11 @@ function _actorSpeedFor(actor, skill) {
       const weapon = skill?._resolveWeaponForSkill?.();
       const weight = weapon ? AspectsofPowerItem.resolveWeaponWeight(weapon) : 0;
       if (weight <= 0) return a.dexterity?.mod ?? 0;
-      const cfg = CONFIG.ASPECTSOFPOWER.rangedBlend;
-      const norm = Math.max(0, Math.min(1, (weight - cfg.weightOffset) / cfg.weightSpan));
-      const perW = cfg.perFloor + cfg.slope * norm;
-      return Math.round((a.dexterity?.mod ?? 0) * (1 - perW) + (a.perception?.mod ?? 0) * perW);
+      // Speed mirrors the damage stat blend — SAME implementation
+      // (helpers/formulas.mjs) so speed can never drift from damage.
+      return weaponStatBlend(weight, {
+        dex: a.dexterity?.mod ?? 0, per: a.perception?.mod ?? 0,
+      }, true).blend;
     }
     case 'wisdom_dexterity': return Math.round(HYBRID_60_40_WIS_DEX(a));
     default:                 return a[ability]?.mod ?? a.dexterity?.mod ?? 1;

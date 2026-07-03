@@ -1,5 +1,6 @@
 import { EquipmentSystem } from '../systems/equipment.mjs';
 import { getPositionalTags } from '../helpers/positioning.mjs';
+import { houseHitFormula, hybridAbilityMod, weaponStatBlend, spellDamageRef, spellInvestDamage, strikeInvestDamage, infusionDamage, investSelfDamage as computeInvestSelfDamage, effectiveDodgeValue, splitEvenlyWithRemainder } from '../helpers/formulas.mjs';
 import { recordActionFired, declareAction, isInActiveCombat, computeActionWait, referenceRoundLength, computeWindupMultiplier, getScrambleStacks, addScrambleStack, applyDodgeCost, findCombatantForActor } from '../systems/celerity.mjs';
 import { getThreatRadiusFt, actorIsDashing } from '../systems/engagement-halts.mjs';
 import { selectTargetOnCanvas, skillNeedsTargetPrompt, skillTargetsAtFire, selectMarkerOnCanvas } from '../canvas/target-prompt.mjs';
@@ -110,14 +111,7 @@ export class AspectsofPowerItem extends Item {
     // Helper: compute average skill roll for any skill (used by craft, prep, and refine previews).
     const avgSkillRollFor = (skill) => {
       const r = skill.system?.roll ?? {};
-      const primaryMod = A[r.abilities]?.mod ?? 0;
-      let abMod = primaryMod;
-      if (r.statType === 'hybrid') {
-        const secMod = A[r.secondaryAbility]?.mod ?? 0;
-        const pw = r.primaryWeight ?? 1.0;
-        const sw = r.secondaryWeight ?? 0;
-        abMod = Math.round(primaryMod * pw + secMod * sw);
-      }
+      const abMod = hybridAbilityMod(A, r);
       const dm = String(r.dice || '0').match(/(\d*)d(\d+)/);
       const diceCount = dm ? (parseInt(dm[1]) || 1) : 0;
       const diceSize  = dm ? parseInt(dm[2]) : 0;
@@ -457,15 +451,11 @@ export class AspectsofPowerItem extends Item {
     // Damage curve: potency × multiplier × (invested/ref)^0.2 — very flat,
     // invest is a small lever. Self-damage: linear in excess/safeInvest.
     // `damageRef` overrides the denominator so this preview matches the actual
-    // roll: spells normalize by a fixed grade-relative ref (item.mjs:6837), not
+    // roll: spells normalize by a fixed grade-relative ref (spellDamageRef — the 65f8a42 tier fix), not
     // their own baseMana; weapons pass none and keep baseCost.
     const dmgRef = Math.max(1, damageRef ?? baseCost);
-    const computeDmg = (v) => Math.round(potency * multiplier * Math.pow(Math.max(v, 1) / dmgRef, 0.2));
-    const computeSelfDmg = (v) => {
-      const excess = Math.max(0, v - safeCeiling);
-      if (excess <= 0 || safeInvest <= 0) return 0;
-      return Math.round(potency * (excess / safeInvest));
-    };
+    const computeDmg = (v) => spellInvestDamage(potency, multiplier, v, dmgRef);
+    const computeSelfDmg = (v) => computeInvestSelfDamage(potency, v, baseCost, safeInvest);
     // Channel time for spell invest — Wis_mod controls rate per design memo.
     const computeChannelTime = (channelStat && channelFactor)
       ? (v) => Math.round(v * channelFactor / Math.max(1, channelStat))
@@ -576,18 +566,14 @@ export class AspectsofPowerItem extends Item {
     const startStam = stamina.baseCost;
     const startMana = mana.baseCost;
 
-    const computeStrike = (sv) => Math.round(stamina.potency * multiplier * Math.pow(Math.max(sv, 1) / Math.max(stamina.baseCost, 1), 0.2));
+    const computeStrike = (sv) => strikeInvestDamage(stamina.potency, multiplier, 1, sv, Math.max(stamina.baseCost, 1));
     // Infusion preview must mirror the real formula: Int × coef × (mana/dmgRef)^0.2
     // (fusion penalty coef + grade-relative fixed ref). Fall back to legacy
     // (coef 1, baseCost denom) if the caller didn't supply the new fields.
     const infCoef = mana.coef ?? 1;
     const infRef = mana.dmgRef ?? mana.baseCost;
-    const computeInfusion = (mv) => Math.round(mana.potency * infCoef * Math.pow(Math.max(mv, 1) / Math.max(infRef, 1), 0.2));
-    const computeSelfDmg = (sv) => {
-      const excess = Math.max(0, sv - safeCeiling);
-      if (excess <= 0 || stamina.safeInvest <= 0) return 0;
-      return Math.round(stamina.potency * (excess / stamina.safeInvest));
-    };
+    const computeInfusion = (mv) => infusionDamage(mana.potency, infCoef, mv, infRef);
+    const computeSelfDmg = (sv) => computeInvestSelfDamage(stamina.potency, sv, stamina.baseCost, stamina.safeInvest);
     // Channel time on the mana side — Wis controls rate, mirrors the spell
     // path so heavy infusion adds the same celerity wait penalty as channeling
     // a spell of equivalent mana cost.
@@ -705,16 +691,9 @@ export class AspectsofPowerItem extends Item {
 
   _buildRollFormulas(rollData) {
     const A   = this.actor.system.abilities;
-    // Pure (default): use primary ability mod at full weight.
-    // Hybrid: blend primary + secondary at configured weights (e.g., 0.7 + 0.3).
-    const primaryMod = A[rollData.roll.abilities]?.mod ?? 0;
-    let ab = primaryMod;
-    if (rollData.roll.statType === 'hybrid') {
-      const secondaryMod = A[rollData.roll.secondaryAbility]?.mod ?? 0;
-      const pw = rollData.roll.primaryWeight ?? 1.0;
-      const sw = rollData.roll.secondaryWeight ?? 0;
-      ab = Math.round(primaryMod * pw + secondaryMod * sw);
-    }
+    // Pure (default): primary ability mod at full weight; hybrid blends
+    // primary + secondary at configured weights — helpers/formulas.mjs.
+    const ab = hybridAbilityMod(A, rollData.roll);
     // diceBonus null/undefined produces a `* null` term in the dmg formula
     // → Foundry parses as StringTerm("null") → "Unresolved StringTerm null"
     // crash on roll evaluation. Default to 1 (the schema initial), matching
@@ -730,37 +709,37 @@ export class AspectsofPowerItem extends Item {
 
     if (typ === 'dex_weapon') {
       const m = `${A.dexterity.mod}*(9/10)+${A.strength.mod}*(3/10)`;
-      hitFormula = `((((d20/100)*(${m}))+(${m})))`;
+      hitFormula = houseHitFormula(m);
       dmgFormula = `(((${dic}/50*(${A.strength.mod}*(9/10)+${A.dexterity.mod}*(3/10)))+${A.strength.mod}+${A.dexterity.mod}*(3/10))*${db})`;
 
     } else if (typ === 'str_weapon') {
       const m = `${A.strength.mod}*(9/10)+${A.dexterity.mod}*(3/10)`;
-      hitFormula = `((((d20/100)*(${m}))+(${m})))`;
+      hitFormula = houseHitFormula(m);
       dmgFormula = `((${dic}/50*(${A.strength.mod})+${A.strength.mod}+${A.strength.mod}*(3/10))*${db})`;
 
     } else if (typ === 'phys_ranged') {
       const m = `${A.perception.mod}*(9/10)+${A.dexterity.mod}*(3/10)`;
-      hitFormula = `((((d20/100)*(${m}))+(${m})))`;
+      hitFormula = houseHitFormula(m);
       dmgFormula = `(((${dic}/50*(${A.perception.mod}*(9/10)+${A.dexterity.mod}*(3/10)))+${A.perception.mod}*(9/10)+${A.dexterity.mod}*(3/10))*${db})`;
 
     } else if (typ === 'magic_projectile') {
       const m = `${A.intelligence.mod}*(9/10)+${A.perception.mod}*(3/10)`;
-      hitFormula = `((((d20/100)*(${m}))+(${m})))`;
+      hitFormula = houseHitFormula(m);
       dmgFormula = `(((${dic}/100*${ab})+${ab})*${db})`;
 
     } else if (typ === 'magic_melee') {
       const m = `${A.intelligence.mod}*(9/10)+${A.strength.mod}*(3/10)`;
-      hitFormula = `((((d20/100)*(${m}))+(${m})))`;
+      hitFormula = houseHitFormula(m);
       dmgFormula = `(((${dic}/50*(${m}))+(${m}))*${db})`;
 
     } else if (typ === 'magic') {
       const m = `${A.intelligence.mod}`;
-      hitFormula = `((((d20/100)*(${m}))+(${m})))`;
+      hitFormula = houseHitFormula(m);
       dmgFormula = `(((${dic}/100*${ab})+${ab})*${db})`;
 
     } else if (typ === 'wisdom_dexterity') {
       const m = `${A.wisdom.mod}*(9/10)+${A.dexterity.mod}*(3/10)`;
-      hitFormula = `((((d20/100)*(${m}))+(${m})))`;
+      hitFormula = houseHitFormula(m);
       dmgFormula = `(((${dic}/50*(${m}))+(${m}))*${db})`;
 
     } else {
@@ -799,28 +778,17 @@ export class AspectsofPowerItem extends Item {
     if (!this.actor) return null;
     const weapon = this._resolveWeaponForSkill();
     if (!weapon) return null;
-    const sc = CONFIG.ASPECTSOFPOWER;
     const weight = AspectsofPowerItem.resolveWeaponWeight(weapon);
     const A = this.actor.system.abilities;
-    const strMod = A.strength?.mod ?? 0;
-    const dexMod = A.dexterity?.mod ?? 0;
-    const perMod = A.perception?.mod ?? 0;
+    // NOTE: ranged here classifies by weapon TAG while the damage path
+    // classifies by roll.type === 'phys_ranged' — a known inconsistency
+    // (audit 2026-07-03 bug 2.10), preserved as-is pending a ruling.
     const RANGED = new Set(['pistol', 'shortbow', 'bow', 'crossbow', 'shotgun', 'longbow', 'rifle']);
     const isRanged = (weapon.system?.tags ?? []).some(t => RANGED.has(t));
-    let blend;
-    if (isRanged) {
-      const b = sc.rangedBlend;
-      const norm = Math.max(0, Math.min(1, (weight - b.weightOffset) / b.weightSpan));
-      const perWeight = b.perFloor + b.slope * norm;
-      blend = Math.round(dexMod * (1 - perWeight) + perMod * perWeight);
-    } else {
-      const b = sc.meleeBlend;
-      const norm = Math.max(0, Math.min(1, (weight - b.weightOffset) / b.weightSpan));
-      const strWeight = b.strFloor + b.slope * norm;
-      blend = Math.round(strMod * strWeight + dexMod * (1 - strWeight));
-    }
-    const m = String(Math.max(0, blend));
-    return `((((d20/100)*(${m}))+(${m})))`;
+    const { blend } = weaponStatBlend(weight, {
+      str: A.strength?.mod ?? 0, dex: A.dexterity?.mod ?? 0, per: A.perception?.mod ?? 0,
+    }, isRanged);
+    return houseHitFormula(String(Math.max(0, blend)));
   }
 
   /* ------------------------------------------------------------------ */
@@ -1139,8 +1107,7 @@ export class AspectsofPowerItem extends Item {
       if (defenseResult.defend) {
         const dt = CONFIG.ASPECTSOFPOWER.defenseTuning ?? {};
         const stacks = getScrambleStacks(targetActor);
-        const defVal = (targetActor.system.defense[defKey]?.value ?? 0) / (dt.dodgeBasisDiv ?? 1);
-        const dv = defVal * Math.max(0, 1 - (dt.scrambleStackPct ?? 0.15) * stacks);
+        const dv = effectiveDodgeValue(targetActor, defKey, stacks, dt);
         const die = await new Roll('1d20').evaluate();
         let droll = dv * (1 + die.total / 100);
         // Shrapnel is hard to dodge — penalize the roll (replaces the old
@@ -1642,13 +1609,7 @@ export class AspectsofPowerItem extends Item {
       const weaponBuffAff = rollData?.roll?.weaponBuffAffinities ?? [];
       if (weaponBuffRaw > 0 && weaponBuffAff.length > 0 && ratio > 0) {
         weaponBuffAfter = Math.round(weaponBuffRaw * ratio);
-        let assigned = 0;
-        for (let i = 0; i < weaponBuffAff.length; i++) {
-          const aff = weaponBuffAff[i];
-          const part = (i === weaponBuffAff.length - 1)
-            ? (weaponBuffAfter - assigned)
-            : Math.round(weaponBuffAfter / weaponBuffAff.length);
-          assigned += part;
+        for (const [aff, part] of Object.entries(splitEvenlyWithRemainder(weaponBuffAfter, weaponBuffAff))) {
           if (part > 0) scaled[aff] = (scaled[aff] || 0) + part;
         }
       }
@@ -1661,13 +1622,7 @@ export class AspectsofPowerItem extends Item {
         const augmentPortion = Math.round(equipped * ratio);
         const skillPortion = Math.max(0, afterDefense - augmentPortion - weaponBuffAfter);
         if (skillPortion > 0) {
-          let assigned = 0;
-          for (let i = 0; i < skillAffinities.length; i++) {
-            const aff = skillAffinities[i];
-            const part = (i === skillAffinities.length - 1)
-              ? (skillPortion - assigned)
-              : Math.round(skillPortion / skillAffinities.length);
-            assigned += part;
+          for (const [aff, part] of Object.entries(splitEvenlyWithRemainder(skillPortion, skillAffinities))) {
             scaled[aff] = (scaled[aff] || 0) + part;
           }
         }
@@ -2157,8 +2112,7 @@ export class AspectsofPowerItem extends Item {
       // Perception gate: you can't dodge what you can't see.
       const blinded = targetActor.effects.some(e => !e.disabled && e.system?.debuffType === 'blind');
       const stacks = getScrambleStacks(targetActor);
-      const defVal = (targetActor.system.defense[defKey]?.value ?? 0) / (dt.dodgeBasisDiv ?? 1);
-      const dv = Math.round(defVal * Math.max(0, 1 - (dt.scrambleStackPct ?? 0.15) * stacks));
+      const dv = Math.round(effectiveDodgeValue(targetActor, defKey, stacks, dt));
       hasDefend = !blinded && dv > 0;
       defendLabel = 'Dodge';
       const scrambleNote = stacks >= 1
@@ -2193,8 +2147,7 @@ export class AspectsofPowerItem extends Item {
       let note = 'takes the hit';
       if (isPhysicalLane && hasDefend) {
         const aiStacks = getScrambleStacks(targetActor);
-        const aiDv = (targetActor.system.defense[defKey]?.value ?? 0) / (dt.dodgeBasisDiv ?? 1)
-                   * Math.max(0, 1 - (dt.scrambleStackPct ?? 0.15) * aiStacks);
+        const aiDv = effectiveDodgeValue(targetActor, defKey, aiStacks, dt);
         const p = _dodgeWinProb(aiDv, hitTotal);
         defend = p >= (dt.aiDodgeWinProbMin ?? 0.35);
         note = defend ? `dodges (p≈${Math.round(p * 100)}%)` : `takes the hit (dodge p≈${Math.round(p * 100)}%)`;
@@ -6903,7 +6856,7 @@ export class AspectsofPowerItem extends Item {
               channelStat: wisMod,
               channelFactor: sc.celerity?.CHANNEL_FACTOR ?? null,
               hardCap: true,                              // hide safe-ceiling/self-damage rows
-              damageRef: Math.max(1, Math.round((sc.spellTierFactors?.basic ?? 2) * gradeFactor)),
+              damageRef: spellDamageRef(gradeFactor),
             });
         if (invested === null) {
           if (preplacedTemplateDoc) await this._gmDeleteRegion(canvas.scene, preplacedTemplateDoc.id);
@@ -6969,7 +6922,7 @@ export class AspectsofPowerItem extends Item {
         // stored power has grade baked in. Rarity `multiplier` stays: same
         // grammar as spells (basis × rarity mult), basis is power not stats.
         const power = Math.max(1, invested);
-        hitFormula = `((((d20/100)*(${power}))+(${power})))`;
+        hitFormula = houseHitFormula(power);
         dmgFormula = String(Math.round(power * multiplier));
       } else {
         // Invest normalized by a GRADE-RELATIVE FIXED reference (the basic
@@ -6982,8 +6935,8 @@ export class AspectsofPowerItem extends Item {
         // ratio is grade-invariant (tier scaling identical at every grade; the
         // grade power-jump comes purely from the int stat curve). Still ^0.2
         // concave → dumping the pool is inefficient, no alpha strike.
-        const spellDmgRef = Math.max(1, Math.round((sc.spellTierFactors?.basic ?? 2) * gradeFactor));
-        dmgFormula = String(Math.round(intMod * multiplier * Math.pow(Math.max(effectiveInvested, 1) / spellDmgRef, 0.2)));
+        const spellDmgRef = spellDamageRef(gradeFactor);
+        dmgFormula = String(spellInvestDamage(intMod, multiplier, effectiveInvested, spellDmgRef));
       }
 
       // Hand off to the AOE block below: store the pre-placed template +
@@ -7017,28 +6970,14 @@ export class AspectsofPowerItem extends Item {
       if (weaponWeight > 0) {
         const isRanged = rollData.roll.type === 'phys_ranged';
         const A = this.actor.system.abilities;
-        const strMod = A.strength?.mod  ?? 0;
-        const dexMod = A.dexterity?.mod ?? 0;
-        const perMod = A.perception?.mod ?? 0;
         const toughMod = A.toughness?.mod ?? 0;
 
-        // Compute hybrid stat_blend per design Option B (melee) / Option α (ranged).
-        let statBlend, potencyLabel;
-        if (isRanged) {
-          const b = sc.rangedBlend;
-          const norm = Math.max(0, Math.min(1, (weaponWeight - b.weightOffset) / b.weightSpan));
-          const perWeight = b.perFloor + b.slope * norm;
-          const dexWeight = 1 - perWeight;
-          statBlend = Math.round(dexMod * dexWeight + perMod * perWeight);
-          potencyLabel = 'Dex/Per';
-        } else {
-          const b = sc.meleeBlend;
-          const norm = Math.max(0, Math.min(1, (weaponWeight - b.weightOffset) / b.weightSpan));
-          const strWeight = b.strFloor + b.slope * norm;
-          const dexWeight = 1 - strWeight;
-          statBlend = Math.round(strMod * strWeight + dexMod * dexWeight);
-          potencyLabel = 'Str/Dex';
-        }
+        // Hybrid stat_blend per design Option B (melee) / Option α (ranged) —
+        // ONE implementation in helpers/formulas.mjs, shared with the
+        // spellstrike hit override and celerity speed.
+        const { blend: statBlend, label: potencyLabel } = weaponStatBlend(weaponWeight, {
+          str: A.strength?.mod ?? 0, dex: A.dexterity?.mod ?? 0, per: A.perception?.mod ?? 0,
+        }, isRanged);
 
         // base_stamina uses stat_blend for both melee and ranged — per the
         // 2026-05-03 rebalance, "high-output bodies cost more fuel" applies
@@ -7103,7 +7042,7 @@ export class AspectsofPowerItem extends Item {
             // the spell path (65f8a42). Normalizing infusion by the skill's OWN
             // tier baseMana inverted tier (higher tiers did LESS at equal mana);
             // the fixed ref makes absolute mana drive damage so tier scales up.
-            infusedDmgRef = Math.max(1, Math.round((sc.spellTierFactors?.basic ?? 2) * gradeFactor));
+            infusedDmgRef = spellDamageRef(gradeFactor);
             // Wis-cap the infusion invest exactly like a real spell of this tier,
             // so a spellstrike can't pump more mana into its spell portion than a
             // dedicated caster could into the same-tier spell (design-spellstriker
@@ -7173,12 +7112,12 @@ export class AspectsofPowerItem extends Item {
         // 0.6×) — raw DPS-neutral with wait ∝ weight; the defense layer
         // (one big dodge vs many scrambling dodges) provides the archetype RPS.
         const windup = computeWindupMultiplier(this, weapon);
-        const strikeDmg = Math.round(statBlend * multiplier * windup * Math.pow(Math.max(invested, 1) / Math.max(baseStamina, 1), 0.2));
+        const strikeDmg = strikeInvestDamage(statBlend, multiplier, windup, invested, baseStamina);
         if (useInfused && manaInvested > 0) {
           infusedManaCost = manaInvested;
           // Fusion penalty coef + grade-relative fixed ref (see isInfused block).
           const infusionCoef = sc.spellstrike?.infusionCoef ?? 0.7;
-          infusedInfusionDmg = Math.round(intMod * infusionCoef * Math.pow(Math.max(manaInvested, 1) / Math.max(infusedDmgRef, 1), 0.2));
+          infusedInfusionDmg = infusionDamage(intMod, infusionCoef, manaInvested, infusedDmgRef);
         }
         // Weapon buff (Flameblade — design-spellstriker.md): flat affinity
         // damage added to WEAPON strikes while a weapon-buff effect is active
@@ -7194,11 +7133,12 @@ export class AspectsofPowerItem extends Item {
         }
         dmgFormula = String(strikeDmg + infusedInfusionDmg + weaponBuffDmg);
 
-        const excess = Math.max(0, invested - (baseStamina + safeInvest));
-        if (excess > 0 && safeInvest > 0) {
-          // Linear self-damage per design-skill-rarity-system.md: scales 1:1
-          // with how far past safe ceiling you push.
-          investSelfDamage = Math.round(statBlend * (excess / safeInvest));
+        // Linear self-damage per design-skill-rarity-system.md: scales 1:1
+        // with how far past the safe ceiling you push (shared helper — same
+        // math the invest dialogs preview).
+        const _wSelf = computeInvestSelfDamage(statBlend, invested, baseStamina, safeInvest);
+        if (_wSelf > 0) {
+          investSelfDamage = _wSelf;
           investSelfDamageFlavor = 'over-exerting';
         }
       }
