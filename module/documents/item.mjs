@@ -777,6 +777,47 @@ export class AspectsofPowerItem extends Item {
     return { hitFormula, dmgFormula };
   }
 
+  /**
+   * Spellstrike accuracy (ruled 2026-07-03): a `spellstrike` skill hits with
+   * the WIELDED WEAPON, not its casting stat — the spell discharges on the
+   * weapon's hit. Returns a hit formula built from the weapon's weight-based
+   * stat blend (light weapons → Dex-leaning, heavy → Str-leaning; ranged
+   * weapons → Dex/Per), reusing the same `meleeBlend`/`rangedBlend` config the
+   * weapon DAMAGE path uses so accuracy tracks "the weapon he uses" with no
+   * per-skill authoring. Returns null when no weapon is wielded (caller keeps
+   * the casting-stat fallback + warns). Bare-fist-as-weapon is the future
+   * proper answer to the no-weapon case.
+   *
+   * @returns {string|null} hit formula, or null if no weapon wielded.
+   */
+  _resolveSpellstrikeHitFormula() {
+    if (!this.actor) return null;
+    const weapon = this._resolveWeaponForSkill();
+    if (!weapon) return null;
+    const sc = CONFIG.ASPECTSOFPOWER;
+    const weight = AspectsofPowerItem.resolveWeaponWeight(weapon);
+    const A = this.actor.system.abilities;
+    const strMod = A.strength?.mod ?? 0;
+    const dexMod = A.dexterity?.mod ?? 0;
+    const perMod = A.perception?.mod ?? 0;
+    const RANGED = new Set(['pistol', 'shortbow', 'bow', 'crossbow', 'shotgun', 'longbow', 'rifle']);
+    const isRanged = (weapon.system?.tags ?? []).some(t => RANGED.has(t));
+    let blend;
+    if (isRanged) {
+      const b = sc.rangedBlend;
+      const norm = Math.max(0, Math.min(1, (weight - b.weightOffset) / b.weightSpan));
+      const perWeight = b.perFloor + b.slope * norm;
+      blend = Math.round(dexMod * (1 - perWeight) + perMod * perWeight);
+    } else {
+      const b = sc.meleeBlend;
+      const norm = Math.max(0, Math.min(1, (weight - b.weightOffset) / b.weightSpan));
+      const strWeight = b.strFloor + b.slope * norm;
+      blend = Math.round(strMod * strWeight + dexMod * (1 - strWeight));
+    }
+    const m = String(Math.max(0, blend));
+    return `((((d20/100)*(${m}))+(${m})))`;
+  }
+
   /* ------------------------------------------------------------------ */
   /*  Tag handlers                                                       */
   /* ------------------------------------------------------------------ */
@@ -6535,6 +6576,28 @@ export class AspectsofPowerItem extends Item {
     // Done BEFORE the celerity defer gate so the variable-invest dialog (which
     // needs formula context) can capture the invest amount at declaration time.
     let { hitFormula, dmgFormula } = this._buildRollFormulas(rollData);
+
+    // ── Spellstrike accuracy override (ruled 2026-07-03) ──────────────────
+    // A `spellstrike` skill's accuracy comes from the WIELDED WEAPON, not its
+    // casting stat — the spell discharges on the weapon's hit. Two authoring
+    // patterns ride this one rule: TYPE-1 vehicle (magic-type + spellstrike +
+    // tier → spell-only damage via the invest path below) has its int hit
+    // flipped to the weapon here; TYPE-2 fusion (str/dex_weapon + `infused` +
+    // spellstrike → weapon strike + int mana-rider) is already weapon-based so
+    // this is a consistent no-op. No weapon wielded → keep the casting-stat
+    // fallback + warn (bare-fist-as-weapon is the future proper answer).
+    if (tags.includes('spellstrike')) {
+      const ssHit = this._resolveSpellstrikeHitFormula();
+      if (ssHit) {
+        hitFormula = ssHit;
+      } else {
+        ChatMessage.create({
+          speaker, rollMode, ...(whisperGM ? { whisper: whisperGM } : {}),
+          flavor: label,
+          content: `<p><em>⚠️ Spellstrike with no weapon wielded — hitting with your casting stat. Equip a weapon to strike with it.</em></p>`,
+        });
+      }
+    }
 
     // ── Variable resource invest (per design-magic/melee/ranged-system.md) ─
     // Two gated paths share the same dialog:
