@@ -23,6 +23,7 @@
  */
 
 import { declareAction, declareMovement, findCombatantForActor, getClockTick } from './celerity.mjs';
+import { isActingGM } from '../helpers/gm.mjs';
 
 // Per-combatant re-entrancy guard: an AI acts at most ONCE per celerity clock
 // tick. The legitimate loop (declare → clock advances → fire → decide) always
@@ -774,7 +775,7 @@ export async function aiCommandMove(actor, destCenter) {
  */
 export function registerAIHooks() {
   Hooks.on('updateCombatant', async (combatantDoc, changes, _options, _userId) => {
-    if (!game.user.isGM) return;
+    if (!isActingGM()) return;
 
     // CANCEL-to-redeclare also nulls declaredAction but is NOT an action
     // firing — ignoring it is what stops the infinite re-trigger loop
@@ -815,7 +816,7 @@ export function registerAIHooks() {
   // freshly-added AI combatant (or a whole combat at start) sat idle until
   // the GM manually advanced — this kicks each one once. Covers towers too.
   const _kick = (combatantDoc) => {
-    if (!game.user.isGM) return;
+    if (!isActingGM()) return;
     if (combatantDoc.flags?.aspectsofpower?.declaredAction) return;
     const actor = combatantDoc.actor;
     const profileName = actor?.flags?.aspectsofpower?.aiProfile;
@@ -860,7 +861,7 @@ export function registerAIHooks() {
   // another chance. Skips combatants that already have a declared action
   // (the firing combatant still holds its action when round-start runs).
   Hooks.on('aopRoundStart', (combat, combatantDoc) => {
-    if (!game.user.isGM) return;
+    if (!isActingGM()) return;
     if (combatantDoc.flags?.aspectsofpower?.declaredAction) return; // not inert
     const actor = combatantDoc.actor;
     const profileName = actor?.flags?.aspectsofpower?.aiProfile;

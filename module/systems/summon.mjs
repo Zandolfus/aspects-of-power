@@ -14,6 +14,8 @@
  *     cleanupActorOnDelete:  true → deleteToken hook will purge linked actor
  *   }
  */
+import { isActingGM } from '../helpers/gm.mjs';
+
 export class SummonHelpers {
   /**
    * Clone source actor → temporary world actor with overrides → drop a token
@@ -507,7 +509,7 @@ function _registerGMSpawnListener() {
   // Sync wrapper, async work runs fire-and-forget so socket.on doesn't see
   // a Promise return value (avoids "Promised response went out of scope").
   game.socket.on(SOCKET_CHANNEL, (msg) => {
-    if (!game.user.isGM) return;
+    if (!isActingGM()) return;
     if (msg?.type !== 'summonSpawnRequest') return;
     const { method, payload, requestId, requesterId } = msg;
 
@@ -586,7 +588,7 @@ export function registerSummonHooks() {
   _registerGMSpawnListener();
 
   Hooks.on('deleteToken', async (tokenDoc, _options, _userId) => {
-    if (!game.user.isGM) return;
+    if (!isActingGM()) return;
     const summonFlag = tokenDoc.flags?.['aspects-of-power']?.summon;
     if (!summonFlag?.cleanupActorOnDelete) return;
     const actor = game.actors.get(tokenDoc.actorId);

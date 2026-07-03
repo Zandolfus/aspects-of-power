@@ -27,6 +27,7 @@ import { AopEffectData } from './data/effect-base.mjs';
 // Import helper/utility classes and constants.
 import { preloadHandlebarsTemplates } from './helpers/templates.mjs';
 import { ASPECTSOFPOWER } from './helpers/config.mjs';
+import { isActingGM } from './helpers/gm.mjs';
 import { deriveItemStats } from './systems/item-derivation.mjs';
 import { getPositionalTags } from './helpers/positioning.mjs';
 // Import systems.
@@ -415,7 +416,7 @@ Hooks.once('init', function () {
   // cachedTags on the actor track is the structured `[{id, value}]` form
   // (kept for backward compat); we wrap the new flat string array for the cache.
   Hooks.on('updateItem', (item, changes, _options, _userId) => {
-    if (!game.user.isGM) return;
+    if (!isActingGM()) return;
     if (!changes.system?.tags) return;
     if (!['race', 'class', 'profession'].includes(item.type)) return;
 
@@ -904,9 +905,12 @@ Hooks.once('ready', async function () {
     const candidates = [canvas?.scene, combatant.combat?.scene].filter(Boolean);
     for (const scene of candidates) {
       if (!scene.regions?.get(priorRegionId)) continue;
-      if (game.user.isGM) {
+      if (isActingGM()) {
         scene.deleteEmbeddedDocuments('Region', [priorRegionId]).catch(e => console.warn('[orphan-aoe-cleanup]', e));
-      } else {
+      } else if (!game.user.isGM) {
+        // Players route through the GM. Non-acting GM clients do NOTHING —
+        // the acting GM's own copy of this hook handles it (multi-GM safe:
+        // both GMs deleting raced, the loser logged an error).
         game.socket.emit('system.aspects-of-power', {
           type: 'gmDeleteAoeRegion',
           sceneId: scene.id,
@@ -983,7 +987,9 @@ Hooks.once('ready', async function () {
   });
 
   // ── One-time migrations ──
-  if (game.user.isGM) {
+  // isActingGM: two GM clients hitting ready simultaneously both read the
+  // stale migrationVersion and both run the migration — double writes.
+  if (isActingGM()) {
     const migrationVersion = game.settings.get('aspects-of-power', 'migrationVersion') ?? '0';
     if (foundry.utils.isNewerVersion('2.1.1', migrationVersion)) {
       // Migrate equipment slot 'hands' → 'weaponry'.
@@ -1241,7 +1247,7 @@ Hooks.on('renderActiveEffectConfig', (app, element, _options) => {
  * Only the GM executes to avoid duplicate writes.
  */
 Hooks.on('combatTurnChange', async (combat, _prior, current) => {
-  if (!game.user.isGM) return;
+  if (!isActingGM()) return;
   // Skip under celerity — round-end mechanics fire from the celerity tracker's
   // advance handler instead. (Foundry's turn pointer change still happens for
   // pan-to-active sync, but we don't want to re-run regen/sustain/etc.)
@@ -1257,7 +1263,7 @@ Hooks.on('combatTurnChange', async (combat, _prior, current) => {
  * Initialize defense pools and reactions when combat starts.
  */
 Hooks.on('combatStart', async (combat) => {
-  if (!game.user.isGM) return;
+  if (!isActingGM()) return;
   for (const combatant of combat.combatants) {
     if (!combatant.actor) continue;
     const actor = combatant.actor;
@@ -1281,7 +1287,7 @@ Hooks.on('combatStart', async (combat) => {
  * Only the GM executes to avoid duplicate writes.
  */
 Hooks.on('combatTurnChange', async (combat, _prior, current) => {
-  if (!game.user.isGM) return;
+  if (!isActingGM()) return;
   // Skip under celerity — DoTs fire per-actor at celerity round boundaries
   // via runRoundEnd. The legacy turn-change DoT pass would double-tick.
   if (CONFIG.ui.combat?.name === 'CelerityCombatTracker') return;
@@ -1327,7 +1333,7 @@ Hooks.on('combatTurnChange', async (combat, _prior, current) => {
  * dismembered slots) when any ActiveEffect is deleted.
  */
 Hooks.on('deleteActiveEffect', async (effect, _options, _userId) => {
-  if (!game.user.isGM) return;
+  if (!isActingGM()) return;
   const actor = effect.parent;
   if (!actor || !(actor instanceof Actor)) return;
 
@@ -1384,7 +1390,7 @@ Hooks.on('deleteActiveEffect', async (effect, _options, _userId) => {
  * Only the GM executes to avoid duplicate deletes.
  */
 Hooks.on('combatTurnChange', async (combat, prior, _current) => {
-  if (!game.user.isGM) return;
+  if (!isActingGM()) return;
   if (!canvas.scene?.regions) return;
 
   const toDelete = [];
@@ -2172,7 +2178,7 @@ async function _checkZoneEffects(tokenDoc) {
  * When a token moves, check zone effects (every movement) and persistent AOE tags (once per round).
  */
 Hooks.on('updateToken', async (tokenDoc, changes, _options, _userId) => {
-  if (!game.user.isGM) return;
+  if (!isActingGM()) return;
   if (!('x' in changes) && !('y' in changes)) return;
   await _checkZoneEffects(tokenDoc);
   await _triggerPersistentAoe(tokenDoc, false);
@@ -2193,7 +2199,7 @@ Hooks.on('preUpdateToken', (tokenDoc, changes, options, userId) =>
  * flag first (so they can be re-hit) and forces the trigger.
  */
 Hooks.on('combatTurnChange', async (combat, _prior, current) => {
-  if (!game.user.isGM) return;
+  if (!isActingGM()) return;
 
   const combatant = combat.combatants.get(current.combatantId);
   if (!combatant?.token) return;

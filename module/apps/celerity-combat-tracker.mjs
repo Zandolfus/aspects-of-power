@@ -9,6 +9,7 @@
  */
 
 import { getClockTick, referenceRoundLength, runRoundStart, MOVEMENT_ITEM_ID, BREAK_FREE_ITEM_ID, interpolateMovementPosition, declareMovement, separateOverlappingTokens, formatTicksAsTime } from '../systems/celerity.mjs';
+import { isActingGM } from '../helpers/gm.mjs';
 // TRIAL-REALTIME: engagement-halts disabled for the real-time-advance trial.
 // If trial reverts, restore this import + the checkEngagementHalts call in
 // _onCelAdvance (search "TRIAL-REALTIME" for both sites). If trial succeeds,
@@ -514,7 +515,7 @@ async function _onCelCancel(event, target) {
  * entry + path-crossing; this handles the "standing-in" cadence.
  */
 async function _scanPersistentAoeReticks(combat, newClock) {
-  if (!game.user.isGM) return;
+  if (!isActingGM()) return;
   const scene = combat.scene ?? canvas.scene;
   if (!scene) return;
   const regions = scene.regions ?? [];

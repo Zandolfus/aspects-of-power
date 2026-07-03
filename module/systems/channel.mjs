@@ -26,6 +26,7 @@
  */
 
 import { getClockTick, referenceRoundLength } from './celerity.mjs';
+import { isActingGM } from '../helpers/gm.mjs';
 
 const COMBAT_FLAG_TICK = 'aspectsofpower.clockTick';
 
@@ -309,7 +310,7 @@ export class ChannelHelpers {
  */
 export function registerChannelHooks() {
   Hooks.on('updateCombat', async (combat, changes) => {
-    if (!game.user.isGM) return;
+    if (!isActingGM()) return;
     if (!changes?.flags?.['aspects-of-power']) return;
     const newTick = combat.flags?.['aspects-of-power']?.clockTick ?? 0;
     // Iterate a snapshot since fireTick may mutate the channels map (cancel)

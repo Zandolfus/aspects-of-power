@@ -15,6 +15,8 @@
  * an event-router so we don't have to migrate existing data.
  */
 
+import { isActingGM } from '../helpers/gm.mjs';
+
 const FLAG_NS = 'aspects-of-power';
 // Bare type name. v14 looks up CONFIG.RegionBehavior.dataModels[behavior.type]
 // directly — the key MUST match the bare type that creation uses (and what
@@ -40,7 +42,7 @@ class PersistentAoeBehavior extends foundry.data.regionBehaviors.RegionBehaviorT
   }
 
   async _handleRegionEvent(event) {
-    if (!game.user.isGM) return; // Only GM applies effects.
+    if (!isActingGM()) return; // Only the acting GM applies effects (multi-GM safe).
     if (!_triggerFn) return; // Trigger not yet wired.
     const tokenDoc = event.data?.token;
     if (!tokenDoc) return;
