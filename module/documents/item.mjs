@@ -1121,7 +1121,7 @@ export class AspectsofPowerItem extends Item {
       : 1;
     const effectiveHit = Math.round(hitTotal * shrapnelMult);
 
-    const defenseResult = await this._promptDefensePool(targetActor, defKey, hitTotal, item.name);
+    const defenseResult = await this._promptDefensePool(targetActor, defKey, hitTotal, item.name, effectiveHit);
 
     let isHit = true;
     let damageMultiplier = 1;
@@ -2090,7 +2090,14 @@ export class AspectsofPowerItem extends Item {
    * Prompt the target's owner to choose whether to defend with their pool.
    * Player-owned targets are prompted via socket; GM-owned via direct dialog.
    */
-  async _promptDefensePool(targetActor, defKey, hitTotal, attackName) {
+  async _promptDefensePool(targetActor, defKey, hitTotal, attackName, effectiveHit = null) {
+    // effectiveHit: the shrapnel-multiplied hit the MENTAL-lane pool is
+    // actually depleted against in _resolveDefenseCheck. The preview used to
+    // compute full/partial off raw hitTotal, promising "Full dodge, pool
+    // 400→100" and then delivering partial. Physical-lane text stays on raw
+    // hitTotal — the dodge roll genuinely compares against it (shrapnel
+    // penalizes the dodge roll instead).
+    const mentalHit = Math.max(1, Math.round(effectiveHit ?? hitTotal));
     const pool    = targetActor.system.defense[defKey]?.pool ?? 0;
     const poolMax = targetActor.system.defense[defKey]?.poolMax ?? 0;
     const defLabel = defKey.charAt(0).toUpperCase() + defKey.slice(1);
@@ -2164,12 +2171,12 @@ export class AspectsofPowerItem extends Item {
     } else {
       hasDefend = pool > 0;
       defendLabel = 'Defend';
-      const fullDodge = pool > 0 && pool >= hitTotal;
+      const fullDodge = pool > 0 && pool >= mentalHit;
       defenseText = '';
       if (pool > 0) {
         const outcomeText = fullDodge
-          ? `<strong>Full dodge.</strong> Pool: ${pool} → ${pool - hitTotal}`
-          : `<strong>Partial defense (${Math.round((pool / hitTotal) * 100)}% reduction).</strong> Pool: ${pool} → 0`;
+          ? `<strong>Full dodge.</strong> Pool: ${pool} → ${pool - mentalHit}`
+          : `<strong>Partial defense (${Math.round((pool / mentalHit) * 100)}% reduction).</strong> Pool: ${pool} → 0`;
         defenseText = `<p>${defLabel} defense pool: ${pool} / ${poolMax}</p><p>If you defend: ${outcomeText}</p>`;
       }
     }
@@ -3732,6 +3739,20 @@ export class AspectsofPowerItem extends Item {
       value: -Math.round(rollTotal * (e.value || 1)),
     }));
 
+    // DoT damage uses its own scale factor (dotScale, default 0.1) so a
+    // bleed-style chain ticks for ~10% of the attack roll per round per
+    // stack rather than the full attack damage. Separate from
+    // debuffScaleWithAttack which keeps governing stat-reduction
+    // strength. Per user 2026-05-11. Computed BEFORE effectData so the
+    // description advertises the real per-round tick — it used to
+    // interpolate the full rollTotal, overstating the tick 10×
+    // (the refresh path at gmApplyDebuff already reported the scaled
+    // number, so create/refresh disagreed).
+    const dotScale = this.system.tagConfig?.dotScale ?? 0.1;
+    const dotDmg = dealsDmg
+      ? Math.max(0, Math.round(dmgRoll.total * dotScale * defenseMultiplier))
+      : 0;
+
     // Build effect data with optional DoT flags.
     const effectName = `${item.name} (Debuff)`;
     const effectData = {
@@ -3742,7 +3763,7 @@ export class AspectsofPowerItem extends Item {
       disabled:    false,
       changes,
       description: dealsDmg
-        ? `Deals <strong>${rollTotal}</strong> ${dmgType} damage per round (bypasses armor &amp; veil; reduced by Toughness).`
+        ? `Deals <strong>${dotDmg}</strong> ${dmgType} damage per round (bypasses armor &amp; veil; reduced by Toughness).`
         : '',
     };
 
@@ -3779,15 +3800,7 @@ export class AspectsofPowerItem extends Item {
       if (!dismemberedSlot) return; // cancelled
     }
 
-    // DoT damage uses its own scale factor (dotScale, default 0.1) so a
-    // bleed-style chain ticks for ~10% of the attack roll per round per
-    // stack rather than the full attack damage. Separate from
-    // debuffScaleWithAttack which keeps governing stat-reduction
-    // strength. Per user 2026-05-11.
-    const dotScale = this.system.tagConfig?.dotScale ?? 0.1;
-    const dotDmg = dealsDmg
-      ? Math.max(0, Math.round(dmgRoll.total * dotScale * defenseMultiplier))
-      : 0;
+    // (dotScale/dotDmg hoisted above effectData — see comment there.)
 
     // Store debuff metadata in the AE TypeDataModel system fields.
     // Marked subsystem: when the skill defines markBonus > 0, the spawned
@@ -4999,7 +5012,9 @@ export class AspectsofPowerItem extends Item {
 
     // ── Critical failure: d100 of 1 ──
     if (effectiveD100Raw === 1) {
-      const isAlchemyFailure = (item.system.tags ?? []).includes('alchemy');
+      // Iterative reworks carry NO material (materialItem is null) — guard the
+      // name interpolations or a nat-1 on a rework throws instead of reporting.
+      const isAlchemyFailure = (item.system.tags ?? []).includes('alchemy') && !!materialItem;
       const failureMsg = isAlchemyFailure
         ? `<p><strong>Materials destroyed!</strong> ${materialItem.name} is consumed in the failed brew.</p>`
         : `<p><strong>Craft failed.</strong> Materials are preserved — try again.</p>`;
@@ -5019,7 +5034,7 @@ export class AspectsofPowerItem extends Item {
           <h3>${item.name} — Critical Failure</h3>
           <hr>
           <p style="color:#ef5350;font-size:1.2em;">&#10008; Natural 1 on d100! &#10008;</p>
-          <p><strong>Material:</strong> ${materialItem.name}</p>
+          ${materialItem ? `<p><strong>Material:</strong> ${materialItem.name}</p>` : ''}
           ${failureMsg}
         </div>`,
       });
@@ -6562,7 +6577,10 @@ export class AspectsofPowerItem extends Item {
     // from preTargetIds (snapshotted at declare time, passed through
     // the celerity dispatch socket).
     if (options.executeDeferred && Array.isArray(options.preTargetIds) && options.preTargetIds.length > 0) {
-      for (const t of game.user.targets) t.setTarget(false, { releaseOthers: false, groupSelection: false });
+      // Snapshot before clearing — setTarget(false) mutates game.user.targets
+      // (a Set) during iteration, which can skip members and leave stale
+      // targets alive alongside the restored snapshot.
+      for (const t of [...game.user.targets]) t.setTarget(false, { releaseOthers: false, groupSelection: false });
       let liveTargets = 0;
       for (const id of options.preTargetIds) {
         const tok = canvas.tokens?.get(id);
@@ -6582,8 +6600,15 @@ export class AspectsofPowerItem extends Item {
       // the no-target-picked abort below. Area skills are exempt — they resolve
       // on their template/centroid, not a single living token, so a dead anchor
       // token shouldn't cancel the blast.
+      // Match the full area predicate used by the static-AOE pre-placement
+      // block below — in-world spells largely still use the legacy
+      // system.aoe.enabled flag (no `aoe` tag), and the alteration id can be
+      // `aoe` as well as `cleave`. Testing only tag+cleave made legacy AOE
+      // spells fizzle when their anchor target died in the declare→fire gap,
+      // even though the blast resolves on its template, not the token.
       const _isAreaSkill = (this.system.tags ?? []).includes('aoe')
-        || (this.system.alterations ?? []).some(a => a.id === 'cleave');
+        || this.system.aoe?.enabled === true
+        || (this.system.alterations ?? []).some(a => (a.id ?? a) === 'cleave' || (a.id ?? a) === 'aoe');
       if (liveTargets === 0 && !_isAreaSkill) {
         ui.notifications.info(`${this.name} fizzles — its target is already down.`);
         return;
@@ -7796,10 +7821,14 @@ export class AspectsofPowerItem extends Item {
           await this._handleAugmentTag(item, rollData, dmgRoll, speaker, rollMode, label);
           break;
         case 'teleport':
-          await this._handleTeleportTag(item, rollData, speaker, rollMode, label, options.preTeleportDestination ?? null);
+          // Out of combat there is no celerity declare→fire round-trip, so the
+          // destination picked moments ago lives in the local, not options.
+          await this._handleTeleportTag(item, rollData, speaker, rollMode, label, options.preTeleportDestination ?? teleportDestination ?? null);
           break;
         case 'leap':
-          await this._handleLeapTag(item, rollData, speaker, rollMode, label, options.preLeapDestination ?? null, options.preLeapApexFt ?? null);
+          await this._handleLeapTag(item, rollData, speaker, rollMode, label,
+            options.preLeapDestination ?? leapDestination ?? null,
+            options.preLeapApexFt ?? (leapDestination ? (this.system.tagConfig?.leapApexFt ?? 10) : null));
           break;
         case 'summon':
           await this._handleSummonTag(item, rollData, speaker, rollMode, label, options.preInvestAmount);

@@ -1309,7 +1309,7 @@ Hooks.on('combatTurnChange', async (combat, _prior, current) => {
       ChatMessage.create({
         whisper: ChatMessage.getWhisperRecipients('GM'),
         content: `<p><strong>${c.actor.name}</strong> takes <strong>${damage}</strong> `
-               + `${flags.dotDamageType ?? 'physical'} damage from ${effect.name} (DR: −${drValue}). `
+               + `${sys.dotDamageType ?? 'physical'} damage from ${effect.name} (DR: −${drValue}). `
                + `Health: ${newHealth} / ${health.max}`
                + `${newHealth === 0 ? ' &mdash; <em>Incapacitated!</em>' : ''}</p>`,
       });
@@ -1666,9 +1666,12 @@ Hooks.on('renderTokenHUD', (hud, html, data) => {
       // would just restore the key on next merge. Use the V14.360+
       // ForcedDeletion sentinel for the unset (the legacy `-=key` prefix
       // still works but logs a deprecation warning).
+      // The sentinel must be an INSTANCE, not the class — passing the class
+      // is silently ignored and the key never deletes (see actor.mjs, which
+      // does `new FD()`, and reference_foundry_quirks #11).
       const ForcedDeletion = foundry.data?.operators?.ForcedDeletion;
       await game.user.update({
-        [`flags.aspects-of-power.showRangeFor.${tokenDoc.id}`]: ForcedDeletion,
+        [`flags.aspects-of-power.showRangeFor.${tokenDoc.id}`]: ForcedDeletion ? new ForcedDeletion() : null,
       });
     } else {
       // Toggle on — merge a single new entry; merge semantics are fine here.
