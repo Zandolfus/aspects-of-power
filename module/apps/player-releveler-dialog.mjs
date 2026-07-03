@@ -13,11 +13,8 @@
  */
 
 import { applyTrackLevels } from '../systems/mass-leveler.mjs';
+import { ABILITY_KEYS } from '../helpers/config.mjs';
 
-const ABILITY_KEYS = [
-  'vitality', 'endurance', 'strength', 'dexterity', 'toughness',
-  'intelligence', 'willpower', 'wisdom', 'perception',
-];
 
 const PATH_TAGS = ['onefold-path', 'twofold-path', 'threefold-path'];
 

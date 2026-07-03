@@ -23,6 +23,13 @@ ASPECTSOFPOWER.abilities = {
 
 };
 
+/**
+ * Canonical ability-key list, derived from the abilities table above.
+ * Import THIS instead of redeclaring the array (it existed as 5 separate
+ * copies before 2026-07-03 — a silent-drift hazard when abilities change).
+ */
+export const ABILITY_KEYS = Object.keys(ASPECTSOFPOWER.abilities);
+
 ASPECTSOFPOWER.abilityAbbreviations = {
   vitality: 'ASPECTSOFPOWER.Ability.vitality.abbr',
   endurance: 'ASPECTSOFPOWER.Ability.endurance.abbr',
@@ -244,6 +251,9 @@ ASPECTSOFPOWER.celerity = {
   //   Major/Grand: every cast discharges (each banks ≥ threshold)
   // Universal across tiers per design 2026-05-06 — Wand stays the speed
   // king on Basic; Orb is the mana-economy alternative.
+  // Wand implement: Basic-tier spell wait multiplier (−23% per design
+  // 2026-05-06). Lived inline in celerity.mjs before 2026-07-03.
+  WAND_BASIC_WAIT_MULT: 0.77,
   ORB_DISCHARGE_THRESHOLD: 400,
   // Base movement weight per 5ft. Multiplied by the selected mode's
   // `celerityMult` (see MOVEMENT_MODES below). Sprint = 1× baseline (this

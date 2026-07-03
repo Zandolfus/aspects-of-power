@@ -6,11 +6,8 @@
  *
  * Owner-only. Writes residual back to `system.freePoints`.
  */
+import { ABILITY_KEYS } from '../helpers/config.mjs';
 
-const ABILITY_KEYS = [
-  'vitality', 'endurance', 'strength', 'dexterity', 'toughness',
-  'intelligence', 'willpower', 'wisdom', 'perception',
-];
 
 export class SpendFreePointsDialog extends foundry.applications.api.HandlebarsApplicationMixin(
   foundry.applications.api.ApplicationV2

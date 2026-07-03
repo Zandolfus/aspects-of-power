@@ -18,11 +18,8 @@
  * script only touches G and E. New templates at higher ranks should be
  * authored against the new totals (8 + 4×(rankIdx) capped at min 8).
  */
+import { ABILITY_KEYS } from '../helpers/config.mjs';
 
-const ABILITY_KEYS = [
-  'vitality', 'endurance', 'strength', 'dexterity', 'toughness',
-  'intelligence', 'willpower', 'wisdom', 'perception',
-];
 
 const E_SPECIALIST_OLD_SHAPE = [5, 4, 3, 2];
 const E_SPECIALIST_OLD_FP    = 4;

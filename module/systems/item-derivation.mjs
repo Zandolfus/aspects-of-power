@@ -9,11 +9,8 @@
  * live on the item as `system.lockedFields = ['armorBonus', ...]`; the
  * caller decides which derived fields to actually apply.
  */
+import { ABILITY_KEYS } from '../helpers/config.mjs';
 
-const ABILITY_KEYS = [
-  'vitality', 'endurance', 'strength', 'dexterity', 'toughness',
-  'intelligence', 'willpower', 'wisdom', 'perception',
-];
 
 /**
  * Derive an item's stat bundle from its current schema fields.

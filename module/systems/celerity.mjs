@@ -156,7 +156,7 @@ export function computeActionWait(actor, skill, weapon = null, investAmount = nu
   // wait MAX so a Wand-equipped caster paying low mana sees the speed-up.
   let adjustedBaseWait = baseWait;
   if (isMagic && tier === 'basic' && equippedImplements.has('wand')) {
-    adjustedBaseWait = Math.max(1, Math.round(baseWait * 0.77));
+    adjustedBaseWait = Math.max(1, Math.round(baseWait * (sc.WAND_BASIC_WAIT_MULT ?? 0.77)));
   }
 
   // Orb implement: when the orb has banked ≥ ORB_DISCHARGE_THRESHOLD weight
@@ -185,7 +185,9 @@ export function computeActionWait(actor, skill, weapon = null, investAmount = nu
     : (isInfused ? (manaInvestAmount ?? 0) : 0);
   if (channelMana > 0) {
     const wisMod = Math.max(1, actor.system.abilities?.wisdom?.mod ?? 0);
-    const factor = sc.CHANNEL_FACTOR ?? 1000;
+    // Fallback matches config.mjs (was 1000 — a stale fallback that would
+    // silently TRIPLE channel speed if the config key ever went missing).
+    const factor = sc.CHANNEL_FACTOR ?? 3000;
     const channelWait = Math.round(channelMana * factor / wisMod);
     return Math.max(adjustedBaseWait, channelWait);
   }
