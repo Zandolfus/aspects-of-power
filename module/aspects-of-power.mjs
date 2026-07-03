@@ -35,22 +35,12 @@ import { EquipmentSystem } from './systems/equipment.mjs';
 import * as MassLeveler from './systems/mass-leveler.mjs';
 import * as TemplateMigration from './systems/template-migration.mjs';
 import * as Celerity from './systems/celerity.mjs';
-import { CelerityTracker, openTracker as openCelerityTracker, refreshTracker as refreshCelerityTracker, registerCelerityTrackerHooks } from './apps/celerity-tracker.mjs';
 import { SummonHelpers, registerSummonHooks } from './systems/summon.mjs';
 import { ChannelHelpers, registerChannelHooks } from './systems/channel.mjs';
 import { AIProfiles, registerAIHooks } from './systems/ai.mjs';
 import { registerSummonHud } from './canvas/summon-hud.mjs';
 import { CelerityCombatTracker, installAopTurnMarkerPatch } from './apps/celerity-combat-tracker.mjs';
 
-/**
- * Check if an actor is an assigned player character (not just owned).
- */
-function _isPlayerCharacter(actor) {
-  return game.users.some(u => !u.isGM && u.active && u.character?.id === actor.id);
-}
-
-/* -------------------------------------------- */
-/*  Movement Distance Tracker (per combat turn) */
 /* -------------------------------------------- */
 /*  Debuff Helpers                              */
 /* -------------------------------------------- */
@@ -65,20 +55,6 @@ function getActiveDebuff(actor, types) {
   if (!actor?.effects) return undefined;
   const typeArr = Array.isArray(types) ? types : [types];
   return actor.effects.find(e =>
-    !e.disabled && typeArr.includes(e.system?.debuffType)
-  );
-}
-
-/**
- * Get all active debuffs of the given type(s) on an actor.
- * @param {Actor} actor
- * @param {string|string[]} types
- * @returns {ActiveEffect[]}
- */
-function getActiveDebuffs(actor, types) {
-  if (!actor?.effects) return [];
-  const typeArr = Array.isArray(types) ? types : [types];
-  return actor.effects.filter(e =>
     !e.disabled && typeArr.includes(e.system?.debuffType)
   );
 }
@@ -107,7 +83,7 @@ Hooks.once('init', function () {
     getPositionalTags,
     massLeveler: MassLeveler,
     templateMigration: TemplateMigration,
-    celerity: { ...Celerity, openTracker: openCelerityTracker, refreshTracker: refreshCelerityTracker, CelerityTracker },
+    celerity: { ...Celerity },
   };
 
   // ── System Settings ──
@@ -853,7 +829,6 @@ Hooks.on('renderCompendium', (app, html) => {
 
 Hooks.once('ready', async function () {
   // Register celerity tracker auto-refresh hooks (idempotent).
-  registerCelerityTrackerHooks();
 
   // Register summon-subsystem deleteToken hook (cleans up cloned actor
   // when its token is removed). Idempotent.

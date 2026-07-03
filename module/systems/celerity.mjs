@@ -658,9 +658,6 @@ export async function runRoundStart(combat, combatant) {
   Hooks.callAll('aopRoundStart', combat, combatant);
 }
 
-/** Backward-compat alias for the renamed function — anything importing the
- *  old name still works. New code should use runRoundStart. */
-export const runRoundEnd = runRoundStart;
 
 /** Sentinel itemId stored on `declaredAction` to mark a movement entry. */
 export const MOVEMENT_ITEM_ID = '__movement__';
@@ -1005,42 +1002,6 @@ export async function declareBreakFree(actor, effect) {
   ChatMessage.create({
     speaker: ChatMessage.getSpeaker({ actor }),
     content: `<p><em>${actor.name} strains against <strong>${typeName}</strong> — break attempt scheduled in ${wait} ticks (tick ${scheduledTick}).</em></p>`,
-  });
-
-  return { wait, scheduledTick };
-}
-
-/**
- * LEGACY — immediate-charge movement path. Kept for any caller that still
- * uses the pre-declare-and-execute flow. New code should use declareMovement.
- *
- * Cost formula (placeholder, design open item #4):
- *   wait = (distanceFt / 5) × MOVEMENT_BASE_WEIGHT_PER_5FT × SCALE / dex.mod
- *
- * @param {Actor}  actor
- * @param {number} distanceFt  Distance moved in feet (post-snap to grid)
- * @returns {Promise<{wait, scheduledTick}|null>}
- */
-export async function chargeMovementCelerity(actor, distanceFt) {
-  const combatant = findCombatantForActor(actor);
-  if (!combatant) return null;
-  if (distanceFt <= 0) return null;
-
-  const wait = computeMovementWait(actor, distanceFt);
-  const clockTick = getClockTick(combatant.combat);
-  const scheduledTick = clockTick + wait;
-
-  await _safeCombatantUpdate(combatant, {
-    'flags.aspectsofpower.declaredAction': null,
-    'flags.aspectsofpower.nextActionTick': scheduledTick,
-    'flags.aspectsofpower.lastActionWait': wait,
-    'flags.aspectsofpower.lastActionName': `Movement (${distanceFt}ft)`,
-    'flags.aspectsofpower.lastActionAt':   clockTick,
-  });
-
-  ChatMessage.create({
-    speaker: ChatMessage.getSpeaker({ actor }),
-    content: `<p><em>${actor.name} moves ${distanceFt}ft — celerity cost ${wait} ticks → next action at tick ${scheduledTick}.</em></p>`,
   });
 
   return { wait, scheduledTick };

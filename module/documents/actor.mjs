@@ -260,7 +260,6 @@ export class AspectsofPowerActor extends Actor {
     let zeroMelee = false, zeroRanged = false, zeroMind = false;
     let dexReduction = 0;       // Root: flat reduction to dex contribution
     let perceptionReduction = 0; // Blind: flat reduction to perception contribution
-    let allDefensePctReduction = 0; // Slow: % reduction to all defenses
     let meleeRangedPctReduction = 0; // Enraged: % reduction to melee/ranged
 
     for (const effect of this.effects) {
@@ -304,10 +303,8 @@ export class AspectsofPowerActor extends Actor {
           // 20% of defense or debuff roll, whichever is lower (applied as % later).
           meleeRangedPctReduction += Math.min(20, roll);
           break;
-        // Slow: NYI — will reduce all defenses by a calculated amount.
-        // case 'slow':
-        //   allDefensePctReduction += Math.max(0, roll - (systemData.abilities.endurance.mod ?? 0));
-        //   break;
+        // Slow: NYI — design in design-debuff-buildup.md; no accumulator kept
+        // here until it ships.
       }
     }
 
