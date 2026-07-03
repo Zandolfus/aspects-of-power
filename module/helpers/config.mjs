@@ -203,6 +203,22 @@ ASPECTSOFPOWER.invest = {
 };
 
 /**
+ * Spellstriker tuning (design-spellstriker.md). Type-2 FUSION spellstrikes
+ * (weapon strike + `infused` int mana-rider) are balance-bounded so the
+ * fusion honors "never best of both worlds": the infusion's mana invest is
+ * wis-capped exactly like a real spell of its tier, and its damage is scaled
+ * by `infusionCoef` (< 1) — the fusion penalty for also landing the strike.
+ *   infusion = Int × infusionCoef × (mana / basicRef)^0.2
+ * At 0.7 the infusion ≈ 70% of an equivalent pure spell, so a fusion hit lands
+ * ~88% of a fighter's heavy hit while costing BOTH stamina and mana (sim
+ * 2026-07-03). Type-1 vehicle spellstrikes are unaffected — they run the full
+ * spell formula (rarity mult + wis-cap) already.
+ */
+ASPECTSOFPOWER.spellstrike = {
+  infusionCoef: 0.7,
+};
+
+/**
  * Celerity timing constants (per design-celerity.md).
  *   wait = (weapon_base_weight × skill_multiplier × SCALE) / actor_speed
  *   round_length = ROUND_K / ref_mod(RL)

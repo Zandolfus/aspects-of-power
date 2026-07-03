@@ -577,7 +577,12 @@ export class AspectsofPowerItem extends Item {
     const startMana = mana.baseCost;
 
     const computeStrike = (sv) => Math.round(stamina.potency * multiplier * Math.pow(Math.max(sv, 1) / Math.max(stamina.baseCost, 1), 0.2));
-    const computeInfusion = (mv) => Math.round(mana.potency * Math.pow(Math.max(mv, 1) / Math.max(mana.baseCost, 1), 0.2));
+    // Infusion preview must mirror the real formula: Int × coef × (mana/dmgRef)^0.2
+    // (fusion penalty coef + grade-relative fixed ref). Fall back to legacy
+    // (coef 1, baseCost denom) if the caller didn't supply the new fields.
+    const infCoef = mana.coef ?? 1;
+    const infRef = mana.dmgRef ?? mana.baseCost;
+    const computeInfusion = (mv) => Math.round(mana.potency * infCoef * Math.pow(Math.max(mv, 1) / Math.max(infRef, 1), 0.2));
     const computeSelfDmg = (sv) => {
       const excess = Math.max(0, sv - safeCeiling);
       if (excess <= 0 || stamina.safeInvest <= 0) return 0;
@@ -617,7 +622,7 @@ export class AspectsofPowerItem extends Item {
           <div style="font-size:14px;">Total damage: <strong class="total-display">${computeStrike(startStam) + computeInfusion(startMana)}</strong></div>
         </div>
 
-        <p class="hint" style="font-size:11px;margin-top:8px;">Strike = ${potencyLabel} × multiplier × (stamina/base)^0.2. Infusion = Int × (mana/base)^0.2. Stamina excess past safe ceiling deals self-damage; mana has no self-damage.</p>
+        <p class="hint" style="font-size:11px;margin-top:8px;">Strike = ${potencyLabel} × multiplier × (stamina/base)^0.2. Infusion = Int × ${infCoef} × (mana/ref)^0.2 (fusion penalty; mana wis-capped like a spell). Stamina excess past safe ceiling deals self-damage; mana has no self-damage.</p>
       </div>`;
 
     let resolveFn;
@@ -7017,7 +7022,9 @@ export class AspectsofPowerItem extends Item {
         // warning) when mana, spell tier, or spell grade are missing.
         const isInfused = tags.includes('infused');
         let infusedBaseMana = 0;
-        let infusedManaPool = 0;
+        let infusedManaPool = 0;   // actual mana pool (affordability check)
+        let infusedManaCap = 0;    // wis-capped invest ceiling (like a real spell)
+        let infusedDmgRef = 1;     // grade-relative FIXED damage reference
         let intMod = 0;
         let useInfused = false;
         if (isInfused) {
@@ -7027,6 +7034,21 @@ export class AspectsofPowerItem extends Item {
             infusedBaseMana = Math.round(tierFactor * gradeFactor);
             intMod = this.actor.system.abilities?.intelligence?.mod ?? 0;
             infusedManaPool = Math.round(this.actor.system.mana?.value ?? 0);
+            // Grade-relative FIXED reference (basic-tier baseMana) — same fix as
+            // the spell path (65f8a42). Normalizing infusion by the skill's OWN
+            // tier baseMana inverted tier (higher tiers did LESS at equal mana);
+            // the fixed ref makes absolute mana drive damage so tier scales up.
+            infusedDmgRef = Math.max(1, Math.round((sc.spellTierFactors?.basic ?? 2) * gradeFactor));
+            // Wis-cap the infusion invest exactly like a real spell of this tier,
+            // so a spellstrike can't pump more mana into its spell portion than a
+            // dedicated caster could into the same-tier spell (design-spellstriker
+            // fusion balance, 2026-07-03). Burst size grows by authoring a
+            // higher-tier spellstrike, gated by wis — consistent with casting.
+            const aboveBaseFactor = sc.spellMaxInvestAboveBase?.[spellTier]
+              ?? sc.spellMaxInvestAboveBase?.['']
+              ?? 0.1;
+            const wisModForCap = this.actor.system.abilities?.wisdom?.mod ?? 0;
+            infusedManaCap = Math.min(infusedManaPool, Math.round(infusedBaseMana + wisModForCap * aboveBaseFactor));
             useInfused = infusedManaPool >= infusedBaseMana && infusedBaseMana > 0;
           }
           if (!useInfused) {
@@ -7046,7 +7068,7 @@ export class AspectsofPowerItem extends Item {
           // Deferred-fire: re-spend the mana invest captured at declare time
           // so the infusion damage/cost matches what the player committed to.
           if (useInfused && options.preManaInvestAmount != null) {
-            manaInvested = Math.min(options.preManaInvestAmount, infusedManaPool);
+            manaInvested = Math.min(options.preManaInvestAmount, infusedManaCap);
           }
         } else if (options.aiAutoInvest) {
           // AI: minimum swing (base stamina, no over-exertion/self-damage),
@@ -7060,7 +7082,7 @@ export class AspectsofPowerItem extends Item {
           const baseWait = computeActionWait(this.actor, this, weapon, null, null);
           const result = await this._promptDualResourceInvest({
             stamina: { baseCost: baseStamina, safeInvest, maxPool, potency: statBlend },
-            mana:    { baseCost: infusedBaseMana, maxPool: infusedManaPool, potency: intMod },
+            mana:    { baseCost: infusedBaseMana, maxPool: infusedManaCap, potency: intMod, dmgRef: infusedDmgRef, coef: sc.spellstrike?.infusionCoef ?? 0.7 },
             multiplier, label, potencyLabel,
             channelStat: wisMod,
             channelFactor: sc.celerity?.CHANNEL_FACTOR ?? null,
@@ -7089,7 +7111,9 @@ export class AspectsofPowerItem extends Item {
         const strikeDmg = Math.round(statBlend * multiplier * windup * Math.pow(Math.max(invested, 1) / Math.max(baseStamina, 1), 0.2));
         if (useInfused && manaInvested > 0) {
           infusedManaCost = manaInvested;
-          infusedInfusionDmg = Math.round(intMod * Math.pow(Math.max(manaInvested, 1) / Math.max(infusedBaseMana, 1), 0.2));
+          // Fusion penalty coef + grade-relative fixed ref (see isInfused block).
+          const infusionCoef = sc.spellstrike?.infusionCoef ?? 0.7;
+          infusedInfusionDmg = Math.round(intMod * infusionCoef * Math.pow(Math.max(manaInvested, 1) / Math.max(infusedDmgRef, 1), 0.2));
         }
         dmgFormula = String(strikeDmg + infusedInfusionDmg);
 
