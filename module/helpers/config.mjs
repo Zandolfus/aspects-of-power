@@ -775,49 +775,53 @@ ASPECTSOFPOWER.debuffSubtypeTags = {
 };
 
 /**
- * THE AFFINITY DICTIONARY (expanded 2026-07-03, design-affinity-dictionary.md).
- * One rich entry per mana affinity — replaces the old flat Set as the single
- * source of truth (`affinityTags` below is DERIVED from these keys, so every
- * existing consumer is unchanged).
+ * THE AFFINITY DICTIONARY (2026-07-03, design-affinity-dictionary.md).
+ * One rich entry per mana affinity — the single source of truth. Both
+ * `affinityTags` (the skill-affinity Set) and `craftElements` (crafting
+ * material stats) are DERIVED from this below, so nothing drifts.
  *
  * Per-affinity fields:
- *   label     i18n key (ASPECTSOFPOWER.Affinity.<key>).
- *   statGain  { primary, secondary } — the ability pair this affinity TRAINS.
- *             Substrate for roadmap pillar 3 (affinities as learning-rate
- *             systems): familiarity accrual grants growth in these stats, and
- *             they define each affinity's natural hybrid identity (metal →
- *             str/tough battle-smith, wind → dex/per skirmisher-caster...).
- *             DATA ONLY for now — no mechanics read statGain yet; magnitudes
- *             + accrual model need a ruling (see the design memo).
- *   opposed   Affinity keys this one opposes (future: resist/counter logic,
- *             dual-affinity gating, enemy-weakness authoring).
- *   lane      'elemental' → damage mitigated by armor+DR (the 2026-07-02
- *             ruling: elemental NEVER hits veil); 'mental' → mind/soul
- *             POTENCY routed through veil; 'hybrid' → case-by-case per skill.
+ *   label          i18n key (ASPECTSOFPOWER.Affinity.<key>).
+ *   materialStats  [stat1, stat2, stat3] — the ability trio a MATERIAL of this
+ *                  affinity contributes to crafted gear (item-derivation splits
+ *                  the stat budget base+1 / base / base-1 across the trio, so
+ *                  ORDER matters — stat1 is the dominant material identity).
+ *                  Feeds craftElements. Distribution levelled to a 6-8 band
+ *                  across the 21 affinities (2026-07-03 redline); the 9
+ *                  authored craftElements entries (fire/earth/water/wind/
+ *                  lightning/ice/lunar/solar/space) are preserved verbatim.
+ *   opposed        Affinity keys this one opposes (future: usage-gating
+ *                  rarity, resist/counter logic, enemy-weakness authoring).
+ *   lane           'elemental' → damage mitigated by armor+DR (the 2026-07-02
+ *                  ruling: elemental NEVER hits veil); 'mental' → mind/soul
+ *                  POTENCY via veil; 'hybrid' → case-by-case per skill.
+ * (arcane removed 2026-07-03 per user — a specific narrative concept, not a
+ *  craftable/character affinity. It survives only as a skill damage-type tag.)
  */
 ASPECTSOFPOWER.affinities = {
-  fire:        { label: 'ASPECTSOFPOWER.Affinity.fire',        statGain: { primary: 'intelligence', secondary: 'willpower' },  opposed: ['ice', 'water'],      lane: 'elemental' },
-  heat:        { label: 'ASPECTSOFPOWER.Affinity.heat',        statGain: { primary: 'intelligence', secondary: 'endurance' },  opposed: ['ice'],               lane: 'elemental' },
-  ice:         { label: 'ASPECTSOFPOWER.Affinity.ice',         statGain: { primary: 'intelligence', secondary: 'wisdom' },     opposed: ['fire', 'heat'],      lane: 'elemental' },
-  lightning:   { label: 'ASPECTSOFPOWER.Affinity.lightning',   statGain: { primary: 'intelligence', secondary: 'dexterity' },  opposed: ['earth'],             lane: 'elemental' },
-  earth:       { label: 'ASPECTSOFPOWER.Affinity.earth',       statGain: { primary: 'toughness',    secondary: 'endurance' },  opposed: ['lightning', 'wind'], lane: 'elemental' },
-  water:       { label: 'ASPECTSOFPOWER.Affinity.water',       statGain: { primary: 'wisdom',       secondary: 'endurance' },  opposed: ['fire'],              lane: 'elemental' },
-  wind:        { label: 'ASPECTSOFPOWER.Affinity.wind',        statGain: { primary: 'dexterity',    secondary: 'perception' }, opposed: ['earth'],             lane: 'elemental' },
-  metal:       { label: 'ASPECTSOFPOWER.Affinity.metal',       statGain: { primary: 'strength',     secondary: 'toughness' },  opposed: [],                    lane: 'elemental' },
-  lunar:       { label: 'ASPECTSOFPOWER.Affinity.lunar',       statGain: { primary: 'wisdom',       secondary: 'perception' }, opposed: ['solar'],             lane: 'elemental' },
-  solar:       { label: 'ASPECTSOFPOWER.Affinity.solar',       statGain: { primary: 'willpower',    secondary: 'vitality' },   opposed: ['lunar'],             lane: 'elemental' },
-  space:       { label: 'ASPECTSOFPOWER.Affinity.space',       statGain: { primary: 'intelligence', secondary: 'perception' }, opposed: [],                    lane: 'elemental' },
-  shadow:      { label: 'ASPECTSOFPOWER.Affinity.shadow',      statGain: { primary: 'dexterity',    secondary: 'willpower' },  opposed: ['light', 'holy'],     lane: 'elemental' },
-  light:       { label: 'ASPECTSOFPOWER.Affinity.light',       statGain: { primary: 'perception',   secondary: 'willpower' },  opposed: ['shadow'],            lane: 'elemental' },
-  nature:      { label: 'ASPECTSOFPOWER.Affinity.nature',      statGain: { primary: 'vitality',     secondary: 'wisdom' },     opposed: ['necromantic'],       lane: 'elemental' },
-  poison:      { label: 'ASPECTSOFPOWER.Affinity.poison',      statGain: { primary: 'intelligence', secondary: 'vitality' },   opposed: ['holy'],              lane: 'elemental' },
-  blood:       { label: 'ASPECTSOFPOWER.Affinity.blood',       statGain: { primary: 'vitality',     secondary: 'strength' },   opposed: ['holy'],              lane: 'elemental' },
-  necromantic: { label: 'ASPECTSOFPOWER.Affinity.necromantic', statGain: { primary: 'willpower',    secondary: 'intelligence' }, opposed: ['nature', 'holy'],  lane: 'hybrid' },
-  holy:        { label: 'ASPECTSOFPOWER.Affinity.holy',        statGain: { primary: 'willpower',    secondary: 'wisdom' },     opposed: ['necromantic', 'shadow', 'blood', 'poison'], lane: 'hybrid' },
-  arcane:      { label: 'ASPECTSOFPOWER.Affinity.arcane',      statGain: { primary: 'intelligence', secondary: 'wisdom' },     opposed: [],                    lane: 'elemental' },
-  psychic:     { label: 'ASPECTSOFPOWER.Affinity.psychic',     statGain: { primary: 'willpower',    secondary: 'perception' }, opposed: [],                    lane: 'mental' },
-  time:        { label: 'ASPECTSOFPOWER.Affinity.time',        statGain: { primary: 'wisdom',       secondary: 'intelligence' }, opposed: [],                  lane: 'hybrid' },
-  karma:       { label: 'ASPECTSOFPOWER.Affinity.karma',       statGain: { primary: 'wisdom',       secondary: 'willpower' },  opposed: [],                    lane: 'hybrid' },
+  // ── Authored craftElements (preserved verbatim; 'air' key → 'wind') ──
+  fire:        { label: 'ASPECTSOFPOWER.Affinity.fire',        materialStats: ['strength', 'vitality', 'dexterity'],       opposed: ['ice', 'water'],      lane: 'elemental' },
+  earth:       { label: 'ASPECTSOFPOWER.Affinity.earth',       materialStats: ['strength', 'endurance', 'vitality'],       opposed: ['lightning', 'wind'], lane: 'elemental' },
+  water:       { label: 'ASPECTSOFPOWER.Affinity.water',       materialStats: ['wisdom', 'willpower', 'endurance'],        opposed: ['fire'],              lane: 'elemental' },
+  wind:        { label: 'ASPECTSOFPOWER.Affinity.wind',        materialStats: ['dexterity', 'endurance', 'perception'],    opposed: ['earth'],             lane: 'elemental' },
+  lightning:   { label: 'ASPECTSOFPOWER.Affinity.lightning',   materialStats: ['dexterity', 'perception', 'vitality'],     opposed: ['earth'],             lane: 'elemental' },
+  ice:         { label: 'ASPECTSOFPOWER.Affinity.ice',         materialStats: ['intelligence', 'perception', 'toughness'], opposed: ['fire', 'heat'],      lane: 'elemental' },
+  lunar:       { label: 'ASPECTSOFPOWER.Affinity.lunar',       materialStats: ['intelligence', 'willpower', 'wisdom'],     opposed: ['solar'],             lane: 'elemental' },
+  solar:       { label: 'ASPECTSOFPOWER.Affinity.solar',       materialStats: ['vitality', 'perception', 'endurance'],     opposed: ['lunar'],             lane: 'elemental' },
+  space:       { label: 'ASPECTSOFPOWER.Affinity.space',       materialStats: ['perception', 'willpower', 'endurance'],    opposed: [],                    lane: 'elemental' },
+  // ── New affinities (2026-07-03; trios tuned for the 6-8 distribution) ──
+  metal:       { label: 'ASPECTSOFPOWER.Affinity.metal',       materialStats: ['toughness', 'strength', 'endurance'],      opposed: [],                    lane: 'elemental' },
+  heat:        { label: 'ASPECTSOFPOWER.Affinity.heat',        materialStats: ['strength', 'endurance', 'vitality'],       opposed: ['ice'],               lane: 'elemental' },
+  blood:       { label: 'ASPECTSOFPOWER.Affinity.blood',       materialStats: ['vitality', 'strength', 'toughness'],       opposed: ['holy'],              lane: 'elemental' },
+  shadow:      { label: 'ASPECTSOFPOWER.Affinity.shadow',      materialStats: ['dexterity', 'perception', 'strength'],     opposed: ['light', 'holy'],     lane: 'elemental' },
+  nature:      { label: 'ASPECTSOFPOWER.Affinity.nature',      materialStats: ['vitality', 'wisdom', 'toughness'],         opposed: ['necromantic'],       lane: 'elemental' },
+  poison:      { label: 'ASPECTSOFPOWER.Affinity.poison',      materialStats: ['dexterity', 'intelligence', 'vitality'],   opposed: ['holy'],              lane: 'elemental' },
+  necromantic: { label: 'ASPECTSOFPOWER.Affinity.necromantic', materialStats: ['intelligence', 'toughness', 'willpower'],  opposed: ['nature', 'holy'],    lane: 'hybrid' },
+  holy:        { label: 'ASPECTSOFPOWER.Affinity.holy',        materialStats: ['willpower', 'wisdom', 'toughness'],        opposed: ['necromantic', 'shadow', 'blood', 'poison'], lane: 'hybrid' },
+  light:       { label: 'ASPECTSOFPOWER.Affinity.light',       materialStats: ['perception', 'wisdom', 'willpower'],       opposed: ['shadow'],            lane: 'elemental' },
+  psychic:     { label: 'ASPECTSOFPOWER.Affinity.psychic',     materialStats: ['willpower', 'intelligence', 'perception'], opposed: [],                    lane: 'mental' },
+  time:        { label: 'ASPECTSOFPOWER.Affinity.time',        materialStats: ['wisdom', 'intelligence', 'dexterity'],     opposed: [],                    lane: 'hybrid' },
+  karma:       { label: 'ASPECTSOFPOWER.Affinity.karma',       materialStats: ['wisdom', 'intelligence', 'toughness'],     opposed: [],                    lane: 'hybrid' },
 };
 
 /**
@@ -956,20 +960,21 @@ ASPECTSOFPOWER.professionTags = {
 };
 
 /**
- * Element-to-stat mappings for crafting.
+ * Element-to-stat mappings for crafting — DERIVED from the affinity dictionary
+ * (single source of truth, 2026-07-03). item-derivation (element from an
+ * item's *-affinity tag) and the craft-setup dialog read
+ * craftElements[element].{stats, label}. Was hand-maintained + incomplete
+ * (only 10 of 22 affinities, and an 'air' vs 'wind' key bug that dropped
+ * wind gear to neutral); now every affinity's materialStats flows here and
+ * the wind key is correct. `neutral` stays as the no-affinity fallback
+ * (empty stats → even 1/9 spread in item-derivation).
  */
-ASPECTSOFPOWER.craftElements = {
-  solar:     { stats: ['vitality', 'perception', 'endurance'],     label: 'ASPECTSOFPOWER.CraftElement.solar' },
-  lunar:     { stats: ['intelligence', 'willpower', 'wisdom'],     label: 'ASPECTSOFPOWER.CraftElement.lunar' },
-  water:     { stats: ['wisdom', 'willpower', 'endurance'],        label: 'ASPECTSOFPOWER.CraftElement.water' },
-  fire:      { stats: ['strength', 'vitality', 'dexterity'],       label: 'ASPECTSOFPOWER.CraftElement.fire' },
-  earth:     { stats: ['strength', 'endurance', 'vitality'],       label: 'ASPECTSOFPOWER.CraftElement.earth' },
-  air:       { stats: ['dexterity', 'endurance', 'perception'],    label: 'ASPECTSOFPOWER.CraftElement.air' },
-  lightning: { stats: ['dexterity', 'perception', 'vitality'],     label: 'ASPECTSOFPOWER.CraftElement.lightning' },
-  ice:       { stats: ['intelligence', 'perception', 'toughness'], label: 'ASPECTSOFPOWER.CraftElement.ice' },
-  space:     { stats: ['perception', 'willpower', 'endurance'],    label: 'ASPECTSOFPOWER.CraftElement.space' },
-  neutral:   { stats: [],                                          label: 'ASPECTSOFPOWER.CraftElement.neutral' },
-};
+ASPECTSOFPOWER.craftElements = Object.fromEntries([
+  ...Object.entries(ASPECTSOFPOWER.affinities).map(
+    ([key, def]) => [key, { stats: def.materialStats, label: def.label }]
+  ),
+  ['neutral', { stats: [], label: 'ASPECTSOFPOWER.CraftElement.neutral' }],
+]);
 
 /**
  * Quality thresholds for crafted items (progress → quality).
