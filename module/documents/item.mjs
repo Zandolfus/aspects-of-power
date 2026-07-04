@@ -2160,6 +2160,17 @@ export class AspectsofPowerItem extends Item {
       }
     }
     const skillMagicType  = (this.system.tags ?? []).includes('magic') ? 'magical' : '';
+    // Physical weapon strikes carry an IMPLICIT 'physical' affinity for
+    // DR-strip matching (armor-answer system) — so Hemorrhage-family physical
+    // strippers apply to a bare strike without every weapon skill needing an
+    // authored tag. Elemental strikes (authored affinity, e.g. a fire-tagged
+    // strike) and magic use their own; only affinity-less non-magic weapon
+    // attacks default to physical.
+    const rollType = this.system.roll?.type;
+    const isPhysWeaponType = rollType === 'str_weapon' || rollType === 'dex_weapon' || rollType === 'phys_ranged';
+    if (isPhysWeaponType && !skillAffinities.length && !skillMagicType) {
+      skillAffinities.push('physical');
+    }
     if (!skillAffinities.length && !skillMagicType) return 0;
 
     const currentPositions = (attackerToken && targetToken)
