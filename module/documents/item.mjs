@@ -2884,6 +2884,11 @@ export class AspectsofPowerItem extends Item {
     const markAttackBonus  = this.system.tagConfig?.markAttackBonus ?? 0;
     const markExpiresOnHit = this.system.tagConfig?.markExpiresOnHit ?? false;
     const markActive       = markBonus > 0 || markAttackBonus > 0;
+    // Armor Crush (armor-answer system): a pure crush debuff has no stat
+    // entries / DoT / debuffType, so it would otherwise fail the effectData
+    // gate below and silently apply nothing. Treat a non-zero debuffArmorCrush
+    // as reason enough to spawn the carrying effect.
+    const armorCrushVal    = this.system.tagConfig?.debuffArmorCrush ?? 0;
     effectData.type = 'base';
     effectData.system = {
       debuffDamage: rollTotal,
@@ -2913,7 +2918,7 @@ export class AspectsofPowerItem extends Item {
       effectName,
       originUuid: this.uuid,
       stackable: this.system.tagConfig?.debuffStackable ?? false,
-      effectData: (changes.length > 0 || dealsDmg || debuffType !== 'none' || markActive) ? effectData : null,
+      effectData: (changes.length > 0 || dealsDmg || debuffType !== 'none' || markActive || armorCrushVal > 0) ? effectData : null,
       dotDamage: dotDmg,
       dotDamageType: dmgType,
       duration,
