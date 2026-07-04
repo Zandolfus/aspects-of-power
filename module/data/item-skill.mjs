@@ -309,6 +309,9 @@ export class SkillData extends foundry.abstract.TypeDataModel {
         // the strip amount). Only DEDICATED strippers (Hemorrhage, Burn, the
         // per-affinity set) set this — generic DoTs leave it false.
         debuffDRStrip:      new fields.BooleanField({ initial: false }),
+        // Armor Crush opt-in: fraction of the target's armor+blockDR this
+        // debuff removes per application (armor-answer system; ~0.10, cap 30%).
+        debuffArmorCrush:   new fields.NumberField({ initial: 0, min: 0, max: 1 }),
         // DoT damage scaling: per-tick DoT damage = dmgRoll × dotScale ×
         // defenseMultiplier. Separate from debuffScaleWithAttack (which
         // scales the stat-reduction portion of the debuff) so designers

@@ -33,6 +33,12 @@ export class AopEffectData extends foundry.data.ActiveEffectTypeDataModel {
       // does NOT melt DR. Set from the source skill's tagConfig.debuffDRStrip.
       drStrip:          new fields.BooleanField({ initial: false }),
 
+      // ── Armor Crush (armor-answer system) ──
+      // Fraction of the target's armor+blockDR this debuff removes while
+      // active (summed across stacks, capped in _getArmorCrushReduction).
+      // Set from the source skill's tagConfig.debuffArmorCrush.
+      armorCrush:       new fields.NumberField({ initial: 0, min: 0 }),
+
       // ── Caster / source tracking ──
       casterActorUuid:  new fields.StringField({ initial: '' }),
       affinities:       new fields.ArrayField(new fields.StringField(), { initial: [] }),

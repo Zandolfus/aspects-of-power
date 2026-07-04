@@ -226,6 +226,20 @@ ASPECTSOFPOWER.spellstrike = {
 };
 
 /**
+ * Armor-answer system (design-armor-answer-system.md, sim-set 2026-07-03).
+ * The physical ARMOR layer (armor + blockDR) is reduced by ARMOR CRUSH
+ * (stacking debuff) then PIERCE (a `pierce` skill tag, or inherent on
+ * hammers/maces). Both are %-of-armor, applied multiplicatively. DR-strip
+ * (the toughDR layer) is separate (drStrip flag + dotScale).
+ */
+ASPECTSOFPOWER.armorAnswer = {
+  pierceFraction:     0.35,
+  pierceWeaponTypes:  ['hammer', 'mace'],
+  armorCrushPerStack: 0.10,
+  armorCrushMaxStacks: 3,
+};
+
+/**
  * Celerity timing constants (per design-celerity.md).
  *   wait = (weapon_base_weight × skill_multiplier × SCALE) / actor_speed
  *   round_length = ROUND_K / ref_mod(RL)

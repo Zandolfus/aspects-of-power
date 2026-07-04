@@ -1088,9 +1088,22 @@ export class AspectsofPowerItem extends Item {
     const isPhysical   = rollData.roll.damageType === 'physical';
     // Physical mitigation = armor + held-weapon block DR (active defense:
     // the str archetype's constant-on guard). Magical = veil only.
-    const mitigation   = isPhysical
-      ? (targetActor.system.defense.armor?.value ?? 0) + (targetActor.system.defense.blockDR ?? 0)
-      : (targetActor.system.defense.veil?.value  ?? 0);
+    // Armor-answer system: the physical armor layer (armor+blockDR) is reduced
+    // by ARMOR CRUSH (stacking debuff) then PIERCE (a `pierce` skill tag, or
+    // inherent on hammers/maces) — both %-of-armor, multiplicative.
+    let mitigation;
+    if (isPhysical) {
+      const _aa = CONFIG.ASPECTSOFPOWER.armorAnswer ?? {};
+      const armorLayer = (targetActor.system.defense.armor?.value ?? 0) + (targetActor.system.defense.blockDR ?? 0);
+      const crushFrac = this._getArmorCrushReduction(targetActor);
+      const _wpnTags = this._resolveWeaponForSkill?.()?.system?.tags ?? [];
+      const hasPierce = (this.system.tags ?? []).includes('pierce')
+        || (_aa.pierceWeaponTypes ?? ['hammer', 'mace']).some(t => _wpnTags.includes(t));
+      const pierceFrac = hasPierce ? (_aa.pierceFraction ?? 0.35) : 0;
+      mitigation = Math.round(armorLayer * (1 - crushFrac) * (1 - pierceFrac));
+    } else {
+      mitigation = (targetActor.system.defense.veil?.value ?? 0);
+    }
     const attackerToken      = this.actor.getActiveTokens()[0] ?? null;
     const baseDR             = targetActor.system.defense?.dr?.value ?? 0;
     const affinityDR         = this._getAffinityDRReduction(targetActor, attackerToken, targetToken);
@@ -2148,6 +2161,23 @@ export class AspectsofPowerItem extends Item {
    * @param {Token|null} targetToken    The target's canvas token.
    * @returns {number}
    */
+  /**
+   * Armor Crush reduction (armor-answer system): total fraction of the
+   * target's armor+blockDR removed by active armor-crush debuffs, summed
+   * across stacks and capped (config armorCrushPerStack × armorCrushMaxStacks).
+   * @returns {number} fraction in [0, cap]
+   */
+  _getArmorCrushReduction(targetActor) {
+    const aa = CONFIG.ASPECTSOFPOWER.armorAnswer ?? {};
+    const cap = (aa.armorCrushPerStack ?? 0.10) * (aa.armorCrushMaxStacks ?? 3);
+    let total = 0;
+    for (const effect of targetActor.allApplicableEffects()) {
+      const v = Number(effect.system?.armorCrush ?? 0) || 0;
+      if (v > 0) total += v;
+    }
+    return Math.min(cap, total);
+  }
+
   _getAffinityDRReduction(targetActor, attackerToken = null, targetToken = null) {
     const skillMagicType  = (this.system.tags ?? []).includes('magic') ? 'magical' : '';
     const rollType = this.system.roll?.type;
@@ -2864,6 +2894,7 @@ export class AspectsofPowerItem extends Item {
       directions,
       ...(dismemberedSlot ? { dismemberedSlot } : {}),
       ...(dealsDmg ? { dot: true, dotDamage: dotDmg, dotDamageType: dmgType, applierActorUuid: this.actor.uuid, drStrip: !!this.system.tagConfig?.debuffDRStrip } : {}),
+      ...((this.system.tagConfig?.debuffArmorCrush ?? 0) > 0 ? { armorCrush: this.system.tagConfig.debuffArmorCrush } : {}),
       ...(markActive ? {
         markedByActorUuid:      this.actor.uuid,
         markedDamageBonus:      markBonus,
