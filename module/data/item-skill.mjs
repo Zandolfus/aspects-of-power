@@ -303,6 +303,12 @@ export class SkillData extends foundry.abstract.TypeDataModel {
         debuffDirectional:  new fields.BooleanField({ initial: false }),
         debuffDealsDamage:  new fields.BooleanField({ initial: false }),
         debuffDamageType:   new fields.StringField({ initial: 'physical' }),
+        // DR-strip opt-in (armor-answer system): when true AND the debuff is a
+        // damage DoT with an affinity, the applied effect reduces the target's
+        // toughness DR vs matching-affinity attacks (its debuffDamage tick is
+        // the strip amount). Only DEDICATED strippers (Hemorrhage, Burn, the
+        // per-affinity set) set this — generic DoTs leave it false.
+        debuffDRStrip:      new fields.BooleanField({ initial: false }),
         // DoT damage scaling: per-tick DoT damage = dmgRoll × dotScale ×
         // defenseMultiplier. Separate from debuffScaleWithAttack (which
         // scales the stat-reduction portion of the debuff) so designers

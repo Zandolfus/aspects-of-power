@@ -26,6 +26,13 @@ export class AopEffectData extends foundry.data.ActiveEffectTypeDataModel {
       dotDamageType:    new fields.StringField({ initial: 'physical' }),
       applierActorUuid: new fields.StringField({ initial: '' }),
 
+      // ── DR-strip opt-in (armor-answer system, design-armor-answer-system) ──
+      // Only effects with drStrip:true reduce the target's toughness DR vs a
+      // matching-affinity attack (_getAffinityDRReduction). Keeps DR-strip a
+      // DEDICATED debuff property — a generic bleed/venom deals DoT damage but
+      // does NOT melt DR. Set from the source skill's tagConfig.debuffDRStrip.
+      drStrip:          new fields.BooleanField({ initial: false }),
+
       // ── Caster / source tracking ──
       casterActorUuid:  new fields.StringField({ initial: '' }),
       affinities:       new fields.ArrayField(new fields.StringField(), { initial: [] }),

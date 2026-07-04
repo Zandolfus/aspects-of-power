@@ -2169,6 +2169,9 @@ export class AspectsofPowerItem extends Item {
     let total = 0;
     for (const effect of targetActor.allApplicableEffects()) {
       const sys = effect.system ?? {};
+      // DR-strip is now OPT-IN (armor-answer system): only dedicated stripper
+      // debuffs (drStrip:true) melt DR — a generic affinity DoT no longer does.
+      if (!sys.drStrip) continue;
       if (!sys.debuffDamage || !sys.dot) continue;
 
       const effectAffinities = sys.affinities ?? [];
@@ -2840,7 +2843,7 @@ export class AspectsofPowerItem extends Item {
       magicType: (this.system.tags ?? []).includes('magic') ? 'magical' : 'non-magical',
       directions,
       ...(dismemberedSlot ? { dismemberedSlot } : {}),
-      ...(dealsDmg ? { dot: true, dotDamage: dotDmg, dotDamageType: dmgType, applierActorUuid: this.actor.uuid } : {}),
+      ...(dealsDmg ? { dot: true, dotDamage: dotDmg, dotDamageType: dmgType, applierActorUuid: this.actor.uuid, drStrip: !!this.system.tagConfig?.debuffDRStrip } : {}),
       ...(markActive ? {
         markedByActorUuid:      this.actor.uuid,
         markedDamageBonus:      markBonus,
