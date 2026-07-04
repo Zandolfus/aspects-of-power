@@ -2149,27 +2149,36 @@ export class AspectsofPowerItem extends Item {
    * @returns {number}
    */
   _getAffinityDRReduction(targetActor, attackerToken = null, targetToken = null) {
-    // Merge skill affinities with actor's innate affinities from tags.
+    const skillMagicType  = (this.system.tags ?? []).includes('magic') ? 'magical' : '';
+    const rollType = this.system.roll?.type;
+    const isPhysWeaponType = rollType === 'str_weapon' || rollType === 'dex_weapon' || rollType === 'phys_ranged';
+
     const skillAffinities = [...(this.system.affinities ?? [])];
-    if (this.actor?.system?.collectedTags) {
+    if (isPhysWeaponType && !skillMagicType) {
+      // "A sword is a sword" (ruled 2026-07-03): a weapon STRIKE is always
+      // physical, PLUS the WIELDED WEAPON's enchant affinity (a lightning
+      // sword deals phys + lightning → matches both a physical and a lightning
+      // stripper). We derive from the WEAPON only — NOT the actor's aggregate
+      // collectedTags, which would smear every equipped gear affinity onto
+      // every swing (a fire ring + ice armor shouldn't colour a sword-strike).
+      if (!skillAffinities.includes('physical')) skillAffinities.push('physical');
+      const weapon = this._resolveWeaponForSkill?.();
+      const wpnAff = [
+        ...((weapon?.system?.tags ?? [])
+          .filter(t => typeof t === 'string' && t.endsWith('-affinity'))
+          .map(t => t.replace('-affinity', ''))),
+        ...(weapon?.system?.affinities ?? []),
+      ];
+      for (const aff of wpnAff) if (!skillAffinities.includes(aff)) skillAffinities.push(aff);
+    } else if (this.actor?.system?.collectedTags) {
+      // Magic / non-weapon skills keep the actor-innate affinity merge
+      // (a fire-affinity caster's spells read fire) — unchanged behavior.
       for (const [tagId, data] of this.actor.system.collectedTags) {
         if (data.category === 'affinity') {
           const affinityName = tagId.replace('-affinity', '');
           if (!skillAffinities.includes(affinityName)) skillAffinities.push(affinityName);
         }
       }
-    }
-    const skillMagicType  = (this.system.tags ?? []).includes('magic') ? 'magical' : '';
-    // Physical weapon strikes carry an IMPLICIT 'physical' affinity for
-    // DR-strip matching (armor-answer system) — so Hemorrhage-family physical
-    // strippers apply to a bare strike without every weapon skill needing an
-    // authored tag. Elemental strikes (authored affinity, e.g. a fire-tagged
-    // strike) and magic use their own; only affinity-less non-magic weapon
-    // attacks default to physical.
-    const rollType = this.system.roll?.type;
-    const isPhysWeaponType = rollType === 'str_weapon' || rollType === 'dex_weapon' || rollType === 'phys_ranged';
-    if (isPhysWeaponType && !skillAffinities.length && !skillMagicType) {
-      skillAffinities.push('physical');
     }
     if (!skillAffinities.length && !skillMagicType) return 0;
 
