@@ -18,20 +18,9 @@
  *     returns false, default movement fires unchanged.
  */
 
-import { declareMovement, MOVEMENT_ITEM_ID, resolveMovementMode } from '../systems/celerity.mjs';
+import { declareMovement, MOVEMENT_ITEM_ID, getActiveMovementMode, computeMovementStamina } from '../systems/celerity.mjs';
 
 const FLAG_NS = 'aspectsofpower';
-
-/**
- * Read the current Shift-key state from Foundry's keyboard manager. WASD
- * buffer uses this on each extend to (re)pick the buffer's mode — latest
- * Shift state wins, so the player can swap mid-buffer by holding/releasing.
- */
-function _isShiftHeld() {
-  const dk = game.keyboard?.downKeys;
-  if (!dk) return false;
-  return dk.has('ShiftLeft') || dk.has('ShiftRight') || dk.has('Shift');
-}
 
 /**
  * Buffer state per combatant.
@@ -82,30 +71,27 @@ export function extendBuffer(combatant, dxSteps, dySteps) {
       destPos: { x: tok.x, y: tok.y },
       totalDistFt: 0,
       staminaCost: 0,
-      mode: 'walk',
+      // MODE LOCKS AT BUFFER START (movement UX 2026-07-14). The old
+      // "latest Shift wins" re-pick silently flipped the mode mid-buffer,
+      // so the committed mode could mismatch what the player intended.
+      mode: getActiveMovementMode(combatant.actor),
     };
     _buffers.set(combatant.id, buf);
   }
-
-  // Latest Shift state wins. Player can toggle modes mid-buffer.
-  buf.mode = _isShiftHeld() ? 'sprint' : 'walk';
-  const m = resolveMovementMode(buf.mode);
 
   // Step the destination by one grid square in the indicated direction.
   buf.destPos = {
     x: buf.destPos.x + dxSteps * gridSize,
     y: buf.destPos.y + dySteps * gridSize,
   };
-  // Recompute distance + cost from start to current dest.
+  // Recompute distance + cost from start to current dest — via the ONE shared
+  // stamina formula (the old local copy omitted movementStaminaMultiplier, so
+  // WASD moves cost differently than identical drags).
   const dxPx = buf.destPos.x - buf.startPos.x;
   const dyPx = buf.destPos.y - buf.startPos.y;
   const distPx = Math.hypot(dxPx, dyPx);
   buf.totalDistFt = Math.round(distPx / gridSize * ftPerSquare);
-  // 1 stamina per 5ft (Foundry default) scaled by mode and encumbrance.
-  // Walk = 0.5× mode mult; carry ratio adds proportional cost on top.
-  const carryRatio = Math.max(0, combatant.actor?.system?.carryRatio ?? 0);
-  const encumbranceMult = 1 + carryRatio;
-  buf.staminaCost = Math.round((buf.totalDistFt / 5) * m.staminaMult * encumbranceMult);
+  buf.staminaCost = computeMovementStamina(combatant.actor, buf.totalDistFt, buf.mode);
 
   Hooks.callAll('aopMovementBufferChanged', combatant.id);
   return true;

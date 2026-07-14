@@ -17,7 +17,7 @@
 
     {{#if stamina.display}}
     <span class="delta-measurement sep">|</span>
-    <span class="total-measurement stamina-cost">{{stamina.cost}}S</span>
+    {{#if stamina.cost}}<span class="total-measurement stamina-cost">{{stamina.cost}}S</span>{{/if}}
     <span class="remaining-movement">({{stamina.mode}})</span>
     {{/if}}
 

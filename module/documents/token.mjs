@@ -1,15 +1,4 @@
-import { declareMovement, resolveMovementMode, clampMoveNoOverlap } from '../systems/celerity.mjs';
-
-/**
- * Read the current Shift-key state from Foundry's keyboard manager. Used
- * to pick movement mode at drag-release / WASD-press time. Returns false
- * if the keyboard manager is not yet available (system init order).
- */
-function _isShiftHeld() {
-  const dk = game.keyboard?.downKeys;
-  if (!dk) return false;
-  return dk.has('ShiftLeft') || dk.has('ShiftRight') || dk.has('Shift');
-}
+import { declareMovement, resolveMovementMode, getActiveMovementMode, clampMoveNoOverlap } from '../systems/celerity.mjs';
 
 /**
  * Extended TokenDocument for Aspects of Power.
@@ -120,7 +109,7 @@ export class AspectsofPowerToken extends foundry.documents.TokenDocument {
     // (canvas/token._getMovementCostFunction) already applies mode and
     // encumbrance multipliers along the path — read the summed result here
     // and use it directly. Re-applying would double-charge.
-    const mode = resolveMovementMode(_isShiftHeld() ? 'sprint' : 'walk');
+    const mode = resolveMovementMode(getActiveMovementMode(actor));
     const staminaCost = Math.round((movement.passed?.cost ?? 0) + (movement.pending?.cost ?? 0));
     if (staminaCost > actor.system.stamina.value) {
       ui.notifications.warn(`${actor.name}: insufficient stamina (${actor.system.stamina.value}/${staminaCost} needed).`);

@@ -14,13 +14,7 @@
  *
  * @extends {foundry.canvas.placeables.Token}
  */
-import { resolveMovementMode } from '../systems/celerity.mjs';
-
-function _isShiftHeld() {
-  const dk = game.keyboard?.downKeys;
-  if (!dk) return false;
-  return dk.has('ShiftLeft') || dk.has('ShiftRight') || dk.has('Shift');
-}
+import { resolveMovementMode, getActiveMovementMode } from '../systems/celerity.mjs';
 
 export class AspectsofPowerTokenObject extends foundry.canvas.placeables.Token {
 
@@ -50,7 +44,7 @@ export class AspectsofPowerTokenObject extends foundry.canvas.placeables.Token {
       // Pick mode + encumbrance live from current state. The ruler refreshes
       // continuously during drag, so Shift toggles and item-weight changes
       // are reflected immediately.
-      const mode = resolveMovementMode(_isShiftHeld() ? 'sprint' : 'walk');
+      const mode = resolveMovementMode(getActiveMovementMode(actor));
       const carryRatio = Math.max(0, actor.system.carryRatio ?? 0);
       const encumbranceMult = 1 + carryRatio;
       // Active-effect-driven stamina multiplier (Stormstride efficiency,

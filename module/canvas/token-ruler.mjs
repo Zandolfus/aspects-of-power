@@ -8,11 +8,7 @@
  *
  * @extends {foundry.canvas.placeables.tokens.TokenRuler}
  */
-function _isShiftHeld() {
-  const dk = game.keyboard?.downKeys;
-  if (!dk) return false;
-  return dk.has('ShiftLeft') || dk.has('ShiftRight') || dk.has('Shift');
-}
+import { getActiveMovementMode } from '../systems/celerity.mjs';
 
 export class AspectsofPowerTokenRuler extends foundry.canvas.placeables.tokens.TokenRuler {
 
@@ -24,20 +20,20 @@ export class AspectsofPowerTokenRuler extends foundry.canvas.placeables.tokens.T
     if (!context) return context;
 
     const actor = this.token.actor;
-    const combat = game.combat;
-
-    // Only show stamina cost during active combat.
-    if (!actor?.system || !combat?.started) {
+    if (!actor?.system) {
       context.stamina = { display: false };
       return context;
     }
 
+    // Mode shows ALWAYS (movement UX 2026-07-14 — players must be able to see
+    // how they're moving); stamina cost only in combat, where it's charged.
+    const combat = game.combat;
+    const mode = getActiveMovementMode(actor);
     const cost = waypoint.measurement?.cost ?? 0;
-    const mode = _isShiftHeld() ? 'sprint' : 'walk';
 
     context.stamina = {
       display: true,
-      cost: isFinite(cost) ? Math.round(cost) : '---',
+      cost: combat?.started ? (isFinite(cost) ? Math.round(cost) : '---') : '',
       mode,
     };
 

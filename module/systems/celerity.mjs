@@ -685,6 +685,43 @@ export function resolveMovementMode(modeKey) {
   return { key, ...modes[key] };
 }
 
+/** Shared Shift-state read — the momentary sprint override. Single source of
+ *  truth for what used to be four separate copies (movement UX 2026-07-14). */
+export function isShiftHeld() {
+  const dk = game.keyboard?.downKeys;
+  if (!dk) return false;
+  return dk.has('ShiftLeft') || dk.has('ShiftRight') || dk.has('Shift');
+}
+
+/**
+ * The actor's ACTIVE movement mode key (movement UX overhaul 2026-07-14):
+ *   1. Shift held → sprint (momentary override, preserved legacy gesture)
+ *   2. actor's persisted preference (flags.aspectsofpower.movementMode,
+ *      set by the token-HUD walk/sprint toggle)
+ *   3. config default ('walk')
+ */
+export function getActiveMovementMode(actor) {
+  if (isShiftHeld()) return 'sprint';
+  const pref = actor?.flags?.aspectsofpower?.movementMode;
+  const modes = CONFIG.ASPECTSOFPOWER.celerity?.MOVEMENT_MODES ?? {};
+  if (pref && modes[pref]) return pref;
+  return CONFIG.ASPECTSOFPOWER.celerity?.DEFAULT_MOVEMENT_MODE ?? 'walk';
+}
+
+/**
+ * Movement stamina cost — ONE formula for every input path (drag preview,
+ * WASD buffer, declare). Pre-2026-07-14 the buffer had its own copy that
+ * omitted movementStaminaMultiplier, so the same move could cost different
+ * stamina depending on input method.
+ *   cost = distFt × 0.2 × mode.staminaMult × (1 + carryRatio) × movementStaminaMultiplier
+ */
+export function computeMovementStamina(actor, distanceFt, modeKey) {
+  const m = resolveMovementMode(modeKey);
+  const carryRatio = Math.max(0, actor?.system?.carryRatio ?? 0);
+  const fxMult = Math.max(0, actor?.system?.movementStaminaMultiplier ?? 1);
+  return Math.ceil(distanceFt * 0.2 * (m.staminaMult ?? 1) * (1 + carryRatio) * fxMult);
+}
+
 /**
  * Compute movement wait in ticks for `distanceFt` traveled by `actor`.
  *   wait = (distanceFt / 5) × MOVEMENT_BASE_WEIGHT_PER_5FT × mode.celerityMult × SCALE / (dex.mod × movementSpeedMultiplier)

@@ -361,12 +361,10 @@
           <span class="range-item">
             <strong>{{localize "ASPECTSOFPOWER.Range.castingRange"}}:</strong> {{system.castingRange}} ft
           </span>
-          <span class="range-item">
-            <strong>{{localize "ASPECTSOFPOWER.Range.walkRange"}}:</strong> {{system.walkRange}} ft
-          </span>
-          <span class="range-item">
-            <strong>{{localize "ASPECTSOFPOWER.Range.sprintRange"}}:</strong> {{system.sprintRange}} ft
-          </span>
+          {{!-- walkRange/sprintRange removed 2026-07-14: vestigial — the
+               movement model has no distance cap (movement is one action of
+               any length, priced in celerity+stamina), so these numbers gated
+               nothing and read as a false "move budget". --}}
         </div>
 
       </div>

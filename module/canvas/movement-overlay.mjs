@@ -84,6 +84,31 @@ function _refreshOverlayNow() {
   if (!_overlayContainer || _overlayContainer.destroyed) return;
   _overlayContainer.removeChildren().forEach(c => c.destroy({ children: true }));
 
+  // Movement-mode chips (movement UX 2026-07-14): a small always-visible
+  // label under YOUR tokens showing the persisted walk/sprint mode — in and
+  // out of combat. Players see chips on owned tokens; the GM only on
+  // controlled ones (else every NPC would sprout one).
+  for (const tok of (canvas.tokens?.placeables ?? [])) {
+    const actor = tok.actor;
+    if (!actor) continue;
+    const show = game.user.isGM ? tok.controlled : actor.isOwner;
+    if (!show) continue;
+    const mode = actor.flags?.aspectsofpower?.movementMode ?? 'walk';
+    const isSprint = mode === 'sprint';
+    const label = new PIXI.Text(isSprint ? 'SPRINT' : 'walk', {
+      fontSize: 11,
+      fill: isSprint ? 0xff8833 : 0xbbbbbb,
+      stroke: 0x000000,
+      strokeThickness: 3,
+      fontWeight: 'bold',
+    });
+    label.anchor?.set?.(0.5, 0);
+    label.x = tok.document.x + ((tok.document.width ?? 1) * canvas.grid.size) / 2;
+    label.y = tok.document.y + (tok.document.height ?? 1) * canvas.grid.size + 2;
+    label.eventMode = 'none';
+    _overlayContainer.addChild(label);
+  }
+
   const combat = game.combat;
   if (!combat?.started) return;
   const sceneId = canvas.scene?.id;

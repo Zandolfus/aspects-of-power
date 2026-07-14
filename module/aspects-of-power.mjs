@@ -40,6 +40,7 @@ import { SummonHelpers, registerSummonHooks } from './systems/summon.mjs';
 import { ChannelHelpers, registerChannelHooks } from './systems/channel.mjs';
 import { AIProfiles, registerAIHooks } from './systems/ai.mjs';
 import { registerSummonHud } from './canvas/summon-hud.mjs';
+import { registerMovementHud } from './canvas/movement-hud.mjs';
 import { CelerityCombatTracker, installAopTurnMarkerPatch } from './apps/celerity-combat-tracker.mjs';
 
 /* -------------------------------------------- */
@@ -844,6 +845,7 @@ Hooks.once('ready', async function () {
 
   // Token-HUD command buttons (Hold / Manual / Focus / Move) for owned AI units.
   registerSummonHud();
+  registerMovementHud();
 
   // Eagerly hydrate the augments compendium so `fromUuidSync` returns full
   // system data (not just index stubs). Required by `deriveItemStats` and
@@ -1686,8 +1688,8 @@ Hooks.on('canvasTearDown', () => detachOverlayLayer());
 // and updateActor (sense tags / stats changed).
 Hooks.on('canvasReady', () => attachPowerSenseLayer());
 Hooks.on('canvasTearDown', () => detachPowerSenseLayer());
-Hooks.on('controlToken', () => refreshPowerSense());
-Hooks.on('updateToken', () => refreshPowerSense());
+Hooks.on('controlToken', () => { refreshPowerSense(); refreshOverlay(); });
+Hooks.on('updateToken', () => { refreshPowerSense(); refreshOverlay(); });
 
 // Re-render overlay when any combatant's flags change (declare / cancel /
 // movement completion clears the flag) or the combat clock advances (so
