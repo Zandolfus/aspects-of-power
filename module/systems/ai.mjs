@@ -783,11 +783,17 @@ export function registerAIHooks() {
     // declares → cancels → … machine-speed; live bug 2026-06-14).
     if (_options?._aopCancelRedeclare) return;
 
-    // We care about declaredAction transitions from set → null (action fired)
-    const declaredChange = changes?.flags?.['aspectsofpower']?.declaredAction;
-    if (declaredChange !== null && declaredChange !== undefined) return;
-    // After the update, the combatant's declaredAction should be null
+    // We care about set → null transitions on EITHER track (2026-07-14
+    // movement split): declaredAction (skill fired) or declaredMovement
+    // (move landed). Either one resolving is the AI's "decide what's next".
+    const fchg = changes?.flags?.['aspectsofpower'] ?? {};
+    const actionCleared = fchg.declaredAction === null;
+    const movementCleared = fchg.declaredMovement === null;
+    if (!actionCleared && !movementCleared) return;
+    // After the update, BOTH tracks must be idle — an AI mid-walk with a
+    // queued shot (or vice versa) decides when the LAST track resolves.
     if (combatantDoc.flags?.aspectsofpower?.declaredAction) return;
+    if (combatantDoc.flags?.aspectsofpower?.declaredMovement) return;
 
     const actor = combatantDoc.actor;
     if (!actor) return;
@@ -818,6 +824,7 @@ export function registerAIHooks() {
   const _kick = (combatantDoc) => {
     if (!isActingGM()) return;
     if (combatantDoc.flags?.aspectsofpower?.declaredAction) return;
+    if (combatantDoc.flags?.aspectsofpower?.declaredMovement) return;
     const actor = combatantDoc.actor;
     const profileName = actor?.flags?.aspectsofpower?.aiProfile;
     if (!profileName) return;
@@ -862,7 +869,8 @@ export function registerAIHooks() {
   // (the firing combatant still holds its action when round-start runs).
   Hooks.on('aopRoundStart', (combat, combatantDoc) => {
     if (!isActingGM()) return;
-    if (combatantDoc.flags?.aspectsofpower?.declaredAction) return; // not inert
+    if (combatantDoc.flags?.aspectsofpower?.declaredAction) return;   // not inert
+    if (combatantDoc.flags?.aspectsofpower?.declaredMovement) return; // still moving
     const actor = combatantDoc.actor;
     const profileName = actor?.flags?.aspectsofpower?.aiProfile;
     if (!profileName) return;

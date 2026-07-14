@@ -656,6 +656,11 @@ ASPECTSOFPOWER.skillTags = {
   pierce:      'ASPECTSOFPOWER.Tag.pierce',
   shred:       'ASPECTSOFPOWER.Tag.shred',
   crush:       'ASPECTSOFPOWER.Tag.crush',
+  // Mobile (design-concurrent-actions, 2026-07-14): skill can be declared and
+  // fired WHILE WALKING (parallel movement track) — potions, pistol shots,
+  // wand bolts, thrown knives. Read by the declareAction/declareMovement
+  // concurrency gates in celerity.mjs. Sprint never permits concurrency.
+  mobile:      'ASPECTSOFPOWER.Tag.mobile',
   // Affinity tags (set skill damage affinity).
   fire:          'ASPECTSOFPOWER.Tag.fire',
   heat:          'ASPECTSOFPOWER.Tag.heat',
@@ -772,6 +777,8 @@ ASPECTSOFPOWER.combatTags = {
   pierce:      'ASPECTSOFPOWER.Tag.pierce',
   shred:       'ASPECTSOFPOWER.Tag.shred',
   crush:       'ASPECTSOFPOWER.Tag.crush',
+  // Concurrency (design-concurrent-actions).
+  mobile:      'ASPECTSOFPOWER.Tag.mobile',
   // Affinities.
   time:          'ASPECTSOFPOWER.Tag.time',
   karma:         'ASPECTSOFPOWER.Tag.karma',

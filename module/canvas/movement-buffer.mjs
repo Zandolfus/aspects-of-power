@@ -110,13 +110,10 @@ export async function commitBuffer(combatant) {
   const actor = combatant.actor;
   if (!actor) return false;
 
-  // Refuse if actor already has a non-buffered declared action queued.
-  const existing = combatant.flags?.[FLAG_NS]?.declaredAction;
-  if (existing && existing.itemId && existing.itemId !== MOVEMENT_ITEM_ID) {
-    ui.notifications.warn(`${actor.name} already has "${existing.label}" queued. Cancel it first.`);
-    cancelBuffer(combatant);
-    return false;
-  }
+  // Concurrency gating (walk + mobile-skill parallelism) now lives inside
+  // declareMovement itself — it refuses with a toast and returns null when
+  // the combination is illegal, in which case the buffer stays staged so
+  // the player can cancel or adjust.
 
   // Stamina check.
   if (buf.staminaCost > actor.system.stamina.value) {
@@ -124,7 +121,8 @@ export async function commitBuffer(combatant) {
     return false;
   }
 
-  await declareMovement(actor, buf.startPos, buf.destPos, buf.totalDistFt, buf.staminaCost, buf.mode);
+  const res = await declareMovement(actor, buf.startPos, buf.destPos, buf.totalDistFt, buf.staminaCost, buf.mode);
+  if (!res) return false;
   _buffers.delete(combatant.id);
   Hooks.callAll('aopMovementBufferChanged', combatant.id);
   return true;

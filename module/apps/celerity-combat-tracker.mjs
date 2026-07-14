@@ -31,10 +31,21 @@ async function _onCelAdvance(event, target) {
   const combat = this.viewed;
   if (!combat?.started) return;
   const clockTick = getClockTick(combat);
-  // Find the soonest declared action with a scheduled tick still in the future.
+  // Find the soonest declared entry with a scheduled tick still in the future.
+  // TWO parallel tracks per combatant (2026-07-14): declaredAction (skills)
+  // + declaredMovement — each is an independent queue entry, so a walking
+  // actor's queued pistol shot and the walk itself both advance the clock.
+  const _entriesOf = (c) => {
+    const out = [];
+    const da = c.flags?.[FLAG_NS]?.declaredAction;
+    if (da) out.push({ c, declared: da });
+    const dm = c.flags?.[FLAG_NS]?.declaredMovement;
+    if (dm) out.push({ c, declared: dm });
+    return out;
+  };
   const queued = [...combat.combatants]
-    .map(c => ({ c, declared: c.flags?.[FLAG_NS]?.declaredAction ?? null }))
-    .filter(e => e.declared && typeof e.declared.scheduledTick === 'number' && e.declared.scheduledTick > clockTick)
+    .flatMap(_entriesOf)
+    .filter(e => typeof e.declared.scheduledTick === 'number' && e.declared.scheduledTick > clockTick)
     .sort((a, b) => a.declared.scheduledTick - b.declared.scheduledTick);
   if (queued.length === 0) {
     ui.notifications.info('No queued actions to advance to.');
@@ -89,11 +100,11 @@ async function _onCelAdvance(event, target) {
   await _scanPersistentAoeReticks(combat, newClock);
 
   // Re-pick the firer in case halt-check truncated something to an earlier
-  // tick than originally targeted. Re-read declaredAction from the latest
-  // combatant flag so wait/scheduledTick reflect post-truncation values.
+  // tick than originally targeted. Re-read both tracks from the latest
+  // combatant flags so wait/scheduledTick reflect post-truncation values.
   const requeued = [...combat.combatants]
-    .map(cm => ({ cm, declared: cm.flags?.[FLAG_NS]?.declaredAction ?? null }))
-    .filter(e => e.declared && typeof e.declared.scheduledTick === 'number')
+    .flatMap(cm => _entriesOf(cm).map(e => ({ cm: e.c, declared: e.declared })))
+    .filter(e => typeof e.declared.scheduledTick === 'number')
     .sort((a, b) => a.declared.scheduledTick - b.declared.scheduledTick);
   if (requeued.length > 0 && requeued[0].declared.scheduledTick <= newClock) {
     c = requeued[0].cm;
@@ -112,7 +123,7 @@ async function _onCelAdvance(event, target) {
   const movementUpdates = [];
   const completedMovementCombatantIds = [];
   for (const member of combat.combatants) {
-    const mv = member.flags?.[FLAG_NS]?.declaredAction;
+    const mv = member.flags?.[FLAG_NS]?.declaredMovement;
     if (!mv || mv.itemId !== MOVEMENT_ITEM_ID) continue;
     const token = member.token;
     if (!token) continue;
@@ -141,9 +152,12 @@ async function _onCelAdvance(event, target) {
   const autoResumes = [];
   for (const { id, mv } of completedMovementCombatantIds) {
     const member = combat.combatants.get(id);
+    // Movement track clears; a still-queued skill (parallel track) keeps
+    // owning nextActionTick.
+    const _qa = member.flags?.[FLAG_NS]?.declaredAction;
     const updates = {
-      [`flags.${FLAG_NS}.declaredAction`]: null,
-      [`flags.${FLAG_NS}.nextActionTick`]: null,
+      [`flags.${FLAG_NS}.declaredMovement`]: null,
+      [`flags.${FLAG_NS}.nextActionTick`]: (typeof _qa?.scheduledTick === 'number') ? _qa.scheduledTick : null,
       [`flags.${FLAG_NS}.lastActionName`]: mv.label,
       [`flags.${FLAG_NS}.lastActionWait`]: mv.wait,
       [`flags.${FLAG_NS}.lastActionAt`]: newClock,
@@ -232,7 +246,9 @@ async function _onCelAdvance(event, target) {
   if (declared.itemId === BREAK_FREE_ITEM_ID) {
     await c.update({
       [`flags.${FLAG_NS}.declaredAction`]: null,
-      [`flags.${FLAG_NS}.nextActionTick`]: null,
+      [`flags.${FLAG_NS}.nextActionTick`]:
+        (typeof c.flags?.[FLAG_NS]?.declaredMovement?.scheduledTick === 'number')
+          ? c.flags[FLAG_NS].declaredMovement.scheduledTick : null,
     });
     const actor = c.actor;
     const effect = declared.effectId ? actor?.effects?.get(declared.effectId) : null;
@@ -258,7 +274,10 @@ async function _onCelAdvance(event, target) {
   // the region itself once damage has applied (for instantaneous AOEs).
   await c.update({
     [`flags.${FLAG_NS}.declaredAction`]: null,
-    [`flags.${FLAG_NS}.nextActionTick`]: null,
+    // A movement still in flight (parallel track) keeps owning "next up".
+    [`flags.${FLAG_NS}.nextActionTick`]:
+      (typeof c.flags?.[FLAG_NS]?.declaredMovement?.scheduledTick === 'number')
+        ? c.flags[FLAG_NS].declaredMovement.scheduledTick : null,
   }, { _aopFireDispatch: true });
   const item = c.actor?.items?.get(declared.itemId);
   if (!item) {
@@ -490,22 +509,27 @@ async function _onCelCancel(event, target) {
   const combat = this.viewed;
   const c = combat?.combatants.get(combatantId);
   if (!c) return;
-  const declared = c.flags?.[FLAG_NS]?.declaredAction;
-  // For a cancelled movement: token stays at its current position (which is
-  // the lerp position from the most recent pause). No stamina debit — sunk
-  // cost is the celerity-time spent, not the resource. Per design.
+  // Two parallel tracks: cancel the SKILL first (most likely intent); a
+  // second click cancels the walk. For a cancelled movement the token stays
+  // at its current lerp position; no stamina debit — sunk cost is the
+  // celerity-time spent, not the resource. Per design.
+  const qa = c.flags?.[FLAG_NS]?.declaredAction;
+  const qm = c.flags?.[FLAG_NS]?.declaredMovement;
+  const declared = qa ?? qm;
+  if (!declared) return;
+  const clearingAction = !!qa;
+  const other = clearingAction ? qm : null;
   await c.update({
-    [`flags.${FLAG_NS}.nextActionTick`]: null,
-    [`flags.${FLAG_NS}.declaredAction`]: null,
+    [`flags.${FLAG_NS}.${clearingAction ? 'declaredAction' : 'declaredMovement'}`]: null,
+    [`flags.${FLAG_NS}.nextActionTick`]:
+      (typeof other?.scheduledTick === 'number') ? other.scheduledTick : null,
   });
   const noun = declared?.itemId === MOVEMENT_ITEM_ID ? 'movement' : (declared?.label ?? 'action');
-  ui.notifications.info(`${c.name} — ${noun} cancelled.`);
-  if (declared) {
-    ChatMessage.create({
-      speaker: ChatMessage.getSpeaker({ actor: c.actor }),
-      content: `<p><em>${c.name} cancels <strong>${declared.label}</strong>.</em></p>`,
-    });
-  }
+  ui.notifications.info(`${c.name} — ${noun} cancelled.${other ? ' (Movement still in flight — cancel again to stop it.)' : ''}`);
+  ChatMessage.create({
+    speaker: ChatMessage.getSpeaker({ actor: c.actor }),
+    content: `<p><em>${c.name} cancels <strong>${declared.label}</strong>.</em></p>`,
+  });
 }
 
 /**
@@ -581,6 +605,7 @@ async function _onCelReset(event, target) {
     await c.update({
       [`flags.${FLAG_NS}.nextActionTick`]: null,
       [`flags.${FLAG_NS}.declaredAction`]: null,
+      [`flags.${FLAG_NS}.declaredMovement`]: null,
       [`flags.${FLAG_NS}.lastActionName`]: null,
       [`flags.${FLAG_NS}.lastActionWait`]: null,
       [`flags.${FLAG_NS}.lastActionAt`]: null,
@@ -706,7 +731,7 @@ export class CelerityCombatTracker extends ParentTracker {
     // target pos at nextTick, scheduledTick fingerprint for re-declare detection.
     const targets = [];
     for (const cm of combat.combatants) {
-      const mv = cm.flags?.['aspectsofpower']?.declaredAction;
+      const mv = cm.flags?.['aspectsofpower']?.declaredMovement;
       if (!mv || mv.itemId !== MOVEMENT_ITEM_ID) continue;
       if (!mv.startPos || !mv.endPos) continue;
       const tok = cm.token;
@@ -750,7 +775,7 @@ export class CelerityCombatTracker extends ParentTracker {
         // own _scheduleNextFire which will start a fresh concurrent-lerps
         // cycle.
         const cm = this.viewed?.combatants?.get(t.combatantId);
-        const live = cm?.flags?.['aspectsofpower']?.declaredAction;
+        const live = cm?.flags?.['aspectsofpower']?.declaredMovement;
         if (!live
             || live.itemId !== MOVEMENT_ITEM_ID
             || live.scheduledTick !== t.scheduledTickFingerprint) {

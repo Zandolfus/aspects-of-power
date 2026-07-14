@@ -49,7 +49,7 @@ export async function checkEngagementHalts(combat, newClock) {
   // circle, firing duplicate halts at the same tick. The combat log
   // showed Gabriel halting at the same Stalker / Brute 2-3 times.
   const inFlight = combat.combatants.contents
-    .map(c => ({ cm: c, mv: c.flags?.[FLAG_NS]?.declaredAction }))
+    .map(c => ({ cm: c, mv: c.flags?.[FLAG_NS]?.declaredMovement }))
     .filter(e => e.mv?.itemId === MOVEMENT_ITEM_ID && e.cm.token && !e.mv.halted);
 
   // Per-combatant earliest halt across all engagements they're part of.
@@ -132,8 +132,8 @@ function _evaluatePair(moverEntry, opponentCm, newClock) {
   const moverStartC = _addCenter(moverMv.startPos, moverTok);
   const moverEndC = _addCenter(moverMv.endPos, moverTok);
 
-  const oppMv = (opponentCm.flags?.[FLAG_NS]?.declaredAction?.itemId === MOVEMENT_ITEM_ID)
-    ? opponentCm.flags[FLAG_NS].declaredAction
+  const oppMv = (opponentCm.flags?.[FLAG_NS]?.declaredMovement?.itemId === MOVEMENT_ITEM_ID)
+    ? opponentCm.flags[FLAG_NS].declaredMovement
     : null;
   const oppStartC = oppMv ? _addCenter(oppMv.startPos, oppTok) : { x: oppTok.x + (oppTok.width ?? 1) * canvas.grid.size / 2, y: oppTok.y + (oppTok.height ?? 1) * canvas.grid.size / 2 };
   const oppEndC = oppMv ? _addCenter(oppMv.endPos, oppTok) : oppStartC;
@@ -303,7 +303,7 @@ function _setEarliestHalt(map, cmId, haltInfo) {
 async function _applyHalt(combat, cmId, haltInfo) {
   const cm = combat.combatants.get(cmId);
   if (!cm) return;
-  const mv = cm.flags?.[FLAG_NS]?.declaredAction;
+  const mv = cm.flags?.[FLAG_NS]?.declaredMovement;
   if (!mv || mv.itemId !== MOVEMENT_ITEM_ID) return;
 
   const labelSuffix = haltInfo.type === 'melee'
@@ -336,7 +336,7 @@ async function _applyHalt(combat, cmId, haltInfo) {
     halted: true, // skip future halt-checks until this movement completes
   };
   const update = {
-    [`flags.${FLAG_NS}.declaredAction`]: newDeclared,
+    [`flags.${FLAG_NS}.declaredMovement`]: newDeclared,
     [`flags.${FLAG_NS}.nextActionTick`]: haltInfo.scheduledTick,
   };
 

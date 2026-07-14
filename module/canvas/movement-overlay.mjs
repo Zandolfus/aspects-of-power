@@ -114,9 +114,9 @@ function _refreshOverlayNow() {
   const sceneId = canvas.scene?.id;
   const clockTick = getClockTick(combat);
 
-  // Committed declared movements (solid).
+  // Committed declared movements (solid) — the parallel movement track.
   for (const member of combat.combatants) {
-    const mv = member.flags?.[FLAG_NS]?.declaredAction;
+    const mv = member.flags?.[FLAG_NS]?.declaredMovement;
     if (!mv || mv.itemId !== MOVEMENT_ITEM_ID) continue;
     if (!_isVisibleToCurrentUser(member)) continue;
     const tokenDoc = member.token;

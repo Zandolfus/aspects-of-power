@@ -450,6 +450,24 @@ export async function declareAction(actor, skill, options = {}) {
   const combatant = findCombatantForActor(actor);
   if (!combatant) return null;
 
+  // ── Concurrency gate (design-concurrent-actions, RULED 2026-07-14) ──
+  // A movement in flight (declaredMovement track) permits skill declares
+  // ONLY when it's a WALK and the skill is `mobile`-tagged (potion, pistol
+  // shot, wand bolt — no count limit; each paces by its own wait). Sprint is
+  // all-out; heavy windups demand a stance.
+  const qm = combatant.flags?.aspectsofpower?.declaredMovement;
+  if (qm && qm.itemId) {
+    const skillMobile = (skill?.system?.tags ?? []).includes('mobile');
+    if (qm.movementMode !== 'walk') {
+      ui.notifications.warn(`${actor.name} is sprinting — all-out. Cancel the sprint to act.`);
+      return null;
+    }
+    if (!skillMobile) {
+      ui.notifications.warn(`${actor.name} is moving — only mobile actions while walking. Cancel the walk for ${skill.name}.`);
+      return null;
+    }
+  }
+
   // Any existing declaration is auto-overridden by the new one. Per user
   // 2026-05-11: players can change their mind at will. EXCEPT: leap-in-
   // flight is committed motion (the actor is conceptually mid-air during
@@ -559,7 +577,11 @@ export async function declareAction(actor, skill, options = {}) {
       ritualActivation,
       aiAutoInvest,
     },
-    'flags.aspectsofpower.nextActionTick': scheduledTick,
+    // Two parallel tracks: "next up" is the sooner of skill + movement.
+    'flags.aspectsofpower.nextActionTick': Math.min(
+      scheduledTick,
+      (typeof qm?.scheduledTick === 'number') ? qm.scheduledTick : Infinity,
+    ),
     'flags.aspectsofpower.lastActionWait': wait,
     'flags.aspectsofpower.lastActionName': skill.name + ' (queued)',
     'flags.aspectsofpower.dodgeDebt': 0,
@@ -888,7 +910,7 @@ export async function separateOverlappingTokens(scene) {
   if (combat?.started) {
     const clock = getClockTick(combat);
     for (const cm of combat.combatants) {
-      const da = cm.flags?.aspectsofpower?.declaredAction;
+      const da = cm.flags?.aspectsofpower?.declaredMovement;
       if (da?.itemId === MOVEMENT_ITEM_ID && typeof da.scheduledTick === 'number' && da.scheduledTick > clock) {
         inFlight.add(cm.tokenId);
       }
@@ -940,6 +962,26 @@ export async function declareMovement(actor, startPos, endPos, distanceFt, stami
   if (!combatant) return null;
   if (distanceFt <= 0) return null;
 
+  // ── Concurrency gate (design-concurrent-actions, RULED 2026-07-14) ──
+  // Movement runs on its OWN track (declaredMovement) parallel to the skill
+  // track (declaredAction). Starting a move while a skill is queued is
+  // allowed ONLY as a WALK alongside a `mobile`-tagged skill — sprinting is
+  // all-out, and a non-mobile windup demands stance.
+  const _modeKey = resolveMovementMode(mode).key;
+  const qa = combatant.flags?.aspectsofpower?.declaredAction;
+  if (qa && qa.itemId) {
+    if (_modeKey !== 'walk') {
+      ui.notifications.warn(`${actor.name}: cannot sprint while ${qa.label} is queued — walk, or cancel the action.`);
+      return null;
+    }
+    const qaItem = actor.items?.get(qa.itemId);
+    const qaMobile = (qaItem?.system?.tags ?? []).includes('mobile');
+    if (!qaMobile) {
+      ui.notifications.warn(`${actor.name}: ${qa.label} demands a stance — cancel it before moving.`);
+      return null;
+    }
+  }
+
   // No-stacking: a move may pass through others but must not END overlapping
   // one. Stop short at the last clear point; rescale distance + stamina to the
   // shortened path. A move fully blocked by overlap (no clear ground gained)
@@ -962,8 +1004,12 @@ export async function declareMovement(actor, startPos, endPos, distanceFt, stami
   const scheduledTick = clockTick + wait;
   const label = `Move ${distanceFt}ft (${m.label})`;
 
+  // PARALLEL TRACK: movement lives on declaredMovement (2026-07-14), beside —
+  // not instead of — any queued skill. nextActionTick = the SOONER of the two
+  // tracks so the tracker's "next up" ordering stays correct.
+  const _qaTick = (typeof qa?.scheduledTick === 'number') ? qa.scheduledTick : Infinity;
   await _safeCombatantUpdate(combatant, {
-    'flags.aspectsofpower.declaredAction': {
+    'flags.aspectsofpower.declaredMovement': {
       itemId: MOVEMENT_ITEM_ID,
       label,
       wait,
@@ -975,7 +1021,7 @@ export async function declareMovement(actor, startPos, endPos, distanceFt, stami
       distanceFt,
       movementMode: m.key,
     },
-    'flags.aspectsofpower.nextActionTick': scheduledTick,
+    'flags.aspectsofpower.nextActionTick': Math.min(scheduledTick, _qaTick),
     'flags.aspectsofpower.lastActionWait': wait,
     'flags.aspectsofpower.lastActionName': `${label} (queued)`,
   });

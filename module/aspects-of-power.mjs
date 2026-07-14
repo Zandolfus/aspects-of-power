@@ -1923,7 +1923,7 @@ function _walkTerrainBonus(targetActor, ability) {
   if (!combat?.started) return 0;
   const combatant = combat.combatants.find(c => c.actor?.id === targetActor?.id);
   if (!combatant) return 0;
-  const decl = combatant.flags?.aspectsofpower?.declaredAction;
+  const decl = combatant.flags?.aspectsofpower?.declaredMovement;
   if (!decl || decl.itemId !== Celerity.MOVEMENT_ITEM_ID) return 0;
   if (decl.movementMode !== 'walk') return 0;
   const fraction = CONFIG.ASPECTSOFPOWER.celerity?.WALK_TERRAIN_BONUS_FRACTION ?? 0.25;
@@ -2681,10 +2681,12 @@ Hooks.on('updateActor', async (actor, changes, _options, userId) => {
     // chat note so other players see why the next-up indicator changed.
     for (const combat of game.combats) {
       const cm = combat.combatants.find(c => c.actorId === actor.id);
-      const declared = cm?.flags?.aspectsofpower?.declaredAction;
+      const declared = cm?.flags?.aspectsofpower?.declaredAction
+        ?? cm?.flags?.aspectsofpower?.declaredMovement;
       if (!declared) continue;
       await cm.update({
         'flags.aspectsofpower.declaredAction': null,
+        'flags.aspectsofpower.declaredMovement': null,
         'flags.aspectsofpower.nextActionTick': null,
       });
       ChatMessage.create({
