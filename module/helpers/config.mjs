@@ -401,6 +401,7 @@ ASPECTSOFPOWER.ai = {
     primitive:  'Primitive (stationary)',
     brawler:    'Brawler (melee)',
     skirmisher: 'Skirmisher (ranged)',
+    hexer:      'Hexer (debuff caster)',
   },
   // Per-NPC `flags.aspectsofpower.aiPathMode` — how the unit routes to its
   // destination. 'direct' charges straight (ignores AOE). 'smart' deviates the

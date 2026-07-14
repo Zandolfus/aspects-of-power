@@ -110,14 +110,107 @@ export function aiOrderTargets(actor, hostiles) {
     if (inSet.length) list = inSet;
   }
   if (f.aiFocusWeakest) {
-    list = [...list].sort((a, b) =>
-      (a.tokenDoc.actor?.system?.health?.value ?? 0) - (b.tokenDoc.actor?.system?.health?.value ?? 0));
+    // Weakest = lowest HP FRACTION (fix 2026-07-14 — absolute HP eternally
+    // focused low-max summons/critters over a nearly-dead brute).
+    const frac = (h) => {
+      const hp = h.tokenDoc.actor?.system?.health;
+      return (hp?.max ?? 0) > 0 ? (hp.value ?? 0) / hp.max : 1;
+    };
+    list = [...list].sort((a, b) => frac(a) - frac(b));
+  }
+  // FUTILITY DEPRIORITIZATION (smart swap, 2026-07-14): targets this actor
+  // has repeatedly failed to damage drop to the BACK of the list (never
+  // filtered out — a futile target is still better than none). See
+  // _recordAttackOutcome for the streak bookkeeping.
+  const futile = _futilityAvoidSet(actor);
+  if (futile.size) {
+    const ok = list.filter(h => !futile.has(h.tokenDoc.id));
+    if (ok.length) list = [...ok, ...list.filter(h => futile.has(h.tokenDoc.id))];
   }
   if (f.aiFocusTarget) {
     const fi = list.findIndex(h => h.tokenDoc.id === f.aiFocusTarget);
     if (fi > 0) list = [list[fi], ...list.slice(0, fi), ...list.slice(fi + 1)];
   }
   return list;
+}
+
+/* ── Futility tracking ("can't hit this guy — move to the next") ──
+ * GM-side in-memory; the AI compares the target's HP between its OWN
+ * consecutive decisions. If it attacked T last decision and T's HP hasn't
+ * dropped by the next one, that's a futile attempt; FUTILE_STREAK such
+ * attempts in a row deprioritizes T for FUTILE_ROUNDS of this actor's
+ * decisions. HP-delta is a heuristic (a heal can mask real damage) — fine
+ * for creature brains, and it self-clears. */
+const FUTILE_STREAK = 2;
+const FUTILE_DECISIONS = 6; // decisions the avoid-mark lasts
+const _futility = new Map(); // actorId → { lastTargetId, lastHp, streaks: Map<tokenId, n>, avoid: Map<tokenId, decisionsLeft> }
+
+function _futilityState(actor) {
+  let s = _futility.get(actor.id);
+  if (!s) { s = { lastTargetId: null, lastHp: null, streaks: new Map(), avoid: new Map() }; _futility.set(actor.id, s); }
+  return s;
+}
+
+function _futilityAvoidSet(actor) {
+  const s = _futility.get(actor.id);
+  if (!s) return new Set();
+  return new Set([...s.avoid.keys()]);
+}
+
+/** Call at the top of a profile decision: settles last attack's outcome and
+ *  decays avoid-marks. Then call _futilityMarkAttack when declaring one. */
+export function aiFutilityTick(actor, hostiles) {
+  const s = _futilityState(actor);
+  // Decay avoid marks by one decision.
+  for (const [id, n] of [...s.avoid]) {
+    if (n <= 1) s.avoid.delete(id); else s.avoid.set(id, n - 1);
+  }
+  // Settle the previous attack: did the target's HP drop?
+  if (s.lastTargetId != null && s.lastHp != null) {
+    const t = hostiles.find(h => h.tokenDoc.id === s.lastTargetId);
+    const hpNow = t?.tokenDoc.actor?.system?.health?.value;
+    if (t && typeof hpNow === 'number' && hpNow >= s.lastHp) {
+      const n = (s.streaks.get(s.lastTargetId) ?? 0) + 1;
+      s.streaks.set(s.lastTargetId, n);
+      if (n >= FUTILE_STREAK) {
+        s.avoid.set(s.lastTargetId, FUTILE_DECISIONS);
+        s.streaks.delete(s.lastTargetId);
+      }
+    } else if (t) {
+      s.streaks.delete(s.lastTargetId); // damage landed — reset
+      s.avoid.delete(s.lastTargetId);
+    }
+    s.lastTargetId = null; s.lastHp = null;
+  }
+}
+
+function _futilityMarkAttack(actor, targetTokenDoc) {
+  const s = _futilityState(actor);
+  s.lastTargetId = targetTokenDoc.id;
+  s.lastHp = targetTokenDoc.actor?.system?.health?.value ?? null;
+}
+
+/**
+ * FACTION FOCUS (GM command, 2026-07-14): stamp aiFocusTarget on every
+ * AI-profiled actor of the given disposition in the combat — "everyone,
+ * kill THAT one." Pass tokenId=null to clear. Console/macro v1:
+ *   game.aspectsofpower.aiSetFactionFocus(game.combat, -1, targetTokenId)
+ */
+export async function aiSetFactionFocus(combat, disposition, tokenId) {
+  if (!combat) return 0;
+  let n = 0;
+  for (const cm of combat.combatants) {
+    const actor = cm.actor;
+    if (!actor?.flags?.aspectsofpower?.aiProfile) continue;
+    if (cm.token?.disposition !== disposition) continue;
+    await actor.update({ 'flags.aspectsofpower.aiFocusTarget': tokenId ?? null });
+    n++;
+  }
+  if (n) ChatMessage.create({
+    whisper: ChatMessage.getWhisperRecipients('GM'),
+    content: `<p><em>[AI] Faction focus ${tokenId ? 'set' : 'cleared'} for ${n} unit(s).</em></p>`,
+  });
+  return n;
 }
 
 /** Profile-agnostic command check: is this unit commanded to hold position? */
@@ -189,12 +282,10 @@ const primitiveProfile = {
       const distPx = Math.hypot(dx, dy);
       if (distPx > rangePx) continue;
 
-      // LOS check
-      const visible = canvas.visibility?.testVisibility?.(tCenter, {
-        tolerance: 2,
-        object: t.object ?? null,
-      });
-      if (visible === false) continue;
+      // Hidden tokens are not perceivable; LOS via sight-polygon collision
+      // (client-independent — fix 2026-07-14, was GM-vision testVisibility).
+      if (t.hidden) continue;
+      if (!_sightClear(selfCenter, tCenter)) continue;
 
       candidates.push({ tokenDoc: t, distPx, tCenter });
     }
@@ -308,6 +399,7 @@ function _aliveHostilesOf(selfTokenDoc) {
   const out = [];
   for (const t of scene.tokens.contents) {
     if (t.id === selfTokenDoc.id) continue;
+    if (t.hidden) continue; // GM-hidden tokens are not perceivable (fix 2026-07-14)
     if (!t.actor) continue;
     if ((t.actor.system?.health?.value ?? 0) <= 0) continue;
     if (!_isHostileToSelf(selfTokenDoc.disposition, t.disposition)) continue;
@@ -330,13 +422,19 @@ function _edgeDistFt(selfTokenDoc, otherTokenDoc) {
   return Math.max(0, centerDist - rA - rB) / pxPerFt;
 }
 
-function _hasLOS(point, tokenDoc) {
-  const visible = canvas.visibility?.testVisibility?.(point, {
-    tolerance: 2,
-    object: tokenDoc.object ?? null,
-  });
-  return visible !== false;
+/**
+ * Deterministic sight-line test between two points (fix 2026-07-14).
+ * The old canvas.visibility.testVisibility check ran on the ACTING GM's
+ * client, whose vision typically sees everything — so AI "LOS" nearly
+ * always passed and towers/skirmishers could target through walls. A
+ * sight-polygon collision test is client-independent.
+ */
+function _sightClear(fromPoint, toPoint) {
+  const sight = CONFIG.Canvas.polygonBackends?.sight;
+  if (!sight?.testCollision) return true;
+  return !sight.testCollision(fromPoint, toPoint, { type: 'sight', mode: 'any' });
 }
+
 
 /**
  * Pick the attack skill for an AI profile. `aiSkillUuid` flag overrides;
@@ -417,7 +515,9 @@ function _segmentCrossesHazard(a, b, hazards) {
  */
 function _findWallPath(selfCenter, goalCenter) {
   const move = CONFIG.Canvas.polygonBackends?.move;
-  if (!move?.testCollision) return goalCenter;
+  // Shape fix 2026-07-14: this early-return handed back a bare point, so
+  // callers doing `.waypoint` got undefined → NaN aim.
+  if (!move?.testCollision) return { waypoint: goalCenter, reachable: true };
   const blocked = (a, b) => move.testCollision(a, b, { type: 'move', mode: 'any' });
   if (!blocked(selfCenter, goalCenter)) return { waypoint: goalCenter, reachable: true }; // straight line clear
 
@@ -591,16 +691,26 @@ async function _idle(actor, skill, note) {
 }
 
 /** Self-preservation faculty (aiSelfPreserve): true when the actor is below the
- *  retreat HP fraction AND a threat sits within ~2× its danger bubble. */
+ *  retreat HP fraction AND a threat sits within ~2× its danger bubble.
+ *  STICKY (fix 2026-07-14): once retreating, the state holds until HP recovers
+ *  above 1.5× the threshold — the old instant-recheck made a low-HP brawler
+ *  yo-yo (flee till the threat is far → charge back in → flee again). */
+const _retreating = new Set(); // actor ids currently in sticky retreat (GM-side)
+
 function _shouldRetreat(actor, hostiles, selfTokenDoc) {
-  if (!actor.flags?.aspectsofpower?.aiSelfPreserve) return false;
+  if (!actor.flags?.aspectsofpower?.aiSelfPreserve) { _retreating.delete(actor.id); return false; }
   const hp = actor.system?.health?.value ?? 0;
   const max = actor.system?.health?.max ?? 1;
-  if (max <= 0 || hp / max >= (CONFIG.ASPECTSOFPOWER.ai?.retreatHpPct ?? 0.25)) return false;
+  const frac = max > 0 ? hp / max : 1;
+  const pct = CONFIG.ASPECTSOFPOWER.ai?.retreatHpPct ?? 0.25;
+  const sticky = _retreating.has(actor.id);
+  if (frac >= (sticky ? pct * 1.5 : pct)) { _retreating.delete(actor.id); return false; }
   const nearest = hostiles[0];
-  if (!nearest) return false;
+  if (!nearest) return sticky; // still hurt, nothing near — hold the state, don't flee
   const dangerFt = actor.flags?.aspectsofpower?.aiDangerFt ?? CONFIG.ASPECTSOFPOWER.ai?.dangerFt ?? 15;
-  return _edgeDistFt(selfTokenDoc, nearest.tokenDoc) < dangerFt * 2;
+  const threatNear = _edgeDistFt(selfTokenDoc, nearest.tokenDoc) < dangerFt * 2;
+  if (threatNear) _retreating.add(actor.id);
+  return threatNear || sticky;
 }
 
 /** Flee directly away from the nearest threat (sprint). Returns true if a
@@ -626,6 +736,9 @@ const brawlerProfile = {
     const hostiles = _aliveHostilesOf(selfTokenDoc);
     if (hostiles.length === 0) return _idle(actor, skill, 'no targets on scene');
     if (!skill) return _idle(actor, null, 'no affordable melee attack skill');
+
+    // Futility bookkeeping: settle last attack's outcome, decay avoid-marks.
+    aiFutilityTick(actor, hostiles);
 
     // SELF-PRESERVATION faculty: flee when low on HP with a threat nearby.
     if (_shouldRetreat(actor, hostiles, selfTokenDoc) && await _fleeFrom(actor, selfTokenDoc, hostiles)) return;
@@ -668,6 +781,7 @@ const brawlerProfile = {
     if (attackNow) {
       // Declare-and-wait (paced by the tracker); aiAutoInvest threaded through
       // declaredAction so the deferred fire auto-invests (no dialog).
+      _futilityMarkAttack(actor, target.tokenDoc);
       await declareAction(actor, skill, { targetIds: [target.tokenDoc.id], aiAutoInvest: true });
       return;
     }
@@ -700,6 +814,9 @@ const skirmisherProfile = {
     if (hostiles.length === 0) return _idle(actor, skill, 'no targets on scene');
     if (!skill) return _idle(actor, null, 'no affordable ranged attack skill');
 
+    // Futility bookkeeping: settle last attack's outcome, decay avoid-marks.
+    aiFutilityTick(actor, hostiles);
+
     // SELF-PRESERVATION faculty: flee far when low on HP with a threat nearby.
     if (_shouldRetreat(actor, hostiles, selfTokenDoc) && await _fleeFrom(actor, selfTokenDoc, hostiles)) return;
 
@@ -720,7 +837,9 @@ const skirmisherProfile = {
         x: selfCenter.x + (selfCenter.x - nearest.tCenter.x),
         y: selfCenter.y + (selfCenter.y - nearest.tCenter.y),
       };
-      const moved = await _declareStepToward(actor, selfTokenDoc, away, 20, 'walk');
+      // Kite at SPRINT (fix 2026-07-14): a walk-kite (2× ticks/ft) loses to
+      // any sprinting pursuer forever — fleeing is worth the stamina.
+      const moved = await _declareStepToward(actor, selfTokenDoc, away, 20, 'sprint');
       if (moved) return;
       // Cornered — fall through and shoot point-blank instead.
     }
@@ -729,12 +848,17 @@ const skirmisherProfile = {
     // the FOCUS-WEAKEST faculty.
     // Universal target ordering (focus-weakest / commanded focus / target-set),
     // shared via aiOrderTargets() so the shoot pick matches every other profile.
+    // Range is EDGE-TO-EDGE (fix 2026-07-14 — was center-to-center, so a big
+    // token's edge could be shootable while its center read out-of-range);
+    // LOS via the client-independent sight-collision test.
+    const selfCenterShot = _centerOf(selfTokenDoc);
     const shootList = aiOrderTargets(actor, hostiles);
     const shootable = shootList.find(h =>
-      h.distPx <= rangeFt * pxPerFt && _hasLOS(h.tCenter, h.tokenDoc)
+      _edgeDistFt(selfTokenDoc, h.tokenDoc) <= rangeFt && _sightClear(selfCenterShot, h.tCenter)
     );
     if (shootable) {
       // Declare-and-wait with aiAutoInvest threaded (see brawler note).
+      _futilityMarkAttack(actor, shootable.tokenDoc);
       await declareAction(actor, skill, { targetIds: [shootable.tokenDoc.id], aiAutoInvest: true });
       return;
     }
@@ -748,6 +872,109 @@ const skirmisherProfile = {
 };
 
 AIProfiles.register('skirmisher', skirmisherProfile);
+
+/* ---------------------------------------------------------------------------- */
+/*  'hexer' — debuff caster: spread afflictions, then fall back to damage       */
+/* ---------------------------------------------------------------------------- */
+
+/** Pick a debuff skill: aiSkillUuid override (if it's debuff-tagged), else the
+ *  most expensive affordable Active debuff-tagged skill. */
+async function _pickDebuffSkill(actor) {
+  const overrideUuid = actor.flags?.aspectsofpower?.aiSkillUuid;
+  if (overrideUuid) {
+    const s = await fromUuid(overrideUuid);
+    if (s && (s.system?.tags ?? []).includes('debuff')) return s;
+  }
+  const candidates = actor.items.filter(s => {
+    if (s.type !== 'skill' || s.system.skillType !== 'Active') return false;
+    if (!(s.system.tags ?? []).includes('debuff')) return false;
+    const resKey = s.system.roll?.resource;
+    const cost = s.system.roll?.cost ?? 0;
+    if (resKey && cost > 0 && (actor.system[resKey]?.value ?? 0) < cost) return false;
+    return true;
+  });
+  candidates.sort((a, b) => (b.system.roll?.cost ?? 0) - (a.system.roll?.cost ?? 0));
+  return candidates[0] ?? null;
+}
+
+/** Does the target already carry MY application of this skill's debuff?
+ *  Matches the effect-name convention `${skill.name} (Debuff)` (see
+ *  _handleDebuffTag) + casterActorUuid, non-disabled. */
+function _targetHasMyDebuff(targetActor, skill, casterUuid) {
+  const wanted = `${skill.name} (Debuff)`;
+  for (const e of targetActor?.effects ?? []) {
+    if (e.disabled) continue;
+    if (e.name !== wanted) continue;
+    if ((e.system?.casterActorUuid ?? '') !== casterUuid) continue;
+    return true;
+  }
+  return false;
+}
+
+/**
+ * 'hexer' — the debuff-caster archetype (expansion 2026-07-14). Kites like a
+ * skirmisher, but its priority is SPREADING AFFLICTIONS: cast the debuff on
+ * the first ordered target that doesn't already carry it; once everyone in
+ * range is hexed, fall back to a damage skill; re-hex as debuffs expire.
+ */
+const hexerProfile = {
+  onActionReady: async (actor, _ctx) => {
+    const selfTokenDoc = _selfTokenDoc(actor);
+    if (!selfTokenDoc) return;
+
+    const hexSkill = await _pickDebuffSkill(actor);
+    const atkSkill = await _pickAttackSkill(actor, ['phys_ranged', 'magic_projectile', 'magic', 'magic_melee']);
+    const hostiles = _aliveHostilesOf(selfTokenDoc);
+    if (hostiles.length === 0) return _idle(actor, hexSkill ?? atkSkill, 'no targets on scene');
+    if (!hexSkill && !atkSkill) return _idle(actor, null, 'no affordable debuff or attack skill');
+
+    aiFutilityTick(actor, hostiles);
+
+    // SELF-PRESERVATION + kite bubble — same posture as the skirmisher.
+    if (_shouldRetreat(actor, hostiles, selfTokenDoc) && await _fleeFrom(actor, selfTokenDoc, hostiles)) return;
+    const ai = CONFIG.ASPECTSOFPOWER.ai ?? {};
+    const dangerFt = actor.flags?.aspectsofpower?.aiDangerFt ?? ai.dangerFt ?? 15;
+    const hold = aiHoldsPosition(actor);
+    const nearest = hostiles[0];
+    if (!hold && _edgeDistFt(selfTokenDoc, nearest.tokenDoc) < dangerFt) {
+      const sc = _centerOf(selfTokenDoc);
+      const away = { x: sc.x + (sc.x - nearest.tCenter.x), y: sc.y + (sc.y - nearest.tCenter.y) };
+      if (await _declareStepToward(actor, selfTokenDoc, away, 20, 'sprint')) return;
+    }
+
+    const selfCenter = _centerOf(selfTokenDoc);
+    const ordered = aiOrderTargets(actor, hostiles);
+    const inRangeWithLOS = (skill) => {
+      const skillRange = skill?.system?.castingRange ?? 0;
+      const rangeFt = skillRange > 0 ? skillRange : (actor.system?.castingRange ?? 60);
+      return ordered.filter(h => _edgeDistFt(selfTokenDoc, h.tokenDoc) <= rangeFt && _sightClear(selfCenter, h.tCenter));
+    };
+
+    // 1. Hex the first reachable target NOT already carrying my debuff.
+    if (hexSkill) {
+      const fresh = inRangeWithLOS(hexSkill).find(h => !_targetHasMyDebuff(h.tokenDoc.actor, hexSkill, actor.uuid));
+      if (fresh) {
+        await declareAction(actor, hexSkill, { targetIds: [fresh.tokenDoc.id], aiAutoInvest: true });
+        return;
+      }
+    }
+    // 2. Everyone hexed (or no hex) — damage fallback.
+    if (atkSkill) {
+      const shootable = inRangeWithLOS(atkSkill)[0];
+      if (shootable) {
+        _futilityMarkAttack(actor, shootable.tokenDoc);
+        await declareAction(actor, atkSkill, { targetIds: [shootable.tokenDoc.id], aiAutoInvest: true });
+        return;
+      }
+    }
+    // 3. Nobody reachable — advance (unless holding).
+    if (hold) return _idle(actor, hexSkill ?? atkSkill, 'holding position');
+    const moved = await _declareStepToward(actor, selfTokenDoc, nearest.tCenter, 30, 'walk');
+    if (!moved) return _idle(actor, hexSkill ?? atkSkill, 'no target in range and path blocked');
+  },
+};
+
+AIProfiles.register('hexer', hexerProfile);
 
 /**
  * Summoner MOVE order: command a one-step move toward a destination center,

@@ -38,7 +38,7 @@ import * as TemplateMigration from './systems/template-migration.mjs';
 import * as Celerity from './systems/celerity.mjs';
 import { SummonHelpers, registerSummonHooks } from './systems/summon.mjs';
 import { ChannelHelpers, registerChannelHooks } from './systems/channel.mjs';
-import { AIProfiles, registerAIHooks } from './systems/ai.mjs';
+import { AIProfiles, registerAIHooks, aiSetFactionFocus } from './systems/ai.mjs';
 import { registerSummonHud } from './canvas/summon-hud.mjs';
 import { registerMovementHud } from './canvas/movement-hud.mjs';
 import { CelerityCombatTracker, installAopTurnMarkerPatch } from './apps/celerity-combat-tracker.mjs';
@@ -86,6 +86,9 @@ Hooks.once('init', function () {
     massLeveler: MassLeveler,
     templateMigration: TemplateMigration,
     celerity: { ...Celerity },
+    // GM faction-focus command (ai.mjs): stamp aiFocusTarget on every
+    // AI-profiled unit of a disposition. Console/macro v1.
+    aiSetFactionFocus,
   };
 
   // ── System Settings ──
