@@ -29,6 +29,13 @@ export class NpcData extends foundry.abstract.TypeDataModel {
       // Wounded token image — swaps token art when HP drops below threshold.
       tokenImageWounded: new fields.StringField({ initial: '' }),
 
+      // Actor-level system tags (design-power-sense, 2026-07-14): direct grants
+      // (senses, boons, creature traits) that don't route through a template or
+      // equipment. Registry IDs (helpers/tags.mjs); ingested by _collectTags.
+      // NPCs have no cachedTags/class/profession, so this is their ONLY direct
+      // tag source.
+      tags: new fields.ArrayField(new fields.StringField(), { initial: [] }),
+
       // Base stamina regeneration per turn (percentage of max stamina).
       staminaRegen: new fields.NumberField({ initial: 5, min: 0 }),
 

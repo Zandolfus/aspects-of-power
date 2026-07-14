@@ -330,7 +330,12 @@
         "gate": "Capability",
         "passive": "Passive",
         "size": "Size",
-        "path": "Path Structure"
+        "path": "Path Structure",
+        "sense": "Sense"
+      },
+      "affinitySight": {
+        "label": "Affinity Sight",
+        "desc": "Focused senses: reads WHICH affinity is being gathered in a windup or cast (power-sense identity layer)"
       },
       "fire": {
         "label": "Fire",

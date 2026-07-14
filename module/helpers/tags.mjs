@@ -22,6 +22,7 @@ export const TAG_CATEGORIES = {
   passive:    { label: 'ASPECTSOFPOWER.SystemTag.Category.passive',    color: '#ab47bc' },
   size:       { label: 'ASPECTSOFPOWER.SystemTag.Category.size',       color: '#78909c' },
   path:       { label: 'ASPECTSOFPOWER.SystemTag.Category.path',       color: '#26a69a' },
+  sense:      { label: 'ASPECTSOFPOWER.SystemTag.Category.sense',      color: '#7e57c2' },
 };
 
 /* ------------------------------------------------------------------ */
@@ -51,6 +52,12 @@ export const TAG_REGISTRY = {
   'holy-affinity':        { label: 'ASPECTSOFPOWER.SystemTag.holy.label',        category: 'affinity', implies: [], description: 'ASPECTSOFPOWER.SystemTag.holy.desc' },
   'arcane-affinity':      { label: 'ASPECTSOFPOWER.SystemTag.arcane.label',      category: 'affinity', implies: [], description: 'ASPECTSOFPOWER.SystemTag.arcane.desc' },
   'psychic-affinity':     { label: 'ASPECTSOFPOWER.SystemTag.psychic.label',     category: 'affinity', implies: [], description: 'ASPECTSOFPOWER.SystemTag.psychic.desc' },
+
+  // ── Senses (design-power-sense, 2026-07-14) ──
+  // Power-sense MAGNITUDE is universal (everyone senses big mana / sees big
+  // windups); these tags gate the IDENTITY layer — reading WHICH affinity is
+  // being gathered. Consumed by the power-sense canvas overlay.
+  'affinity-sight':     { label: 'ASPECTSOFPOWER.SystemTag.affinitySight.label',     category: 'sense', implies: [], description: 'ASPECTSOFPOWER.SystemTag.affinitySight.desc' },
 
   // ── Immunities ──
   'stun-immune':        { label: 'ASPECTSOFPOWER.SystemTag.stunImmune.label',        category: 'immunity', implies: [], description: 'ASPECTSOFPOWER.SystemTag.stunImmune.desc' },

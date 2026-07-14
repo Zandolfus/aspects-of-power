@@ -464,6 +464,29 @@
           {{/if}}
         </div>
 
+        {{!-- Actor Tags (direct grants: senses, boons — GM-editable) --}}
+        <div class="defense-section">
+          <h3>Actor Tags</h3>
+          <div class="immunity-chips">
+            {{#each actorTags}}
+              <span class="immunity-chip" data-tag-id="{{this.id}}" style="border-color: {{this.color}}">
+                {{this.label}}{{#if ../canEditActorTags}} <a class="actor-tag-remove" title="Remove"><i class="fas fa-times"></i></a>{{/if}}
+              </span>
+            {{else}}
+              <p class="hint">No actor tags.</p>
+            {{/each}}
+          </div>
+          {{#if canEditActorTags}}
+            <div class="form-group">
+              <input type="text" class="actor-tag-input" list="actor-tag-registry-{{actor.id}}" placeholder="tag id…" />
+              <datalist id="actor-tag-registry-{{actor.id}}">
+                {{#each actorTagOptions}}<option value="{{this}}"></option>{{/each}}
+              </datalist>
+              <a class="actor-tag-add" title="Add tag"><i class="fas fa-plus"></i></a>
+            </div>
+          {{/if}}
+        </div>
+
       </div>
     </div>
 

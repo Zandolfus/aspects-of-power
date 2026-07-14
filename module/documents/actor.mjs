@@ -658,6 +658,13 @@ export class AspectsofPowerActor extends Actor {
       }
     }
 
+    // Collect from actor-level tags — direct grants (senses, boons, creature
+    // traits) authored on the actor itself (design-power-sense, 2026-07-14).
+    // The only direct source NPCs have (no cachedTags/class/profession).
+    for (const tagId of (systemData.tags ?? [])) {
+      if (tagId) addTag(tagId, 0, 'actor');
+    }
+
     // Collect from equipped items — read the unified `tags` array.
     for (const item of this.items) {
       if (item.type !== 'item' || !item.system.equipped) continue;

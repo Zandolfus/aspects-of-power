@@ -167,6 +167,22 @@ export class AspectsofPowerActorSheet extends foundry.applications.api.Handlebar
     // Build tooltip strings for defense stats.
     context.tooltips = this._prepareTooltips(context.system);
 
+    // Actor-level tags (design-power-sense): direct grants editable by the GM.
+    // Chips show registry label + category color; the add input offers every
+    // registry ID via datalist. Shared by character + NPC sheets.
+    const tagRegistry = CONFIG.ASPECTSOFPOWER.tagRegistry ?? {};
+    const tagCategories = CONFIG.ASPECTSOFPOWER.tagCategories ?? {};
+    context.actorTags = (this.actor.system.tags ?? []).map(id => {
+      const def = tagRegistry[id];
+      return {
+        id,
+        label: def ? game.i18n.localize(def.label) : id,
+        color: tagCategories[def?.category]?.color ?? '#888888',
+      };
+    });
+    context.actorTagOptions = Object.keys(tagRegistry);
+    context.canEditActorTags = game.user.isGM;
+
     return context;
   }
 
@@ -241,6 +257,7 @@ export class AspectsofPowerActorSheet extends foundry.applications.api.Handlebar
         }
       }
     }
+
   }
 
   /**
@@ -474,6 +491,35 @@ export class AspectsofPowerActorSheet extends foundry.applications.api.Handlebar
     // Keep tabGroups in sync when the user clicks a tab.
     this.element.querySelectorAll('.sheet-tabs .item').forEach(el => {
       el.addEventListener('click', () => { this.tabGroups.primary = el.dataset.tab; });
+    });
+
+    // Actor-level tag chips (design-power-sense) — GM add/remove on system.tags.
+    this.element.querySelectorAll('.actor-tag-remove').forEach(el => {
+      el.addEventListener('click', async ev => {
+        ev.preventDefault();
+        if (!game.user.isGM) return;
+        const id = ev.currentTarget.closest('[data-tag-id]')?.dataset.tagId;
+        if (!id) return;
+        const tags = (this.actor.system.tags ?? []).filter(t => t !== id);
+        await this.actor.update({ 'system.tags': tags });
+      });
+    });
+    this.element.querySelector('.actor-tag-add')?.addEventListener('click', async ev => {
+      ev.preventDefault();
+      if (!game.user.isGM) return;
+      const input = this.element.querySelector('.actor-tag-input');
+      const id = input?.value?.trim();
+      if (!id) return;
+      if (!CONFIG.ASPECTSOFPOWER.tagRegistry?.[id]) {
+        ui.notifications.warn(`Unknown tag "${id}" — pick a registry tag.`);
+        return;
+      }
+      const tags = [...(this.actor.system.tags ?? [])];
+      if (!tags.includes(id)) {
+        tags.push(id);
+        await this.actor.update({ 'system.tags': tags });
+      }
+      if (input) input.value = '';
     });
 
     // Item sheet open — available regardless of edit state.
