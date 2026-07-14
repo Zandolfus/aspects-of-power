@@ -5,6 +5,7 @@ import { AspectsofPowerToken } from './documents/token.mjs';
 import { AspectsofPowerTokenObject } from './canvas/token.mjs';
 import { AspectsofPowerTokenRuler } from './canvas/token-ruler.mjs';
 import { attachOverlayLayer, detachOverlayLayer, refreshOverlay } from './canvas/movement-overlay.mjs';
+import { attachPowerSenseLayer, detachPowerSenseLayer, refreshPowerSense } from './canvas/power-sense-overlay.mjs';
 import { resetFirstContactSeen } from './systems/engagement-halts.mjs';
 import { onMoveKey, onCommitKey, onCancelKey, clearAllBuffers, getBuffer } from './canvas/movement-buffer.mjs';
 import { registerAoeBehavior, setAoeTrigger } from './canvas/aoe-region-behavior.mjs';
@@ -1680,18 +1681,30 @@ Hooks.on('renderTokenHUD', (hud, html, data) => {
 Hooks.on('canvasReady', () => attachOverlayLayer());
 Hooks.on('canvasTearDown', () => detachOverlayLayer());
 
+// Power-sense ring overlay (design-power-sense): same lifecycle + triggers,
+// plus controlToken (the observer changed → range/sense gates re-evaluate)
+// and updateActor (sense tags / stats changed).
+Hooks.on('canvasReady', () => attachPowerSenseLayer());
+Hooks.on('canvasTearDown', () => detachPowerSenseLayer());
+Hooks.on('controlToken', () => refreshPowerSense());
+Hooks.on('updateToken', () => refreshPowerSense());
+
 // Re-render overlay when any combatant's flags change (declare / cancel /
 // movement completion clears the flag) or the combat clock advances (so
 // the current-position dot moves along the path).
 Hooks.on('updateCombatant', (combatant, change) => {
-  if (change?.flags?.aspectsofpower?.declaredAction !== undefined) refreshOverlay();
+  if (change?.flags?.aspectsofpower?.declaredAction !== undefined) {
+    refreshOverlay();
+    refreshPowerSense();
+  }
 });
 Hooks.on('updateCombat', (combat, change) => {
   // Clock-tick changes don't always pass through `change` if we're updating
   // it directly via combat.update — easier to refresh on any combat update.
   refreshOverlay();
+  refreshPowerSense();
 });
-Hooks.on('deleteCombat', () => refreshOverlay());
+Hooks.on('deleteCombat', () => { refreshOverlay(); refreshPowerSense(); });
 
 // Reset first-contact-seen tracking on combat start so each new encounter
 // starts with no stale "already seen" memory carrying over. Per design

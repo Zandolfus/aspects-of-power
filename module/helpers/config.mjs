@@ -240,6 +240,35 @@ ASPECTSOFPOWER.armorAnswer = {
 };
 
 /**
+ * Power-sense indicators (design-power-sense.md, RULED 2026-07-14).
+ * Magnitude is UNIVERSAL (ring for every observer in range); tier is
+ * OBSERVER-RELATIVE: invest ÷ observer capacity (wil.mod for mana, the
+ * physSafeFrac×tough safe-invest ceiling for physical), bucketed by
+ * tierBands into faint/notable/heavy/overwhelming. Affinity identity is
+ * gated by the `affinity-sight` sense tag. rangePerPerception: sensory
+ * range = observer per.mod × this many ft.
+ */
+ASPECTSOFPOWER.powerSense = {
+  rangePerPerception: 1.0,
+  tierBands: [0.3, 0.9, 2.0],
+  physSafeFrac: 0.02,
+};
+
+/**
+ * Affinity display colors (power-sense ring tint, future UI accents).
+ * Keys match ASPECTSOFPOWER.affinities. Kept beside the dictionary —
+ * candidate to fold into the entries themselves on the next dictionary pass.
+ */
+ASPECTSOFPOWER.affinityColors = {
+  fire: '#ff5722', earth: '#8d6e63', water: '#29b6f6', wind: '#b2dfdb',
+  lightning: '#ffee58', ice: '#81d4fa', lunar: '#b39ddb', solar: '#ffb300',
+  space: '#5c6bc0', metal: '#90a4ae', heat: '#ff8a65', blood: '#c62828',
+  shadow: '#616161', nature: '#66bb6a', poison: '#9ccc65', necromantic: '#7b1fa2',
+  holy: '#fff59d', light: '#ffffff', psychic: '#ec407a', time: '#26a69a',
+  karma: '#a1887f', physical: '#e0d7c6',
+};
+
+/**
  * Celerity timing constants (per design-celerity.md).
  *   wait = (weapon_base_weight × skill_multiplier × SCALE) / actor_speed
  *   round_length = ROUND_K / ref_mod(RL)
