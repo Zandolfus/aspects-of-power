@@ -1388,6 +1388,11 @@ export class AspectsofPowerItemSheet extends foundry.applications.api.Handlebars
         if (!existing.includes('debuff')) existing.push('debuff');
         updateData['system.tagConfig.debuffType'] = debuffSubtypes[tagKey];
       }
+      // Armor-answer behavior tags (shred/crush) route through the debuff
+      // handler, so they need the `debuff` parent. The mechanic itself is read
+      // straight off the tag in _handleDebuffTag — no config to set here.
+      const behaviorTags = CONFIG.ASPECTSOFPOWER.debuffBehaviorTags ?? {};
+      if (behaviorTags[tagKey] && !existing.includes('debuff')) existing.push('debuff');
       if (tagKey === 'aoe') {
         updateData['system.aoe.enabled'] = true;
       }
@@ -1414,16 +1419,18 @@ export class AspectsofPowerItemSheet extends foundry.applications.api.Handlebars
         updateData['system.aoe.enabled'] = false;
       }
       const debuffSubtypes = CONFIG.ASPECTSOFPOWER.debuffSubtypeTags ?? {};
-      if (debuffSubtypes[tagKey]) {
-        updateData['system.tagConfig.debuffType'] = 'none';
-        const hasOtherSubtype = filtered.some(t => debuffSubtypes[t]);
-        if (!hasOtherSubtype) {
+      const behaviorTags = CONFIG.ASPECTSOFPOWER.debuffBehaviorTags ?? {};
+      const isDebuffChild = t => debuffSubtypes[t] || behaviorTags[t];
+      if (debuffSubtypes[tagKey] || behaviorTags[tagKey]) {
+        if (debuffSubtypes[tagKey]) updateData['system.tagConfig.debuffType'] = 'none';
+        // Drop the debuff parent only if no other subtype/behavior child remains.
+        if (!filtered.some(isDebuffChild)) {
           filtered = filtered.filter(t => t !== 'debuff');
           updateData['system.tags'] = filtered;
         }
       }
       if (tagKey === 'debuff') {
-        filtered = filtered.filter(t => !debuffSubtypes[t]);
+        filtered = filtered.filter(t => !isDebuffChild(t));
         updateData['system.tags'] = filtered;
         updateData['system.tagConfig.debuffType'] = 'none';
       }

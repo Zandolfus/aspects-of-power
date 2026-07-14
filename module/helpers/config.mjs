@@ -620,6 +620,13 @@ ASPECTSOFPOWER.skillTags = {
   ranged:      'ASPECTSOFPOWER.Tag.ranged',
   melee:       'ASPECTSOFPOWER.Tag.melee',
   infused:     'ASPECTSOFPOWER.Tag.infused',
+  // Armor-answer tags (design-armor-answer-system). pierce = static %-ignore of
+  // the armor layer (read in the mitigation calc). shred = affinity DR-strip,
+  // crush = armor+block reduction (both read in _handleDebuffTag; shred/crush
+  // imply `debuff`).
+  pierce:      'ASPECTSOFPOWER.Tag.pierce',
+  shred:       'ASPECTSOFPOWER.Tag.shred',
+  crush:       'ASPECTSOFPOWER.Tag.crush',
   // Affinity tags (set skill damage affinity).
   fire:          'ASPECTSOFPOWER.Tag.fire',
   heat:          'ASPECTSOFPOWER.Tag.heat',
@@ -732,6 +739,10 @@ ASPECTSOFPOWER.combatTags = {
   vocal:       'ASPECTSOFPOWER.Tag.vocal',
   ranged:      'ASPECTSOFPOWER.Tag.ranged',
   melee:       'ASPECTSOFPOWER.Tag.melee',
+  // Armor-answer (design-armor-answer-system).
+  pierce:      'ASPECTSOFPOWER.Tag.pierce',
+  shred:       'ASPECTSOFPOWER.Tag.shred',
+  crush:       'ASPECTSOFPOWER.Tag.crush',
   // Affinities.
   time:          'ASPECTSOFPOWER.Tag.time',
   karma:         'ASPECTSOFPOWER.Tag.karma',
@@ -786,6 +797,19 @@ ASPECTSOFPOWER.debuffSubtypeTags = {
   blind: 'blind', silence: 'silence', weaken: 'weaken',
   deafened: 'deafened', taunt: 'taunt', charm: 'charm',
   enraged: 'enraged', hallucination: 'hallucination', dismembered: 'dismembered',
+};
+
+/**
+ * Debuff BEHAVIOR tags (armor-answer system) — adding one to a skill auto-adds
+ * the `debuff` parent (so it routes through _handleDebuffTag). Unlike the
+ * subtype tags, these carry no debuffType; the mechanic is read straight off
+ * the tag in _handleDebuffTag (single source of truth — no buried checkbox).
+ *   shred → affinity DR-strip (affinity comes from the skill's own affinity tag)
+ *   crush → armor + block reduction (physical/generic; magnitude from armorAnswer)
+ */
+ASPECTSOFPOWER.debuffBehaviorTags = {
+  shred: 'shred',
+  crush: 'crush',
 };
 
 /**

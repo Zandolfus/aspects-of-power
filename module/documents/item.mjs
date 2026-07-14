@@ -2795,7 +2795,15 @@ export class AspectsofPowerItem extends Item {
 
     const entries    = this.system.tagConfig?.debuffEntries ?? [];
     const duration   = this.system.tagConfig?.debuffDuration ?? 1;
-    const dealsDmg   = this.system.tagConfig?.debuffDealsDamage ?? false;
+    // Armor-answer behavior tags (single source of truth, mirroring how `pierce`
+    // is read straight off the tags array). `shred` = affinity DR-strip; `crush`
+    // = armor+block reduction. OR'd with the legacy tagConfig flags so pre-tag
+    // skills keep working. `shred` forces a damaging DoT because the strip only
+    // fires on a dot:true / debuffDamage>0 effect (the Hemorrhage bug).
+    const _tags      = this.system.tags ?? [];
+    const hasShred   = _tags.includes('shred');
+    const hasCrush   = _tags.includes('crush');
+    const dealsDmg   = (this.system.tagConfig?.debuffDealsDamage ?? false) || hasShred;
     const dmgType    = this.system.tagConfig?.debuffDamageType ?? 'physical';
     const debuffType = this.system.tagConfig?.debuffType ?? 'none';
     // Scale debuff by defense multiplier (partial defense = partial debuff).
@@ -2886,9 +2894,15 @@ export class AspectsofPowerItem extends Item {
     const markActive       = markBonus > 0 || markAttackBonus > 0;
     // Armor Crush (armor-answer system): a pure crush debuff has no stat
     // entries / DoT / debuffType, so it would otherwise fail the effectData
-    // gate below and silently apply nothing. Treat a non-zero debuffArmorCrush
-    // as reason enough to spawn the carrying effect.
-    const armorCrushVal    = this.system.tagConfig?.debuffArmorCrush ?? 0;
+    // gate below and silently apply nothing. Treat a non-zero armorCrush as
+    // reason enough to spawn the carrying effect. The `crush` tag supplies the
+    // config default magnitude; the legacy debuffArmorCrush flag still counts
+    // (larger of the two wins).
+    const _crushDefault    = CONFIG.ASPECTSOFPOWER.armorAnswer?.armorCrushPerStack ?? 0.10;
+    const armorCrushVal    = Math.max(
+      hasCrush ? _crushDefault : 0,
+      this.system.tagConfig?.debuffArmorCrush ?? 0,
+    );
     effectData.type = 'base';
     effectData.system = {
       debuffDamage: rollTotal,
@@ -2898,8 +2912,8 @@ export class AspectsofPowerItem extends Item {
       magicType: (this.system.tags ?? []).includes('magic') ? 'magical' : 'non-magical',
       directions,
       ...(dismemberedSlot ? { dismemberedSlot } : {}),
-      ...(dealsDmg ? { dot: true, dotDamage: dotDmg, dotDamageType: dmgType, applierActorUuid: this.actor.uuid, drStrip: !!this.system.tagConfig?.debuffDRStrip } : {}),
-      ...((this.system.tagConfig?.debuffArmorCrush ?? 0) > 0 ? { armorCrush: this.system.tagConfig.debuffArmorCrush } : {}),
+      ...(dealsDmg ? { dot: true, dotDamage: dotDmg, dotDamageType: dmgType, applierActorUuid: this.actor.uuid, drStrip: hasShred || !!this.system.tagConfig?.debuffDRStrip } : {}),
+      ...(armorCrushVal > 0 ? { armorCrush: armorCrushVal } : {}),
       ...(markActive ? {
         markedByActorUuid:      this.actor.uuid,
         markedDamageBonus:      markBonus,
