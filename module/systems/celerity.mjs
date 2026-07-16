@@ -995,11 +995,16 @@ export async function declareMovement(actor, startPos, endPos, distanceFt, stami
     if (clamped.x !== endPos.x || clamped.y !== endPos.y) {
       const pxPerFt = canvas.grid.size / canvas.grid.distance;
       const newFt = Math.round(Math.hypot(clamped.x - startPos.x, clamped.y - startPos.y) / pxPerFt);
-      // Fully blocked (no ground gained) — tell the player why instead of the
-      // move silently vanishing (the other half of "indicator for stopping").
+      // Move to MAX (up until the enemy physically blocks) + a warning, per user
+      // 2026-07-16. Fully blocked (no ground gained) → nowhere to go, just warn.
+      // Toasts are gated to player-owned tokens so AI turns don't spam the GM;
+      // the on-path STOP indicator carries the visual for everyone.
       if (newFt <= 0) {
-        ui.notifications.warn(`${actor.name}: can't move that way — an enemy is in the way.`);
+        if (actor.hasPlayerOwner) ui.notifications.warn(`${actor.name}: can't move that way — an enemy is in the way.`);
         return null;
+      }
+      if (actor.hasPlayerOwner) {
+        ui.notifications.warn(`${actor.name}: blocked by an enemy — moving ${newFt}ft of ${distanceFt}ft.`);
       }
       staminaCost = Math.max(0, Math.round(staminaCost * (newFt / distanceFt)));
       distanceFt = newFt;
