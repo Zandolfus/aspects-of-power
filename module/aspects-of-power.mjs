@@ -1698,8 +1698,15 @@ Hooks.on('updateToken', () => { refreshPowerSense(); refreshOverlay(); });
 // movement completion clears the flag) or the combat clock advances (so
 // the current-position dot moves along the path).
 Hooks.on('updateCombatant', (combatant, change) => {
-  if (change?.flags?.aspectsofpower?.declaredAction !== undefined) {
+  const aop = change?.flags?.aspectsofpower;
+  // Movement lives on its OWN track (declaredMovement) since the 2026-07-14
+  // concurrency split — watch it too, or the path overlay won't refresh on a
+  // movement declare / REDECLARE / cancel (it only moved when the clock or
+  // token happened to update). declaredAction still drives the power-sense ring.
+  if (aop?.declaredAction !== undefined || aop?.declaredMovement !== undefined) {
     refreshOverlay();
+  }
+  if (aop?.declaredAction !== undefined) {
     refreshPowerSense();
   }
 });
