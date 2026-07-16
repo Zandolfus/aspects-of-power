@@ -863,15 +863,29 @@ export function clampMoveNoOverlap(tokenDoc, fromPos, toPos) {
     }
     return false;
   };
+  // Enemy TRANSIT test uses only the inner CORE of each footprint (centered),
+  // so a mover can graze/brush past an enemy's edge without halting — only
+  // barging into the solid core blocks. coreF=1 reproduces the old full-body
+  // "block like walls". The gap is intentionally excluded here (it governs
+  // resting spacing, not transit). Per user 2026-07-16 ("shrink the block zone").
+  const coreF = Math.max(0, Math.min(1, CONFIG.ASPECTSOFPOWER?.movement?.enemyBlockCoreFraction ?? 1));
+  const hitsCore = (p, set) => {
+    for (const o of set) {
+      const ox = (selfW * coreF + o.w * coreF) / 2 - Math.abs((p.x + selfW / 2) - (o.x + o.w / 2));
+      const oy = (selfH * coreF + o.h * coreF) / 2 - Math.abs((p.y + selfH / 2) - (o.y + o.h / 2));
+      if (ox > 0.5 && oy > 0.5) return true;
+    }
+    return false;
+  };
   const enemies = obstacles.filter(o => o.enemy);
   const STEPS = 48;
 
-  // 1. Cross-faction bodies block transit. Find the last step before the
-  //    footprint first contacts an enemy along the path (full path if none).
+  // 1. Cross-faction cores block transit. Find the last step before the mover's
+  //    core first contacts an enemy core along the path (full path if none).
   let tMax = 1;
   if (enemies.length) {
     for (let i = 1; i <= STEPS; i++) {
-      if (hits(lerp(i / STEPS), enemies)) { tMax = (i - 1) / STEPS; break; }
+      if (hitsCore(lerp(i / STEPS), enemies)) { tMax = (i - 1) / STEPS; break; }
     }
   }
   // 2. Within reach [0, tMax], stop at the furthest point whose resting

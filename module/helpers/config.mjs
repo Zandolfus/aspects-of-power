@@ -431,6 +431,14 @@ ASPECTSOFPOWER.movement = {
   // applies on top of each token's own footprint, so it reads the same for big
   // and small tokens.
   tokenGapPx: 0,
+  // Enemy transit block: fraction of a footprint that is SOLID for the
+  // pass-through check (2026-07-16). Cross-faction bodies only halt a move when
+  // the mover barges into this inner CORE — the outer margin is grazeable, so a
+  // token can brush/slip past an adjacent enemy instead of stopping a full
+  // square short. 1.0 = full body blocks (old "block like walls"); 0.5 = inner
+  // half blocks; lower = more permissive. The RESTING check still uses the full
+  // footprint, so you can pass NEAR an enemy but never END overlapping one.
+  enemyBlockCoreFraction: 0.5,
 };
 
 /**
