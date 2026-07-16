@@ -1025,6 +1025,13 @@ export class AspectsofPowerItem extends Item {
       }
     }
 
+    // A defensive reaction that NEGATED the hit (dodge/parry succeeded →
+    // isHit false) supersedes the physical-lane "takes the hit (bulk absorbs)"
+    // fallback, which is set earlier (before we know a reaction will fire). Drop
+    // the stale line so the card doesn't read "takes the hit" AND "parries!".
+    // (2026-07-15 cosmetic finding.)
+    if (defenseResult.reactionSkillId && isHit === false) defenseLine = '';
+
     return { isHit, damageMultiplier, defenseLine, reactionLine, swappedTargetActor, swappedTargetToken };
   }
 
@@ -2817,7 +2824,18 @@ export class AspectsofPowerItem extends Item {
     const hasCrush   = _tags.includes('crush');
     const dealsDmg   = (this.system.tagConfig?.debuffDealsDamage ?? false) || hasShred;
     const dmgType    = this.system.tagConfig?.debuffDamageType ?? 'physical';
-    const debuffType = this.system.tagConfig?.debuffType ?? 'none';
+    // Derive debuffType from a subtype TAG when tagConfig doesn't set it.
+    // Skills tagged with a CC subtype (paralysis/stun/root/…) BEFORE the item
+    // sheet started auto-wiring tagConfig.debuffType (item-sheet _addSkillTag)
+    // kept debuffType 'none' and silently applied NO control effect — the tag
+    // is the single source of truth, so honor it. (2026-07-15 test: Puppet
+    // Strings carried `paralysis` but debuffType 'none' → no CC.)
+    let debuffType = this.system.tagConfig?.debuffType ?? 'none';
+    if (debuffType === 'none') {
+      const _subtypeMap = CONFIG.ASPECTSOFPOWER.debuffSubtypeTags ?? {};
+      const _subtypeTag = _tags.find(t => _subtypeMap[t]);
+      if (_subtypeTag) debuffType = _subtypeMap[_subtypeTag];
+    }
     // Scale debuff by defense multiplier (partial defense = partial debuff).
     // If debuffScaleWithAttack > 0, debuff strength is a fraction of attack damage.
     const attackScaling = this.system.tagConfig?.debuffScaleWithAttack ?? 0;
