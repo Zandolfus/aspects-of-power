@@ -936,6 +936,25 @@ export class CelerityCombatTracker extends ParentTracker {
     return context;
   }
 
+  /**
+   * @override — guard a core Foundry bug. Core CombatTracker._onRender does
+   * `data = renderData.find(d => d._id === this.viewed?.id)` (which can be
+   * `undefined`) and then tests `"turn" in data` → TypeError. It fires on our
+   * frequent flag-only `combat.update()` calls, where renderData has no entry
+   * for the viewed combat, and spammed the console every render. The crashing
+   * branch runs AFTER super's real render and only scrolls the active
+   * combatant into view, so swallowing exactly that TypeError is safe. Remove
+   * this override if/when Foundry guards the `.find()` result.
+   */
+  async _onRender(context, options) {
+    try {
+      await super._onRender(context, options);
+    } catch (e) {
+      if (e instanceof TypeError && e.message.includes("search for 'turn' in undefined")) return;
+      throw e;
+    }
+  }
+
   // TRIAL-REALTIME: stop the loop + remove the hook when the tracker closes
   // so we don't leak timers or stale listeners.
   async _onClose(options) {
