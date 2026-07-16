@@ -1044,7 +1044,14 @@ export class AspectsofPowerItem extends Item {
    *   armor/veil, toughness) runs ONCE on the combined post-defense damage —
    *   so the target isn't double-tapped by toughness across the two halves.
    */
-  async _handleAttackTag(item, rollData, hitRoll, dmgRoll, speaker, rollMode, label, targetTokenOverride = null, aoeFraction = 1) {
+  async _handleAttackTag(item, rollData, hitRoll, dmgRoll, speaker, rollMode, label, targetTokenOverride = null, aoeFraction = 1, opts = {}) {
+    // `skipDefense`: this attack is a chained RIDER — the parent attack already
+    // resolved the target's defense (dodge/parry/pool/guardian) and its cost.
+    // The rider must NOT put up a second Defend prompt (an orphanable dialog
+    // that re-resolves + double-applies when clicked, per 2026-07-15 test) nor
+    // re-fire retaliations/guardian reactions. Damage still passes through the
+    // target's passive mitigation (armor/veil/toughness) downstream.
+    const { skipDefense = false } = opts;
     const whisperGM = !_isPlayerCharacter(this.actor) ? ChatMessage.getWhisperRecipients('GM') : undefined;
     let targetToken    = targetTokenOverride ?? game.user.targets.first() ?? null;
     let targetActor    = targetToken?.actor ?? null;
@@ -1121,7 +1128,7 @@ export class AspectsofPowerItem extends Item {
     // matching the `self_attacked` trigger. They fire automatically — no
     // budget, no cooldown enforcement, no player prompt. Author sets cost=0
     // for free-fire passives (Thorns-style); non-zero cost is still paid.
-    await this._firePassiveReactions(targetActor, attackerToken, 'self_attacked');
+    if (!skipDefense) await this._firePassiveReactions(targetActor, attackerToken, 'self_attacked');
 
     // Guardian-cover (P2b): when a guardian chooses cover, the defense check
     // below runs vs the GUARDIAN (coverGuardian) instead of the ally — their
@@ -1139,7 +1146,7 @@ export class AspectsofPowerItem extends Item {
     // configured `reactionTriggerRange` of `targetActor`. Each fires
     // automatically against the attacker. Savior's Slash is the canonical
     // case (15ft, non-hostile triggers fire from a reactor in range).
-    if (attackerToken && targetToken && game.combat?.started) {
+    if (!skipDefense && attackerToken && targetToken && game.combat?.started) {
       const gridSize = canvas.grid.size;
       const gridDist = canvas.grid.distance;
       const pxPerFt = gridSize / gridDist;
@@ -1273,13 +1280,18 @@ export class AspectsofPowerItem extends Item {
     const aoeContext = this.constructor._classifyAoeContext(this);
     const bypassPool = aoeContext === 'aoe-volumetric';
     const _defLabel = (k) => (k ?? '').charAt(0).toUpperCase() + (k ?? '').slice(1);
-    if (bypassPool) {
+    // Chained riders (skipDefense) auto-hit exactly like volumetric AOEs skip
+    // the pool — no Defend prompt — but the chat note names the real reason.
+    if (bypassPool || skipDefense) {
+      const _primaryNote = bypassPool
+        ? `${_defLabel(targetDefKey)} pool bypassed (volumetric AOE — can't dodge gas).`
+        : `Chained hit — parent attack already resolved the defense.`;
       primaryResult = { isHit: true, damageMultiplier: 1,
-        defenseLine: `<p><em>${_defLabel(targetDefKey)} pool bypassed (volumetric AOE — can't dodge gas).</em></p>`,
+        defenseLine: `<p><em>${_primaryNote}</em></p>`,
         reactionLine: '' };
       if (hasDualDefense) {
         secondaryResult = { isHit: true, damageMultiplier: 1,
-          defenseLine: `<p><em>${_defLabel(secondaryDefKey)} pool bypassed.</em></p>`,
+          defenseLine: bypassPool ? `<p><em>${_defLabel(secondaryDefKey)} pool bypassed.</em></p>` : '',
           reactionLine: '' };
       }
     } else {
@@ -5430,7 +5442,8 @@ export class AspectsofPowerItem extends Item {
         for (const tag of chainTags) {
           switch (tag) {
             case 'attack':
-              await chainedItem._handleAttackTag(chainedItem, chainRollData, cHitRoll, cDmgRoll, speaker, rollMode, chainLabel, targetToken);
+              // Rider: no second Defend prompt (parent already resolved it).
+              await chainedItem._handleAttackTag(chainedItem, chainRollData, cHitRoll, cDmgRoll, speaker, rollMode, chainLabel, targetToken, 1, { skipDefense: true });
               break;
             case 'restoration':
               await chainedItem._handleRestorationTag(chainedItem, chainRollData, cDmgRoll, speaker, rollMode, chainLabel, targetToken);
