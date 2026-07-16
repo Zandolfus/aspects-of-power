@@ -1100,13 +1100,17 @@ export class AspectsofPowerItem extends Item {
       }
     }
     const isPhysical   = rollData.roll.damageType === 'physical';
-    // Physical mitigation = armor + held-weapon block DR (active defense:
-    // the str archetype's constant-on guard). Magical = veil only.
-    // Armor-answer system: the physical armor layer (armor+blockDR) is reduced
-    // by ARMOR CRUSH (stacking debuff) then PIERCE (a `pierce` skill tag, or
-    // inherent on hammers/maces) — both %-of-armor, multiplicative.
+    // Armor-answer routing (2026-07-16 ruling): VEIL defends mind/soul attacks
+    // ONLY. Physical AND elemental damage face the ARMOR layer (armor+blockDR,
+    // reduced by crush/pierce) plus toughness/affinity DR. The lane is the
+    // attack's targetDefense — NOT damageType — because elemental attacks are
+    // 'magical' yet must hit armor, not veil. (mitigLabel + the apply-damage
+    // button's data-mitigation carry this same lane so display and application
+    // agree.)
+    const _targetDef = rollData.roll.targetDefense;
+    const usesVeil   = _targetDef === 'mind' || _targetDef === 'soul';
     let mitigation;
-    if (isPhysical) {
+    if (!usesVeil) {
       const _aa = CONFIG.ASPECTSOFPOWER.armorAnswer ?? {};
       const armorLayer = (targetActor.system.defense.armor?.value ?? 0) + (targetActor.system.defense.blockDR ?? 0);
       const crushFrac = this._getArmorCrushReduction(targetActor);
@@ -1122,7 +1126,7 @@ export class AspectsofPowerItem extends Item {
     const baseDR             = targetActor.system.defense?.dr?.value ?? 0;
     const affinityDR         = this._getAffinityDRReduction(targetActor, attackerToken, targetToken);
     const effectiveToughness = Math.max(0, baseDR - affinityDR);
-    const mitigLabel         = isPhysical ? 'Armor' : 'Veil';
+    const mitigLabel         = usesVeil ? 'Veil' : 'Armor';
 
     // ── Defense check(s): one per defense, sequentially. Dual-defense skills
     // run two prompts; the defender chooses pool/reaction independently for
@@ -1524,10 +1528,16 @@ export class AspectsofPowerItem extends Item {
     // the ally button to the kept amount with toughness/affinity 0 so the handler
     // doesn't re-mitigate (mitigation already applied at resolve); keep fmAttrs so
     // the ally's self_struck/hp_threshold still fire. Add a guardian apply button.
+    // data-mitigation is the armor-answer lane (armor for physical+elemental,
+    // veil for mind/soul) — the apply-damage handler routes on it so the actual
+    // HP mitigation matches the display above. (data-damage-type is kept for
+    // affinity/display semantics.)
+    const _mitLane = usesVeil ? 'veil' : 'armor';
     let allyApplyAttr = `data-damage="${afterDefense}"
              data-toughness="${baseDR}"
              data-affinity-dr="${affinityDR}"
-             data-damage-type="${isPhysical ? 'physical' : 'magical'}"${damageBreakdownAttr}${fmAttrs}`;
+             data-damage-type="${isPhysical ? 'physical' : 'magical'}"
+             data-mitigation="${_mitLane}"${damageBreakdownAttr}${fmAttrs}`;
     let redirectLine = '';
     let redirectButton = '';
     if (redirectGuardian && isHit && finalDamage > 0) {
@@ -1536,7 +1546,8 @@ export class AspectsofPowerItem extends Item {
       allyApplyAttr = `data-damage="${keep}"
              data-toughness="0"
              data-affinity-dr="0"
-             data-damage-type="${isPhysical ? 'physical' : 'magical'}"${fmAttrs}`;
+             data-damage-type="${isPhysical ? 'physical' : 'magical'}"
+             data-mitigation="${_mitLane}"${fmAttrs}`;
       redirectLine = `<p><em>Redirected ${share} of ${finalDamage} to ${redirectGuardian.name} (${Math.round(redirectPct * 100)}%).</em></p>`;
       redirectButton = `<button class="apply-damage"
              data-actor-uuid="${redirectGuardian.uuid}"
@@ -1544,6 +1555,7 @@ export class AspectsofPowerItem extends Item {
              data-toughness="0"
              data-affinity-dr="0"
              data-damage-type="${isPhysical ? 'physical' : 'magical'}"
+             data-mitigation="${_mitLane}"
              style="margin-top:6px;width:100%;">
              Apply redirected ${share} to ${redirectGuardian.name}
            </button>`;

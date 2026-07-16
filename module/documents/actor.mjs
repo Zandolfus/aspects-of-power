@@ -1216,15 +1216,17 @@ export class AspectsofPowerActor extends Actor {
 
     if (effectType === 'damage') {
       const dmgType = sys.auraDamageType ?? 'physical';
-      const isMagic = sys.auraIsMagic ?? false;
+      // Armor-answer routing (2026-07-16): veil only for mind/soul auras;
+      // physical AND elemental aura damage face armor.
+      const auraMitLane = (dmgType === 'mind' || dmgType === 'soul') ? 'veil' : 'armor';
       ChatMessage.create({
         speaker, ...gmWhisper,
         content: `<p><strong>${targetActor.name}</strong> caught in <em>${effect.name}</em> aura — `
                + `<strong>${amount}</strong> ${dmgType} damage.</p>`
                + `<button class="apply-damage" data-actor-uuid="${targetActor.uuid}" `
                + `data-damage="${amount}" data-toughness="${targetActor.system.defense?.dr?.value ?? 0}" `
-               + `data-damage-type="${dmgType}" data-affinity-dr="0" `
-               + `data-bypass-pool="true" data-bypass-armor="${isMagic}">Apply Damage</button>`,
+               + `data-damage-type="${dmgType}" data-affinity-dr="0" data-mitigation="${auraMitLane}" `
+               + `data-bypass-pool="true">Apply Damage</button>`,
       });
       return;
     }

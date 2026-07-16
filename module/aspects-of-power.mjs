@@ -1842,9 +1842,12 @@ async function _triggerPersistentAoe(tokenDoc, force = false) {
       //   route directly to armor (physical) or veil (magical) → DR → HP.
       const hitBonus = isShrapnel ? (pd.tagConfig?.shrapnelHitBonus ?? 4) : 0;
       const finalHit = (pd.hitTotal ?? rollTotal) + hitBonus;
-      const mitigationLine = isMagic
-        ? '(magical: → veil → DR → HP, ignore armor)'
-        : '(physical: → armor → DR → HP)';
+      // Armor-answer routing (2026-07-16): veil only for mind/soul zones;
+      // physical AND elemental zone damage face armor. (Was: all `magic` → veil.)
+      const zoneMitLane = targetingPool ? 'veil' : 'armor';
+      const mitigationLine = zoneMitLane === 'veil'
+        ? '(mind/soul: → veil → DR → HP)'
+        : '(physical/elemental: → armor → DR → HP)';
       const poolLine = isShrapnel
         ? `Hit ${finalHit} vs target's ${targetDefense} pool — pool absorbs first.`
         : 'Pool BYPASSED (persistent zone — no dodging).';
@@ -1857,8 +1860,8 @@ async function _triggerPersistentAoe(tokenDoc, force = false) {
                + `<p><em>${poolLine} ${mitigationLine}</em></p>`
                + `<button class="apply-damage" data-actor-uuid="${targetActor.uuid}" `
                + `data-damage="${rollTotal}" data-toughness="${targetActor.system.defense?.dr?.value ?? 0}" `
-               + `data-damage-type="${pd.damageType}" data-affinity-dr="0" `
-               + `data-bypass-pool="${!isShrapnel}" data-bypass-armor="${isMagic}">Apply Damage</button>`,
+               + `data-damage-type="${pd.damageType}" data-affinity-dr="0" data-mitigation="${zoneMitLane}" `
+               + `data-bypass-pool="${!isShrapnel}">Apply Damage</button>`,
       });
     }
 
@@ -2226,8 +2229,16 @@ Hooks.on('renderChatMessageHTML', (message, html) => {
       if (!target || isNaN(incomingDmg)) return;
 
       const isPhysical = damageType === 'physical';
-      // Physical mitigation = armor + held-weapon block DR (active defense).
-      const mitigation = isPhysical
+      // Armor-answer routing (2026-07-16 ruling): VEIL defends mind/soul only;
+      // physical AND elemental face the armor layer. The resolver stamps the
+      // lane on data-mitigation ('armor'|'veil'); prefer it so the applied HP
+      // mitigation matches the chat display. Fall back to the legacy
+      // damageType split for buttons that don't set it (raw/redirect helpers).
+      // NOTE: `isPhysical` still keys the separate Phys/Mag DR-resist layer
+      // below (that's about damage TYPE, not the armor/veil lane).
+      const mitigLane = btn.dataset.mitigation
+        || (isPhysical ? 'armor' : 'veil');
+      const mitigation = mitigLane === 'armor'
         ? (target.system.defense.armor?.value ?? 0) + (target.system.defense.blockDR ?? 0)
         : (target.system.defense.veil?.value ?? 0);
 
@@ -2370,7 +2381,7 @@ Hooks.on('renderChatMessageHTML', (message, html) => {
       if (remaining > 0 && mitigation > 0) {
         const mitigated = Math.min(mitigation, remaining);
         remaining = Math.max(0, remaining - mitigation);
-        parts.push(`${isPhysical ? 'Armor' : 'Veil'}: −${mitigated}`);
+        parts.push(`${mitigLane === 'armor' ? 'Armor' : 'Veil'}: −${mitigated}`);
       }
 
       // 3. DR (with affinity reduction) reduces whatever got through armor.
