@@ -995,7 +995,12 @@ export async function declareMovement(actor, startPos, endPos, distanceFt, stami
     if (clamped.x !== endPos.x || clamped.y !== endPos.y) {
       const pxPerFt = canvas.grid.size / canvas.grid.distance;
       const newFt = Math.round(Math.hypot(clamped.x - startPos.x, clamped.y - startPos.y) / pxPerFt);
-      if (newFt <= 0) return null;
+      // Fully blocked (no ground gained) — tell the player why instead of the
+      // move silently vanishing (the other half of "indicator for stopping").
+      if (newFt <= 0) {
+        ui.notifications.warn(`${actor.name}: can't move that way — an enemy is in the way.`);
+        return null;
+      }
       staminaCost = Math.max(0, Math.round(staminaCost * (newFt / distanceFt)));
       distanceFt = newFt;
       endPos = clamped;
