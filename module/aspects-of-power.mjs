@@ -2702,7 +2702,12 @@ Hooks.on('updateActor', async (actor, changes, _options, userId) => {
     // 0 HP are marked defeated + skulled without GM action. Player-owned
     // actors are exempt — downed PCs stay a GM/narrative call.
     if ((CONFIG.ASPECTSOFPOWER.ai?.autoDefeatHostiles ?? true) && !actor.hasPlayerOwner) {
-      const isHostile = actor.getActiveTokens(true, true)
+      // getActiveTokens(linked, document): linked=true returns ONLY tokens
+      // linked to the actor — empty for unlinked-token NPCs (i.e. nearly every
+      // hostile), so auto-defeat never fired for them (2026-07-15 test: a dead
+      // Saurian stayed un-defeated while its on_death AOE still fired via the
+      // no-arg getActiveTokens above). Use all active tokens as documents.
+      const isHostile = actor.getActiveTokens(false, true)
         .some(d => d.disposition === CONST.TOKEN_DISPOSITIONS.HOSTILE);
       if (isHostile) {
         for (const combat of game.combats) {
