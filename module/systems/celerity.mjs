@@ -863,29 +863,15 @@ export function clampMoveNoOverlap(tokenDoc, fromPos, toPos) {
     }
     return false;
   };
-  // Enemy TRANSIT test uses only the inner CORE of each footprint (centered),
-  // so a mover can graze/brush past an enemy's edge without halting — only
-  // barging into the solid core blocks. coreF=1 reproduces the old full-body
-  // "block like walls". The gap is intentionally excluded here (it governs
-  // resting spacing, not transit). Per user 2026-07-16 ("shrink the block zone").
-  const coreF = Math.max(0, Math.min(1, CONFIG.ASPECTSOFPOWER?.movement?.enemyBlockCoreFraction ?? 1));
-  const hitsCore = (p, set) => {
-    for (const o of set) {
-      const ox = (selfW * coreF + o.w * coreF) / 2 - Math.abs((p.x + selfW / 2) - (o.x + o.w / 2));
-      const oy = (selfH * coreF + o.h * coreF) / 2 - Math.abs((p.y + selfH / 2) - (o.y + o.h / 2));
-      if (ox > 0.5 && oy > 0.5) return true;
-    }
-    return false;
-  };
   const enemies = obstacles.filter(o => o.enemy);
   const STEPS = 48;
 
-  // 1. Cross-faction cores block transit. Find the last step before the mover's
-  //    core first contacts an enemy core along the path (full path if none).
+  // 1. Cross-faction bodies block transit. Find the last step before the
+  //    footprint first contacts an enemy along the path (full path if none).
   let tMax = 1;
   if (enemies.length) {
     for (let i = 1; i <= STEPS; i++) {
-      if (hitsCore(lerp(i / STEPS), enemies)) { tMax = (i - 1) / STEPS; break; }
+      if (hits(lerp(i / STEPS), enemies)) { tMax = (i - 1) / STEPS; break; }
     }
   }
   // 2. Within reach [0, tMax], stop at the furthest point whose resting
@@ -999,7 +985,11 @@ export async function declareMovement(actor, startPos, endPos, distanceFt, stami
   // No-stacking: a move may pass through others but must not END overlapping
   // one. Stop short at the last clear point; rescale distance + stamina to the
   // shortened path. A move fully blocked by overlap (no clear ground gained)
-  // is dropped.
+  // is dropped. `blocked` + `requestedEndPos` are stamped on the declaration so
+  // the path overlay can draw a STOP indicator (you stopped short of where you
+  // aimed — 2026-07-16, "we need an indicator for stopping").
+  const requestedEndPos = { x: endPos.x, y: endPos.y };
+  let blocked = false;
   if (combatant.token) {
     const clamped = clampMoveNoOverlap(combatant.token, startPos, endPos);
     if (clamped.x !== endPos.x || clamped.y !== endPos.y) {
@@ -1009,6 +999,7 @@ export async function declareMovement(actor, startPos, endPos, distanceFt, stami
       staminaCost = Math.max(0, Math.round(staminaCost * (newFt / distanceFt)));
       distanceFt = newFt;
       endPos = clamped;
+      blocked = true;
     }
   }
 
@@ -1034,6 +1025,8 @@ export async function declareMovement(actor, startPos, endPos, distanceFt, stami
       staminaCost,
       distanceFt,
       movementMode: m.key,
+      blocked,
+      requestedEndPos,
     },
     'flags.aspectsofpower.nextActionTick': Math.min(scheduledTick, _qaTick),
     'flags.aspectsofpower.lastActionWait': wait,

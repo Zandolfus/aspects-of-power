@@ -259,6 +259,31 @@ function _buildPathGraphic(tokenDoc, mv, clockTick) {
     gfx.stroke({ color: 0xffffff, alpha: 0.8, width: 2 });
   }
 
+  // STOP indicator: the move was clamped short of where it was aimed (an enemy
+  // body / no-stack). Draw a faint ghost line to the intended destination plus
+  // a red stop ring + label at the actual stop, so it's clear WHY the move is
+  // short instead of feeling "locked". (2026-07-16 "indicator for stopping".)
+  if (mv.blocked && mv.requestedEndPos) {
+    const rqx = mv.requestedEndPos.x + cx;
+    const rqy = mv.requestedEndPos.y + cy;
+    const stop = 0xff3b3b;
+    _drawDashedLine(gfx, ex, ey, rqx, rqy, stop, 0.35);
+    if (typeof gfx.drawCircle === 'function') {
+      gfx.lineStyle(1.5, stop, 0.4); gfx.beginFill(0, 0); gfx.drawCircle(rqx, rqy, 6); gfx.endFill();
+      gfx.lineStyle(3, stop, 0.95); gfx.beginFill(stop, 0.15); gfx.drawCircle(ex, ey, 11); gfx.endFill();
+    } else {
+      gfx.circle(rqx, rqy, 6); gfx.stroke({ color: stop, alpha: 0.4, width: 1.5 });
+      gfx.circle(ex, ey, 11); gfx.fill({ color: stop, alpha: 0.15 }); gfx.stroke({ color: stop, alpha: 0.95, width: 3 });
+    }
+    const tag = new PIXI.Text('blocked', {
+      fontSize: 11, fill: stop, stroke: 0x000000, strokeThickness: 3, fontWeight: 'bold',
+    });
+    tag.anchor?.set?.(0.5, 1);
+    tag.x = ex; tag.y = ey - 15;
+    tag.eventMode = 'none';
+    gfx.addChild(tag);
+  }
+
   return gfx;
 }
 

@@ -1698,14 +1698,18 @@ Hooks.on('updateToken', () => { refreshPowerSense(); refreshOverlay(); });
 // movement completion clears the flag) or the combat clock advances (so
 // the current-position dot moves along the path).
 Hooks.on('updateCombatant', (combatant, change) => {
-  // NOTE (2026-07-16): do NOT also refresh on declaredMovement here — the
-  // movement declare fires mid-drag (token.mjs _preUpdateMovement →
-  // declareMovement), and rebuilding the PIXI overlay during the drag
-  // interaction truncated the move to ~1ft ("movement locked to 1-2m"
-  // regression). The redeclare-overlay-refresh needs a drag-safe trigger;
-  // reverted here until that's designed. See [[design-concurrent-actions]].
-  if (change?.flags?.aspectsofpower?.declaredAction !== undefined) {
+  const aop = change?.flags?.aspectsofpower;
+  // Movement lives on its own track (declaredMovement) since the 2026-07-14
+  // concurrency split — refresh on it too so the path + STOP indicator update
+  // on a declare / REDECLARE / cancel. This is drag-safe: declareMovement fires
+  // AFTER the drag commits (token._preUpdateMovement returns false, the write is
+  // async), and refreshOverlay is itself rAF-debounced — so the rebuild lands a
+  // frame after release, never mid-drag. (The "locked to 1-2m" report was the
+  // enemy no-stack clamp, not this refresh.) declaredAction drives power-sense.
+  if (aop?.declaredAction !== undefined || aop?.declaredMovement !== undefined) {
     refreshOverlay();
+  }
+  if (aop?.declaredAction !== undefined) {
     refreshPowerSense();
   }
 });
