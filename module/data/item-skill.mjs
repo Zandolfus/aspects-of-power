@@ -309,9 +309,15 @@ export class SkillData extends foundry.abstract.TypeDataModel {
         // the strip amount). Only DEDICATED strippers (Hemorrhage, Burn, the
         // per-affinity set) set this — generic DoTs leave it false.
         debuffDRStrip:      new fields.BooleanField({ initial: false }),
-        // Armor Crush opt-in: fraction of the target's armor+blockDR this
-        // debuff removes per application (armor-answer system; ~0.10, cap 30%).
+        // Armor Crush opt-in (armor-answer system): >0 means this debuff crushes
+        // armor. FLAT amount is computed at apply (crushHitFrac × dmgRoll) and
+        // stored on the effect as armorCrushFlat — this field is now just the
+        // ON gate (any non-zero enables crush; magnitude comes from config).
         debuffArmorCrush:   new fields.NumberField({ initial: 0, min: 0, max: 1 }),
+        // Armor MELT rate (design-burn-status.md): >0 means this (burn) debuff
+        // melts armor by this rate × its per-tick dotDamage, summed globally.
+        // Default 0 = no melt. Canonical Burn sets ~config burnMeltRate (0.5).
+        debuffArmorMelt:    new fields.NumberField({ initial: 0, min: 0, max: 2 }),
         // DoT damage scaling: per-tick DoT damage = dmgRoll × dotScale ×
         // defenseMultiplier. Separate from debuffScaleWithAttack (which
         // scales the stat-reduction portion of the debuff) so designers

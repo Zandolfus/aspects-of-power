@@ -226,17 +226,28 @@ ASPECTSOFPOWER.spellstrike = {
 };
 
 /**
- * Armor-answer system (design-armor-answer-system.md, sim-set 2026-07-03).
- * The physical ARMOR layer (armor + blockDR) is reduced by ARMOR CRUSH
- * (stacking debuff) then PIERCE (a `pierce` skill tag, or inherent on
- * hammers/maces). Both are %-of-armor, applied multiplicatively. DR-strip
- * (the toughDR layer) is separate (drStrip flag + dotScale).
+ * Armor-answer system (design-armor-answer-system.md; FLAT/absolute rework
+ * 2026-07-18, design-burn-status.md). The physical ARMOR layer (armor+blockDR)
+ * is reduced by three FLAT reductions that SUM and are anchored to the
+ * ATTACKER's output (never a fraction of the target's armor — that scaled with
+ * target grade and let a lower-grade attacker strip a huge absolute chunk of a
+ * superior's armor). All grade-correct by construction:
+ *   pierce  = pierceHitFrac × attacker hit          (weapon/tag property, per-hit)
+ *   crush   = Σ crushHitFrac × applier hit           (stacking debuff, stored flat)
+ *   melt    = Σ armorMeltRate × burn-stack dotDamage (global; design-burn-status)
+ *   armorAfter = max(0, armor+blockDR − pierce − crush − melt)
+ * DR-strip (toughDR layer) is separate (drStrip flag). Legacy %-fields kept for
+ * back-compat/migration only; the calc no longer reads them.
  */
 ASPECTSOFPOWER.armorAnswer = {
-  pierceFraction:     0.35,
+  pierceHitFrac:       0.23,   // pierce flat = frac × attacker hit
   pierceWeaponTypes:  ['hammer', 'mace'],
+  crushHitFrac:        0.10,   // crush flat, PER application = frac × applier hit
+  armorCrushMaxStacks: 3,      // cap on crush stacks that contribute
+  burnMeltRate:        0.5,    // default armor-melt rate (× Σ burn dotDamage)
+  // ── legacy %-fields (SUPERSEDED by flat, kept for migration back-compat) ──
+  pierceFraction:     0.35,
   armorCrushPerStack: 0.10,
-  armorCrushMaxStacks: 3,
 };
 
 /**

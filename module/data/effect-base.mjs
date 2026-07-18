@@ -34,10 +34,19 @@ export class AopEffectData extends foundry.data.ActiveEffectTypeDataModel {
       drStrip:          new fields.BooleanField({ initial: false }),
 
       // ── Armor Crush (armor-answer system) ──
-      // Fraction of the target's armor+blockDR this debuff removes while
-      // active (summed across stacks, capped in _getArmorCrushReduction).
-      // Set from the source skill's tagConfig.debuffArmorCrush.
+      // LEGACY fraction (SUPERSEDED 2026-07-18 by armorCrushFlat). Kept so old
+      // stored effects don't error; the flat calc no longer reads it.
       armorCrush:       new fields.NumberField({ initial: 0, min: 0 }),
+      // FLAT armor reduction this crush debuff contributes while active, summed
+      // across stacks in the mitigation calc. Anchored to the APPLIER's hit at
+      // apply time (crushHitFrac × dmgRoll) so it's grade-correct — never a
+      // fraction of the target's armor. design-burn-status.md.
+      armorCrushFlat:   new fields.NumberField({ initial: 0, min: 0 }),
+      // Armor-MELT rate (design-burn-status.md): when > 0, this (burn) effect
+      // melts armor by armorMeltRate × its dotDamage, summed globally across
+      // burn stacks. Explicit opt-in so a generic bleed/poison DoT never melts
+      // armor — only skills that declare it (canonical Burn) do.
+      armorMeltRate:    new fields.NumberField({ initial: 0, min: 0 }),
 
       // ── Caster / source tracking ──
       casterActorUuid:  new fields.StringField({ initial: '' }),
