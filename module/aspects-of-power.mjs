@@ -2248,9 +2248,18 @@ Hooks.on('renderChatMessageHTML', (message, html) => {
       // below (that's about damage TYPE, not the armor/veil lane).
       const mitigLane = btn.dataset.mitigation
         || (isPhysical ? 'armor' : 'veil');
-      const mitigation = mitigLane === 'armor'
-        ? (target.system.defense.armor?.value ?? 0) + (target.system.defense.blockDR ?? 0)
-        : (target.system.defense.veil?.value ?? 0);
+      // Prefer the mitigation VALUE computed at attack-resolve (item.mjs) — the
+      // armor lane there is already reduced by the FLAT armor-answer (pierce +
+      // crush + melt). Recomputing raw armor+blockDR here is what made crush/
+      // pierce display-only (2026-07-18 fix, design-burn-status.md). Fall back
+      // to raw armor/veil for buttons that don't carry it (raw/redirect helpers,
+      // zone damage). `data-mitigation-value="0"` is honored (already-final dmg).
+      const _mitVal = btn.dataset.mitigationValue;
+      const mitigation = (_mitVal !== undefined && _mitVal !== '')
+        ? (parseInt(_mitVal, 10) || 0)
+        : (mitigLane === 'armor'
+            ? (target.system.defense.armor?.value ?? 0) + (target.system.defense.blockDR ?? 0)
+            : (target.system.defense.veil?.value ?? 0));
 
       // --- Damage routing: Mark bonus → Affinity DR → Barrier → Armor/Veil → DR → Overhealth → HP ---
       const updateData = {};

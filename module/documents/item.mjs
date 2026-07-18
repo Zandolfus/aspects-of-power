@@ -1136,12 +1136,19 @@ export class AspectsofPowerItem extends Item {
     if (!usesVeil) {
       const _aa = CONFIG.ASPECTSOFPOWER.armorAnswer ?? {};
       const armorLayer = (targetActor.system.defense.armor?.value ?? 0) + (targetActor.system.defense.blockDR ?? 0);
-      const crushFrac = this._getArmorCrushReduction(targetActor);
+      // FLAT armor-answer (design-burn-status.md, 2026-07-18): pierce/crush/melt
+      // are ABSOLUTE reductions anchored to the ATTACKER's output — they SUM and
+      // subtract, never a fraction of the target's armor (%-of-target scaled with
+      // target grade and let a lower-grade attacker strip a huge chunk of a
+      // superior's armor). Grade-correct by construction.
+      const _hit = Math.max(0, Math.round(dmgRoll?.total ?? 0));
+      const crushFlat = this._getArmorCrushFlat(targetActor);
+      const meltFlat  = this._getArmorMeltFlat(targetActor);
       const _wpnTags = this._resolveWeaponForSkill?.()?.system?.tags ?? [];
       const hasPierce = (this.system.tags ?? []).includes('pierce')
         || (_aa.pierceWeaponTypes ?? ['hammer', 'mace']).some(t => _wpnTags.includes(t));
-      const pierceFrac = hasPierce ? (_aa.pierceFraction ?? 0.35) : 0;
-      mitigation = Math.round(armorLayer * (1 - crushFrac) * (1 - pierceFrac));
+      const pierceFlat = hasPierce ? Math.round((_aa.pierceHitFrac ?? 0.23) * _hit) : 0;
+      mitigation = Math.max(0, armorLayer - pierceFlat - crushFlat - meltFlat);
     } else {
       mitigation = (targetActor.system.defense.veil?.value ?? 0);
     }
@@ -1556,11 +1563,16 @@ export class AspectsofPowerItem extends Item {
     // HP mitigation matches the display above. (data-damage-type is kept for
     // affinity/display semantics.)
     const _mitLane = usesVeil ? 'veil' : 'armor';
+    // data-mitigation-value carries the FINAL armor/veil mitigation computed here
+    // (armor lane already reduced by flat pierce/crush/melt). The apply handler
+    // uses it verbatim instead of recomputing raw armor+blockDR — without this,
+    // crush/pierce/melt were DISPLAY-ONLY (handler applied raw armor). Single
+    // source → display and applied damage can't drift. design-burn-status.md.
     let allyApplyAttr = `data-damage="${afterDefense}"
              data-toughness="${baseDR}"
              data-affinity-dr="${affinityDR}"
              data-damage-type="${isPhysical ? 'physical' : 'magical'}"
-             data-mitigation="${_mitLane}"${damageBreakdownAttr}${fmAttrs}`;
+             data-mitigation="${_mitLane}" data-mitigation-value="${mitigation}"${damageBreakdownAttr}${fmAttrs}`;
     let redirectLine = '';
     let redirectButton = '';
     if (redirectGuardian && isHit && finalDamage > 0) {
@@ -1570,7 +1582,7 @@ export class AspectsofPowerItem extends Item {
              data-toughness="0"
              data-affinity-dr="0"
              data-damage-type="${isPhysical ? 'physical' : 'magical'}"
-             data-mitigation="${_mitLane}"${fmAttrs}`;
+             data-mitigation="${_mitLane}" data-mitigation-value="0"${fmAttrs}`;
       redirectLine = `<p><em>Redirected ${share} of ${finalDamage} to ${redirectGuardian.name} (${Math.round(redirectPct * 100)}%).</em></p>`;
       redirectButton = `<button class="apply-damage"
              data-actor-uuid="${redirectGuardian.uuid}"
@@ -1578,7 +1590,7 @@ export class AspectsofPowerItem extends Item {
              data-toughness="0"
              data-affinity-dr="0"
              data-damage-type="${isPhysical ? 'physical' : 'magical'}"
-             data-mitigation="${_mitLane}"
+             data-mitigation="${_mitLane}" data-mitigation-value="0"
              style="margin-top:6px;width:100%;">
              Apply redirected ${share} to ${redirectGuardian.name}
            </button>`;
@@ -2216,20 +2228,42 @@ export class AspectsofPowerItem extends Item {
    * @returns {number}
    */
   /**
-   * Armor Crush reduction (armor-answer system): total fraction of the
-   * target's armor+blockDR removed by active armor-crush debuffs, summed
-   * across stacks and capped (config armorCrushPerStack × armorCrushMaxStacks).
-   * @returns {number} fraction in [0, cap]
+   * FLAT armor-crush reduction (armor-answer system, flat rework 2026-07-18):
+   * sum the stored `armorCrushFlat` (absolute, anchored to each applier's hit)
+   * across active crush debuffs, using at most armorCrushMaxStacks of them
+   * (largest first). Grade-correct — the amount reflects the attackers' output,
+   * not the target's armor. design-burn-status.md.
+   * @returns {number} absolute armor reduction
    */
-  _getArmorCrushReduction(targetActor) {
+  _getArmorCrushFlat(targetActor) {
     const aa = CONFIG.ASPECTSOFPOWER.armorAnswer ?? {};
-    const cap = (aa.armorCrushPerStack ?? 0.10) * (aa.armorCrushMaxStacks ?? 3);
+    const maxStacks = aa.armorCrushMaxStacks ?? 3;
+    const vals = [];
+    for (const effect of targetActor.allApplicableEffects()) {
+      const v = Number(effect.system?.armorCrushFlat ?? 0) || 0;
+      if (v > 0) vals.push(v);
+    }
+    vals.sort((a, b) => b - a);
+    return vals.slice(0, maxStacks).reduce((s, v) => s + v, 0);
+  }
+
+  /**
+   * FLAT armor-MELT reduction (design-burn-status.md): fire's answer to armor.
+   * Sums `armorMeltRate × dotDamage` over active burn stacks that OPT IN via a
+   * non-zero armorMeltRate — a generic bleed/poison DoT never melts armor.
+   * GLOBAL: any attacker benefits from a burned target's softened armor, and
+   * stacks from multiple casters sum (swarm-vs-superior is valid).
+   * @returns {number} absolute armor reduction
+   */
+  _getArmorMeltFlat(targetActor) {
     let total = 0;
     for (const effect of targetActor.allApplicableEffects()) {
-      const v = Number(effect.system?.armorCrush ?? 0) || 0;
-      if (v > 0) total += v;
+      const rate = Number(effect.system?.armorMeltRate ?? 0) || 0;
+      if (rate <= 0) continue;
+      const dot = Number(effect.system?.dotDamage ?? 0) || 0;
+      if (dot > 0) total += rate * dot;
     }
-    return Math.min(cap, total);
+    return Math.round(total);
   }
 
   _getAffinityDRReduction(targetActor, attackerToken = null, targetToken = null) {
@@ -2968,6 +3002,18 @@ export class AspectsofPowerItem extends Item {
       hasCrush ? _crushDefault : 0,
       this.system.tagConfig?.debuffArmorCrush ?? 0,
     );
+    // FLAT crush amount (flat rework 2026-07-18): anchored to THIS applier's hit
+    // at apply time (crushHitFrac × dmgRoll) → grade-correct. armorCrushVal is
+    // now just the ON gate; the flat value is what _getArmorCrushFlat sums.
+    const _crushHitFrac = CONFIG.ASPECTSOFPOWER.armorAnswer?.crushHitFrac ?? 0.10;
+    const armorCrushFlat = armorCrushVal > 0
+      ? Math.max(0, Math.round(_crushHitFrac * (dmgRoll?.total ?? 0)))
+      : 0;
+    // Armor-MELT rate for burn effects (design-burn-status.md): opt-in via
+    // tagConfig.debuffArmorMelt; only on a damaging DoT (its tick is the base).
+    const armorMeltRate = (dealsDmg && (this.system.tagConfig?.debuffArmorMelt ?? 0) > 0)
+      ? (this.system.tagConfig?.debuffArmorMelt ?? 0)
+      : 0;
     effectData.type = 'base';
     effectData.system = {
       debuffDamage: rollTotal,
@@ -2978,7 +3024,8 @@ export class AspectsofPowerItem extends Item {
       directions,
       ...(dismemberedSlot ? { dismemberedSlot } : {}),
       ...(dealsDmg ? { dot: true, dotDamage: dotDmg, dotDamageType: dmgType, applierActorUuid: this.actor.uuid, drStrip: hasShred || !!this.system.tagConfig?.debuffDRStrip } : {}),
-      ...(armorCrushVal > 0 ? { armorCrush: armorCrushVal } : {}),
+      ...(armorCrushVal > 0 ? { armorCrush: armorCrushVal, armorCrushFlat } : {}),
+      ...(armorMeltRate > 0 ? { armorMeltRate } : {}),
       ...(markActive ? {
         markedByActorUuid:      this.actor.uuid,
         markedDamageBonus:      markBonus,
