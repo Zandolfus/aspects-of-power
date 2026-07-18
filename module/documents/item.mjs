@@ -166,8 +166,8 @@ export class AspectsofPowerItem extends Item {
 
   /**
    * Resolve a skill's effective multiplier, cost mod, and weight mod
-   * from its rarity tag + alteration list. Per design-skill-rarity-system.md:
-   *   effective_mult            = max(0, rarityMult + Σ alteration.dmgMod)
+   * from its rarity tag + alteration list. Per design-dmgmod-multiplicative.md:
+   *   effective_mult            = max(0, rarityMult × Π(1 + alteration.dmgMod))
    *   cost_mult                 = 1 + Σ alteration.costMod
    *   effective_weight_mult     = 1 + Σ alteration.weightMod
    * Returned for callers to apply to base resource costs and action
@@ -180,19 +180,26 @@ export class AspectsofPowerItem extends Item {
     const rarity     = this.system.rarity || 'common';
     const rarityMult = sc.skillRarities?.[rarity]?.mult ?? 0.6;
     const alterations = this.system.alterations || [];
-    let dmgMod = 0;
+    // dmgMod is MULTIPLICATIVE (design-dmgmod-multiplicative.md): effective_mult
+    // = rarityMult × Π(1 + dmgMod). A flat additive penalty off the small
+    // rarityMult base (0.2–1.2) is disproportionate — a −0.20 is −40% at
+    // inferior but −17% at divine, and the grade-up demotion treadmill drives
+    // it toward the zero floor. The factor form is a constant percentage at
+    // every rarity, demotion-immune, and never zeroes. Anchored at legendary
+    // (rarityMult 1.0), where additive and multiplicative coincide.
+    let dmgFactor = 1;
     let costMod = 0;
     let weightMod = 0;
     for (const alt of alterations) {
       const tag = sc.alterationTags?.[alt.id];
       if (!tag) continue;
-      dmgMod    += tag.dmgMod    ?? 0;
+      dmgFactor *= 1 + (tag.dmgMod ?? 0);
       costMod   += tag.costMod   ?? 0;
       weightMod += tag.weightMod ?? 0;
     }
     return {
       rarityMult,
-      effectiveMult:             Math.max(0, rarityMult + dmgMod),
+      effectiveMult:             Math.max(0, rarityMult * dmgFactor),
       costMultiplier:            1 + costMod,
       effectiveWeightMultiplier: 1 + weightMod,
     };
