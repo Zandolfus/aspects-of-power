@@ -190,12 +190,28 @@ export class AspectsofPowerItem extends Item {
     let dmgFactor = 1;
     let costMod = 0;
     let weightMod = 0;
+    const altIds = new Set();
     for (const alt of alterations) {
       const tag = sc.alterationTags?.[alt.id];
       if (!tag) continue;
       dmgFactor *= 1 + (tag.dmgMod ?? 0);
       costMod   += tag.costMod   ?? 0;
       weightMod += tag.weightMod ?? 0;
+      altIds.add(alt.id);
+    }
+    // Tag/flag coupling (design-dmgmod-multiplicative.md): an INTRINSIC aoe/debuff
+    // skill pays the same damage penalty as one that spent an upgrade on the
+    // alteration. Without this the penalty only reads `alterations` — which no
+    // live skill uses — so area/debuff authored directly via the tag dodges its
+    // cost. Deduped against altIds so a skill carrying both isn't charged twice.
+    // aoe: area costs output (tag OR the legacy aoe.enabled flag). debuff: gated
+    // to attack spells so pure-utility debuffs (slow/fear) aren't taxed on damage.
+    const skillTags = this.system.tags ?? [];
+    if ((skillTags.includes('aoe') || this.system.aoe?.enabled === true) && !altIds.has('aoe')) {
+      dmgFactor *= 1 + (sc.alterationTags?.aoe?.dmgMod ?? 0);
+    }
+    if (skillTags.includes('debuff') && skillTags.includes('attack') && !altIds.has('debuff')) {
+      dmgFactor *= 1 + (sc.alterationTags?.debuff?.dmgMod ?? 0);
     }
     return {
       rarityMult,
