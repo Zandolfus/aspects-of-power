@@ -3587,7 +3587,10 @@ export class AspectsofPowerItem extends Item {
   async _fireOnDeath(deadToken) {
     if (!this.actor) return;
     const aoe = this.system.aoe;
-    if (!aoe?.enabled) return; // on_death only meaningful for AOE skills today
+    // AOE-ness keys on the tag OR the enabled flag, same as the cast paths
+    // (roll dispatch, invest placement, dmgMod coupling) — a tag-only skill
+    // must not silently skip its burst.
+    if (!aoe?.enabled && !(this.system.tags ?? []).includes('aoe')) return;
 
     const tokenObj = deadToken.object ?? deadToken;
     const tokenDoc = deadToken.document ?? deadToken;
@@ -4811,7 +4814,9 @@ export class AspectsofPowerItem extends Item {
     // time and prompt placement when the player clicks Advance. Bad UX.
     // Place at declare time so the player commits the location now.
     if (!options.executeDeferred
-        && (this.system.aoe?.enabled === true || (this.system.alterations ?? []).some(a => (a.id ?? a) === 'aoe'))
+        && (this.system.aoe?.enabled === true
+          || (this.system.tags ?? []).includes('aoe')
+          || (this.system.alterations ?? []).some(a => (a.id ?? a) === 'aoe'))
         && !aoePerCastContext?.preplacedTemplateDoc
         && this.actor && isInActiveCombat(this.actor)) {
       const casterToken = this.actor.getActiveTokens()?.[0];
