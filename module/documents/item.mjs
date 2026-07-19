@@ -3506,6 +3506,18 @@ export class AspectsofPowerItem extends Item {
     }
 
     const behaviors = [];
+    // Difficult terrain uses Foundry's native modifyMovementCost behavior —
+    // mirror of the _placeAoeTemplate path so non-variable AOEs placed through
+    // this helper (static declare-time placement) also get the movement bite,
+    // not just persistentData.zoneEffect (which nothing reads for difficult
+    // terrain — only slippery is handled in _checkZoneEffects).
+    if ((aoe.zoneEffect ?? 'none') === 'difficultTerrain') {
+      behaviors.push({
+        type: 'modifyMovementCost',
+        name: 'Difficult Terrain',
+        system: { difficulties: { walk: 2, crawl: 2, swim: 2, climb: 2 } },
+      });
+    }
     if ((aoe.templateDuration ?? 0) > 0) {
       behaviors.push({ type: 'persistentAoe', name: 'Persistent AOE Trigger', system: {} });
     }
