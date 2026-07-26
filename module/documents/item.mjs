@@ -2950,7 +2950,7 @@ export class AspectsofPowerItem extends Item {
     // investment. Still faces toughness DR at tick time. See [design-hemorrhage-bleed].
     const dotScale = this.system.tagConfig?.dotScale ?? 0.1;
     const _hasInvestTag = (this.system.tags ?? []).includes('invest');
-    const _investAmt = Math.max(0, Math.round(rollData.roll?.cost ?? 0));
+    const _investAmt = Math.max(0, Math.round(rollData.roll?.investedAmount ?? rollData.roll?.cost ?? 0));
     const _investScale = this.system.tagConfig?.dotInvestScale ?? 1.0;
     const dotDmg = dealsDmg
       ? (_hasInvestTag
@@ -5327,7 +5327,7 @@ export class AspectsofPowerItem extends Item {
       }
 
       // Execute chained skills after all parent tags have resolved.
-      await this._executeChainedSkills(hitResults, targets, speaker, rollMode);
+      await this._executeChainedSkills(hitResults, targets, speaker, rollMode, { investedAmount });
 
       // Mark initial targets as affected on persistent AOEs. Keys are token
       // ids and values are CLOCK TICKS — the re-tick eligibility check
@@ -5479,7 +5479,7 @@ export class AspectsofPowerItem extends Item {
     }
 
     // Execute chained skills after all parent tags have resolved.
-    await this._executeChainedSkills(hitResults, null, speaker, rollMode);
+    await this._executeChainedSkills(hitResults, null, speaker, rollMode, { investedAmount });
 
     await this._applySustainEffect(speaker);
     return dmgRoll;
@@ -5528,7 +5528,7 @@ export class AspectsofPowerItem extends Item {
     });
   }
 
-  async _executeChainedSkills(hitResults, aoeTargets, speaker, rollMode) {
+  async _executeChainedSkills(hitResults, aoeTargets, speaker, rollMode, chainContext = {}) {
     const whisperGM = !_isPlayerCharacter(this.actor) ? ChatMessage.getWhisperRecipients('GM') : undefined;
     const chains = this.system.chainedSkills ?? [];
     if (chains.length === 0) return;
@@ -5580,6 +5580,17 @@ export class AspectsofPowerItem extends Item {
 
         // Build the chained skill's own rolls.
         const chainRollData = chainedItem.getRollData();
+        // CHAIN CONTEXT (designed in design-chained-skills, built 2026-07-25):
+        // a rider has no invest of its own — the chain is free, "the parent's
+        // invest covers both phases". Carry the PARENT's invested amount so
+        // invest-scaling riders (the `invest` tag) size off what was actually
+        // committed to the strike/cast that caused them, instead of the
+        // rider's own flat cost. Direct casts are unaffected (they fall back
+        // to roll.cost, which for a variable cast already IS the invest).
+        if (chainContext?.investedAmount != null) {
+          chainRollData.roll = { ...(chainRollData.roll ?? {}),
+            investedAmount: Math.max(0, Math.round(chainContext.investedAmount)) };
+        }
         const chainLabel = `[chain] ${chainedItem.name}`;
         const { hitFormula: cHitF, dmgFormula: cDmgF } = chainedItem._buildRollFormulas(chainRollData);
 
