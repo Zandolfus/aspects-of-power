@@ -131,7 +131,35 @@ export function aiOrderTargets(actor, hostiles) {
     const fi = list.findIndex(h => h.tokenDoc.id === f.aiFocusTarget);
     if (fi > 0) list = [list[fi], ...list.slice(0, fi), ...list.slice(fi + 1)];
   }
+  // TAUNT (ruled 2026-07-25: taunt is an AI mechanic, not a bespoke debuff).
+  // A taunted creature is COMPELLED onto whoever taunted it, so this runs
+  // LAST and overrides everything above — including a summoner's focus order.
+  // That's the point of taunt: it takes the choice away. Mirrors the
+  // aiTargetSet pattern — it only narrows the list when the taunter is
+  // actually among the current candidates, so a dead/unreachable taunter
+  // never leaves the AI with nothing to attack.
+  const taunterUuid = _activeTaunterUuid(actor);
+  if (taunterUuid) {
+    const forced = list.filter(h => h.tokenDoc.actor?.uuid === taunterUuid);
+    if (forced.length) list = forced;
+  }
   return list;
+}
+
+/**
+ * UUID of the actor currently taunting `actor`, or null. Reads the standard
+ * debuff effect shape (`system.debuffType === 'taunt'` + `casterActorUuid`),
+ * so ANY skill that applies a taunt debuff drives this — no special-casing.
+ * Most-recently-applied taunt wins when several are active.
+ */
+function _activeTaunterUuid(actor) {
+  let found = null;
+  for (const e of actor?.effects ?? []) {
+    if (e.disabled) continue;
+    if (e.system?.debuffType !== 'taunt') continue;
+    if (e.system?.casterActorUuid) found = e.system.casterActorUuid;
+  }
+  return found;
 }
 
 /* ── Futility tracking ("can't hit this guy — move to the next") ──

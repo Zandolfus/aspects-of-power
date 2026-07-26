@@ -570,7 +570,18 @@ export class AspectsofPowerItemSheet extends foundry.applications.api.Handlebars
         return out;
       };
 
+      // Plain string-array checkbox list (no per-entry value input), e.g.
+      // summonBehaviors. Same conditional-render rule as collectEntries: only
+      // collect when the list is actually in the DOM, else keep stored. MUST be
+      // enumerated below — the generic catch-all would collapse a multi-checkbox
+      // group to a single string.
+      const collectKeys = (name) => {
+        if (!form.querySelector(`input[name="system.tagConfig.${name}"]`)) return stored[name] ?? [];
+        return [...form.querySelectorAll(`input[name="system.tagConfig.${name}"]:checked`)].map(cb => cb.value);
+      };
+
       const tagConfigData = {
+        summonBehaviors:     collectKeys('summonBehaviors'),
         restorationTarget:   str('restorationTarget', 'selected'),
         restorationResource: str('restorationResource', 'health'),
         restorationOverhealth: bool('restorationOverhealth', false),

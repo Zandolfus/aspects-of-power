@@ -704,6 +704,41 @@
       </div>
       {{/if}}
 
+      {{! ── Summon Tag Config (AI behavior tags) ── }}
+      {{#if (includes system.tags "summon")}}
+      <div class='tag-config summon-config'>
+        <label class='resource-label'>AI Behaviors</label>
+        <p class='hint'>The conjured creature's brain. Pick ONE brain (stationary / melee / ranged),
+          then stack faculties or a preset. Each adds a tier, and the tier multiplies this skill's
+          resource cost — a smarter creature costs more to conjure.</p>
+        <div class='attribute-group'>
+          <span class='group-label'>Brains &amp; Faculties</span>
+          <div class='group-entries'>
+            {{#each config.aiBehaviors as |beh key|}}
+              <label class='attr-entry' title='{{beh.category}} — adds tier {{beh.tier}}'>
+                <input type='checkbox' name='system.tagConfig.summonBehaviors'
+                       value='{{key}}' {{#if (includes ../system.tagConfig.summonBehaviors key)}}checked{{/if}} />
+                {{#if beh.label}}{{beh.label}}{{else}}{{key}}{{/if}}
+                <span class='multiplier-label'>t{{beh.tier}}</span>
+              </label>
+            {{/each}}
+          </div>
+        </div>
+        <div class='attribute-group'>
+          <span class='group-label'>Presets (expand to faculties)</span>
+          <div class='group-entries'>
+            {{#each config.aiBehaviorPresets as |preset key|}}
+              <label class='attr-entry'>
+                <input type='checkbox' name='system.tagConfig.summonBehaviors'
+                       value='{{key}}' {{#if (includes ../system.tagConfig.summonBehaviors key)}}checked{{/if}} />
+                {{key}}
+              </label>
+            {{/each}}
+          </div>
+        </div>
+      </div>
+      {{/if}}
+
       {{! ── Gather Tag Config ── }}
       {{#if (includes system.tags "gather")}}
       <div class='tag-config gather-config'>
