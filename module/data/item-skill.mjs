@@ -328,6 +328,14 @@ export class SkillData extends foundry.abstract.TypeDataModel {
         // surprise sentinel is gone.
         dotScale: new fields.NumberField({ initial: 0.1, min: 0, max: 1 }),
 
+        // `invest` tag: DoT tick scales on the amount of the ability's PRIMARY
+        // RESOURCE committed (rollData.roll.cost = invested stamina/mana), not
+        // the damage roll — the stab/cast/craft is the cause, so the DoT rides
+        // its investment. dotDamage = dotInvestScale × invested. Still faces
+        // toughness DR at tick time (only a future `virulent` tag bypasses).
+        // See [design-hemorrhage-bleed.md].
+        dotInvestScale: new fields.NumberField({ initial: 1.0, min: 0 }),
+
         // Marked subsystem (per [design-ice-maiden.md] / Marked for Death,
         // Feint, etc.). When non-zero, the spawned debuff carries the
         // caster's UUID + bonus so the apply-damage handler can multiply

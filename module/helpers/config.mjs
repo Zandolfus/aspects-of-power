@@ -646,6 +646,7 @@ ASPECTSOFPOWER.skillTags = {
   aoe:         'ASPECTSOFPOWER.Tag.aoe',
   sustain:     'ASPECTSOFPOWER.Tag.sustain',
   shrapnel:    'ASPECTSOFPOWER.Tag.shrapnel',
+  invest:      'ASPECTSOFPOWER.Tag.invest',
   craft:       'ASPECTSOFPOWER.Tag.craft',
   // Trigger tags (auto-fire passives).
   on_death:    'ASPECTSOFPOWER.Tag.on_death',
@@ -728,6 +729,7 @@ ASPECTSOFPOWER.combatTags = {
   aoe:         'ASPECTSOFPOWER.Tag.aoe',
   sustain:     'ASPECTSOFPOWER.Tag.sustain',
   shrapnel:    'ASPECTSOFPOWER.Tag.shrapnel',
+  invest:      'ASPECTSOFPOWER.Tag.invest',
   // Triggers.
   on_death:    'ASPECTSOFPOWER.Tag.on_death',
   // Chain conditional.

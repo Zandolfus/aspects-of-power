@@ -64,6 +64,7 @@
       "aoe": "AOE",
       "sustain": "Sustain",
       "shrapnel": "Shrapnel",
+      "invest": "Invest",
       "on_death": "On Death",
       "requires_armor_pierce": "Requires Armor Pierce",
       "mine": "Mine",

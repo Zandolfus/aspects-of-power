@@ -2929,9 +2929,19 @@ export class AspectsofPowerItem extends Item {
     // interpolate the full rollTotal, overstating the tick 10×
     // (the refresh path at gmApplyDebuff already reported the scaled
     // number, so create/refresh disagreed).
+    // `invest` tag: the DoT's per-tick damage scales on the PRIMARY RESOURCE
+    // committed to the ability (rollData.roll.cost holds the invested amount
+    // after the invest step — stamina for a stab, mana for a cast), not the
+    // damage roll. The stab/cast/craft is the cause, so the DoT rides its own
+    // investment. Still faces toughness DR at tick time. See [design-hemorrhage-bleed].
     const dotScale = this.system.tagConfig?.dotScale ?? 0.1;
+    const _hasInvestTag = (this.system.tags ?? []).includes('invest');
+    const _investAmt = Math.max(0, Math.round(rollData.roll?.cost ?? 0));
+    const _investScale = this.system.tagConfig?.dotInvestScale ?? 1.0;
     const dotDmg = dealsDmg
-      ? Math.max(0, Math.round(dmgRoll.total * dotScale * defenseMultiplier))
+      ? (_hasInvestTag
+          ? Math.max(0, Math.round(_investScale * _investAmt * defenseMultiplier))
+          : Math.max(0, Math.round(dmgRoll.total * dotScale * defenseMultiplier)))
       : 0;
 
     // Build effect data with optional DoT flags.
