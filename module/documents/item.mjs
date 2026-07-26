@@ -5176,6 +5176,12 @@ export class AspectsofPowerItem extends Item {
         if (!templateDoc) return dmgRoll;
       }
 
+      // Which item/tags the per-target dispatch below uses. Normally this
+      // skill's own; the detonate branch swaps in the consumed mine's summon
+      // so the explosion resolves as the SUMMON's attack.
+      let dispatchItem = item;
+      let dispatchTags = tags;
+
       // Detonate redirect: if this AOE was triggered by a `detonate`-
       // tagged skill consuming a mine, the region carries the summon
       // item's UUID. Override hit/dmg rolls with the summon's formulas
@@ -5201,6 +5207,15 @@ export class AspectsofPowerItem extends Item {
           // shallow-merge the relevant roll fields.
           rollData = foundry.utils.deepClone(rollData);
           rollData.roll = { ...rollData.roll, ...summonRollData.roll };
+          // The explosion IS the summon's attack — dispatch the SUMMON's tags
+          // on the SUMMON item. Without this the loop below iterates the
+          // trigger's tags (Detonate = ['detonate','magic']), matches no
+          // `attack` case, and the detonation applies NOTHING: rolls post, the
+          // AOE announces targets, zero damage lands (confirmed live 2026-07-18).
+          // Also restores the summon's identity tags (shrapnel/pierce/element)
+          // that gate mitigation and the dodge penalty.
+          dispatchItem = summonItem;
+          dispatchTags = summonItem.system.tags ?? [];
         }
       }
 
@@ -5249,19 +5264,19 @@ export class AspectsofPowerItem extends Item {
       // the per-target overlap fraction (per design 2026-05-12) — a token
       // 50% inside the AOE takes 50% of the rolled damage.
       const hitResults = new Map();
-      for (const tag of tags) {
+      for (const tag of dispatchTags) {
         for (const { token: targetToken, fraction } of targets) {
           switch (tag) {
             case 'attack': {
-              const result = await this._handleAttackTag(item, rollData, hitRoll, dmgRoll, speaker, rollMode, label, targetToken, fraction);
+              const result = await dispatchItem._handleAttackTag(dispatchItem, rollData, hitRoll, dmgRoll, speaker, rollMode, label, targetToken, fraction);
               if (result) hitResults.set(targetToken, result);
               break;
             }
             case 'restoration':
-              await this._handleRestorationTag(item, rollData, dmgRoll, speaker, rollMode, label, targetToken);
+              await dispatchItem._handleRestorationTag(dispatchItem, rollData, dmgRoll, speaker, rollMode, label, targetToken);
               break;
             case 'buff':
-              await this._handleBuffTag(item, rollData, dmgRoll, speaker, rollMode, label, targetToken);
+              await dispatchItem._handleBuffTag(dispatchItem, rollData, dmgRoll, speaker, rollMode, label, targetToken);
               break;
             case 'debuff': {
               // Skip debuff if the attack missed or barrier fully absorbed for this target.
@@ -5269,29 +5284,29 @@ export class AspectsofPowerItem extends Item {
               if (attackResult && !attackResult.isHit) break;
               if (attackResult?.fullyBlocked) break;
               const defMult = attackResult?.damageMultiplier ?? 1;
-              await this._handleDebuffTag(item, rollData, dmgRoll, speaker, rollMode, label, targetToken, defMult);
+              await dispatchItem._handleDebuffTag(dispatchItem, rollData, dmgRoll, speaker, rollMode, label, targetToken, defMult);
               break;
             }
             case 'repair':
-              await this._handleRepairTag(item, rollData, dmgRoll, speaker, rollMode, label, targetToken);
+              await dispatchItem._handleRepairTag(dispatchItem, rollData, dmgRoll, speaker, rollMode, label, targetToken);
               break;
             case 'cleanse':
-              await this._handleCleanseTag(item, rollData, dmgRoll, speaker, rollMode, label, targetToken);
+              await dispatchItem._handleCleanseTag(dispatchItem, rollData, dmgRoll, speaker, rollMode, label, targetToken);
               break;
             case 'craft':
-              await this._handleCraftTag(item, rollData, dmgRoll, speaker, rollMode, label);
+              await dispatchItem._handleCraftTag(dispatchItem, rollData, dmgRoll, speaker, rollMode, label);
               break;
             case 'gather':
-              await this._handleGatherTag(item, rollData, dmgRoll, speaker, rollMode, label);
+              await dispatchItem._handleGatherTag(dispatchItem, rollData, dmgRoll, speaker, rollMode, label);
               break;
             case 'refine':
-              await this._handleRefineTag(item, rollData, dmgRoll, speaker, rollMode, label);
+              await dispatchItem._handleRefineTag(dispatchItem, rollData, dmgRoll, speaker, rollMode, label);
               break;
             case 'inscribe':
-              await this._handleInscribeTag(item, rollData, dmgRoll, speaker, rollMode, label);
+              await dispatchItem._handleInscribeTag(dispatchItem, rollData, dmgRoll, speaker, rollMode, label);
               break;
             case 'augment':
-              await this._handleAugmentTag(item, rollData, dmgRoll, speaker, rollMode, label);
+              await dispatchItem._handleAugmentTag(dispatchItem, rollData, dmgRoll, speaker, rollMode, label);
               break;
           }
         }
