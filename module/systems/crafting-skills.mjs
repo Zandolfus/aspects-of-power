@@ -979,13 +979,50 @@ class CraftingSkills {
     // crafter quality (their stat mod + dice + any active augments on the
     // application skill itself). magnifierPct of 0 = use template values
     // verbatim (legacy / non-scaling augments).
-    const magnifierPct = Number(augmentDoc.system?.magnifierPct ?? 0);
+    //
+    // Crafter-mastery scaling (RULED 2026-07-25): when the template sets
+    // `scaleWithCrafter`, the magnifier comes from the RARITY OF THE APPLYING
+    // CRAFT SKILL (common 0.1× the roll, uncommon 0.2×, … divine 0.8×) rather
+    // than a static per-augment percentage — "the magnitude should be based on
+    // the crafter's skill in crafting". A divine smith's Molten is 8× a common
+    // smith's from the same template. Falls back to the legacy static
+    // `magnifierPct` when scaleWithCrafter is off.
+    const _rarityMags = CONFIG.ASPECTSOFPOWER.augmentRarityMagnifiers ?? {};
+    const _skillRarity = item.system?.rarity ?? '';
+    const magnifierPct = augmentDoc.system?.scaleWithCrafter
+      ? Number(_rarityMags[_skillRarity] ?? 0)
+      : Number(augmentDoc.system?.magnifierPct ?? 0);
     const skillRollTotal = Math.round(dmgRoll?.total ?? 0);
     const scaleValue = (templateValue) => {
       if (magnifierPct > 0 && skillRollTotal > 0) {
         return Math.floor(skillRollTotal * magnifierPct);
       }
       return templateValue;
+    };
+    // Percentage-mode bonuses are RESOLVED TO ABSOLUTE at apply time against
+    // the host's current value, then stored as `mode: 'flat'`. Consistent with
+    // the snapshot architecture (values freeze at apply time) and it makes
+    // slot/unslot exactly symmetric — the delta hook previously SKIPPED
+    // percentage bonuses on locked items (silent no-op + console warning),
+    // so Hardening/Durability never applied there. `pctOfHost` is retained
+    // for display/audit.
+    const hostValueForField = (field) => {
+      const sys = targetItem.system ?? {};
+      if (field === 'durability.max')            return Number(sys.durability?.max ?? 0);
+      if (field === 'damageReduction.physical')  return Number(sys.damageReduction?.physical ?? 0);
+      if (field === 'damageReduction.magical')   return Number(sys.damageReduction?.magical ?? 0);
+      if (field?.startsWith('statBonus.')) {
+        const ab = field.slice('statBonus.'.length);
+        return Number((sys.statBonuses ?? []).find(s => s.ability === ab)?.value ?? 0);
+      }
+      return Number(sys[field] ?? 0); // damageBonus / armorBonus / veilBonus
+    };
+    const resolveBonusValue = (b) => {
+      if (b.mode === 'percentage') {
+        const pct = Number(b.value) || 0;
+        return { value: Math.floor(hostValueForField(b.field) * pct / 100), mode: 'flat', pctOfHost: pct };
+      }
+      return { value: scaleValue(b.value), mode: b.mode };
     };
     // Normalize affinity routing: legacy `affinity: 'fire'` becomes
     // `affinities: {fire: 1}`; explicit `affinities` map wins when both set.
@@ -995,13 +1032,17 @@ class CraftingSkills {
       if (b.affinity) return { [b.affinity]: 1 };
       return {};
     };
-    const snapshotItemBonuses = (augmentDoc.system?.itemBonuses ?? []).map(b => ({
-      field:      b.field,
-      value:      scaleValue(b.value),
-      mode:       b.mode,
-      affinity:   b.affinity ?? '',
-      affinities: normalizeAffinities(b),
-    }));
+    const snapshotItemBonuses = (augmentDoc.system?.itemBonuses ?? []).map(b => {
+      const r = resolveBonusValue(b);
+      return {
+        field:      b.field,
+        value:      r.value,
+        mode:       r.mode,
+        ...(r.pctOfHost !== undefined ? { pctOfHost: r.pctOfHost } : {}),
+        affinity:   b.affinity ?? '',
+        affinities: normalizeAffinities(b),
+      };
+    });
     const snapshotCraftBonuses = (augmentDoc.system?.craftBonuses ?? []).map(b => ({
       type:     b.type,
       value:    scaleValue(b.value),

@@ -1480,6 +1480,29 @@ ASPECTSOFPOWER.rarities = {
 };
 
 /**
+ * Augment crafter-scaling ladder (RULED 2026-07-25): an augment's magnitude is
+ * driven by the RARITY OF THE APPLYING CRAFT SKILL — "a common grants .1x of
+ * the roll, uncommon .2x, etc." Read when the augment template sets
+ * `scaleWithCrafter: true`; the snapshot value becomes
+ * `floor(craftRoll × augmentRarityMagnifiers[skill.rarity])`.
+ *
+ * Same augment template, different magnitude per crafter's mastery — a divine
+ * smith's Molten is 8× a common smith's. `inferior` sits a half-step below
+ * common rather than 0 so an unskilled application still does something.
+ */
+ASPECTSOFPOWER.augmentRarityMagnifiers = {
+  inferior:  0.05,
+  common:    0.10,
+  uncommon:  0.20,
+  rare:      0.30,
+  epic:      0.40,
+  ancient:   0.50,
+  legendary: 0.60,
+  mythic:    0.70,
+  divine:    0.80,
+};
+
+/**
  * Profession augment craft-bonus types — single source of truth for the
  * augment sheet's type dropdown and the craft-side bonus dispatcher.
  * Order here is the display order in the dropdown.

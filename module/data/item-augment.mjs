@@ -44,6 +44,14 @@ export class AugmentData extends foundry.abstract.TypeDataModel {
       // of 0 means use the template value verbatim (no scaling).
       magnifierPct: new fields.NumberField({ initial: 0, min: 0 }),
 
+      // Crafter-mastery scaling (RULED 2026-07-25). When true, the magnifier
+      // is NOT the static `magnifierPct` above — it's derived from the RARITY
+      // of the craft skill applying the augment, via
+      // CONFIG.ASPECTSOFPOWER.augmentRarityMagnifiers (common 0.1, uncommon
+      // 0.2, … divine 0.8). "The magnitude should be based on the crafter's
+      // skill in crafting." Takes precedence over magnifierPct when set.
+      scaleWithCrafter: new fields.BooleanField({ initial: false }),
+
       // Profession augment flag — only fits in profession augment slots.
       // @deprecated — superseded by the `tags` array below. Kept readable for
       // back-compat reads but new code should check `tags.includes('profession')`.

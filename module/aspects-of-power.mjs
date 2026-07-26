@@ -537,10 +537,13 @@ Hooks.once('init', function () {
     // — the auto-derive hook (which respects locks) doesn't fire for these
     // augment-only changes.
     //
-    // Only `mode: 'flat'` bonuses are handled by delta. Percentage-mode
-    // bonuses (e.g. Hardening +5% armor) require a full re-derive to revert
-    // cleanly and won't auto-reverse on locked items — manual cleanup
-    // needed for those. Most existing augments are flat.
+    // Only `mode: 'flat'` bonuses are handled by delta. As of 2026-07-25
+    // percentage-mode template bonuses (Hardening +5% armor, Durability +25%)
+    // are RESOLVED to an absolute amount at apply time (see
+    // `_handleAugmentTag` → resolveBonusValue) and snapshotted as flat, so
+    // new applications round-trip exactly. Only LEGACY snapshots written
+    // before that change can still carry mode:'percentage' — those remain
+    // skipped here (they'd need a re-derive to revert cleanly).
     const priorAugList = item.system.augments ?? [];
     const priorProfAugList = item.system.profAugments ?? [];
     const priorEntryById = new Map();
@@ -629,7 +632,7 @@ Hooks.once('init', function () {
       cs.statBonuses = newList.filter(s => (s.value || 0) > 0);
     }
     if (percentageSkipped) {
-      console.warn(`[aspects-of-power] augment add/remove on ${item.name}: percentage-mode bonus(es) skipped by delta — re-derive needed (locked items: manual cleanup).`);
+      console.warn(`[aspects-of-power] augment add/remove on ${item.name}: LEGACY percentage-mode bonus(es) skipped by delta — re-apply the augment to convert it to a resolved flat snapshot, or re-derive manually.`);
     }
 
     // Only write cs.tags if it actually differs — otherwise we'd spuriously

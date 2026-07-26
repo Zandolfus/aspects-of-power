@@ -87,6 +87,10 @@ export class ItemItemData extends foundry.abstract.TypeDataModel {
           field:      new fields.StringField({ initial: '' }),
           value:      new fields.NumberField({ initial: 0 }),
           mode:       new fields.StringField({ initial: 'flat' }),
+          // Set when a percentage-mode template bonus was RESOLVED to an
+          // absolute value against the host at apply time (audit/display only
+          // — `value` is already the resolved flat amount).
+          pctOfHost:  new fields.NumberField({ initial: 0 }),
           affinity:   new fields.StringField({ initial: '' }),
           affinities: new fields.ObjectField({ initial: () => ({}) }),
         }), { initial: [] }),
@@ -107,6 +111,10 @@ export class ItemItemData extends foundry.abstract.TypeDataModel {
           field:      new fields.StringField({ initial: '' }),
           value:      new fields.NumberField({ initial: 0 }),
           mode:       new fields.StringField({ initial: 'flat' }),
+          // Set when a percentage-mode template bonus was RESOLVED to an
+          // absolute value against the host at apply time (audit/display only
+          // — `value` is already the resolved flat amount).
+          pctOfHost:  new fields.NumberField({ initial: 0 }),
           affinity:   new fields.StringField({ initial: '' }),
           affinities: new fields.ObjectField({ initial: () => ({}) }),
         }), { initial: [] }),
