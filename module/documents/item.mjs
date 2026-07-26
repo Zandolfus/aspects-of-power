@@ -1738,7 +1738,7 @@ export class AspectsofPowerItem extends Item {
    * Fires once per cast (not per target). Skill picks its own destination
    * via destination-prompt, range = caster's `castingRange`.
    */
-  async _handleSummonTag(item, rollData, speaker, rollMode, label, preInvestAmount = 0) {
+  async _handleSummonTag(item, rollData, speaker, rollMode, label, preInvestAmount = 0, summonRoll = null) {
     if (!this.actor) return;
     const tc = item.system.tagConfig ?? {};
     if (!tc.summonType) return;
@@ -1836,6 +1836,18 @@ export class AspectsofPowerItem extends Item {
       summonAiFlags = resolveAiBehaviors(behKeys).flags;
     }
 
+    // V × VECTOR (unified summon model, 2026-07-25). One roll in, a
+    // creature-shaped stat block out — the same math the tower path has always
+    // used, so clone-summons stop being a bespoke flat-HP special case.
+    //   V      = the ritual medium's power when activated that way, else this
+    //            cast's own roll (already scales with the caster's stats and
+    //            the skill's rarity — exactly the summoner-model definition).
+    //   vector = tagConfig.summonStatDistribution, the creature's SHAPE.
+    // Skills with no vector fall back to the legacy hpOverride branch.
+    const summonVector = tc.summonStatDistribution ?? {};
+    const summonV = (preInvestAmount > 0)
+      ? preInvestAmount
+      : Math.max(0, Math.round(summonRoll?.total ?? 0));
     const spawned = await SummonHelpers.spawnSummon({
       sourceActor:     this.actor,
       scene:           canvas.scene,
@@ -1846,6 +1858,8 @@ export class AspectsofPowerItem extends Item {
       capacity:        tc.summonCapacity,
       namePrefix:      '',
       aiFlags:         summonAiFlags,
+      statValue:       summonV,
+      statVector:      summonVector,
     });
     if (spawned) {
       ChatMessage.create({
@@ -5456,7 +5470,7 @@ export class AspectsofPowerItem extends Item {
             options.preLeapApexFt ?? (leapDestination ? (this.system.tagConfig?.leapApexFt ?? 10) : null));
           break;
         case 'summon':
-          await this._handleSummonTag(item, rollData, speaker, rollMode, label, options.preInvestAmount);
+          await this._handleSummonTag(item, rollData, speaker, rollMode, label, options.preInvestAmount, dmgRoll);
           break;
         case 'channel':
           await this._handleChannelTag(item, rollData, speaker, rollMode, label);

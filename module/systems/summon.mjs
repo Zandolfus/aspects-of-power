@@ -37,7 +37,8 @@ export class SummonHelpers {
    */
   static async spawnSummon({ sourceActor, scene, position, summonType,
                               sourceSkillUuid, hpOverride = 0, namePrefix = '',
-                              capacity = 1, aiFlags = null }) {
+                              capacity = 1, aiFlags = null,
+                              statValue = 0, statVector = null }) {
     if (!sourceActor || !position) return null;
     scene = scene ?? canvas.scene;
     if (!scene) return null;
@@ -57,6 +58,8 @@ export class SummonHelpers {
         namePrefix,
         capacity,
         aiFlags,
+        statValue,
+        statVector,
       });
     }
 
@@ -100,7 +103,37 @@ export class SummonHelpers {
     };
     delete cloneData._id;
 
-    if (hpOverride > 0 && cloneData.system?.health) {
+    // ── V × VECTOR stat block (unified summon model, 2026-07-25) ──
+    // One roll in, a creature-shaped stat block out: the skill's roll value
+    // (or a ritual medium's power) is `statValue`; `statVector` is the
+    // creature's SHAPE, a per-ability multiplier. `stats = V × vector`, and
+    // the summon then derives HP / defense / damage / celerity with the normal
+    // formulas like any other creature. This is the same math spawnTower has
+    // always used (ritualPower × statDistribution) — applying it here collapses
+    // the old clone-with-flat-HP path into the shape model, so a summon's
+    // identity lives in its vector instead of a bespoke override.
+    // Applied BEFORE create so prepareDerivedData sees the right values.
+    const vectorEntries = Object.entries(statVector ?? {});
+    if (statValue > 0 && vectorEntries.length) {
+      cloneData.system = cloneData.system ?? {};
+      cloneData.system.abilities = { ...(cloneData.system.abilities ?? {}) };
+      for (const [ability, weight] of vectorEntries) {
+        cloneData.system.abilities[ability] = {
+          ...(cloneData.system.abilities[ability] ?? {}),
+          value: Math.max(0, Math.round(statValue * (Number(weight) || 0))),
+        };
+      }
+      // Abilities the vector doesn't name are ZEROED — otherwise the clone
+      // keeps the caster's own scores for them and a "fragile decoy" would
+      // silently inherit a full stat block.
+      for (const key of Object.keys(cloneData.system.abilities)) {
+        if (!(key in (statVector ?? {}))) {
+          cloneData.system.abilities[key] = { ...(cloneData.system.abilities[key] ?? {}), value: 0 };
+        }
+      }
+    } else if (hpOverride > 0 && cloneData.system?.health) {
+      // LEGACY flat-HP path — kept only for callers that haven't been given a
+      // vector yet. Prefer statVector; this branch is deprecated.
       cloneData.system.health.value = hpOverride;
       cloneData.system.health.max   = hpOverride;
     }
@@ -110,7 +143,10 @@ export class SummonHelpers {
     if (!created) return null;
 
     // Re-assert HP override post-prep (derived data may have re-computed max).
-    if (hpOverride > 0) {
+    // Skipped when a stat vector drove the block — there the derived HP IS the
+    // intended value and must not be stomped by a legacy flat override.
+    const usedVector = statValue > 0 && Object.keys(statVector ?? {}).length > 0;
+    if (hpOverride > 0 && !usedVector) {
       await created.update({
         'system.health.value': hpOverride,
         'system.health.max':   hpOverride,
@@ -538,6 +574,8 @@ function _registerGMSpawnListener() {
             namePrefix:      payload.namePrefix,
             capacity:        payload.capacity,
             aiFlags:         payload.aiFlags,
+            statValue:       payload.statValue,
+            statVector:      payload.statVector,
           });
         } else if (method === 'spawnTower') {
           const scene = game.scenes.get(payload.sceneId) ?? canvas.scene;
