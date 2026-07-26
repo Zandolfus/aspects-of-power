@@ -131,6 +131,14 @@ export class SummonHelpers {
           cloneData.system.abilities[key] = { ...(cloneData.system.abilities[key] ?? {}), value: 0 };
         }
       }
+      // ...and strip the caster's GEAR + EFFECTS. Cloning the caster copies
+      // their equipment and active effects, whose statBonuses/armor stack ON
+      // TOP of the vector during prepareDerivedData — a 7-vitality decoy came
+      // out with vitality 25 and the summoner's full armour 175, which makes
+      // the shape meaningless. The vector alone defines a conjured body.
+      // SKILLS are kept so the creature can still act.
+      cloneData.items = (cloneData.items ?? []).filter(i => i.type === 'skill');
+      cloneData.effects = [];
     } else if (hpOverride > 0 && cloneData.system?.health) {
       // LEGACY flat-HP path — kept only for callers that haven't been given a
       // vector yet. Prefer statVector; this branch is deprecated.
