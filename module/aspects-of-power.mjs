@@ -40,6 +40,7 @@ import * as Activities from './systems/activities.mjs';
 import * as Calendar from './systems/calendar.mjs';
 import * as Downtime from './systems/downtime.mjs';
 import { DotHelpers } from './systems/dot.mjs';
+import * as Affinity from './systems/affinity.mjs';
 import { SummonHelpers, registerSummonHooks } from './systems/summon.mjs';
 import { ChannelHelpers, registerChannelHooks } from './systems/channel.mjs';
 import { AIProfiles, registerAIHooks, aiSetFactionFocus } from './systems/ai.mjs';
@@ -100,6 +101,9 @@ Hooks.once('init', function () {
     // Downtime declare/resolve barrier (systems/downtime.mjs): players commit
     // timed actions, the clock advances to whoever finishes FIRST.
     downtime: { ...Downtime },
+    // Affinity roster + usage gating (systems/affinity.mjs). Gate is OFF until
+    // actors carry rosters — run affinity.auditGating() before enabling.
+    affinity: { ...Affinity },
     // GM faction-focus command (ai.mjs): stamp aiFocusTarget on every
     // AI-profiled unit of a disposition. Console/macro v1.
     aiSetFactionFocus,

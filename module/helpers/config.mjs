@@ -560,6 +560,28 @@ ASPECTSOFPOWER.spellMaxInvestAboveBase = {
  * mod if RL falls outside the table.
  */
 /**
+ * Affinity usage-gating (design-affinity-dictionary.md, RULED design-first
+ * 2026-07-03; engine shipped 2026-07-26).
+ *
+ * "Someone with fire affinity cannot use ice affinity items unless they also
+ * have ice affinity, which would be rare for a fire person."
+ *
+ * DEFAULT OFF, and it must stay off until actors carry affinity rosters: as of
+ * 2026-07-26 ZERO actors declare an affinity while 127 of 410 items carry an
+ * affinity tag, with every PC wearing between one and seven. Enabling it blind
+ * would strip the party. Grant affinities, run
+ * `game.aspectsofpower.affinity.auditGating()`, then flip this.
+ */
+ASPECTSOFPOWER.affinityGating = {
+  enabled: false,
+  // `air-affinity` is on 26 live items but the dictionary calls it `wind`, and
+  // `air-affinity` is not even in the tag registry. Aliasing resolves them
+  // rather than leaving 26 items attuned to nothing. (Fix the data too — this
+  // is a safety net, not the cure.)
+  tagAliases: { air: 'wind' },
+};
+
+/**
  * Celestial mechanics (design-calendar-celestial.md, 2026-07-26).
  *
  * The world is our planet, so it runs Foundry's Simplified Gregorian calendar

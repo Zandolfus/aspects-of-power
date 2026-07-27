@@ -1,4 +1,5 @@
 import { deriveItemStats } from './item-derivation.mjs';
+import { checkEquip } from './affinity.mjs';
 
 /**
  * Equipment management — equip/unequip logic, ActiveEffect synchronization,
@@ -52,6 +53,10 @@ export class EquipmentSystem {
       ui.notifications.warn(`Unknown equipment slot: ${slot}`);
       return false;
     }
+
+    // Affinity usage-gating. No-op unless CONFIG.affinityGating.enabled — see
+    // systems/affinity.mjs for why it ships disabled.
+    if (!checkEquip(actor, item)) return false;
 
     // Count items currently equipped in this slot.
     const equippedInSlot = actor.items.filter(
