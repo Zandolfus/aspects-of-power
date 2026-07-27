@@ -1411,6 +1411,30 @@ ASPECTSOFPOWER.ritualProgressWeights = {
 };
 
 /**
+ * MULTI-MATERIAL lever (design-ritual-subsystem, ruled 2026-06-13; built
+ * 2026-07-25). A prep may consume SEVERAL gems, their progress SUMMED at the
+ * 0.30 material weight — the legitimate grind path across the high gates
+ * ("I prepared extensively with rare reagents", not "I brought friends").
+ * The rarity cap still clamps the ceiling, so more materials only helps you
+ * APPROACH a ritual's cap, never exceed the rarity ladder.
+ *
+ * Per-rarity ITEM CAP — the trash-flood guard: you cannot dump 2,000 junk
+ * gems into a common ritual. Rising with rarity means the sacrifice scales
+ * with the power reached.
+ */
+ASPECTSOFPOWER.ritualMaxMaterials = {
+  inferior:  1,
+  common:    2,
+  uncommon:  3,
+  rare:      4,
+  epic:      6,
+  ancient:   8,
+  legendary: 10,
+  mythic:    12,
+  divine:    16,
+};
+
+/**
  * Medium types — the physical form an inscribed ritual takes. Drives
  * range/geometry at activation. Phase 2.5 ships `gem` (touch/self) only;
  * `circle` and `pylon` are deferred to a later phase that needs scene-

@@ -359,7 +359,42 @@ class CraftingSkills {
     const charges = ritualSkill.system?.tagConfig?.ritualChargesProduced ?? 1;
     const minMana = ritualSkill.system?.tagConfig?.ritualMinMana ?? 0;
     const wisdomMod = Math.max(0, Math.round(actor.system?.abilities?.wisdom?.mod ?? 0));
-    const materialProgress = sourceGem.system?.progress ?? 0;
+
+    // ── Step 2.5: MULTI-MATERIAL (ruled 2026-06-13, built 2026-07-25) ──
+    // A prep may consume SEVERAL gems whose progress SUMS at the material
+    // weight — the grind path across high gates. Offered only now because the
+    // per-rarity item cap depends on the ritual just chosen. The rarity cap on
+    // total progress still clamps the ceiling, so extra stones only help you
+    // APPROACH a ritual's cap, never exceed the ladder.
+    const maxMaterials = Math.max(1, (sc.ritualMaxMaterials ?? {})[rarity] ?? 1);
+    const chosenGems = [sourceGem];
+    while (chosenGems.length < maxMaterials) {
+      const remaining = gemMaterials.filter(g => !chosenGems.some(c => c.id === g.id));
+      if (!remaining.length) break;
+      const sumSoFar = chosenGems.reduce((t, g) => t + (g.system?.progress ?? 0), 0);
+      const moreButtons = remaining.map(g => ({
+        action: g.id,
+        label: `${g.name} [${g.system.rarity ?? 'common'}, progress ${g.system?.progress ?? 0}]`,
+      }));
+      moreButtons.push({ action: 'done', label: `Done — inscribe with ${chosenGems.length} material${chosenGems.length === 1 ? '' : 's'}` });
+      const more = await foundry.applications.api.DialogV2.wait({
+        window: { title: `${item.name} — Add Material (${chosenGems.length}/${maxMaterials})` },
+        content: `<p>Summed material progress so far: <strong>${sumSoFar}</strong>`
+               + `${materialFloor > 0 ? ` (floor ${materialFloor}${sumSoFar >= materialFloor ? ' ✓' : ' — not yet met'})` : ''}.</p>`
+               + `<p>${ritualSkill.name} [${grade}-${rarity}] allows up to <strong>${maxMaterials}</strong> materials. `
+               + `Add another, or proceed. <em>Every material added is consumed.</em></p>`,
+        buttons: moreButtons,
+        close: () => 'done',
+      });
+      if (more === 'done') break;
+      const extra = actor.items.get(more);
+      if (!extra) break;
+      chosenGems.push(extra);
+    }
+    const materialProgress = chosenGems.reduce((t, g) => t + (g.system?.progress ?? 0), 0);
+    const materialLabel = chosenGems.length === 1
+      ? `${chosenGems[0].name} — progress ${materialProgress}`
+      : `${chosenGems.length} materials (${chosenGems.map(g => g.name).join(', ')}) — summed progress ${materialProgress}`;
     const currentMana = Math.round(actor.system?.mana?.value ?? 0);
     const initialMana = Math.max(minMana, Math.min(currentMana, minMana || 1));
 
@@ -368,7 +403,7 @@ class CraftingSkills {
     // high-progress material; wisdom + mana alone can't substitute.
     if (materialProgress < materialFloor) {
       ChatMessage.create({ speaker, rollMode,
-        content: `<p><em>${actor.name} cannot inscribe <strong>${ritualSkill.name}</strong> [${grade}-${rarity}]: <strong>${sourceGem.name}</strong> (progress ${materialProgress}) falls below the required material floor of ${materialFloor}. Nothing consumed.</em></p>` });
+        content: `<p><em>${actor.name} cannot inscribe <strong>${ritualSkill.name}</strong> [${grade}-${rarity}]: ${materialLabel} falls below the required material floor of ${materialFloor}. Nothing consumed.</em></p>` });
       return;
     }
 
@@ -387,7 +422,7 @@ class CraftingSkills {
       content: `
         <div class="craft-setup">
           <p><strong>Ritualist:</strong> ${actor.name} (wisdom mod ${wisdomMod})</p>
-          <p><strong>Material:</strong> ${sourceGem.name} — progress ${materialProgress}${materialFloor > 0 ? ` (floor ${materialFloor} ✓)` : ''}</p>
+          <p><strong>Material:</strong> ${materialLabel}${materialFloor > 0 ? ` (floor ${materialFloor} ✓)` : ''}</p>
           <p><strong>Ritual:</strong> ${ritualSkill.name} [${grade}-${rarity}] — threshold ${threshold} / cap ${cap}, produces ${charges} charge${charges === 1 ? '' : 's'}</p>
           <hr>
           <div class="form-group">
@@ -455,20 +490,19 @@ class CraftingSkills {
     const manaInvested = setupResult.mana;
     const progress = Math.round(weights.wisdom * wisdomMod + weights.material * materialProgress + weights.mana * manaInvested);
 
-    // Re-fetch the gem in case state shifted while dialogs were open.
-    const liveSrc = actor.items.get(sourceGem.id);
-    if (!liveSrc) {
+    // Re-fetch every chosen gem in case state shifted while dialogs were open.
+    const liveGems = chosenGems.map(g => actor.items.get(g.id)).filter(Boolean);
+    if (liveGems.length !== chosenGems.length) {
       ChatMessage.create({ speaker, rollMode,
-        content: '<p><em>Inscribe failed: material no longer available. (No mana/material spent.)</em></p>' });
+        content: '<p><em>Inscribe failed: a material is no longer available. (No mana/material spent.)</em></p>' });
       return;
     }
 
-    // ── Always consume: one material + the invested mana ──
-    const srcQty = liveSrc.system.quantity ?? 1;
-    if (srcQty <= 1) {
-      await liveSrc.delete();
-    } else {
-      await liveSrc.update({ 'system.quantity': srcQty - 1 });
+    // ── Always consume: EVERY selected material + the invested mana ──
+    for (const g of liveGems) {
+      const q = g.system.quantity ?? 1;
+      if (q <= 1) await g.delete();
+      else await g.update({ 'system.quantity': q - 1 });
     }
     if (manaInvested > 0) {
       const manaNow = Math.round(actor.system?.mana?.value ?? 0);
