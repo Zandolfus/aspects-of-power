@@ -559,6 +559,61 @@ ASPECTSOFPOWER.spellMaxInvestAboveBase = {
  * design-celerity.md. Treat as authoritative; helpers fall back to actor
  * mod if RL falls outside the table.
  */
+/**
+ * Non-combat activity registry (design-celerity-realtime.md step 4).
+ *
+ *   time = cost x qualityMult / Celerity(named stat)
+ *
+ * `cost` is in the SAME action-point unit as celerity weight — a sword swing
+ * is BASELINE_WEIGHT (100). So a leveled character forces a stuck door in the
+ * time a mundane one takes to blink, which is the whole point of the
+ * re-denomination: superhuman is visible out of combat too.
+ *
+ * Three task classes (RULED 2026-07-02, option 1 + caveat):
+ *   celerity — pure stat race (lockpicking, searching, forcing doors)
+ *   clock    — same wall time for everyone (glue curing, a cart's journey)
+ *   hybrid   — max() of both (precision work with mandatory cooling stages)
+ *
+ * `stat` names the ability that drives it. A null stat means "use the skill
+ * being performed" — crafting rides its profession's ability.
+ *
+ * Costs are the ruled exemplars; author more per activity as they come up.
+ * Verify any new cost against the mundane baseline (G1, ref mod 36) — if a
+ * G1 human takes an unreasonable time, the cost is wrong.
+ */
+ASPECTSOFPOWER.activities = {
+  drawWeapon:  { label: 'Draw a weapon',        cost: 30,      stat: 'dexterity',    class: 'celerity' },
+  forceDoor:   { label: 'Force a stuck door',   cost: 500,     stat: 'strength',     class: 'celerity' },
+  pickLock:    { label: 'Pick a simple lock',   cost: 2000,    stat: 'dexterity',    class: 'celerity' },
+  disarmTrap:  { label: 'Disarm a trap',        cost: 4000,    stat: 'dexterity',    class: 'celerity' },
+  searchRoom:  { label: 'Search a room',        cost: 30000,   stat: 'perception',   class: 'celerity' },
+  research:    { label: 'Research a topic',     cost: 60000,   stat: 'intelligence', class: 'celerity' },
+  forgeSword:  { label: 'Forge a sword',        cost: 360000,  stat: null,           class: 'celerity' },
+  ritualPrep:  { label: 'Prepare a ritual',     cost: 120000,  stat: null,           class: 'celerity' },
+  // Clock-bound: the world takes its own time regardless of who waits.
+  cureGlue:    { label: 'Cure glue',            cost: 0, class: 'clock', clockSeconds: 3600 },
+  travelMile:  { label: 'Travel a mile (cart)', cost: 0, class: 'clock', clockSeconds: 1200 },
+};
+
+/**
+ * Quality-relative crafting multiplier (ruling 3 caveat, 2026-07-02):
+ * "Smithing at your max potential should take time. Smithing something
+ * slipshod that you don't care about should be extremely fast."
+ *
+ * q = target quality / the crafter's own ceiling, so this is RELATIVE — an
+ * S-rank smith knocking out a rough sword pays 0.25x against an enormous
+ * Celerity (seconds), while the same smith working at their ceiling pays 25x
+ * AND cannot outrun the clock floor. Coefficients are a sketch pending the
+ * craft-flow rework sim; the floors are what stop mastery collapsing to
+ * instant.
+ */
+ASPECTSOFPOWER.activityQuality = {
+  rough:      { label: 'Rough',      mult: 0.25, clockFloorSeconds: 0 },
+  standard:   { label: 'Standard',   mult: 1,    clockFloorSeconds: 0 },
+  fine:       { label: 'Fine',       mult: 4,    clockFloorSeconds: 600 },
+  masterwork: { label: 'Masterwork', mult: 25,   clockFloorSeconds: 7200 },
+};
+
 ASPECTSOFPOWER.referenceRoundLength = {
   1:    83333,
   10:   20408,

@@ -36,6 +36,7 @@ import { EquipmentSystem } from './systems/equipment.mjs';
 import * as MassLeveler from './systems/mass-leveler.mjs';
 import * as TemplateMigration from './systems/template-migration.mjs';
 import * as Celerity from './systems/celerity.mjs';
+import * as Activities from './systems/activities.mjs';
 import { SummonHelpers, registerSummonHooks } from './systems/summon.mjs';
 import { ChannelHelpers, registerChannelHooks } from './systems/channel.mjs';
 import { AIProfiles, registerAIHooks, aiSetFactionFocus } from './systems/ai.mjs';
@@ -86,6 +87,9 @@ Hooks.once('init', function () {
     massLeveler: MassLeveler,
     templateMigration: TemplateMigration,
     celerity: { ...Celerity },
+    // Non-combat activity timing (systems/activities.mjs): prices doors,
+    // locks, searches and crafts in the same ticks combat uses.
+    activities: { ...Activities },
     // GM faction-focus command (ai.mjs): stamp aiFocusTarget on every
     // AI-profiled unit of a disposition. Console/macro v1.
     aiSetFactionFocus,
@@ -852,6 +856,7 @@ Hooks.once('ready', async function () {
   // Token-HUD command buttons (Hold / Manual / Focus / Move) for owned AI units.
   registerSummonHud();
   registerMovementHud();
+  Activities.registerActivityHud();
 
   // Eagerly hydrate the augments compendium so `fromUuidSync` returns full
   // system data (not just index stubs). Required by `deriveItemStats` and
@@ -967,6 +972,17 @@ Hooks.once('ready', async function () {
     const combatant = game.combats.get(data.combatId)?.combatants.get(data.combatantId);
     if (combatant) combatant.update(data.data, data.options ?? {}).catch(err =>
       console.warn('[aop] gmCombatantUpdate failed:', err)
+    );
+  });
+
+  // Socket: a player performing a non-combat activity spends world time, but
+  // game.time.advance is GM-only at the server level. The active GM applies it.
+  game.socket.on('system.aspects-of-power', (data) => {
+    if (data?.action !== 'gmAdvanceTime') return;
+    if (game.users.activeGM !== game.user) return;
+    const seconds = Math.round(Number(data.seconds) || 0);
+    if (seconds > 0) game.time.advance(seconds).catch(err =>
+      console.warn('[aop] gmAdvanceTime failed:', err)
     );
   });
 

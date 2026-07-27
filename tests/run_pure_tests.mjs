@@ -11,7 +11,7 @@
 import {
   houseHitFormula, hybridAbilityMod, weaponStatBlend, spellDamageRef,
   spellInvestDamage, strikeInvestDamage, infusionDamage, investSelfDamage,
-  effectiveDodgeValue, splitEvenlyWithRemainder, perceiveGateDecision,
+  effectiveDodgeValue, splitEvenlyWithRemainder, perceiveGateDecision, activityTicks,
 } from '../module/helpers/formulas.mjs';
 
 const CFG = {
@@ -93,6 +93,31 @@ eq('perceive F24 vs E25 reacts', PG(284, 305, 'F', 'E').canReact, true);
 eq('perceive slower attacker', PG(305, 638, 'E', 'E').canReact, true);
 eq('perceive disabled', PG(99999, 1, 'S', 'G', { perceiveGateRatio: 0 }).canReact, true);
 eq('perceive mortal off', PG(147, 36, 'G', 'G', { perceiveGateRatio: 2.5, perceiveGateMortalBand: false }).canReact, false);
+
+// Activity timing. Golden values are the ruled exemplar table in
+// design-celerity-realtime.md, which was itself derived from the shipped
+// celerity constants (SCALE 10,000, TICK_MS 0.072) — G1 ref mod 36, E25 305.
+const secs = (ticks) => ticks * 0.072 / 1000;
+const round1 = (n) => Math.round(n * 10) / 10;
+// G1 mundane: force a stuck door in 10s, search a room in 10min, forge a
+// standard sword in 2.0h (the realism anchor the whole system is calibrated on).
+eq('activity G1 forceDoor 10s', round1(secs(activityTicks(500, 36, { scale: 10000 }))), 10);
+eq('activity G1 searchRoom 10min', round1(secs(activityTicks(30000, 36, { scale: 10000 })) / 60), 10);
+eq('activity G1 forgeSword 2.0h', round1(secs(activityTicks(360000, 36, { scale: 10000 })) / 3600), 2);
+// E25 does the same work in a blink — the point of the re-denomination.
+eq('activity E25 forceDoor 1.2s', round1(secs(activityTicks(500, 305, { scale: 10000 }))), 1.2);
+eq('activity E25 pickLock 4.7s', round1(secs(activityTicks(2000, 305, { scale: 10000 }))), 4.7);
+eq('activity E25 searchRoom 71s', Math.round(secs(activityTicks(30000, 305, { scale: 10000 }))), 71);
+// Quality multiplier scales the celerity part linearly.
+eq('activity quality rough', activityTicks(1000, 100, { qualityMult: 0.25, scale: 10000 }),
+   activityTicks(250, 100, { scale: 10000 }));
+// Clock-bound ignores the performer entirely; celerity-bound ignores the clock.
+eq('activity clock ignores mod', activityTicks(999999, 5000, { taskClass: 'clock', clockTicks: 5000, scale: 10000 }), 5000);
+// Hybrid and the quality floor both resolve as "whichever is longest".
+eq('activity hybrid takes clock', activityTicks(10, 1000, { taskClass: 'hybrid', clockTicks: 90000, scale: 10000 }), 90000);
+eq('activity hybrid takes stat', activityTicks(1000, 10, { taskClass: 'hybrid', clockTicks: 90000, scale: 10000 }), 1000000);
+eq('activity quality floor binds', activityTicks(1, 5000, { qualityMult: 25, clockFloorTicks: 42000, scale: 10000 }), 42000);
+eq('activity never zero', activityTicks(0, 5000, { scale: 10000 }), 1);
 
 // Even split with remainder.
 eq('split 10/3', splitEvenlyWithRemainder(10, ['a', 'b', 'c']), { a: 3, b: 3, c: 4 });

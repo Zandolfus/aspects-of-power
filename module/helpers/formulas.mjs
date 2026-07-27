@@ -137,6 +137,40 @@ export function effectiveDodgeValue(targetActor, defKey, stacks, dt = null) {
 }
 
 /**
+ * Activity duration in ticks (design-celerity-realtime.md step 4).
+ *
+ *   celerity part = cost x qualityMult x SCALE / mod
+ *
+ * Identical grammar to `wait = weight x multiplier x SCALE / speed`, because
+ * an activity IS an action — just a long one. Clock parts (fixed world time
+ * and the high-quality floor) never shrink with stats; the answer is whichever
+ * of the three is longest, which makes 'hybrid' fall out for free rather than
+ * needing its own branch.
+ *
+ * @param {number} cost            Activity cost in action points.
+ * @param {number} mod             The named stat's mod (the actor's rate).
+ * @param {object} [opts]
+ * @param {number} [opts.qualityMult]     Quality multiplier (1 = standard).
+ * @param {string} [opts.taskClass]       'celerity' | 'clock' | 'hybrid'.
+ * @param {number} [opts.clockTicks]      Fixed world-time component, in ticks.
+ * @param {number} [opts.clockFloorTicks] Quality floor, in ticks.
+ * @param {number} [opts.scale]           SCALE override (tests).
+ * @returns {number} Ticks, minimum 1.
+ */
+export function activityTicks(cost, mod, opts = {}) {
+  const SCALE = opts.scale ?? (globalThis.CONFIG?.ASPECTSOFPOWER?.celerity?.SCALE ?? 10000);
+  const qualityMult = opts.qualityMult ?? 1;
+  const taskClass = opts.taskClass ?? 'celerity';
+  const safeMod = Math.max(1, mod);
+  // A clock-bound task ignores the performer entirely — glue does not cure
+  // faster for a fast smith.
+  const celerityPart = taskClass === 'clock' ? 0 : (cost * qualityMult * SCALE) / safeMod;
+  return Math.max(1, Math.round(Math.max(
+    celerityPart, opts.clockTicks ?? 0, opts.clockFloorTicks ?? 0,
+  )));
+}
+
+/**
  * Perceive-to-react decision (design-celerity-realtime.md, RULED 2026-07-02).
  * Pure half of celerity.perceiveGate — the caller resolves actors to their
  * build-neutral reference mods and ranks, this decides.
