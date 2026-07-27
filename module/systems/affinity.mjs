@@ -7,10 +7,16 @@
  * items unless they also have ice affinity, which would be rare for a fire
  * person."
  *
- * ── OPPOSITION-ONLY GATE (RULED 2026-07-26) ──
- * Wear what you like; you are blocked ONLY by a diametrically opposed
- * affinity. Lacking an affinity is not a barrier. That is what makes the gate
- * safe to run live — an actor with no roster is never blocked by anything.
+ * ── THE RULE (as of 2026-07-26) ──
+ * 1. Untagged gear is universal.
+ * 2. OWNING the affinity supersedes everything — if you can channel it, you
+ *    can use it, even while carrying its opposite.
+ * 3. Otherwise you are blocked only by a DIAMETRICALLY OPPOSED affinity you
+ *    hold. Merely lacking an affinity is no barrier — untrained, not fighting
+ *    yourself.
+ * 4. A Unity passive waives a named pair (see unifiedSets).
+ * An actor with no roster is therefore never blocked by anything, which is
+ * what makes the gate safe to run live.
  *
  * ── HISTORY ──
  * First shipped DISABLED under the strict reading ("must possess the
@@ -122,14 +128,19 @@ export function canUseItem(actor, item) {
   if (!cfg().enabled) return ok;
   if (!required.length) return ok;            // untagged gear is universal
 
-  // ── OPPOSITION-ONLY (RULED 2026-07-26) ──
-  // Anyone may wear anything UNLESS they hold a diametrically opposed
-  // affinity. Lacking an affinity is no barrier — you are simply untrained,
-  // not fighting yourself. This deliberately replaces the stricter
-  // "must possess the affinity" reading of the 2026-07-03 ruling, which would
-  // have blocked 105 equipped items across 18 actors on day one.
+  // Opposition-only, superseding the stricter "must possess the affinity"
+  // reading of the 2026-07-03 ruling — that one measured at 105 blocked
+  // equipped items across 18 actors on day one.
   const owned = actorAffinities(actor);
   if (!owned.size) return ok;                 // no affinity, nothing to clash
+
+  // ── OWNERSHIP SUPERSEDES OPPOSITION (RULED 2026-07-26) ──
+  // If you can channel the affinity, you can use the gear — full stop, even if
+  // you also carry something that opposes it. Only an affinity you DON'T own
+  // can be repelled by one you do. This is what lets a bearer of both sides of
+  // a pair simply use both.
+  const unowned = required.filter(a => !owned.has(a));
+  if (!unowned.length) return ok;
 
   const dict = globalThis.CONFIG?.ASPECTSOFPOWER?.affinities ?? {};
   // Checked BOTH directions. The dictionary is symmetric today (verified: 24
@@ -138,7 +149,7 @@ export function canUseItem(actor, item) {
   const unities = unifiedSets(actor);
   const reconciled = (a, b) => unities.some(u => u.has(a) && u.has(b));
   const conflicts = [];
-  for (const need of required) {
+  for (const need of unowned) {
     const clash = [...owned].find(o =>
       ((dict[o]?.opposed ?? []).includes(need) || (dict[need]?.opposed ?? []).includes(o))
       // A Unity passive reconciles exactly this pair for its bearer.
