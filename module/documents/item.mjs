@@ -1,7 +1,7 @@
 import { EquipmentSystem } from '../systems/equipment.mjs';
 import { getPositionalTags } from '../helpers/positioning.mjs';
 import { houseHitFormula, hybridAbilityMod, weaponStatBlend, spellDamageRef, spellInvestDamage, strikeInvestDamage, infusionDamage, investSelfDamage as computeInvestSelfDamage, effectiveDodgeValue, splitEvenlyWithRemainder } from '../helpers/formulas.mjs';
-import { recordActionFired, declareAction, isInActiveCombat, computeActionWait, referenceRoundLength, computeWindupMultiplier, getScrambleStacks, addScrambleStack, applyDodgeCost, findCombatantForActor } from '../systems/celerity.mjs';
+import { recordActionFired, declareAction, isInActiveCombat, computeActionWait, referenceRoundLength, computeWindupMultiplier, getScrambleStacks, addScrambleStack, applyDodgeCost, findCombatantForActor, perceiveGate } from '../systems/celerity.mjs';
 import { getThreatRadiusFt, actorIsDashing } from '../systems/engagement-halts.mjs';
 import { selectTargetOnCanvas, skillNeedsTargetPrompt, skillTargetsAtFire, selectMarkerOnCanvas } from '../canvas/target-prompt.mjs';
 import { regionTokenOverlap, segmentIntersect } from '../helpers/geometry.mjs';
@@ -933,6 +933,9 @@ export class AspectsofPowerItem extends Item {
             content: `<p><strong>${targetActor.name}</strong> fails to dodge. (${droll} vs ${hitTotal})</p>`,
           });
         }
+      } else if (defenseResult.perceiveGated) {
+        defenseLine = `<p>${defLabel} defense: <strong>too fast to react</strong>`
+          + ` (${(defenseResult.perceiveRatio ?? 0).toFixed(1)}x Celerity — the blow is a blur)</p>`;
       } else {
         defenseLine = `<p>${defLabel} defense: takes the hit (bulk absorbs)</p>`;
       }
@@ -1972,13 +1975,23 @@ export class AspectsofPowerItem extends Item {
     // Mental lanes (mind/soul): legacy pool semantics unchanged.
     const isPhysicalLane = defKey === 'melee' || defKey === 'ranged';
     const dt = CONFIG.ASPECTSOFPOWER.defenseTuning ?? {};
+
+    // ── Perceive-to-react gate (design-celerity-realtime.md) ──
+    // Too large a Celerity gap and the blow is a blur: no dodge, no parry,
+    // no reaction. Physical lanes only — mind/soul are not reflexes, they
+    // are the veil holding, and a thought does not arrive too fast to see.
+    const gate = isPhysicalLane
+      ? perceiveGate(this.actor, targetActor)
+      : { canReact: true, ratio: 1, waived: false };
+    if (!gate.canReact) reactionList.length = 0;
+
     let hasDefend, defendLabel, defenseText;
     if (isPhysicalLane) {
       // Perception gate: you can't dodge what you can't see.
       const blinded = targetActor.effects.some(e => !e.disabled && e.system?.debuffType === 'blind');
       const stacks = getScrambleStacks(targetActor);
       const dv = Math.round(effectiveDodgeValue(targetActor, defKey, stacks, dt));
-      hasDefend = !blinded && dv > 0;
+      hasDefend = !blinded && dv > 0 && gate.canReact;
       defendLabel = 'Dodge';
       const scrambleNote = stacks >= 1
         ? ` (scramble −${Math.round((dt.scrambleStackPct ?? 0.15) * stacks * 100)}%)`
@@ -1986,7 +1999,10 @@ export class AspectsofPowerItem extends Item {
       defenseText = hasDefend
         ? `<p>Dodge value: <strong>${dv}</strong>${scrambleNote} vs to-hit ${hitTotal}.</p>`
           + `<p><em>Dodging delays your next action and adds a scramble stack — win or lose.</em></p>`
-        : (blinded ? `<p><em>Blinded — you cannot dodge what you cannot see.</em></p>` : '');
+        : (blinded ? `<p><em>Blinded — you cannot dodge what you cannot see.</em></p>`
+          : (!gate.canReact
+            ? `<p><em>Too fast to react — the blow lands before you can move (${gate.ratio.toFixed(1)}x your Celerity).</em></p>`
+            : ''));
     } else {
       hasDefend = pool > 0;
       defendLabel = 'Defend';
@@ -2009,7 +2025,7 @@ export class AspectsofPowerItem extends Item {
     const aiFlags = targetActor.flags?.aspectsofpower ?? {};
     if (aiFlags.aiProfile && (aiFlags.aiDefense ?? 'auto') === 'auto') {
       let defend = false;
-      let note = 'takes the hit';
+      let note = gate.canReact ? 'takes the hit' : 'cannot react — too fast to see';
       if (isPhysicalLane && hasDefend) {
         const aiStacks = getScrambleStacks(targetActor);
         const aiDv = effectiveDodgeValue(targetActor, defKey, aiStacks, dt);
@@ -2025,11 +2041,13 @@ export class AspectsofPowerItem extends Item {
         speaker: ChatMessage.getSpeaker({ actor: targetActor }),
         content: `<p><em>[AI] ${targetActor.name} ${note} vs ${attackName}.</em></p>`,
       });
-      return { defend, reactionSkillId: null };
+      return { defend, reactionSkillId: null, perceiveGated: !gate.canReact, perceiveRatio: gate.ratio };
     }
 
     // Nothing to offer at all — eat the hit without a prompt.
-    if (!hasDefend && reactionList.length === 0) return { defend: false, reactionSkillId: null };
+    if (!hasDefend && reactionList.length === 0) {
+      return { defend: false, reactionSkillId: null, perceiveGated: !gate.canReact, perceiveRatio: gate.ratio };
+    }
 
     const reactionText = reactionList.length > 0
       ? `<p>Reactions: ${reactions.value} / ${reactions.max}</p>`

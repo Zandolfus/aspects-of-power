@@ -11,14 +11,17 @@
 import {
   houseHitFormula, hybridAbilityMod, weaponStatBlend, spellDamageRef,
   spellInvestDamage, strikeInvestDamage, infusionDamage, investSelfDamage,
-  effectiveDodgeValue, splitEvenlyWithRemainder,
+  effectiveDodgeValue, splitEvenlyWithRemainder, perceiveGateDecision,
 } from '../module/helpers/formulas.mjs';
 
 const CFG = {
   meleeBlend: { strFloor: 0.30, slope: 0.70, weightOffset: 40, weightSpan: 180 },
   rangedBlend: { perFloor: 0.05, slope: 0.55, weightOffset: 50, weightSpan: 200 },
   spellTierFactors: { basic: 2, high: 4, greater: 8, major: 25, grand: 50 },
-  defenseTuning: { dodgeBasisDiv: 1.1, scrambleStackPct: 0.15 },
+  defenseTuning: {
+    dodgeBasisDiv: 1.1, scrambleStackPct: 0.15,
+    perceiveGateRatio: 2.5, perceiveGateMortalBand: true,
+  },
 };
 
 let failures = 0;
@@ -68,6 +71,28 @@ eq('selfDamage none', investSelfDamage(321, 5, 1, 4), 0);
 
 // Effective dodge value: def 400, div 1.1, 2 stacks → (400/1.1)×0.7 = 254.54…
 eq('dodge value', Math.round(effectiveDodgeValue({ system: { defense: { melee: { value: 400 } } } }, 'melee', 2, CFG.defenseTuning)), 255);
+
+// Perceive-to-react gate. Mods are the LOCKED reference curve
+// (ROUND_K 3,000,000 / CONFIG.referenceRoundLength[rl]): G1 36, G10 147,
+// F24 284, E25 305, E50 638, E99 1212.
+const PG = (aMod, dMod, aRank, dRank, dt = CFG.defenseTuning) =>
+  perceiveGateDecision(aMod, dMod, aRank, dRank, dt);
+// The binding modern case from the 2026-07-02 sim: E50 attacking E25 is
+// 2.09x — inside R=2.5, so the +/-25-level ruling holds.
+eq('perceive E50 vs E25 reacts', PG(638, 305, 'E', 'E').canReact, true);
+eq('perceive E50 vs E25 ratio', Math.round(PG(638, 305, 'E', 'E').ratio * 100) / 100, 2.09);
+// E99 vs E25 is 3.97x — a blur.
+eq('perceive E99 vs E25 blurs', PG(1212, 305, 'E', 'E').canReact, false);
+// Mortal band: G10 vs G1 is 4.08x and would blur, but G/F is waived in-band.
+eq('perceive G10 vs G1 waived', PG(147, 36, 'G', 'G'), { canReact: true, ratio: 147 / 36, waived: true, R: 2.5 });
+// Cross-band is NOT waived — an E25 attacking a G1 is 8.47x.
+eq('perceive E25 vs G1 blurs', PG(305, 36, 'E', 'G').canReact, false);
+// Grade boundary stays smooth: F24 -> E25 is 1.07x, no cliff.
+eq('perceive F24 vs E25 reacts', PG(284, 305, 'F', 'E').canReact, true);
+// Slower attacker always reacts; R <= 0 disables the gate entirely.
+eq('perceive slower attacker', PG(305, 638, 'E', 'E').canReact, true);
+eq('perceive disabled', PG(99999, 1, 'S', 'G', { perceiveGateRatio: 0 }).canReact, true);
+eq('perceive mortal off', PG(147, 36, 'G', 'G', { perceiveGateRatio: 2.5, perceiveGateMortalBand: false }).canReact, false);
 
 // Even split with remainder.
 eq('split 10/3', splitEvenlyWithRemainder(10, ['a', 'b', 'c']), { a: 3, b: 3, c: 4 });

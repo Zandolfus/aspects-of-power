@@ -17,7 +17,7 @@
  */
 
 import { AspectsofPowerItem } from '../documents/item.mjs';
-import { weaponStatBlend } from '../helpers/formulas.mjs';
+import { weaponStatBlend, perceiveGateDecision } from '../helpers/formulas.mjs';
 
 const HYBRID_60_40_WIS_DEX = (a) => 0.6 * (a.wisdom?.mod ?? 0) + 0.4 * (a.dexterity?.mod ?? 0);
 const _MAGIC_TYPES_FOR_SPEED = new Set(['magic', 'magic_melee', 'magic_projectile']);
@@ -275,6 +275,55 @@ export function formatTicksAsTime(ticks) {
 export function celerityRating(mod) {
   const sc = CONFIG.ASPECTSOFPOWER.celerity;
   return mod * 1000 / (sc.SCALE * (sc.TICK_MS ?? 0.072));
+}
+
+/**
+ * Build-neutral reference mod for an actor's race level — the inverse of
+ * referenceRoundLength. This is the curve the perceive-gate sim validated
+ * against (design-celerity-realtime.md), NOT the actor's build mods: the
+ * ±25-level ruling is about LEVELS, so a fast build never makes a peer
+ * un-reactable and a slow build is never blinded by its own peers.
+ */
+export function referenceMod(actor) {
+  const sc = CONFIG.ASPECTSOFPOWER.celerity;
+  const rl = actor?.system?.attributes?.race?.level ?? 1;
+  return sc.ROUND_K / Math.max(1, referenceRoundLength(rl));
+}
+
+/**
+ * Perceive-to-react gate (design-celerity-realtime.md step 3, RULED
+ * 2026-07-02). A defender may ATTEMPT active defense (dodge, parry,
+ * reactions) only while the attacker is inside their reaction envelope:
+ *
+ *   attacker_Celerity <= R x defender_Celerity        (R = 2.5, sim-locked)
+ *
+ * Beyond R the blow is a blur and routes through the existing eat-the-hit
+ * path — same outcome as blind, different reason. Mortal-band exemption:
+ * when BOTH parties are G/F the gate is waived outright (G's interior
+ * spread is 4.5x over nine levels — no flat R survives it). Cross-band
+ * (G/F attacker vs E+ defender or the reverse) still uses the ratio.
+ *
+ * Attempt is not success — inside the band the normal opposed roll decides,
+ * so stat gaps stay absolute.
+ *
+ * @returns {{canReact: boolean, ratio: number, waived: boolean, R: number,
+ *            attackerRating: number, defenderRating: number}}
+ */
+export function perceiveGate(attackerActor, defenderActor) {
+  // Missing actors never gate.
+  if (!attackerActor || !defenderActor) {
+    return { canReact: true, ratio: 1, waived: false, R: 0, attackerRating: 0, defenderRating: 0 };
+  }
+  const aMod = referenceMod(attackerActor);
+  const dMod = referenceMod(defenderActor);
+  const decision = perceiveGateDecision(
+    aMod, dMod,
+    attackerActor.system?.attributes?.race?.rank ?? 'E',
+    defenderActor.system?.attributes?.race?.rank ?? 'E',
+  );
+  // Ratings are display sugar for the prompt/chat lines — the decision above
+  // is made on mods so the display anchor can never move a balance outcome.
+  return { ...decision, attackerRating: celerityRating(aMod), defenderRating: celerityRating(dMod) };
 }
 
 /* -------------------------------------------------- */

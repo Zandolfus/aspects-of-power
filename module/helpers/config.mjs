@@ -399,6 +399,19 @@ ASPECTSOFPOWER.defenseTuning = {
   // AI defense auto-policy: AI-flagged defenders dodge when their exact
   // dodge win probability (two-d20 contest) meets this threshold; else eat.
   aiDodgeWinProbMin: 0.35,
+  // Perceive-to-react gate (design-celerity-realtime.md, RULED 2026-07-02).
+  // Active defense may be ATTEMPTED only while
+  //   attacker_Celerity <= perceiveGateRatio x defender_Celerity,
+  // measured on the build-neutral REFERENCE (race-level) curve. R = 2.5 is
+  // sim-locked: it covers the ruled +/-25-level window in every grade from E
+  // up, and grade boundaries stay smooth (adjacent-level ratios ~1.26x).
+  // A ratio, not a level gap — "gap <= 25" would permit a 10.4x blur at low
+  // RL. Set to 0 to disable the gate.
+  perceiveGateRatio: 2.5,
+  // Mortal-band exemption: when attacker AND defender are both G/F the gate
+  // is waived. G's interior spread is 4.1-4.5x across nine levels, which no
+  // flat R can honor. Cross-band (G/F vs E+) still uses the ratio.
+  perceiveGateMortalBand: true,
 };
 
 /**

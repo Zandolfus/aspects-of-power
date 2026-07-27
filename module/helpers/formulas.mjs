@@ -137,6 +137,33 @@ export function effectiveDodgeValue(targetActor, defKey, stacks, dt = null) {
 }
 
 /**
+ * Perceive-to-react decision (design-celerity-realtime.md, RULED 2026-07-02).
+ * Pure half of celerity.perceiveGate — the caller resolves actors to their
+ * build-neutral reference mods and ranks, this decides.
+ *
+ * Ratings are mod × k for a shared k, so the rating ratio IS the mod ratio;
+ * comparing mods avoids dragging the display anchor into a balance decision.
+ *
+ * @param {number} attackerMod  Attacker's reference mod.
+ * @param {number} defenderMod  Defender's reference mod.
+ * @param {string} attackerRank Race rank letter (G..S).
+ * @param {string} defenderRank Race rank letter (G..S).
+ * @param {object} [dt]         defenseTuning override.
+ * @returns {{canReact: boolean, ratio: number, waived: boolean, R: number}}
+ */
+const MORTAL_RANKS = new Set(['G', 'F']);
+export function perceiveGateDecision(attackerMod, defenderMod, attackerRank, defenderRank, dt = null) {
+  const t = dt ?? (globalThis.CONFIG?.ASPECTSOFPOWER?.defenseTuning ?? {});
+  const R = t.perceiveGateRatio ?? 0;
+  // R <= 0 disables the gate outright.
+  if (!(R > 0)) return { canReact: true, ratio: 1, waived: false, R };
+  const waived = (t.perceiveGateMortalBand ?? true)
+    && MORTAL_RANKS.has(attackerRank) && MORTAL_RANKS.has(defenderRank);
+  const ratio = defenderMod > 0 ? attackerMod / defenderMod : 1;
+  return { canReact: waived || ratio <= R, ratio, waived, R };
+}
+
+/**
  * Split `total` across `keys` as evenly as possible, last key absorbing the
  * rounding remainder so the parts always sum exactly to total.
  * @param {number} total
