@@ -266,11 +266,20 @@ export function planetStates(worldTime, c = null) {
 /*  Fixed-calendar events                             */
 /* -------------------------------------------------- */
 
-/** The astronomical quarter day (solstice/equinox) a date falls on, if any. */
-export function quarterDayFor(components, c = null) {
+/**
+ * The astronomical quarter day (solstice/equinox) a date falls on, if any.
+ *
+ * Takes 1-BASED month/day explicitly. Foundry's calendar components are
+ * ZERO-based (December is month 11, the 4th is dayOfMonth 3) while its
+ * formatter adds one back — feeding those straight in put every fixed-date
+ * lookup a month and a day early, and the unit tests missed it because they
+ * passed synthetic 1-based values. Callers feed this from civilDate(), which
+ * is the true date and unambiguous.
+ */
+export function quarterDayFor(month, day, c = null) {
   const k = c ?? cfg();
   for (const [name, d] of Object.entries(k.quarterDays ?? {})) {
-    if (components.month === d.month && components.dayOfMonth === d.day) return name;
+    if (month === d.month && day === d.day) return name;
   }
   return null;
 }
@@ -283,14 +292,14 @@ function inWindow(month, day, start, end) {
   return s <= e ? (v >= s && v <= e) : (v >= s || v <= e);
 }
 
-/** Meteor showers active on a date, flagging the one at its peak. */
-export function meteorShowersOn(components, c = null) {
+/** Meteor showers active on a date (1-BASED month/day — see quarterDayFor). */
+export function meteorShowersOn(month, day, c = null) {
   const k = c ?? cfg();
   return (k.meteorShowers ?? [])
-    .filter(s => inWindow(components.month, components.dayOfMonth, s.start, s.end))
+    .filter(s => inWindow(month, day, s.start, s.end))
     .map(s => ({
       name: s.name, zhr: s.zhr, parent: s.parent,
-      peaking: components.month === s.peak.month && components.dayOfMonth === s.peak.day,
+      peaking: month === s.peak.month && day === s.peak.day,
     }));
 }
 
@@ -334,12 +343,12 @@ export function celestialState(worldTime = null) {
     civil,
     components,
     season: components.season,
-    quarterDay: quarterDayFor(components),
+    quarterDay: quarterDayFor(civil.month, civil.day),
     moon,
     nodeAngle: moonNodeAngle(t),
     nextSyzygy: { ...syz, eclipse: eclipseAtSyzygy(syz.time, syz.kind) },
     planets: planetStates(t),
-    meteorShowers: meteorShowersOn(components),
+    meteorShowers: meteorShowersOn(civil.month, civil.day),
     comets: cometStates(t),
   };
 }
@@ -375,10 +384,10 @@ export function upcomingEvents(days = 90, fromTime = null) {
   // Calendar-fixed events: quarter days and shower peaks.
   for (let d = 0; d <= days; d++) {
     const t = start + d * DAY_SECONDS;
-    const components = cal.timeToComponents(t);
-    const q = quarterDayFor(components);
+    const civil = civilDate(t);
+    const q = quarterDayFor(civil.month, civil.day);
     if (q) events.push({ inDays: d, date: label(t), kind: 'quarter', label: q });
-    for (const s of meteorShowersOn(components)) {
+    for (const s of meteorShowersOn(civil.month, civil.day)) {
       if (s.peaking) {
         events.push({ inDays: d, date: label(t), kind: 'meteor',
           label: `${s.name} peak (ZHR ${s.zhr})` });

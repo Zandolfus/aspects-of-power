@@ -14,7 +14,7 @@ import {
   effectiveDodgeValue, splitEvenlyWithRemainder, perceiveGateDecision, activityTicks, nextCompletionDelta,
 } from '../module/helpers/formulas.mjs';
 import { moonState, moonNodeAngle, nextSyzygy, eclipseAtSyzygy, planetStates,
-         meteorShowersOn, cometStates, julianDay } from '../module/systems/calendar.mjs';
+         meteorShowersOn, cometStates, julianDay, civilDate, worldTimeForDate } from '../module/systems/calendar.mjs';
 
 const CFG = {
   meleeBlend: { strFloor: 0.30, slope: 0.70, weightOffset: 40, weightSpan: 180 },
@@ -128,7 +128,7 @@ eq('activity never zero', activityTicks(0, 5000, { scale: 10000 }), 1);
 // imply (445267.1114034 deg/cy -> 29.5306d synodic, 483202.0175233 -> 27.2122d
 // draconic), which catches a mistyped digit.
 const CEL = {
-  julianDayAtWorldZero: 2451545.0,
+  julianDayAtWorldZero: 2451544.5,
   moonElongation: { atEpoch: 297.8501921, degPerCentury: 445267.1114034 },
   moonArgLatitude: { atEpoch: 93.2720950, degPerCentury: 483202.0175233 },
   lunarCycleDays: 29.530588853, draconicMonthDays: 27.212220817,
@@ -142,6 +142,8 @@ const CEL = {
   meteorShowers: [
     { name: 'Perseids', start: { month: 7, day: 17 }, peak: { month: 8, day: 12 }, end: { month: 8, day: 24 }, zhr: 100 },
     { name: 'Quadrantids', start: { month: 12, day: 28 }, peak: { month: 1, day: 3 }, end: { month: 1, day: 12 }, zhr: 120 },
+    { name: 'Geminids', start: { month: 12, day: 4 }, peak: { month: 12, day: 13 }, end: { month: 12, day: 17 }, zhr: 150 },
+    { name: 'Orionids', start: { month: 10, day: 2 }, peak: { month: 10, day: 21 }, end: { month: 11, day: 7 }, zhr: 20 },
   ],
   planets: {
     Mercury: { a: 0.38709893, e: 0.20563069, L: 252.25084, peri: 77.45645, node: 48.33167, inc: 7.00487 },
@@ -157,9 +159,11 @@ const CEL = {
 // Real UTC instant -> world time, through the J2000 anchor.
 const at = (iso) => (Date.parse(iso) - Date.parse('2000-01-01T12:00:00Z')) / 1000;
 
-// The Julian Day anchor itself.
-eq('JD at world zero is J2000', julianDay(0, CEL), 2451545.0);
-eq('JD one day on', julianDay(86400, CEL), 2451546.0);
+// The Julian Day anchor itself. World zero is 2000-01-01 00:00 UTC (JD
+// 2451544.5) — MIDNIGHT, not J2000 noon, so core's calendar (which starts its
+// own year zero at world time 0) agrees with real months and days.
+eq('JD at world zero', julianDay(0, CEL), 2451544.5);
+eq('JD one day on', julianDay(86400, CEL), 2451545.5);
 
 // REAL new moon: 2000-01-06 18:14 UTC.
 eq('real new moon 2000-01-06', moonState(at('2000-01-06T18:14:00Z'), CEL).name, 'New Moon');
@@ -210,13 +214,34 @@ const ps = planetStates(at('2020-10-01T00:00:00Z'), CEL);
 eq('planets carry zodiac signs', Object.values(ps).every(p => CEL.zodiac.includes(p.sign)), true);
 eq('degree within sign 0..30', Object.values(ps).every(p => p.degreeInSign >= 0 && p.degreeInSign < 30), true);
 
+// Civil date round-trip, and the 1-BASED guard. Foundry's own components are
+// ZERO-based (December is month 11, the 4th is dayOfMonth 3) while its
+// formatter adds one back; feeding those into the fixed-date lookups put every
+// shower and quarter day a month and a day early on the live world. These
+// helpers are the unambiguous source the lookups now read from.
+eq('canonical date round-trips', civilDate(worldTimeForDate(2024, 12, 4, 22, 0, 0, CEL), CEL).iso,
+   '2024-12-04 22:00:00');
+eq('civilDate months are 1-based', civilDate(worldTimeForDate(2024, 12, 4, 0, 0, 0, CEL), CEL).month, 12);
+eq('civilDate days are 1-based', civilDate(worldTimeForDate(2024, 12, 4, 0, 0, 0, CEL), CEL).day, 4);
+eq('world zero is 2000-01-01', civilDate(0, CEL).iso, '2000-01-01 00:00:00');
+eq('leap day survives round-trip', civilDate(worldTimeForDate(2024, 2, 29, 0, 0, 0, CEL), CEL).iso,
+   '2024-02-29 00:00:00');
+// The canonical campaign instant, asserted as a number so it cannot drift.
+eq('canonical worldTime', worldTimeForDate(2024, 12, 4, 22, 0, 0, CEL), 786664800);
+// On that date the Geminids are running and the Orionids are long over — the
+// exact pair that exposed the zero-based bug live.
+eq('Geminids running on the canonical date',
+   meteorShowersOn(12, 4, CEL).some(s => s.name === 'Geminids'), true);
+eq('Orionids NOT running on the canonical date',
+   meteorShowersOn(12, 4, CEL).some(s => s.name === 'Orionids'), false);
+
 // Meteor showers are calendar-fixed; the Perseids peak on Aug 12.
-eq('Perseids peak Aug 12', meteorShowersOn({ month: 8, dayOfMonth: 12 }, CEL)[0].peaking, true);
-eq('Perseids active Aug 1', meteorShowersOn({ month: 8, dayOfMonth: 1 }, CEL)[0].name, 'Perseids');
-eq('no showers in June', meteorShowersOn({ month: 6, dayOfMonth: 15 }, CEL).length, 0);
+eq('Perseids peak Aug 12', meteorShowersOn(8, 12, CEL)[0].peaking, true);
+eq('Perseids active Aug 1', meteorShowersOn(8, 1, CEL)[0].name, 'Perseids');
+eq('no showers in June', meteorShowersOn(6, 15, CEL).length, 0);
 // Quadrantids wrap the New Year — the window must survive the rollover.
-eq('Quadrantids active Dec 30', meteorShowersOn({ month: 12, dayOfMonth: 30 }, CEL).length, 1);
-eq('Quadrantids active Jan 3', meteorShowersOn({ month: 1, dayOfMonth: 3 }, CEL)[0].peaking, true);
+eq('Quadrantids active Dec 30', meteorShowersOn(12, 30, CEL).length, 1);
+eq('Quadrantids active Jan 3', meteorShowersOn(1, 3, CEL)[0].peaking, true);
 
 // Halley returns in 2061: from J2000 that is ~61 years out.
 const halley = cometStates(0, CEL)[0];
