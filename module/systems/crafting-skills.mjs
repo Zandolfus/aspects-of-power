@@ -1177,20 +1177,17 @@ class CraftingSkills {
       const slotsLabel = `combat ${combatFreeOpt}/${t.system.augmentSlots ?? 0}, prof ${profFreeOpt}/${t.system.profAugmentSlots ?? 0}`;
       return `<option value="${t.id}">${t.name} — ${t.system.slot} (${slotsLabel})</option>`;
     }).join('');
-    const targetChoice = await new Promise(resolve => {
-      new foundry.applications.api.DialogV2({
-        window: { title: `${item.name} — Select Target Item` },
-        content: `<p>Select the equipment item to inscribe <strong>${augmentDoc.name}</strong> onto:</p>
-                  <div class="form-group"><label>Target:</label><select name="target">${targetOptions}</select></div>`,
-        buttons: [{
-          action: 'confirm', label: 'Confirm', default: true,
-          callback: (event, button) => resolve(button.form.elements.target?.value || null),
-        }, {
-          action: 'cancel', label: 'Cancel',
-          callback: () => resolve(null),
-        }],
-        close: () => resolve(null),
-      }).render({ force: true });
+    const targetChoice = await foundry.applications.api.DialogV2.wait({
+      window: { title: `${item.name} — Select Target Item` },
+      content: `<p>Select the equipment item to inscribe <strong>${augmentDoc.name}</strong> onto:</p>
+                <div class="form-group"><label>Target:</label><select name="target">${targetOptions}</select></div>`,
+      buttons: [{
+        action: 'confirm', label: 'Confirm', default: true,
+        callback: (event, button) => button.form.elements.target?.value || null,
+      }, {
+        action: 'cancel', label: 'Cancel', callback: () => null,
+      }],
+      close: () => null,
     });
     if (!targetChoice) return;
     const targetItem = actor.items.get(targetChoice);

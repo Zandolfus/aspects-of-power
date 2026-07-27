@@ -84,34 +84,30 @@ export class AspectsofPowerItem extends Item {
 
   async _promptBarrierManaCost(maxMana) {
     const multiplier = this.system.tagConfig?.barrierMultiplier ?? 1;
-    return new Promise(resolve => {
-      let resolved = false;
-      new foundry.applications.api.DialogV2({
-        window: { title: 'Barrier — Mana Cost' },
-        content: `<div class="form-group">
-            <label>Mana to spend (max ${maxMana}):</label>
-            <input type="number" name="manaCost" value="${maxMana}" min="1" max="${maxMana}" autofocus />
-          </div>
-          <p class="hint">Barrier HP = Mana &times; ${multiplier}</p>`,
-        buttons: [
-          {
-            action: 'confirm',
-            label: 'Create Barrier',
-            default: true,
-            callback: (event, button) => {
-              resolved = true;
-              const val = parseInt(button.form.elements.manaCost?.value, 10);
-              resolve(Math.min(Math.max(1, val || 0), maxMana));
-            },
+    // DialogV2.wait, not a hand-rolled promise: every dialog in the system goes
+    // through the static helper so one stub can drive them all headlessly (a
+    // manual `new Promise` + `new DialogV2` cannot be intercepted, and a test
+    // walking that path HANGS on a click that never comes).
+    return foundry.applications.api.DialogV2.wait({
+      window: { title: 'Barrier — Mana Cost' },
+      content: `<div class="form-group">
+          <label>Mana to spend (max ${maxMana}):</label>
+          <input type="number" name="manaCost" value="${maxMana}" min="1" max="${maxMana}" autofocus />
+        </div>
+        <p class="hint">Barrier HP = Mana &times; ${multiplier}</p>`,
+      buttons: [
+        {
+          action: 'confirm',
+          label: 'Create Barrier',
+          default: true,
+          callback: (event, button) => {
+            const val = parseInt(button.form.elements.manaCost?.value, 10);
+            return Math.min(Math.max(1, val || 0), maxMana);
           },
-          {
-            action: 'cancel',
-            label: 'Cancel',
-            callback: () => { resolved = true; resolve(null); },
-          },
-        ],
-        close: () => { if (!resolved) resolve(null); },
-      }).render(true);
+        },
+        { action: 'cancel', label: 'Cancel', callback: () => null },
+      ],
+      close: () => null,
     });
   }
 
@@ -290,12 +286,12 @@ export class AspectsofPowerItem extends Item {
         <p class="hint" style="font-size:11px;margin-top:8px;">Damage = ${potencyLabel} × multiplier × (invested/base)^0.2.${computeChannelTime ? ' Channel time scales with invest / Wis.' : ''}${hardCap ? '' : ` Excess past safe ceiling deals ${potencyLabel} × (excess/safe) self-damage.`}</p>
       </div>`;
 
-    let resolveFn;
-    const promise = new Promise(res => { resolveFn = res; });
-    let resolved = false;
-    const safeResolve = (v) => { if (!resolved) { resolved = true; resolveFn(v); } };
-
-    const dlg = new foundry.applications.api.DialogV2({
+    // DialogV2.wait with a `render` hook, not a hand-rolled promise: the static
+    // helper is the one seam a headless test can stub, so every dialog in the
+    // system goes through it. (This one in particular is why "firing a
+    // variable-invest skill headlessly hangs on the invest dialog" was a
+    // standing workaround — nothing could intercept it.)
+    return foundry.applications.api.DialogV2.wait({
       window: { title: `${label} — ${resourceLabel.charAt(0).toUpperCase() + resourceLabel.slice(1)} Investment` },
       content,
       buttons: [
@@ -305,42 +301,40 @@ export class AspectsofPowerItem extends Item {
           default: true,
           callback: (event, button) => {
             const val = parseInt(button.form.elements.invest?.value, 10);
-            safeResolve(Math.min(Math.max(baseCost, val || baseCost), maxPool));
+            return Math.min(Math.max(baseCost, val || baseCost), maxPool);
           },
         },
-        { action: 'cancel', label: 'Cancel', callback: () => safeResolve(null) },
+        { action: 'cancel', label: 'Cancel', callback: () => null },
       ],
-      close: () => safeResolve(null),
+      close: () => null,
+      // Live readout wiring, once the dialog has mounted.
+      render: (event, dialog) => {
+        const root = dialog?.element ?? dialog;
+        if (!root) return;
+        const slider = root.querySelector('input[name="invest"]');
+        const investDisplay = root.querySelector('.invest-display');
+        const dmgDisplay = root.querySelector('.dmg-display');
+        const selfDmgDisplay = root.querySelector('.self-dmg-display');
+        const selfDmgRowEl = root.querySelector('.self-dmg-row');
+        const remainingDisplay = root.querySelector('.remaining-display');
+        const channelDisplay = root.querySelector('.channel-display');
+        if (!slider) return;
+        slider.addEventListener('input', () => {
+          const v = parseInt(slider.value, 10);
+          const dmg = computeDmg(v);
+          investDisplay.textContent = v;
+          dmgDisplay.textContent = dmg;
+          remainingDisplay.textContent = maxPool - v;
+          if (channelDisplay && computeChannelTime) channelDisplay.textContent = computeChannelTime(v);
+          if (selfDmgDisplay && selfDmgRowEl) {
+            const selfDmg = computeSelfDmg(v);
+            selfDmgDisplay.textContent = selfDmg;
+            selfDmgRowEl.style.color = selfDmg > 0 ? '#c33' : '';
+            selfDmgRowEl.style.fontWeight = selfDmg > 0 ? 'bold' : '';
+          }
+        });
+      },
     });
-    await dlg.render(true);
-
-    // Wire live updates after the dialog mounts.
-    const root = dlg.element;
-    const slider = root.querySelector('input[name="invest"]');
-    const investDisplay = root.querySelector('.invest-display');
-    const dmgDisplay = root.querySelector('.dmg-display');
-    const selfDmgDisplay = root.querySelector('.self-dmg-display');
-    const selfDmgRowEl = root.querySelector('.self-dmg-row');
-    const remainingDisplay = root.querySelector('.remaining-display');
-    const channelDisplay = root.querySelector('.channel-display');
-    if (slider) {
-      slider.addEventListener('input', () => {
-        const v = parseInt(slider.value, 10);
-        const dmg = computeDmg(v);
-        investDisplay.textContent = v;
-        dmgDisplay.textContent = dmg;
-        remainingDisplay.textContent = maxPool - v;
-        if (channelDisplay && computeChannelTime) channelDisplay.textContent = computeChannelTime(v);
-        if (selfDmgDisplay && selfDmgRowEl) {
-          const selfDmg = computeSelfDmg(v);
-          selfDmgDisplay.textContent = selfDmg;
-          selfDmgRowEl.style.color = selfDmg > 0 ? '#c33' : '';
-          selfDmgRowEl.style.fontWeight = selfDmg > 0 ? 'bold' : '';
-        }
-      });
-    }
-
-    return promise;
   }
 
   /**
@@ -406,12 +400,9 @@ export class AspectsofPowerItem extends Item {
         <p class="hint" style="font-size:11px;margin-top:8px;">Strike = ${potencyLabel} × multiplier × (stamina/base)^0.2. Infusion = Int × ${infCoef} × (mana/ref)^0.2 (fusion penalty; mana wis-capped like a spell). Stamina excess past safe ceiling deals self-damage; mana has no self-damage.</p>
       </div>`;
 
-    let resolveFn;
-    const promise = new Promise(res => { resolveFn = res; });
-    let resolved = false;
-    const safeResolve = (v) => { if (!resolved) { resolved = true; resolveFn(v); } };
-
-    const dlg = new foundry.applications.api.DialogV2({
+    // Same uniformity rule as the single-resource invest above: static helper
+    // + `render` hook, so one stub can drive every dialog in the system.
+    return foundry.applications.api.DialogV2.wait({
       window: { title: `${label} — Infused (Mana + Stamina)` },
       content,
       buttons: [
@@ -424,64 +415,64 @@ export class AspectsofPowerItem extends Item {
             const mv = parseInt(button.form.elements.mana?.value, 10);
             const sClamped = Math.min(Math.max(stamina.baseCost, sv || stamina.baseCost), stamina.maxPool);
             const mClamped = Math.min(Math.max(mana.baseCost,    mv || mana.baseCost),    mana.maxPool);
-            safeResolve({ stamina: sClamped, mana: mClamped });
+            return { stamina: sClamped, mana: mClamped };
           },
         },
-        { action: 'cancel', label: 'Cancel', callback: () => safeResolve(null) },
+        { action: 'cancel', label: 'Cancel', callback: () => null },
       ],
-      close: () => safeResolve(null),
+      close: () => null,
+      render: (event, dialog) => {
+        const root = dialog?.element ?? dialog;
+        if (!root) return;
+        const manaSlider   = root.querySelector('input[name="mana"]');
+        const stamSlider   = root.querySelector('input[name="stamina"]');
+        const manaDisplay  = root.querySelector('.mana-display');
+        const stamDisplay  = root.querySelector('.stamina-display');
+        const strikeDisplay   = root.querySelector('.strike-display');
+        const infusionDisplay = root.querySelector('.infusion-display');
+        const totalDisplay    = root.querySelector('.total-display');
+        const selfDmgDisplay  = root.querySelector('.self-dmg-display');
+        const selfDmgRowEl    = root.querySelector('.self-dmg-row');
+
+        const refreshTotal = () => {
+          const sv = parseInt(stamSlider?.value, 10) || stamina.baseCost;
+          const mv = parseInt(manaSlider?.value, 10) || mana.baseCost;
+          totalDisplay.textContent = computeStrike(sv) + computeInfusion(mv);
+        };
+        const channelDisplay = root.querySelector('.channel-display');
+        const channelRowEl = root.querySelector('.channel-row');
+        if (manaSlider) {
+          manaSlider.addEventListener('input', () => {
+            const v = parseInt(manaSlider.value, 10);
+            manaDisplay.textContent = v;
+            infusionDisplay.textContent = computeInfusion(v);
+            if (channelDisplay && computeChannel) {
+              const ch = computeChannel(v);
+              channelDisplay.textContent = ch;
+              // Only surface the channel-time row when it would actually push the
+              // celerity wait past the strike's base wait — otherwise it's noise.
+              if (channelRowEl) channelRowEl.style.display = (ch > baseWait) ? 'block' : 'none';
+            }
+            refreshTotal();
+          });
+        }
+        if (stamSlider) {
+          stamSlider.addEventListener('input', () => {
+            const v = parseInt(stamSlider.value, 10);
+            stamDisplay.textContent = v;
+            strikeDisplay.textContent = computeStrike(v);
+            if (selfDmgDisplay && selfDmgRowEl) {
+              const selfDmg = computeSelfDmg(v);
+              selfDmgDisplay.textContent = selfDmg;
+              selfDmgRowEl.style.color = selfDmg > 0 ? '#c33' : '#888';
+              selfDmgRowEl.style.fontWeight = selfDmg > 0 ? 'bold' : '';
+            }
+            refreshTotal();
+          });
+        }
+
+      },
     });
-    await dlg.render(true);
-
-    const root = dlg.element;
-    const manaSlider   = root.querySelector('input[name="mana"]');
-    const stamSlider   = root.querySelector('input[name="stamina"]');
-    const manaDisplay  = root.querySelector('.mana-display');
-    const stamDisplay  = root.querySelector('.stamina-display');
-    const strikeDisplay   = root.querySelector('.strike-display');
-    const infusionDisplay = root.querySelector('.infusion-display');
-    const totalDisplay    = root.querySelector('.total-display');
-    const selfDmgDisplay  = root.querySelector('.self-dmg-display');
-    const selfDmgRowEl    = root.querySelector('.self-dmg-row');
-
-    const refreshTotal = () => {
-      const sv = parseInt(stamSlider?.value, 10) || stamina.baseCost;
-      const mv = parseInt(manaSlider?.value, 10) || mana.baseCost;
-      totalDisplay.textContent = computeStrike(sv) + computeInfusion(mv);
-    };
-    const channelDisplay = root.querySelector('.channel-display');
-    const channelRowEl = root.querySelector('.channel-row');
-    if (manaSlider) {
-      manaSlider.addEventListener('input', () => {
-        const v = parseInt(manaSlider.value, 10);
-        manaDisplay.textContent = v;
-        infusionDisplay.textContent = computeInfusion(v);
-        if (channelDisplay && computeChannel) {
-          const ch = computeChannel(v);
-          channelDisplay.textContent = ch;
-          // Only surface the channel-time row when it would actually push the
-          // celerity wait past the strike's base wait — otherwise it's noise.
-          if (channelRowEl) channelRowEl.style.display = (ch > baseWait) ? 'block' : 'none';
-        }
-        refreshTotal();
-      });
-    }
-    if (stamSlider) {
-      stamSlider.addEventListener('input', () => {
-        const v = parseInt(stamSlider.value, 10);
-        stamDisplay.textContent = v;
-        strikeDisplay.textContent = computeStrike(v);
-        if (selfDmgDisplay && selfDmgRowEl) {
-          const selfDmg = computeSelfDmg(v);
-          selfDmgDisplay.textContent = selfDmg;
-          selfDmgRowEl.style.color = selfDmg > 0 ? '#c33' : '#888';
-          selfDmgRowEl.style.fontWeight = selfDmg > 0 ? 'bold' : '';
-        }
-        refreshTotal();
-      });
-    }
-
-    return promise;
   }
 
   _buildRollFormulas(rollData) {
@@ -3006,19 +2997,16 @@ export class AspectsofPowerItem extends Item {
       const slotOptions = Object.entries(slots)
         .map(([key, def]) => `<option value="${key}">${game.i18n.localize(def.label ?? `ASPECTSOFPOWER.Equip.Slot.${key}`)}</option>`)
         .join('');
-      dismemberedSlot = await new Promise(resolve => {
-        new foundry.applications.api.DialogV2({
-          window: { title: 'Dismember — Choose Slot' },
-          content: `<div class="form-group"><label>Slot to disable:</label><select name="slot">${slotOptions}</select></div>`,
-          buttons: [{
-            action: 'confirm', label: 'Confirm', default: true,
-            callback: (event, button) => resolve(button.form.elements.slot?.value || null),
-          }, {
-            action: 'cancel', label: 'Cancel',
-            callback: () => resolve(null),
-          }],
-          close: () => resolve(null),
-        }).render({ force: true });
+      dismemberedSlot = await foundry.applications.api.DialogV2.wait({
+        window: { title: 'Dismember — Choose Slot' },
+        content: `<div class="form-group"><label>Slot to disable:</label><select name="slot">${slotOptions}</select></div>`,
+        buttons: [{
+          action: 'confirm', label: 'Confirm', default: true,
+          callback: (event, button) => button.form.elements.slot?.value || null,
+        }, {
+          action: 'cancel', label: 'Cancel', callback: () => null,
+        }],
+        close: () => null,
       });
       if (!dismemberedSlot) return; // cancelled
     }
