@@ -4067,6 +4067,13 @@ export class AspectsofPowerItem extends Item {
    * @private
    */
   async roll(options = {}) {
+    // Consumables have no roll grammar — their entry point is useConsumable().
+    // The character sheet knows that (the flask button calls it directly), but
+    // `rollItemMacro` calls roll() blindly, so a ritual medium dragged to the
+    // hotbar threw "cannot read properties of undefined (reading 'abilities')"
+    // instead of being used. Route it rather than crash.
+    if (this.type === 'consumable') return this.useConsumable();
+
     const item     = this;
     // `let` so the detonate-redirect path can shadow rollData with the
     // summon's roll snapshot at AOE dispatch time.
