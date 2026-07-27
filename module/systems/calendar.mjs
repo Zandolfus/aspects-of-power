@@ -5,8 +5,9 @@
  * world runs its Simplified Gregorian because the setting is our planet. This
  * module adds the part core does not model: the SKY.
  *
- * ATTACHED TO REALITY (2026-07-26). World time 0 IS a real instant — J2000.0,
- * JD 2451545.0 — and every quantity below is computed from real ephemeris
+ * ATTACHED TO REALITY (2026-07-26). World time 0 IS a real instant —
+ * 2000-01-01 00:00 UTC, JD 2451544.5 — and every quantity is computed from
+ * real ephemeris
  * measured from it. The moon phase on a world date is the TRUE phase for the
  * corresponding real date; Mars is retrograde when Mars is really retrograde.
  * Re-anchoring the campaign in real time is one config number
@@ -56,12 +57,58 @@ function foldHalf(deg) {
 /** Julian Day for a world time, via the real-instant anchor. */
 export function julianDay(worldTime, c = null) {
   const k = c ?? cfg();
-  return (k.julianDayAtWorldZero ?? 2451545.0) + worldTime / DAY_SECONDS;
+  return (k.julianDayAtWorldZero ?? 2451544.5) + worldTime / DAY_SECONDS;
 }
 
 /** Julian centuries from J2000 — the argument every mean element takes. */
 export function julianCenturies(worldTime, c = null) {
   return (julianDay(worldTime, c) - 2451545.0) / 36525;
+}
+
+/**
+ * Julian Day -> civil (Gregorian) date. Meeus ch.7. This is what lets the
+ * system report the TRUE date: core's calendar counts years from its own year
+ * zero, so its label reads 0024 where reality says 2024, and rather than fight
+ * that we derive the real date straight from the anchor.
+ */
+export function civilDate(worldTime, c = null) {
+  const jd = julianDay(worldTime, c);
+  const z = Math.floor(jd + 0.5);
+  const f = jd + 0.5 - z;
+  let a = z;
+  if (z >= 2299161) {
+    const alpha = Math.floor((z - 1867216.25) / 36524.25);
+    a = z + 1 + alpha - Math.floor(alpha / 4);
+  }
+  const b = a + 1524;
+  const cc = Math.floor((b - 122.1) / 365.25);
+  const d = Math.floor(365.25 * cc);
+  const e = Math.floor((b - d) / 30.6001);
+  const dayF = b - d - Math.floor(30.6001 * e) + f;
+  const day = Math.floor(dayF);
+  const month = e < 14 ? e - 1 : e - 13;
+  const year = month > 2 ? cc - 4716 : cc - 4715;
+  const secOfDay = Math.round((dayF - day) * DAY_SECONDS);
+  const hour = Math.floor(secOfDay / 3600);
+  const minute = Math.floor((secOfDay % 3600) / 60);
+  const second = secOfDay % 60;
+  const p2 = (n) => String(n).padStart(2, '0');
+  return {
+    year, month, day, hour, minute, second,
+    iso: `${year}-${p2(month)}-${p2(day)} ${p2(hour)}:${p2(minute)}:${p2(second)}`,
+  };
+}
+
+/** Real civil date -> world time. The inverse, for setting the clock. */
+export function worldTimeForDate(year, month, day, hour = 0, minute = 0, second = 0, c = null) {
+  const k = c ?? cfg();
+  let y = year, m = month;
+  if (m <= 2) { y -= 1; m += 12; }
+  const A = Math.floor(y / 100);
+  const B = 2 - A + Math.floor(A / 4);
+  const jd = Math.floor(365.25 * (y + 4716)) + Math.floor(30.6001 * (m + 1))
+    + day + B - 1524.5 + (hour * 3600 + minute * 60 + second) / DAY_SECONDS;
+  return Math.round((jd - (k.julianDayAtWorldZero ?? 2451544.5)) * DAY_SECONDS);
 }
 
 /* -------------------------------------------------- */
@@ -277,10 +324,14 @@ export function celestialState(worldTime = null) {
   const components = cal.timeToComponents(t);
   const moon = moonState(t);
   const syz = nextSyzygy(t);
+  const civil = civilDate(t);
   return {
     worldTime: t,
     julianDay: julianDay(t),
-    date: cal.format(components, 'timestamp'),
+    // The TRUE date, derived from the anchor — not core's year label, which
+    // counts from its own year zero and reads 0024 where reality says 2024.
+    date: civil.iso,
+    civil,
     components,
     season: components.season,
     quarterDay: quarterDayFor(components),
@@ -301,7 +352,7 @@ export function upcomingEvents(days = 90, fromTime = null) {
   const start = fromTime ?? game.time.worldTime;
   const cal = game.time.calendar;
   const events = [];
-  const label = (t) => cal.format(cal.timeToComponents(t), 'timestamp');
+  const label = (t) => civilDate(t).iso;
   const endTime = start + days * DAY_SECONDS;
 
   // Moons and eclipses, one entry per real syzygy.
@@ -369,7 +420,7 @@ export async function postCelestialReport(days = 90) {
 }
 
 export const CalendarHelpers = {
-  julianDay, julianCenturies, moonState, moonNodeAngle, nextSyzygy, eclipseAtSyzygy,
+  julianDay, julianCenturies, civilDate, worldTimeForDate, moonState, moonNodeAngle, nextSyzygy, eclipseAtSyzygy,
   planetStates, quarterDayFor, meteorShowersOn, cometStates,
   celestialState, upcomingEvents, activeLunarRitualName, postCelestialReport,
 };

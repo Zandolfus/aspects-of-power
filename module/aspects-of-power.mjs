@@ -104,6 +104,19 @@ Hooks.once('init', function () {
     aiSetFactionFocus,
   };
 
+  // ── Calendar: make core's leap years match the real ones ──
+  // Foundry's Simplified Gregorian leaps every 4 years starting at its year 8,
+  // so years 0 and 4 are NOT leap. Our world time 0 is 2000-01-01, and 2000 and
+  // 2004 genuinely were leap years, so that default drifts the date by a day
+  // per missed leap. leapStart 0 reproduces reality exactly — verified live
+  // across 2000-01-01 to 2024-12-04, including 2024-02-29.
+  // (Real Gregorian also skips century years not divisible by 400; that first
+  // bites in 2100, well past any campaign date.)
+  const _cal = CONFIG.time.worldCalendarConfig;
+  if (_cal?.years?.leapYear) {
+    _cal.years = { ..._cal.years, leapYear: { leapStart: 0, leapInterval: 4 } };
+  }
+
   // ── System Settings ──
   game.settings.register('aspects-of-power', 'migrationVersion', {
     name: 'Migration Version',

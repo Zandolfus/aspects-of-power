@@ -574,12 +574,21 @@ ASPECTSOFPOWER.spellMaxInvestAboveBase = {
  */
 ASPECTSOFPOWER.celestial = {
   // ── THE ANCHOR ──
-  // World time 0 IS a real instant: J2000.0 (2000-01-01 12:00 UTC, JD
-  // 2451545.0). Everything below is real ephemeris measured from it, so the
-  // moon phase on a world date is the TRUE phase for the corresponding real
-  // date. Move this one number to re-anchor the campaign in real time; the
-  // astronomy follows without a single coefficient changing.
-  julianDayAtWorldZero: 2451545.0,
+  // World time 0 IS a real instant: 2000-01-01 00:00 UTC, JD 2451544.5.
+  // Everything below is real ephemeris measured from it, so the moon phase on
+  // a world date is the TRUE phase for that real date. Move this one number to
+  // re-anchor the campaign; no coefficient changes.
+  //
+  // MIDNIGHT, not J2000 noon, so that core's calendar (which starts its own
+  // year 0 at worldTime 0, midnight) agrees with real months and days
+  // date-for-date. Verified live: with the leap patch below, every probe date
+  // from 2000-01-01 through 2024-12-04 lands on the correct month/day/time,
+  // including 2024-02-29.
+  julianDayAtWorldZero: 2451544.5,
+  // Core prints the year as the count from ITS year zero, so a real year needs
+  // this added back. Our own date formatting derives the true civil date from
+  // the Julian day and does not depend on core's year label at all.
+  yearAtWorldZero: 2000,
 
   // ── LUNAR (Meeus, Astronomical Algorithms ch.47 mean elements) ──
   // Mean elongation D: 0 deg = new moon, 180 = full. Rate cross-checks against
