@@ -475,7 +475,17 @@ export class AspectsofPowerItem extends Item {
     });
   }
 
-  _buildRollFormulas(rollData) {
+  /**
+   * @param {object} rollData
+   * @param {object} [opts]
+   * @param {boolean} [opts.applyRarityMult]  Multiply damage by the skill's
+   *   effectiveMult (rarity x dmgMods). OPT-IN because this same builder feeds
+   *   the crafting refine/prep rolls, where a rarity multiplier would silently
+   *   re-tune crafting output. Combat dispatch sites that never reach the
+   *   invest path (on-death, chained riders, detonated summons) pass true;
+   *   they were the only paths where a skill's rarity did nothing.
+   */
+  _buildRollFormulas(rollData, { applyRarityMult = false } = {}) {
     const A   = this.actor.system.abilities;
     // Pure (default): primary ability mod at full weight; hybrid blends
     // primary + secondary at configured weights — helpers/formulas.mjs.
@@ -484,7 +494,12 @@ export class AspectsofPowerItem extends Item {
     // → Foundry parses as StringTerm("null") → "Unresolved StringTerm null"
     // crash on roll evaluation. Default to 1 (the schema initial), matching
     // the dice fallback below. Old skills with null diceBonus stop crashing.
-    const db  = rollData.roll.diceBonus ?? 1;
+    const dbRaw = rollData.roll.diceBonus ?? 1;
+    // Same precedence the invest paths use: an explicit diceBonus wins,
+    // otherwise the rarity-derived effective multiplier.
+    const db  = (applyRarityMult && (!dbRaw || dbRaw === 1))
+      ? (this._resolveRarityMods?.()?.effectiveMult ?? dbRaw)
+      : dbRaw;
     const dic = rollData.roll.dice || '0';
     const typ = rollData.roll.type;
 
@@ -3689,7 +3704,7 @@ export class AspectsofPowerItem extends Item {
 
     try {
       // ── Build rolls ────────────────────────────────────────────────────
-      const { hitFormula, dmgFormula } = this._buildRollFormulas(rollData);
+      const { hitFormula, dmgFormula } = this._buildRollFormulas(rollData, { applyRarityMult: true });
       let hitRoll = null;
       if (hitFormula) {
         hitRoll = new Roll(hitFormula, rollData);
@@ -5220,7 +5235,7 @@ export class AspectsofPowerItem extends Item {
         const summonItem = await fromUuid(detonateSummonUuid).catch(() => null);
         if (summonItem && summonItem.actor?.id === this.actor?.id) {
           const summonRollData = summonItem.getRollData();
-          const summonFormulas = summonItem._buildRollFormulas(summonRollData);
+          const summonFormulas = summonItem._buildRollFormulas(summonRollData, { applyRarityMult: true });
           if (summonFormulas.hitFormula) {
             hitRoll = new Roll(summonFormulas.hitFormula, summonRollData);
             await hitRoll.evaluate();
@@ -5605,7 +5620,7 @@ export class AspectsofPowerItem extends Item {
             investedAmount: Math.max(0, Math.round(chainContext.investedAmount)) };
         }
         const chainLabel = `[chain] ${chainedItem.name}`;
-        const { hitFormula: cHitF, dmgFormula: cDmgF } = chainedItem._buildRollFormulas(chainRollData);
+        const { hitFormula: cHitF, dmgFormula: cDmgF } = chainedItem._buildRollFormulas(chainRollData, { applyRarityMult: true });
 
         const cHitRoll = cHitF ? new Roll(cHitF, chainRollData) : null;
         if (cHitRoll) await cHitRoll.evaluate();
