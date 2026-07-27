@@ -1475,6 +1475,26 @@ ASPECTSOFPOWER.ritualScale = {
 ASPECTSOFPOWER.ritualGradeStep = 2.5;
 
 /**
+ * Group ritual + prep-time tuning (design-ritual-subsystem.md, RULED
+ * 2026-06-13; buildable only once the activity framework landed).
+ *
+ * Grouping trades quality for SPEED, never power: stored power is the MEAN of
+ * each participant's solo contribution, so a coven can never exceed its best
+ * member and a master who brings a novice drags their own result toward the
+ * middle. Parity needs no rule — the average enforces it.
+ *
+ * Prep time is the payoff: base cost divided by the number of hands. More
+ * materials pull the other way (they extend prep), so the full lever-web is
+ * "more materials = more power but longer, more people = faster but diluted."
+ */
+ASPECTSOFPOWER.ritualPrep = {
+  // Registry key in ASPECTSOFPOWER.activities supplying the base prep cost.
+  activityKey: 'ritualPrep',
+  // Each material UNIT beyond the first adds this share of base prep time.
+  extraMaterialTimeFactor: 0.5,
+};
+
+/**
  * Progress formula weights per design-ritual-subsystem.md Phase 2.5.
  * Sum to 1.0; "wisdom is the dominant input but materials + mana matter."
  */

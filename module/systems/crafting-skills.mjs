@@ -254,6 +254,116 @@ class CraftingSkills {
    * cleanly. Roll has already happened upstream; quality is logged but
    * doesn't drive the charge count (fixed at 3 for first cut; tune later).
    */
+  /**
+   * Actors who could join a coven for this ritual: they must KNOW it (you
+   * cannot lend hands to a working you don't understand — the model averages
+   * each participant's SOLO contribution, which is meaningless otherwise) and
+   * the current user must be able to spend their materials and mana.
+   *
+   * That ownership gate means a GM runs mixed-player covens today; a player
+   * only sees characters they own. Cross-client contribution would need the
+   * inputs routed through the active GM.
+   */
+  _eligibleCoParticipants(leadActor, ritualSkill) {
+    const knows = (a) => a.items.some(i =>
+      i.type === 'skill'
+      && (i.system?.tags ?? []).includes('ritual')
+      && i.name === ritualSkill.name
+    );
+    return game.actors.filter(a =>
+      a.id !== leadActor.id && a.isOwner && knows(a)
+      && Math.round(a.system?.abilities?.wisdom?.mod ?? 0) > 0
+    );
+  }
+
+  /**
+   * One participant's SOLO contribution — what they would produce alone.
+   * A single compact form: how many of each gem stack they commit, plus mana.
+   * Returns { actor, wisdom, materialProgress, mana, progress, gemTally } or
+   * null if they back out.
+   */
+  async _collectCovenContribution(actor, ritualSkill, { weights, maxMaterials, minMana }) {
+    const gems = actor.items.filter(i =>
+      i.type === 'item'
+      && i.system?.isMaterial
+      && (i.system?.material === 'gem' || (i.system?.tags ?? []).includes('gem'))
+      && (i.system?.progress ?? 0) > 0
+      && (i.system?.quantity ?? 1) > 0
+    );
+    const wisdom = Math.max(0, Math.round(actor.system?.abilities?.wisdom?.mod ?? 0));
+    const mana = Math.round(actor.system?.mana?.value ?? 0);
+
+    const gemRows = gems.map(g => {
+      const qty = g.system.quantity ?? 1;
+      return `<div class="form-group"><label>${g.name} [progress ${g.system.progress ?? 0}, ${qty} held]</label>`
+        + `<input type="number" class="coven-gem" data-gem-id="${g.id}" data-progress="${g.system.progress ?? 0}"`
+        + ` value="0" min="0" max="${Math.min(qty, maxMaterials)}" step="1" /></div>`;
+    }).join('') || '<p><em>No progress-bearing gems — this hand contributes wisdom and mana only.</em></p>';
+
+    const result = await foundry.applications.api.DialogV2.wait({
+      window: { title: `${actor.name} — Contribution to ${ritualSkill.name}` },
+      content: `<form>
+        <p><strong>${actor.name}</strong> (wisdom mod ${wisdom}, mana ${mana})</p>
+        <p class="hint">Their solo contribution. Group power is the MEAN of every participant's —
+        a weaker hand speeds the work but dilutes it.</p>
+        <hr>${gemRows}
+        <div class="form-group"><label>Mana to invest (0 – ${mana})</label>
+          <input type="number" class="coven-mana" value="${Math.min(mana, minMana)}" min="0" max="${mana}" step="1" /></div>
+        <p class="hint">Contribution: <strong class="coven-preview">—</strong></p>
+      </form>`,
+      render: (event, dialog) => {
+        const root = dialog?.element ?? dialog;
+        const form = root?.querySelector('form');
+        const preview = form?.querySelector('.coven-preview');
+        if (!form || !preview) return;
+        const recompute = () => {
+          let matTotal = 0, units = 0;
+          for (const inp of form.querySelectorAll('.coven-gem')) {
+            const n = Math.max(0, Number(inp.value) || 0);
+            units += n;
+            matTotal += n * (Number(inp.dataset.progress) || 0);
+          }
+          const m = Math.max(0, Number(form.querySelector('.coven-mana')?.value) || 0);
+          const p = Math.round(weights.wisdom * wisdom + weights.material * matTotal + weights.mana * m);
+          preview.textContent = `${p}  (wis ${wisdom}, materials ${matTotal} from ${units} unit${units === 1 ? '' : 's'}, mana ${m})`;
+        };
+        form.addEventListener('input', recompute);
+        recompute();
+      },
+      buttons: [
+        { action: 'join', label: 'Commit', icon: 'fas fa-hands-holding-circle', default: true,
+          callback: (event, button, dialog) => {
+            const form = dialog?.element?.querySelector('form') ?? button.form;
+            const tally = new Map();
+            let materialProgress = 0;
+            for (const inp of form.querySelectorAll('.coven-gem')) {
+              const n = Math.max(0, Number(inp.value) || 0);
+              if (n <= 0) continue;
+              tally.set(inp.dataset.gemId, n);
+              materialProgress += n * (Number(inp.dataset.progress) || 0);
+            }
+            const manaIn = Math.min(mana, Math.max(0, Number(form.querySelector('.coven-mana')?.value) || 0));
+            return { materialProgress, mana: manaIn, gemTally: tally };
+          } },
+        { action: 'skip', label: 'Withdraw' },
+      ],
+      close: () => 'skip',
+    });
+    if (!result || result === 'skip') return null;
+
+    // Committed units must not exceed the ritual's per-rarity material cap.
+    const units = [...result.gemTally.values()].reduce((t, n) => t + n, 0);
+    if (units > maxMaterials) {
+      ui.notifications?.warn(`${actor.name} committed ${units} materials; the cap is ${maxMaterials}.`);
+      return null;
+    }
+    return {
+      actor, wisdom, materialProgress: result.materialProgress, mana: result.mana,
+      gemTally: result.gemTally,
+      progress: Math.round(weights.wisdom * wisdom + weights.material * result.materialProgress + weights.mana * result.mana),
+    };
+  }
+
   async _handleInscribeTag(item, rollData, dmgRoll, speaker, rollMode, label) {
     const actor = this.actor;
     if (!actor) return;
@@ -414,12 +524,56 @@ class CraftingSkills {
     const currentMana = Math.round(actor.system?.mana?.value ?? 0);
     const initialMana = Math.max(minMana, Math.min(currentMana, minMana || 1));
 
+    // ── Step 2.75: COVEN (group rituals, ruled 2026-06-13) ──
+    // Offered here because eligibility depends on the chosen ritual and the
+    // material cap governs each hand's commitment. Grouping never raises
+    // power — stored power is the MEAN of every participant's solo
+    // contribution — it buys TIME, since prep divides by the number of hands.
+    const contributions = [];
+    const eligible = this._eligibleCoParticipants(actor, ritualSkill);
+    if (eligible.length > 0) {
+      const inviteButtons = eligible.map(a => ({
+        action: a.id,
+        label: `${a.name} (wis ${Math.round(a.system?.abilities?.wisdom?.mod ?? 0)})`,
+      }));
+      inviteButtons.push({ action: 'solo', label: 'Work alone', default: true });
+      const invited = new Set();
+      // Loop so several hands can join; each pick opens that actor's own
+      // contribution form.
+      while (true) {
+        const remaining = inviteButtons.filter(b => b.action === 'solo' || !invited.has(b.action));
+        if (remaining.length <= 1) break;
+        const pick = await foundry.applications.api.DialogV2.wait({
+          window: { title: `${ritualSkill.name} — Coven (${1 + contributions.length} hand${contributions.length ? 's' : ''})` },
+          content: `<p>Add another ritualist to this working?</p>`
+            + `<p class="hint">Power becomes the MEAN of every contribution — a peer keeps it and halves the`
+            + ` prep, a weaker hand is faster but dilutes. Each participant spends their own materials and mana.</p>`,
+          buttons: remaining,
+          close: () => 'solo',
+        });
+        if (pick === 'solo') break;
+        const joiner = eligible.find(a => a.id === pick);
+        if (!joiner) break;
+        invited.add(pick);
+        const contribution = await this._collectCovenContribution(joiner, ritualSkill,
+          { weights, maxMaterials, minMana });
+        if (contribution) contributions.push(contribution);
+      }
+    }
+    const handCount = 1 + contributions.length;
+
     // Material-floor gate — clean failure, NOTHING consumed. Per the
     // 2026-05-27 rescale, high-tier rituals require an appropriately
     // high-progress material; wisdom + mana alone can't substitute.
-    if (materialProgress < materialFloor) {
+    // In a coven everything averages, so the floor is checked against the MEAN
+    // material progress: bringing an empty-handed friend can drop the working
+    // below the floor, which is the dilution rule doing its job.
+    const meanMaterial = Math.round(
+      (materialProgress + contributions.reduce((t, c) => t + c.materialProgress, 0)) / handCount);
+    if (meanMaterial < materialFloor) {
+      const covenNote = handCount > 1 ? ` (mean of ${handCount} hands: ${meanMaterial})` : '';
       ChatMessage.create({ speaker, rollMode,
-        content: `<p><em>${actor.name} cannot inscribe <strong>${ritualSkill.name}</strong> [${grade}-${rarity}]: ${materialLabel} falls below the required material floor of ${materialFloor}. Nothing consumed.</em></p>` });
+        content: `<p><em>${actor.name} cannot inscribe <strong>${ritualSkill.name}</strong> [${grade}-${rarity}]: ${materialLabel}${covenNote} falls below the required material floor of ${materialFloor}. Nothing consumed.</em></p>` });
       return;
     }
 
@@ -504,7 +658,13 @@ class CraftingSkills {
     }
 
     const manaInvested = setupResult.mana;
-    const progress = Math.round(weights.wisdom * wisdomMod + weights.material * materialProgress + weights.mana * manaInvested);
+    const soloProgress = Math.round(weights.wisdom * wisdomMod + weights.material * materialProgress + weights.mana * manaInvested);
+    // Group power = MEAN of each hand's solo contribution (ruled: grouping
+    // never increases power, so a coven can never exceed its best member and
+    // parity needs no rule — the average punishes mismatch by itself).
+    const progress = handCount > 1
+      ? Math.round((soloProgress + contributions.reduce((t, c) => t + c.progress, 0)) / handCount)
+      : soloProgress;
 
     // Re-fetch every chosen stack and confirm it still holds the UNITS we took
     // (dialogs were open; quantities may have shifted).
@@ -538,6 +698,48 @@ class CraftingSkills {
       await actor.update({ 'system.mana.value': Math.max(0, manaNow - manaInvested) });
     }
 
+    // Every co-participant spends their OWN materials and mana — a coven is
+    // shared cost, not a free ride on the lead's supplies.
+    for (const c of contributions) {
+      for (const [id, n] of c.gemTally.entries()) {
+        const live = c.actor.items.get(id);
+        if (!live) continue;
+        const q = live.system.quantity ?? 1;
+        if (q <= n) await live.delete();
+        else await live.update({ 'system.quantity': q - n });
+      }
+      if (c.mana > 0) {
+        const manaNow = Math.round(c.actor.system?.mana?.value ?? 0);
+        await c.actor.update({ 'system.mana.value': Math.max(0, manaNow - c.mana) });
+      }
+    }
+
+    // ── Prep time (the whole reason covens exist) ──
+    // Base prep is an activity cost; more material units extend it, more hands
+    // divide it. Spends world time, so downtime is a real resource rather than
+    // a hand-wave — which is what group rituals trade against.
+    const prepCfg = sc.ritualPrep ?? {};
+    const totalUnits = chosenGems.length
+      + contributions.reduce((t, c) => t + [...c.gemTally.values()].reduce((s, n) => s + n, 0), 0);
+    const materialFactor = 1 + Math.max(0, totalUnits - 1) * (prepCfg.extraMaterialTimeFactor ?? 0.5);
+    const { ActivityHelpers } = await import('./activities.mjs');
+    const prep = ActivityHelpers.computeActivityTime(actor, prepCfg.activityKey ?? 'ritualPrep', {
+      skill: ritualSkill,
+      multiplier: materialFactor / handCount,
+    });
+    if (prep) await ActivityHelpers.advanceWorldTime(prep.seconds);
+    const prepLine = prep
+      ? `<p>Preparation took <strong>${prep.display}</strong>`
+        + (handCount > 1 ? ` — ${handCount} hands, ${totalUnits} material unit${totalUnits === 1 ? '' : 's'}` : '')
+        + `.</p>`
+      : '';
+    // Show every hand's solo number so dilution is visible, not mysterious.
+    const covenLine = handCount > 1
+      ? `<p class="hint">Coven — power is the mean of: ${actor.name} ${soloProgress}`
+        + contributions.map(c => `, ${c.actor.name} ${c.progress}`).join('')
+        + ` → <strong>${progress}</strong>.</p>`
+      : '';
+
     // ── Branch on success/failure ──
     if (progress < threshold) {
       ChatMessage.create({ speaker, rollMode,
@@ -547,6 +749,7 @@ class CraftingSkills {
           <p><strong>${actor.name}</strong> attempts to inscribe <strong>${ritualSkill.name}</strong> [${grade}-${rarity}] into <strong>${liveSrc.name}</strong>, but the progress falls short.</p>
           <p>Progress: <strong style="color:#ef5350;">${progress}</strong> / threshold ${threshold} (cap ${cap})</p>
           <p class="hint">Inputs — wis ${wisdomMod}, material ${materialProgress}, mana ${manaInvested} → consumed.</p>
+          ${covenLine}${prepLine}
         </div>` });
       return;
     }
@@ -588,6 +791,7 @@ class CraftingSkills {
         <p>Progress: <strong style="color:#4caf50;">${progress}</strong> / threshold ${threshold} ${progress > cap ? `(capped at ${cap})` : ''}</p>
         <p>Result: <strong>${inscribed.name}</strong> — stored power <strong>${storedPower}</strong>, ${charges} charge${charges === 1 ? '' : 's'}.</p>
         <p class="hint">Inputs — wis ${wisdomMod}, material ${materialProgress}, mana ${manaInvested}.</p>
+        ${covenLine}${prepLine}
       </div>` });
   }
 
