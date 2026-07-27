@@ -13,7 +13,8 @@ import {
   spellInvestDamage, strikeInvestDamage, infusionDamage, investSelfDamage,
   effectiveDodgeValue, splitEvenlyWithRemainder, perceiveGateDecision, activityTicks, nextCompletionDelta,
 } from '../module/helpers/formulas.mjs';
-import { moonState, eclipseState } from '../module/systems/calendar.mjs';
+import { moonState, moonNodeAngle, nextSyzygy, eclipseAtSyzygy, planetStates,
+         meteorShowersOn, cometStates, julianDay } from '../module/systems/calendar.mjs';
 
 const CFG = {
   meleeBlend: { strFloor: 0.30, slope: 0.70, weightOffset: 40, weightSpan: 180 },
@@ -120,43 +121,106 @@ eq('activity hybrid takes stat', activityTicks(1000, 10, { taskClass: 'hybrid', 
 eq('activity quality floor binds', activityTicks(1, 5000, { qualityMult: 25, clockFloorTicks: 42000, scale: 10000 }), 42000);
 eq('activity never zero', activityTicks(0, 5000, { scale: 10000 }), 1);
 
-// Celestial math. Golden values are REAL astronomy (synodic month
-// 29.530588853d, draconic 27.212220817d), not house numbers â€” the config
-// carries the true constants so phases drift against the calendar exactly as
-// they do on Earth. Phase names must stay byte-identical to the eight lunar
-// rituals authored in world.skills, or the sky cannot reach the content.
+// Celestial math — ATTACHED TO REALITY. World time 0 is J2000.0 (JD
+// 2451545.0), so these assert against ACTUAL RECORDED EVENTS: real eclipses,
+// real retrogrades, real moon phases. Constants and their sources are named in
+// config.mjs; the mean-element rates cross-check against the month lengths they
+// imply (445267.1114034 deg/cy -> 29.5306d synodic, 483202.0175233 -> 27.2122d
+// draconic), which catches a mistyped digit.
 const CEL = {
+  julianDayAtWorldZero: 2451545.0,
+  moonElongation: { atEpoch: 297.8501921, degPerCentury: 445267.1114034 },
+  moonArgLatitude: { atEpoch: 93.2720950, degPerCentury: 483202.0175233 },
   lunarCycleDays: 29.530588853, draconicMonthDays: 27.212220817,
-  lunarEpochDays: 0, nodeEpochDays: 0, eclipseNodeToleranceDays: 1.5,
+  eclipseLimits: { solarPartial: 18.4, solarTotal: 11.8, lunarPartial: 12.2, lunarTotal: 5.9 },
   phases: ['New Moon', 'Waxing Crescent', 'First Quarter', 'Waxing Gibbous',
     'Full Moon', 'Waning Gibbous', 'Last Quarter', 'Waning Crescent'],
+  quarterDays: {
+    'Spring Equinox': { month: 3, day: 20 }, 'Summer Solstice': { month: 6, day: 21 },
+    'Autumn Equinox': { month: 9, day: 22 }, 'Winter Solstice': { month: 12, day: 21 },
+  },
+  meteorShowers: [
+    { name: 'Perseids', start: { month: 7, day: 17 }, peak: { month: 8, day: 12 }, end: { month: 8, day: 24 }, zhr: 100 },
+    { name: 'Quadrantids', start: { month: 12, day: 28 }, peak: { month: 1, day: 3 }, end: { month: 1, day: 12 }, zhr: 120 },
+  ],
+  planets: {
+    Mercury: { a: 0.38709893, e: 0.20563069, L: 252.25084, peri: 77.45645, node: 48.33167, inc: 7.00487 },
+    Venus:   { a: 0.72333199, e: 0.00677323, L: 181.97973, peri: 131.53298, node: 76.68069, inc: 3.39471 },
+    Earth:   { a: 1.00000011, e: 0.01671022, L: 100.46435, peri: 102.94719, node: -11.26064, inc: 0.00005 },
+    Mars:    { a: 1.52366231, e: 0.09341233, L: 355.45332, peri: 336.04084, node: 49.57854, inc: 1.85061 },
+    Jupiter: { a: 5.20336301, e: 0.04839266, L: 34.40438, peri: 14.75385, node: 100.55615, inc: 1.30530 },
+    Saturn:  { a: 9.53707032, e: 0.05415060, L: 49.94432, peri: 92.43194, node: 113.71504, inc: 2.48446 },
+  },
+  zodiac: ['Aries','Taurus','Gemini','Cancer','Leo','Virgo','Libra','Scorpio','Sagittarius','Capricorn','Aquarius','Pisces'],
+  comets: [{ name: '1P/Halley', periodYears: 74.7, perihelionJD: 2473682.5, note: '' }],
 };
-const atDay = (d) => moonState(d * 86400, CEL);
-// The four cardinal phases sit at 0, 1/4, 1/2, 3/4 of the synodic month.
-eq('moon new at 0', atDay(0).name, 'New Moon');
-eq('moon first quarter', atDay(29.530588853 * 0.25).name, 'First Quarter');
-eq('moon full at half', atDay(29.530588853 * 0.5).name, 'Full Moon');
-eq('moon last quarter', atDay(29.530588853 * 0.75).name, 'Last Quarter');
-// A full cycle returns to new â€” the anchor holds.
-eq('moon cycle wraps', atDay(29.530588853).name, 'New Moon');
-// Illumination: dark at new, lit at full, half at the quarters.
-eq('illum new', Math.round(atDay(0).illumination * 100), 0);
-eq('illum full', Math.round(atDay(29.530588853 * 0.5).illumination * 100), 100);
-eq('illum first quarter', Math.round(atDay(29.530588853 * 0.25).illumination * 100), 50);
-// Waxing before full, waning after.
-eq('waxing before full', atDay(7).waxing, true);
-eq('waning after full', atDay(22).waxing, false);
-// NEGATIVE times must not break the cycle (JS % keeps the dividend's sign).
-eq('moon handles negative time', atDay(-29.530588853).name, 'New Moon');
-eq('moon negative mid-cycle', atDay(-29.530588853 * 0.5).name, 'Full Moon');
-// Eclipses need syzygy AND a node. Day 0 is both by definition.
-eq('eclipse at epoch is solar', eclipseState(0, CEL).type, 'solar');
-eq('eclipse at epoch is total', eclipseState(0, CEL).total, true);
-// A full moon far from a node is NOT an eclipse â€” the whole point of nodes.
-const fullNoNode = 29.530588853 * 2.5;  // a full moon ~74d in
-eq('full moon away from node is not an eclipse', eclipseState(fullNoNode * 86400, CEL).type, null);
-// A quarter moon is never an eclipse however well-aligned the nodes.
-eq('quarter moon never eclipses', eclipseState(29.530588853 * 0.25 * 86400, CEL).type, null);
+// Real UTC instant -> world time, through the J2000 anchor.
+const at = (iso) => (Date.parse(iso) - Date.parse('2000-01-01T12:00:00Z')) / 1000;
+
+// The Julian Day anchor itself.
+eq('JD at world zero is J2000', julianDay(0, CEL), 2451545.0);
+eq('JD one day on', julianDay(86400, CEL), 2451546.0);
+
+// REAL new moon: 2000-01-06 18:14 UTC.
+eq('real new moon 2000-01-06', moonState(at('2000-01-06T18:14:00Z'), CEL).name, 'New Moon');
+// REAL full moon + total lunar eclipse: 2000-01-21 04:44 UTC.
+eq('real full moon 2000-01-21', moonState(at('2000-01-21T04:44:00Z'), CEL).name, 'Full Moon');
+// Illumination tracks the phase it reports.
+eq('new moon is dark', Math.round(moonState(at('2000-01-06T18:14:00Z'), CEL).illumination * 100) < 5, true);
+eq('full moon is lit', Math.round(moonState(at('2000-01-21T04:44:00Z'), CEL).illumination * 100) > 95, true);
+// Negative world times (dates before J2000) must not break the cycle.
+eq('phase valid before J2000', CEL.phases.includes(moonState(at('1999-08-11T11:03:00Z'), CEL).name), true);
+
+// REAL ECLIPSES. Syzygies are enumerated, so each is found once and tested
+// against the true ecliptic limits rather than a fudged day-window.
+const eclipseNear = (iso) => {
+  const syz = nextSyzygy(at(iso) - 3 * 86400, CEL);
+  return { ...eclipseAtSyzygy(syz.time, syz.kind, CEL), kind: syz.kind,
+           offDays: (syz.time - at(iso)) / 86400 };
+};
+// The total solar eclipse of 1999-08-11 (the one that crossed Europe).
+const e1999 = eclipseNear('1999-08-11T11:03:00Z');
+eq('1999-08-11 is a solar eclipse', e1999.type, 'solar');
+eq('1999-08-11 is total', e1999.magnitude, 'total');
+eq('1999-08-11 syzygy within a day', Math.abs(e1999.offDays) < 1, true);
+// The total lunar eclipse of 2000-01-21.
+const l2000 = eclipseNear('2000-01-21T04:44:00Z');
+eq('2000-01-21 is a lunar eclipse', l2000.type, 'lunar');
+eq('2000-01-21 is total', l2000.magnitude, 'total');
+// A syzygy far from a node is NOT an eclipse — the whole point of the limits.
+const quiet = nextSyzygy(at('2000-04-01T00:00:00Z'), CEL);
+eq('syzygy away from node is no eclipse', eclipseAtSyzygy(quiet.time, quiet.kind, CEL).type, null);
+// Eclipses stay rare and clustered. Syzygies alternate new/full every ~14.77d,
+// so 26 of them is ~1.05 years — the real world sees 4-7 eclipses in that span.
+// This is the assertion that would catch limits fudged to "feel right".
+let eclipseCount = 0, cur = at('2000-01-01T00:00:00Z');
+for (let i = 0; i < 26; i++) {
+  const s2 = nextSyzygy(cur, CEL);
+  if (eclipseAtSyzygy(s2.time, s2.kind, CEL).type) eclipseCount++;
+  cur = s2.time + 86400;
+}
+eq('eclipses per year in 4..7', eclipseCount >= 4 && eclipseCount <= 7, true);
+
+// REAL RETROGRADES, detected as apparent geocentric longitude decreasing.
+// Mars was retrograde 2020-09-09 to 2020-11-13.
+eq('Mars retrograde 2020-10-01', planetStates(at('2020-10-01T00:00:00Z'), CEL).Mars.retrograde, true);
+eq('Mars direct 2021-01-01', planetStates(at('2021-01-01T00:00:00Z'), CEL).Mars.retrograde, false);
+// Every planet lands in a real zodiac sign.
+const ps = planetStates(at('2020-10-01T00:00:00Z'), CEL);
+eq('planets carry zodiac signs', Object.values(ps).every(p => CEL.zodiac.includes(p.sign)), true);
+eq('degree within sign 0..30', Object.values(ps).every(p => p.degreeInSign >= 0 && p.degreeInSign < 30), true);
+
+// Meteor showers are calendar-fixed; the Perseids peak on Aug 12.
+eq('Perseids peak Aug 12', meteorShowersOn({ month: 8, dayOfMonth: 12 }, CEL)[0].peaking, true);
+eq('Perseids active Aug 1', meteorShowersOn({ month: 8, dayOfMonth: 1 }, CEL)[0].name, 'Perseids');
+eq('no showers in June', meteorShowersOn({ month: 6, dayOfMonth: 15 }, CEL).length, 0);
+// Quadrantids wrap the New Year — the window must survive the rollover.
+eq('Quadrantids active Dec 30', meteorShowersOn({ month: 12, dayOfMonth: 30 }, CEL).length, 1);
+eq('Quadrantids active Jan 3', meteorShowersOn({ month: 1, dayOfMonth: 3 }, CEL)[0].peaking, true);
+
+// Halley returns in 2061: from J2000 that is ~61 years out.
+const halley = cometStates(0, CEL)[0];
+eq('Halley returns in about 61 years', Math.round(halley.yearsToPerihelion), 61);
 
 // Downtime barrier: the clock advances to the SHORTEST outstanding action
 // (ruled 2026-07-26) so whoever finishes first can declare again â€” a six-hour

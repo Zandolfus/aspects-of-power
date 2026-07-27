@@ -573,24 +573,42 @@ ASPECTSOFPOWER.spellMaxInvestAboveBase = {
  * key between the sky and the content.
  */
 ASPECTSOFPOWER.celestial = {
-  // Synodic month: new moon to new moon. Real value, so phases drift against
-  // the calendar exactly as they do on Earth and never quite repeat.
+  // ── THE ANCHOR ──
+  // World time 0 IS a real instant: J2000.0 (2000-01-01 12:00 UTC, JD
+  // 2451545.0). Everything below is real ephemeris measured from it, so the
+  // moon phase on a world date is the TRUE phase for the corresponding real
+  // date. Move this one number to re-anchor the campaign in real time; the
+  // astronomy follows without a single coefficient changing.
+  julianDayAtWorldZero: 2451545.0,
+
+  // ── LUNAR (Meeus, Astronomical Algorithms ch.47 mean elements) ──
+  // Mean elongation D: 0 deg = new moon, 180 = full. Rate cross-checks against
+  // the synodic month: 36525 / (445267.1114034/360) = 29.5306 d.
+  moonElongation: { atEpoch: 297.8501921, degPerCentury: 445267.1114034 },
+  // Argument of latitude F: angular distance from the ASCENDING NODE. 0 or 180
+  // means the moon is on the ecliptic, which is the other half of an eclipse.
+  // Cross-checks against the draconic month: 36525 / (483202.0175233/360)
+  // = 27.2122 d. Its slight lag behind the sidereal month IS node regression
+  // (a full lap in 18.6 y), so eclipse seasons drift ~19 days earlier a year
+  // for free.
+  moonArgLatitude: { atEpoch: 93.2720950, degPerCentury: 483202.0175233 },
+  // Derived cycle lengths, kept for display and for the golden tests.
   lunarCycleDays: 29.530588853,
-  // Draconic month: node crossing to node crossing. Eclipses need the moon at
-  // a node AND at syzygy, which is why they are rare instead of monthly.
   draconicMonthDays: 27.212220817,
-  // World time 0 is defined as a new moon at a node — the cleanest anchor for
-  // a fictional world. Shift either to re-phase the sky without touching math.
-  lunarEpochDays: 0,
-  nodeEpochDays: 0,
-  // How close to a node a syzygy must fall for an eclipse. ~1.5 days gives
-  // roughly the real-world cadence of a few per year.
-  eclipseNodeToleranceDays: 1.5,
-  // The eight phases, in cycle order. Index 0 is new moon.
+
+  // ── ECLIPSE LIMITS (real ecliptic limits, in DEGREES from the node) ──
+  // An eclipse needs a syzygy AND proximity to a node. Testing DEGREES rather
+  // than a fudged day-tolerance is what makes the cadence come out right
+  // (~4-7 a year, clustered into seasons) instead of firing every fortnight.
+  eclipseLimits: { solarPartial: 18.4, solarTotal: 11.8, lunarPartial: 12.2, lunarTotal: 5.9 },
+
+  // The eight phases, in cycle order. MUST stay byte-identical to the eight
+  // lunar rituals authored in world.skills — that string is the join key.
   phases: [
     'New Moon', 'Waxing Crescent', 'First Quarter', 'Waxing Gibbous',
     'Full Moon', 'Waning Gibbous', 'Last Quarter', 'Waning Crescent',
   ],
+
   // Astronomical quarter days. Core's seasons are MONTH-banded (Spring =
   // months 3-5), which is fine for a label but wrong for a solstice ritual,
   // so the real dates live here.
@@ -600,6 +618,55 @@ ASPECTSOFPOWER.celestial = {
     'Autumn Equinox': { month: 9, day: 22 },
     'Winter Solstice': { month: 12, day: 21 },
   },
+
+  // ── METEOR SHOWERS (IMO calendar: activity window, peak, ZHR) ──
+  // Annual and calendar-fixed, so a table is the honest model — no orbital
+  // mechanics needed for the date, only for the parent comet.
+  meteorShowers: [
+    { name: 'Quadrantids',   start: { month: 12, day: 28 }, peak: { month: 1, day: 3 },   end: { month: 1, day: 12 },  zhr: 120, parent: null },
+    { name: 'Lyrids',        start: { month: 4, day: 14 },  peak: { month: 4, day: 22 },  end: { month: 4, day: 30 },  zhr: 18,  parent: null },
+    { name: 'Eta Aquariids', start: { month: 4, day: 19 },  peak: { month: 5, day: 5 },   end: { month: 5, day: 28 },  zhr: 50,  parent: '1P/Halley' },
+    { name: 'Delta Aquariids', start: { month: 7, day: 12 }, peak: { month: 7, day: 30 }, end: { month: 8, day: 23 },  zhr: 25,  parent: null },
+    { name: 'Perseids',      start: { month: 7, day: 17 },  peak: { month: 8, day: 12 },  end: { month: 8, day: 24 },  zhr: 100, parent: '109P/Swift-Tuttle' },
+    { name: 'Orionids',      start: { month: 10, day: 2 },  peak: { month: 10, day: 21 }, end: { month: 11, day: 7 },  zhr: 20,  parent: '1P/Halley' },
+    { name: 'Southern Taurids', start: { month: 9, day: 20 }, peak: { month: 11, day: 4 }, end: { month: 11, day: 20 }, zhr: 5,  parent: '2P/Encke' },
+    { name: 'Northern Taurids', start: { month: 10, day: 20 }, peak: { month: 11, day: 11 }, end: { month: 12, day: 10 }, zhr: 5, parent: '2P/Encke' },
+    { name: 'Leonids',       start: { month: 11, day: 6 },  peak: { month: 11, day: 16 }, end: { month: 11, day: 30 }, zhr: 15,  parent: '55P/Tempel-Tuttle' },
+    { name: 'Geminids',      start: { month: 12, day: 4 },  peak: { month: 12, day: 13 }, end: { month: 12, day: 17 }, zhr: 150, parent: null },
+    { name: 'Ursids',        start: { month: 12, day: 17 }, peak: { month: 12, day: 21 }, end: { month: 12, day: 26 }, zhr: 10,  parent: null },
+  ],
+
+  // ── PLANETS (JPL/DE200 mean elements at J2000, ecliptic of J2000) ──
+  // a in AU, angles in degrees. Sidereal period is DERIVED from a by Kepler's
+  // third law (P years = a^1.5) rather than listed, so the table cannot drift
+  // out of internal agreement with itself.
+  planets: {
+    Mercury: { a: 0.38709893, e: 0.20563069, L: 252.25084, peri: 77.45645,  node: 48.33167,  inc: 7.00487 },
+    Venus:   { a: 0.72333199, e: 0.00677323, L: 181.97973, peri: 131.53298, node: 76.68069,  inc: 3.39471 },
+    Earth:   { a: 1.00000011, e: 0.01671022, L: 100.46435, peri: 102.94719, node: -11.26064, inc: 0.00005 },
+    Mars:    { a: 1.52366231, e: 0.09341233, L: 355.45332, peri: 336.04084, node: 49.57854,  inc: 1.85061 },
+    Jupiter: { a: 5.20336301, e: 0.04839266, L: 34.40438,  peri: 14.75385,  node: 100.55615, inc: 1.30530 },
+    Saturn:  { a: 9.53707032, e: 0.05415060, L: 49.94432,  peri: 92.43194,  node: 113.71504, inc: 2.48446 },
+    Uranus:  { a: 19.19126393, e: 0.04716771, L: 313.23218, peri: 170.96424, node: 74.22988, inc: 0.76986 },
+    Neptune: { a: 30.06896348, e: 0.00858587, L: 304.88003, peri: 44.97135,  node: 131.72169, inc: 1.76917 },
+  },
+
+  // Tropical zodiac: twelve 30-degree segments of ecliptic longitude starting
+  // at the vernal equinox. This is what "Mars retrograde in Scorpio" reads off.
+  zodiac: [
+    'Aries', 'Taurus', 'Gemini', 'Cancer', 'Leo', 'Virgo',
+    'Libra', 'Scorpio', 'Sagittarius', 'Capricorn', 'Aquarius', 'Pisces',
+  ],
+
+  // ── COMETS (known perihelion passage + period) ──
+  // A returning comet is a generational event; these are the famous ones with
+  // well-determined returns. perihelionJD is a real Julian day.
+  comets: [
+    { name: '1P/Halley',          periodYears: 74.7,   perihelionJD: 2473682.5, note: 'next perihelion 2061; parent of the Eta Aquariids and Orionids' },
+    { name: '2P/Encke',           periodYears: 3.3,    perihelionJD: 2461406.5, note: 'shortest known period; parent of the Taurids' },
+    { name: '55P/Tempel-Tuttle',  periodYears: 33.318, perihelionJD: 2463014.5, note: 'next perihelion 2031-05-20; Leonid storms follow it' },
+    { name: '109P/Swift-Tuttle',  periodYears: 133.28, perihelionJD: 2497709.5, note: 'next perihelion 2126-07-12; parent of the Perseids' },
+  ],
 };
 
 /**
