@@ -131,6 +131,22 @@
               <span>{{system.defense.soul.pool}}/{{system.defense.soul.poolMax}}</span>
             </div>
           </div>
+          {{#if celerity}}
+          <div class="defense-row defense-tempo">
+            <div class="defense-item" data-tooltip="{{{tooltips.celerity}}}">
+              <label>Celerity</label>
+              <span>{{celerity.rating}}</span>
+            </div>
+            <div class="defense-item" data-tooltip="{{{tooltips.swing}}}">
+              <label>Swing</label>
+              <span>{{celerity.swing}}</span>
+            </div>
+            <div class="defense-item" data-tooltip="{{{tooltips.personalRound}}}">
+              <label>Round</label>
+              <span>{{celerity.round}}</span>
+            </div>
+          </div>
+          {{/if}}
         </div>
 
         <div class="identity-block">

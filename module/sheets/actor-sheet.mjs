@@ -3,7 +3,7 @@ import {
   prepareActiveEffectCategories,
 } from '../helpers/effects.mjs';
 import { EquipmentSystem } from '../systems/equipment.mjs';
-import { declareBreakFree } from '../systems/celerity.mjs';
+import { declareBreakFree, celerityRating, formatTicksAsTime, referenceRoundLength } from '../systems/celerity.mjs';
 import { LevelUpDialog } from '../apps/level-up-dialog.mjs';
 import { PlayerRelevelDialog } from '../apps/player-releveler-dialog.mjs';
 import { SpendFreePointsDialog } from '../apps/spend-fp-dialog.mjs';
@@ -164,8 +164,10 @@ export class AspectsofPowerActorSheet extends foundry.applications.api.Handlebar
     // Prepare debuff data for dedicated display.
     context.debuffs = this._prepareDebuffs();
 
-    // Build tooltip strings for defense stats.
+    // Build tooltip strings for defense stats. Also derives the Celerity
+    // display block (rate, swing, personal round) onto `this._celerity`.
     context.tooltips = this._prepareTooltips(context.system);
+    context.celerity = this._celerity ?? null;
 
     // Actor-level tags (design-power-sense): direct grants editable by the GM.
     // Chips show registry label + category color; the add input offers every
@@ -1052,6 +1054,42 @@ export class AspectsofPowerActorSheet extends foundry.applications.api.Handlebar
     tips.soul = `<strong>Soul Defense ${def.soul?.value ?? 0}</strong><hr>`
               + `Base: (Wis ${wisMod} + Wil ${wilMod} × 0.3) × 1.1 = ${soulBase}`
               + `<br>Pool: ${def.soul?.pool ?? 0} / ${def.soul?.poolMax ?? 0}`;
+
+    // ── Celerity (design-celerity-realtime.md) ──
+    // Published rate stat: action-points per second, a sword swing costs
+    // BASELINE_WEIGHT. Build mod uses the same max-combat-mod proxy as
+    // actorRoundLength so the sheet and the tracker never disagree.
+    const sc = CONFIG.ASPECTSOFPOWER.celerity ?? {};
+    const dt = CONFIG.ASPECTSOFPOWER.defenseTuning ?? {};
+    const buildMod = Math.max(1, strMod, dexMod, intMod, wisMod, perMod);
+    const rating = Math.round(celerityRating(buildMod));
+    const swingTicks = Math.round((sc.BASELINE_WEIGHT ?? 100) * (sc.SCALE ?? 10000) / buildMod);
+    const roundTicks = Math.round((sc.ROUND_K ?? 3000000) / buildMod);
+    // Reaction envelope is measured on the build-neutral REFERENCE curve —
+    // the perceive gate is a level question, not a build question.
+    const rl = system.attributes?.race?.level ?? 1;
+    const refMod = (sc.ROUND_K ?? 3000000) / Math.max(1, referenceRoundLength(rl));
+    const refRating = Math.round(celerityRating(refMod));
+    const R = dt.perceiveGateRatio ?? 0;
+    this._celerity = {
+      rating,
+      swing: formatTicksAsTime(swingTicks),
+      round: formatTicksAsTime(roundTicks),
+      envelope: R > 0 ? Math.round(refRating * R) : 0,
+    };
+    tips.celerity = `<strong>Celerity ${rating} pts/s</strong><hr>`
+      + `Action points per second. A sword swing costs ${sc.BASELINE_WEIGHT ?? 100} points.`
+      + `<br>From your best combat mod (${buildMod}) — it grows as you level.`;
+    tips.swing = `<strong>Sword swing ${this._celerity.swing}</strong><hr>`
+      + `World time for one baseline-weight action (${swingTicks} ticks).`
+      + `<br>Heavier weapons and higher spell tiers cost proportionally more.`;
+    tips.personalRound = `<strong>Personal round ${this._celerity.round}</strong><hr>`
+      + `Your own round length (${roundTicks} ticks) — roughly three sword swings.`
+      + (R > 0
+        ? `<hr>Reaction envelope: you can dodge, parry, or react to attackers up to `
+          + `<strong>${this._celerity.envelope} pts/s</strong> (${R}x your level reference of ${refRating}). `
+          + `Anything faster lands as a blur.`
+        : '');
 
     // Ability mod tooltips.
     tips.abilities = {};
