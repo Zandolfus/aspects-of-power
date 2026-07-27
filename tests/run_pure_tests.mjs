@@ -12,6 +12,7 @@ import {
   houseHitFormula, hybridAbilityMod, weaponStatBlend, spellDamageRef,
   spellInvestDamage, strikeInvestDamage, infusionDamage, investSelfDamage,
   effectiveDodgeValue, splitEvenlyWithRemainder, perceiveGateDecision, activityTicks, nextCompletionDelta,
+  proficiencyMultiplier,
 } from '../module/helpers/formulas.mjs';
 import { moonState, moonNodeAngle, nextSyzygy, eclipseAtSyzygy, planetStates,
          meteorShowersOn, cometStates, julianDay, civilDate, worldTimeForDate } from '../module/systems/calendar.mjs';
@@ -264,6 +265,30 @@ eq('split 10/3', splitEvenlyWithRemainder(10, ['a', 'b', 'c']), { a: 3, b: 3, c:
 eq('split exact', splitEvenlyWithRemainder(9, ['a', 'b', 'c']), { a: 3, b: 3, c: 3 });
 eq('split single', splitEvenlyWithRemainder(7, ['x']), { x: 7 });
 eq('split empty', splitEvenlyWithRemainder(7, []), {});
+
+// ── Weapon proficiency -> damage (design-weapon-proficiencies.md,
+// RULED 2026-07-27). Anchored at `common` so trained is neutral. GOLDEN
+// values are the live CONFIG.skillRarities mults divided by common's 0.6.
+const RAR = {
+  not_proficient: { mult: 0.2 }, neglected: { mult: 0.3 }, rusty: { mult: 0.4 },
+  inferior: { mult: 0.5 }, common: { mult: 0.6 }, uncommon: { mult: 0.7 },
+  rare: { mult: 0.8 }, epic: { mult: 0.9 }, legendary: { mult: 1.0 },
+  mythic: { mult: 1.1 }, divine: { mult: 1.2 },
+};
+const pm = (r) => +proficiencyMultiplier(r, RAR, 'common').toFixed(4);
+eq('prof common is neutral', pm('common'), 1);
+eq('prof not_proficient', pm('not_proficient'), 0.3333);
+eq('prof rusty', pm('rusty'), 0.6667);
+eq('prof legendary', pm('legendary'), 1.6667);
+eq('prof divine doubles', pm('divine'), 2);
+// ABSENCE IS NEUTRAL - the rule that keeps ~110 natural-weapon NPCs and every
+// currently-unproficient PC from being silently nerfed the day this ships.
+eq('no proficiency owned is neutral', pm(null), 1);
+eq('unknown rarity is neutral', pm('bogus_tier'), 1);
+// It compounds with the skill's own rarity rather than replacing it: a divine
+// skill wielded with divine proficiency reaches 2.4x, double today's ceiling.
+eq('compounds with skill rarity', +(RAR.divine.mult * pm('divine')).toFixed(3), 2.4);
+eq('unproficient divine skill', +(RAR.divine.mult * pm('not_proficient')).toFixed(3), 0.4);
 
 if (failures) { console.error(`\n${failures} FAILURES`); process.exit(1); }
 console.log('\nAll pure-function tests pass.');

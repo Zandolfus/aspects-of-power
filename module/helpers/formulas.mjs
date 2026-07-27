@@ -239,3 +239,36 @@ export function splitEvenlyWithRemainder(total, keys) {
   }
   return out;
 }
+
+/**
+ * Weapon-proficiency damage multiplier (design-weapon-proficiencies.md,
+ * RULED 2026-07-27: "attach damage of attacks using weapons to weapon
+ * proficiency").
+ *
+ * The proficiency passive's own RARITY is the mastery ladder — the rarity
+ * table already opens with not_proficient / neglected / rusty, which is
+ * precisely this progression. Anchoring at `common` makes "trained" neutral,
+ * so the ladder reads the way its names promise:
+ *
+ *   not_proficient 0.33x · rusty 0.67x · common 1.00x · legendary 1.67x · divine 2.00x
+ *
+ * `rarity` null/unknown means the actor owns NO proficiency for the weapon in
+ * hand, which returns 1 — absence is neutral, never a penalty. That rule is
+ * load-bearing: ~110 NPCs swing untyped natural weapons and no PC owned a
+ * proficiency when this shipped, so penalising absence would have silently
+ * nerfed the whole world in one commit.
+ *
+ * @param {string|null} rarity  The proficiency passive's rarity, or null if none.
+ * @param {object} [rarities]   skillRarities override (defaults to CONFIG).
+ * @param {string} [anchor]     Rarity treated as neutral.
+ * @returns {number}
+ */
+export function proficiencyMultiplier(rarity, rarities = null, anchor = null) {
+  const C = globalThis.CONFIG?.ASPECTSOFPOWER ?? {};
+  const table = rarities ?? C.skillRarities ?? {};
+  const key = anchor ?? C.weaponProficiency?.anchor ?? 'common';
+  const anchorMult = table[key]?.mult;
+  const ownMult = rarity ? table[rarity]?.mult : null;
+  if (!anchorMult || !ownMult) return 1;
+  return ownMult / anchorMult;
+}

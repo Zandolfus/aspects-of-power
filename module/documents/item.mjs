@@ -7,6 +7,7 @@ import { selectTargetOnCanvas, skillNeedsTargetPrompt, skillTargetsAtFire, selec
 import { regionTokenOverlap, segmentIntersect } from '../helpers/geometry.mjs';
 import { CraftingSkillsMixin } from '../systems/crafting-skills.mjs';
 import { executeGmAction as executeGmActionImpl } from '../systems/gm-actions.mjs';
+import { proficiencyDamageMult } from '../systems/weapon-styles.mjs';
 
 /**
  * Check if an actor is an assigned player character (not just owned).
@@ -209,12 +210,35 @@ export class AspectsofPowerItem extends Item {
     if (skillTags.includes('debuff') && skillTags.includes('attack') && !altIds.has('debuff')) {
       dmgFactor *= 1 + (sc.alterationTags?.debuff?.dmgMod ?? 0);
     }
+    // WEAPON PROFICIENCY (ruled 2026-07-27) — mastery of the weapon TYPE in
+    // hand scales the damage of attacks made with it, anchored so `common`
+    // (trained) is neutral. Folded in here rather than at the formula builder
+    // because this one method feeds both the plain roll path and the two
+    // invest paths; attaching it anywhere else would leave invest unscaled.
+    // Absence is NEUTRAL, never a penalty — see systems/weapon-styles.mjs.
+    const profMult = this._proficiencyDamageMult();
+
     return {
       rarityMult,
-      effectiveMult:             Math.max(0, rarityMult * dmgFactor),
+      profMult,
+      effectiveMult:             Math.max(0, rarityMult * dmgFactor * profMult),
       costMultiplier:            1 + costMod,
       effectiveWeightMultiplier: 1 + weightMod,
     };
+  }
+
+  /**
+   * Proficiency damage multiplier for THIS skill, or 1 when it does not apply.
+   * Only weapon-flavoured roll types are proficiency-scaled (spells are not),
+   * and only when the skill actually deals attack damage.
+   * @returns {number}
+   */
+  _proficiencyDamageMult() {
+    const cfg = CONFIG.ASPECTSOFPOWER?.weaponProficiency ?? {};
+    if (cfg.enabled === false || !this.actor) return 1;
+    const rollTypes = cfg.rollTypes ?? [];
+    if (!rollTypes.includes(this.system?.roll?.type)) return 1;
+    return proficiencyDamageMult(this.actor) || 1;
   }
 
   /**
@@ -4070,13 +4094,14 @@ export class AspectsofPowerItem extends Item {
    * @private
    */
   async roll(options = {}) {
-    // Style / weapon-type gate (design-weapon-proficiencies.md). A skill that
-    // names a required arrangement or weapon is unusable without it — the same
-    // shape as the existing requires_armor_pierce family. Checked before any
-    // cost is paid so a refused skill never charges the actor.
+    // Combination / weapon-type / STYLE gate (design-weapon-proficiencies.md).
+    // A skill that names a required arrangement, weapon, or governing style is
+    // unusable without it — the same shape as the existing
+    // requires_armor_pierce family. Checked before any cost is paid so a
+    // refused skill never charges the actor.
     if (this.type === 'skill' && this.actor) {
       const tc = this.system?.tagConfig ?? {};
-      if (tc.requiresStyle || tc.requiresWeaponTag) {
+      if (tc.requiresStyle || tc.requiresWeaponTag || tc.styleSkill) {
         const { canUseSkill } = await import('../systems/weapon-styles.mjs');
         const verdict = canUseSkill(this.actor, this);
         if (!verdict.allowed) {

@@ -560,25 +560,93 @@ ASPECTSOFPOWER.spellMaxInvestAboveBase = {
  * mod if RL falls outside the table.
  */
 /**
- * Weapon STYLES (design-weapon-proficiencies.md; broken out as a first-class
- * axis 2026-07-26). A style is how your hands are ARRANGED, as opposed to the
- * weapon TYPE in them:
- *   TYPE  -> proficiency passives with riders (`tagConfig.profFor`)
- *   STYLE -> unlocks skills (`tagConfig.requiresStyle`)
- * Detected live from equipped gear by systems/weapon-styles.mjs — never
- * stored, so swapping weapons changes what you can do immediately.
+ * Weapon COMBINATIONS — what is actually in your hands, detected live from
+ * equipped gear by systems/weapon-styles.mjs. Never stored, so swapping
+ * weapons changes what you can do immediately with nothing to keep in sync.
  *
- * `inPlay` records the live footprint when this was authored, so later scope
- * decisions start from evidence rather than assumption.
+ * THREE AXES (ruled 2026-07-27; supersedes the two-axis model of `1dc3a67`,
+ * where "style" meant the arrangement):
+ *
+ *   TYPE        — the weapon itself (greatsword, dagger, bow...). Proficiency
+ *                 passives declare `tagConfig.profFor` and SCALE THE DAMAGE of
+ *                 attacks made with that type (see `weaponProficiency` below).
+ *   COMBINATION — how the hands are arranged. Detected, never owned.
+ *                 `tagConfig.requiresStyle` names one of these keys.
+ *   STYLE       — a Passive skill you OWN that governs a set of attacks, the
+ *                 way a Ritualism passive governs a body of rituals. The style
+ *                 is the key; the combination is the lock. Attacks name their
+ *                 governor in `tagConfig.styleSkill`.
+ *
+ * Combinations are TYPE-AWARE where the type is the whole point: a greatsword
+ * and a greataxe are both two-handed, but they are not the same fighting
+ * discipline, so each gets its own key and a generic `two-handed` is kept for
+ * skills that genuinely only care about handedness.
+ *
+ * `inPlay` is the live PC footprint measured 2026-07-27 — evidence for scope
+ * decisions, not a guess. Note the generic melee counts EXCLUDE archers now;
+ * the earlier `two-handed: 9` wrongly swept in bows, crossbows and staves.
  */
-ASPECTSOFPOWER.weaponStyles = {
-  'two-handed':          { label: 'Two-Handed',          inPlay: 9 },
-  'single-weapon':       { label: 'Single Weapon',       inPlay: 19 },
-  'sword-and-board':     { label: 'Sword and Board',     inPlay: 2 },
-  'blade-and-implement': { label: 'Blade and Implement', inPlay: 1 },
-  'dual-wield':          { label: 'Dual Wield',          inPlay: 0 },
-  'implement-only':      { label: 'Implement Only',      inPlay: null },
-  unarmed:               { label: 'Unarmed',             inPlay: null },
+ASPECTSOFPOWER.weaponCombinations = {
+  // Two-handed melee, discipline-specific.
+  '2h-greatsword':       { label: 'Two-Handed Greatsword', hands: 2, kind: 'melee', types: ['greatsword'], inPlay: 1 },
+  '2h-greataxe':         { label: 'Two-Handed Greataxe',   hands: 2, kind: 'melee', types: ['greataxe'],   inPlay: 1 },
+  '2h-polearm':          { label: 'Two-Handed Polearm',    hands: 2, kind: 'melee', types: ['polearm', 'spear', 'quarterstaff'], inPlay: 0 },
+  'two-handed':          { label: 'Two-Handed',            hands: 2, kind: 'melee', generic: true, inPlay: 1 },
+
+  // Paired weapons, discipline-specific.
+  'dual-dagger':         { label: 'Dual Daggers',   hands: 2, kind: 'melee', types: ['dagger'],   inPlay: 0 },
+  'dual-sword':          { label: 'Dual Blades',    hands: 2, kind: 'melee', types: ['sword', 'rapier'], inPlay: 0 },
+  'dual-gauntlet':       { label: 'Dual Gauntlets', hands: 2, kind: 'melee', types: ['gauntlet'], inPlay: 0 },
+  'dual-shield':         { label: 'Dual Shields',   hands: 2, kind: 'melee', types: ['shield', 'greatshield', 'buckler'], inPlay: 0 },
+  'dual-wield':          { label: 'Dual Wield',     hands: 2, kind: 'melee', generic: true, inPlay: 0 },
+
+  // Mixed hands.
+  'sword-and-board':     { label: 'Sword and Board',     hands: 2, kind: 'melee', inPlay: 2 },
+  'blade-and-implement': { label: 'Blade and Implement', hands: 2, kind: 'melee', inPlay: 1 },
+
+  // Single hand / nothing.
+  'single-weapon':       { label: 'Single Weapon', hands: 1, kind: 'melee', inPlay: 2 },
+  unarmed:               { label: 'Unarmed',       hands: 0, kind: 'melee', inPlay: 0 },
+
+  // RANGED — its own axis. Bows and firearms are two-handed in the literal
+  // sense but share nothing with a greatsword discipline; before 2026-07-27
+  // they fell into the melee buckets and inflated every count there.
+  archery:               { label: 'Archery',  hands: 2, kind: 'ranged', types: ['bow', 'shortbow', 'longbow', 'crossbow'], inPlay: 2 },
+  marksman:              { label: 'Marksman', hands: 2, kind: 'ranged', types: ['pistol', 'rifle', 'shotgun'], inPlay: 0 },
+
+  // Casters.
+  'implement-only':      { label: 'Implement Only', hands: 1, kind: 'implement', types: ['wand', 'staff', 'orb', 'tome'], inPlay: 11 },
+};
+
+/** Back-compat alias: `requiresStyle` values resolve against the same table. */
+ASPECTSOFPOWER.weaponStyles = ASPECTSOFPOWER.weaponCombinations;
+
+/**
+ * Weapon PROFICIENCY -> damage (ruled 2026-07-27: "attach damage of attacks
+ * using weapons to weapon proficiency").
+ *
+ * The proficiency passive's own RARITY is the mastery ladder — the rarity
+ * table already opens with not_proficient / neglected / rusty, which is
+ * exactly this. Its multiplier is ANCHORED at common so that `trained` is
+ * neutral and the ladder reads as intended:
+ *
+ *   profDamageMult = skillRarities[prof.rarity].mult / skillRarities[anchor].mult
+ *
+ *   not_proficient 0.33x · rusty 0.67x · common 1.00x · legendary 1.67x · divine 2.00x
+ *
+ * ABSENCE IS NEUTRAL, never a penalty. An actor with no proficiency passive
+ * for the weapon in hand multiplies by 1.0. This is load-bearing: ~110 NPCs
+ * swing natural weapons and every current PC owns zero proficiencies, so a
+ * penalty-on-absence rule would silently nerf the entire world the moment it
+ * shipped. The sub-common tiers only bite when someone actually OWNS a rusty
+ * or not_proficient passive — a deliberate authored statement ("out of
+ * practice"), which is also the only way the flavour makes sense.
+ */
+ASPECTSOFPOWER.weaponProficiency = {
+  enabled: true,
+  anchor: 'common',
+  // Applies to weapon-flavoured roll types only; spells are not proficiency-scaled.
+  rollTypes: ['str_weapon', 'dex_weapon', 'phys_melee', 'phys_ranged', 'weapon'],
 };
 
 /**
@@ -821,6 +889,18 @@ ASPECTSOFPOWER.weaponWeights = {
   polearm:   180,
   greatsword: 200,
   greataxe:  220,
+  // Defensive weapons. Shields were craftable (buckler/shield/greatshield are
+  // all in craftItemTypes) but had NO weight, so they resolved to no weapon
+  // type at all — Phil's greatshield read as untyped and could not be part of
+  // any combination. Weights sit against their striking analogues: a buckler
+  // punches about like a fist, a shield bash like an axe, a greatshield like a
+  // polearm you shove rather than swing.
+  buckler:    50,
+  shield:    120,
+  greatshield: 190,
+  // Gauntlets — armoured fists. Heavier than bare hands, lighter than a
+  // dagger, because the weight is the armour and not a blade.
+  gauntlet:   50,
   // Ranged
   pistol:     50,
   shortbow:   70,
@@ -1386,6 +1466,10 @@ ASPECTSOFPOWER.craftItemTypes = {
   buckler:      { category: 'armaments', tags: ['weapon', '1H', 'shield', 'buckler'],           slot: 'weaponry' },
   shield:       { category: 'armaments', tags: ['weapon', '1H', 'shield'],                      slot: 'weaponry' },
   greatshield:  { category: 'armaments', tags: ['weapon', '1H', 'shield', 'greatshield'],       slot: 'weaponry' },
+  // Gauntlets as an ARMAMENT, distinct from the `gloves` armour piece: these
+  // are what you hit people with. Needed before a dual-gauntlet combination
+  // can be detected at all (2026-07-27).
+  gauntlet:     { category: 'armaments', tags: ['weapon', '1H', 'gauntlet'],                    slot: 'weaponry' },
 
   // ── Armor (slot = key) ──
   chest:    { category: 'armor', tags: ['armor', 'chest'],     slot: 'chest' },

@@ -351,11 +351,19 @@ export class SkillData extends foundry.abstract.TypeDataModel {
         // CONFIG.weaponWeights ('hammer', 'axe', 'dagger'...). Mastery is the
         // skill's own rarity — highest rarity wins.
         profFor: new fields.StringField({ initial: '' }),
-        // Gates. requiresStyle names a CONFIG.weaponStyles key (how the hands
-        // are arranged); requiresWeaponTag names a weapon TYPE that must be
-        // held. Both are checked at roll time.
+        // Gates, all checked at roll time BEFORE any cost is paid.
+        //   requiresStyle     — a CONFIG.weaponCombinations key: how the hands
+        //                       must be arranged (detected from equipped gear).
+        //   requiresWeaponTag — a weapon TYPE that must be held.
+        //   styleSkill        — the NAME of the governing STYLE passive the
+        //                       actor must OWN, the way a Ritualism passive
+        //                       governs a body of rituals (ruled 2026-07-27:
+        //                       the style is the key, the combination is the
+        //                       lock). Matched by name so content can be
+        //                       authored and granted without threading ids.
         requiresStyle: new fields.StringField({ initial: '' }),
         requiresWeaponTag: new fields.StringField({ initial: '' }),
+        styleSkill: new fields.StringField({ initial: '' }),
         // Riders, all proportional per the no-flat-constants house rule.
         // Hammer: fraction of the armour term that simply does not apply.
         profArmorBypassPct: new fields.NumberField({ initial: 0, min: 0, max: 1 }),
