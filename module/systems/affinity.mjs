@@ -29,6 +29,7 @@
  *   const A = game.aspectsofpower.affinity;
  *   A.actorAffinities(actor);        // what they can channel
  *   A.canUseItem(actor, item);       // {allowed, required, conflicts}
+ *   A.unifiedSets(actor);            // opposed pairs they have reconciled
  *   A.auditGating();                 // what WOULD break if enabled
  */
 
@@ -80,6 +81,36 @@ export function itemAffinities(item) {
 }
 
 /**
+ * Opposed pairs this actor has RECONCILED (RULED 2026-07-26).
+ *
+ * A Unity is a high-rarity learnable passive naming one opposed pair —
+ * "Unity of Flame and Frost" reconciles fire and ice for its bearer. Permission
+ * only: it does not fuse the affinities, grant resistance, or add damage.
+ *
+ * Read from `tagConfig.unifiedAffinities` rather than the skill's `-affinity`
+ * tags, so RECONCILING a pair stays separate from OWNING it. A unity skill can
+ * therefore be authored to grant both affinities (add the tags too) or purely
+ * to resolve a conflict between affinities you already hold.
+ *
+ * @returns {Array<Set<string>>} one set per unity passive
+ */
+export function unifiedSets(actor) {
+  const sets = [];
+  for (const item of actor?.items ?? []) {
+    if (item.type !== 'skill') continue;
+    if (!(item.system?.tags ?? []).includes('unity')) continue;
+    const keys = (item.system?.tagConfig?.unifiedAffinities ?? []).filter(Boolean);
+    if (keys.length >= 2) sets.push(new Set(keys));
+  }
+  return sets;
+}
+
+/** Is this specific clash reconciled by one of the actor's unities? */
+export function isUnified(actor, a, b) {
+  return unifiedSets(actor).some(s => s.has(a) && s.has(b));
+}
+
+/**
  * May this actor use this item?
  *
  * @returns {{allowed:boolean, required:string[], conflicts:string[],
@@ -104,10 +135,14 @@ export function canUseItem(actor, item) {
   // Checked BOTH directions. The dictionary is symmetric today (verified: 24
   // pairs, zero asymmetric), but authoring only one side later should not
   // silently open a hole.
+  const unities = unifiedSets(actor);
+  const reconciled = (a, b) => unities.some(u => u.has(a) && u.has(b));
   const conflicts = [];
   for (const need of required) {
     const clash = [...owned].find(o =>
-      (dict[o]?.opposed ?? []).includes(need) || (dict[need]?.opposed ?? []).includes(o));
+      ((dict[o]?.opposed ?? []).includes(need) || (dict[need]?.opposed ?? []).includes(o))
+      // A Unity passive reconciles exactly this pair for its bearer.
+      && !reconciled(o, need));
     if (clash) conflicts.push({ item: need, actor: clash });
   }
   if (!conflicts.length) return ok;
@@ -176,5 +211,5 @@ export function checkEquip(actor, item, { notify = true } = {}) {
 
 export const AffinityHelpers = {
   knownAffinities, affinitiesFromTags, actorAffinities, itemAffinities,
-  canUseItem, checkEquip, auditGating,
+  unifiedSets, isUnified, canUseItem, checkEquip, auditGating,
 };

@@ -336,6 +336,16 @@ export class SkillData extends foundry.abstract.TypeDataModel {
         // See [design-hemorrhage-bleed.md].
         dotInvestScale: new fields.NumberField({ initial: 1.0, min: 0 }),
 
+        // UNITY (RULED 2026-07-26): a high-rarity passive that reconciles a
+        // pair of diametrically opposed affinities FOR ITS BEARER, so gear of
+        // both may be worn. Permission only — no fused affinity, no resistance,
+        // no damage bonus (explicit user ruling). List the affinity KEYS from
+        // CONFIG.ASPECTSOFPOWER.affinities, e.g. ['fire','ice'].
+        // Declared here rather than inferred from `-affinity` tags so that
+        // UNIFYING a pair stays separate from GRANTING it — a unity skill
+        // reconciles; it does not by itself hand you the affinities.
+        unifiedAffinities: new fields.ArrayField(new fields.StringField({ blank: false })),
+
         // Marked subsystem (per [design-ice-maiden.md] / Marked for Death,
         // Feint, etc.). When non-zero, the spawned debuff carries the
         // caster's UUID + bonus so the apply-damage handler can multiply
