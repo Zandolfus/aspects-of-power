@@ -262,8 +262,14 @@ export function formatTicksAsTime(ticks) {
   if (ms < 100) return `${ms.toFixed(ms < 10 ? 1 : 0)}ms`;
   const s = ms / 1000;
   if (s < 60) return `${s.toFixed(2)}s`;
-  if (s < 3600) return `${Math.floor(s / 60)}m ${String(Math.round(s % 60)).padStart(2, '0')}s`;
-  return `${Math.floor(s / 3600)}h ${String(Math.floor((s % 3600) / 60)).padStart(2, '0')}m`;
+  // Round to whole seconds FIRST, then decompose. Flooring the minutes and
+  // separately rounding the remainder printed "59m 60s" for a clock-bound
+  // hour (float drift puts it a hair under 3600) — the carry has to happen
+  // before the split, not after.
+  const total = Math.round(s);
+  const pad = (n) => String(n).padStart(2, '0');
+  if (total < 3600) return `${Math.floor(total / 60)}m ${pad(total % 60)}s`;
+  return `${Math.floor(total / 3600)}h ${pad(Math.floor((total % 3600) / 60))}m`;
 }
 
 /**

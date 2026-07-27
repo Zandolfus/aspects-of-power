@@ -577,6 +577,12 @@ ASPECTSOFPOWER.spellMaxInvestAboveBase = {
  * `stat` names the ability that drives it. A null stat means "use the skill
  * being performed" — crafting rides its profession's ability.
  *
+ * `qualityScaled: true` opts an activity into activityQuality below. Only
+ * things with a QUALITY OF OUTPUT qualify — you can forge a sword roughly or
+ * masterfully, but a lock is picked or it isn't, and "masterwork door-forcing"
+ * is a category error (it read as 2 hours to open a door before this flag
+ * existed). Non-scaled activities ignore the multiplier and the clock floor.
+ *
  * Costs are the ruled exemplars; author more per activity as they come up.
  * Verify any new cost against the mundane baseline (G1, ref mod 36) — if a
  * G1 human takes an unreasonable time, the cost is wrong.
@@ -588,8 +594,8 @@ ASPECTSOFPOWER.activities = {
   disarmTrap:  { label: 'Disarm a trap',        cost: 4000,    stat: 'dexterity',    class: 'celerity' },
   searchRoom:  { label: 'Search a room',        cost: 30000,   stat: 'perception',   class: 'celerity' },
   research:    { label: 'Research a topic',     cost: 60000,   stat: 'intelligence', class: 'celerity' },
-  forgeSword:  { label: 'Forge a sword',        cost: 360000,  stat: null,           class: 'celerity' },
-  ritualPrep:  { label: 'Prepare a ritual',     cost: 120000,  stat: null,           class: 'celerity' },
+  forgeSword:  { label: 'Forge a sword',        cost: 360000,  stat: null,           class: 'celerity', qualityScaled: true },
+  ritualPrep:  { label: 'Prepare a ritual',     cost: 120000,  stat: null,           class: 'celerity', qualityScaled: true },
   // Clock-bound: the world takes its own time regardless of who waits.
   cureGlue:    { label: 'Cure glue',            cost: 0, class: 'clock', clockSeconds: 3600 },
   travelMile:  { label: 'Travel a mile (cart)', cost: 0, class: 'clock', clockSeconds: 1200 },

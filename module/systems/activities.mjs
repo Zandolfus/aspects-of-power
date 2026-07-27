@@ -63,8 +63,15 @@ export function computeActivityTime(actor, key, opts = {}) {
   const activity = registry[key];
   if (!activity || !actor) return null;
 
-  const qualityKey = opts.quality ?? 'standard';
-  const quality = (CONFIG.ASPECTSOFPOWER.activityQuality ?? {})[qualityKey] ?? { mult: 1, clockFloorSeconds: 0 };
+  // Quality is about the quality of an OUTPUT. A sword can be forged roughly
+  // or masterfully; a lock is picked or it isn't. Activities that don't opt in
+  // ignore quality entirely — otherwise "masterwork" made drawing a weapon
+  // take two hours, because the fine/masterwork clock floor applied to it.
+  const scaled = activity.qualityScaled === true;
+  const qualityKey = scaled ? (opts.quality ?? 'standard') : null;
+  const quality = scaled
+    ? ((CONFIG.ASPECTSOFPOWER.activityQuality ?? {})[qualityKey] ?? { mult: 1, clockFloorSeconds: 0 })
+    : { mult: 1, clockFloorSeconds: 0 };
 
   const statKey = resolveStatKey(activity, opts);
   const mod = Math.max(1, actor.system?.abilities?.[statKey]?.mod ?? 0);
@@ -87,6 +94,7 @@ export function computeActivityTime(actor, key, opts = {}) {
     mod,
     cost,
     qualityKey,
+    qualityScaled: scaled,
     qualityMult,
     ticks,
     ms,
@@ -123,7 +131,7 @@ export async function performActivity(actor, key, opts = {}) {
     return null;
   }
 
-  const qualityNote = result.qualityKey !== 'standard'
+  const qualityNote = result.qualityScaled && result.qualityKey !== 'standard'
     ? ` (${(CONFIG.ASPECTSOFPOWER.activityQuality ?? {})[result.qualityKey]?.label ?? result.qualityKey})`
     : '';
   const basis = result.taskClass === 'clock'
@@ -162,9 +170,12 @@ export async function activityDialog(actor) {
     const t = computeActivityTime(actor, key, { quality: qualityKey });
     if (!t) return '';
     const driver = t.statKey ? `${t.statKey} ${Math.round(t.mod)}` : 'clock-bound';
+    // Say which rows answer to the quality selector, so a row that doesn't
+    // move when quality changes reads as intentional rather than broken.
+    const qualityMark = t.qualityScaled ? ' &middot; quality' : '';
     return `<tr><td><label><input type="radio" name="activity" value="${key}"${i === 0 ? ' checked' : ''}> ${t.label}</label></td>`
       + `<td style="text-align:right"><strong>${t.display}</strong></td>`
-      + `<td style="opacity:0.7;font-size:11px">${driver}</td></tr>`;
+      + `<td style="opacity:0.7;font-size:11px">${driver}${qualityMark}</td></tr>`;
   }).join('');
 
   const qualityOpts = Object.entries(qualities)
@@ -173,7 +184,8 @@ export async function activityDialog(actor) {
 
   const content = `<form><p>Times shown for <strong>${actor.name}</strong>.</p>`
     + `<table class="activity-rows" style="width:100%">${rowsFor('standard')}</table>`
-    + `<p><label>Quality: <select class="activity-quality" name="quality">${qualityOpts}</select></label></p>`
+    + `<p><label>Quality: <select class="activity-quality" name="quality">${qualityOpts}</select></label>`
+    + ` <span style="font-size:11px;opacity:0.7">(applies to quality-scaled work only)</span></p>`
     + `<p style="font-size:11px;opacity:0.7">Performing an activity advances the world clock.</p></form>`;
 
   return foundry.applications.api.DialogV2.wait({
