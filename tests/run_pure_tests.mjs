@@ -13,6 +13,7 @@ import {
   spellInvestDamage, strikeInvestDamage, infusionDamage, investSelfDamage,
   effectiveDodgeValue, splitEvenlyWithRemainder, perceiveGateDecision, activityTicks,
 } from '../module/helpers/formulas.mjs';
+import { moonState, eclipseState } from '../module/systems/calendar.mjs';
 
 const CFG = {
   meleeBlend: { strFloor: 0.30, slope: 0.70, weightOffset: 40, weightSpan: 180 },
@@ -118,6 +119,44 @@ eq('activity hybrid takes clock', activityTicks(10, 1000, { taskClass: 'hybrid',
 eq('activity hybrid takes stat', activityTicks(1000, 10, { taskClass: 'hybrid', clockTicks: 90000, scale: 10000 }), 1000000);
 eq('activity quality floor binds', activityTicks(1, 5000, { qualityMult: 25, clockFloorTicks: 42000, scale: 10000 }), 42000);
 eq('activity never zero', activityTicks(0, 5000, { scale: 10000 }), 1);
+
+// Celestial math. Golden values are REAL astronomy (synodic month
+// 29.530588853d, draconic 27.212220817d), not house numbers — the config
+// carries the true constants so phases drift against the calendar exactly as
+// they do on Earth. Phase names must stay byte-identical to the eight lunar
+// rituals authored in world.skills, or the sky cannot reach the content.
+const CEL = {
+  lunarCycleDays: 29.530588853, draconicMonthDays: 27.212220817,
+  lunarEpochDays: 0, nodeEpochDays: 0, eclipseNodeToleranceDays: 1.5,
+  phases: ['New Moon', 'Waxing Crescent', 'First Quarter', 'Waxing Gibbous',
+    'Full Moon', 'Waning Gibbous', 'Last Quarter', 'Waning Crescent'],
+};
+const atDay = (d) => moonState(d * 86400, CEL);
+// The four cardinal phases sit at 0, 1/4, 1/2, 3/4 of the synodic month.
+eq('moon new at 0', atDay(0).name, 'New Moon');
+eq('moon first quarter', atDay(29.530588853 * 0.25).name, 'First Quarter');
+eq('moon full at half', atDay(29.530588853 * 0.5).name, 'Full Moon');
+eq('moon last quarter', atDay(29.530588853 * 0.75).name, 'Last Quarter');
+// A full cycle returns to new — the anchor holds.
+eq('moon cycle wraps', atDay(29.530588853).name, 'New Moon');
+// Illumination: dark at new, lit at full, half at the quarters.
+eq('illum new', Math.round(atDay(0).illumination * 100), 0);
+eq('illum full', Math.round(atDay(29.530588853 * 0.5).illumination * 100), 100);
+eq('illum first quarter', Math.round(atDay(29.530588853 * 0.25).illumination * 100), 50);
+// Waxing before full, waning after.
+eq('waxing before full', atDay(7).waxing, true);
+eq('waning after full', atDay(22).waxing, false);
+// NEGATIVE times must not break the cycle (JS % keeps the dividend's sign).
+eq('moon handles negative time', atDay(-29.530588853).name, 'New Moon');
+eq('moon negative mid-cycle', atDay(-29.530588853 * 0.5).name, 'Full Moon');
+// Eclipses need syzygy AND a node. Day 0 is both by definition.
+eq('eclipse at epoch is solar', eclipseState(0, CEL).type, 'solar');
+eq('eclipse at epoch is total', eclipseState(0, CEL).total, true);
+// A full moon far from a node is NOT an eclipse — the whole point of nodes.
+const fullNoNode = 29.530588853 * 2.5;  // a full moon ~74d in
+eq('full moon away from node is not an eclipse', eclipseState(fullNoNode * 86400, CEL).type, null);
+// A quarter moon is never an eclipse however well-aligned the nodes.
+eq('quarter moon never eclipses', eclipseState(29.530588853 * 0.25 * 86400, CEL).type, null);
 
 // Even split with remainder.
 eq('split 10/3', splitEvenlyWithRemainder(10, ['a', 'b', 'c']), { a: 3, b: 3, c: 4 });

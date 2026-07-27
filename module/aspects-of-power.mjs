@@ -37,6 +37,7 @@ import * as MassLeveler from './systems/mass-leveler.mjs';
 import * as TemplateMigration from './systems/template-migration.mjs';
 import * as Celerity from './systems/celerity.mjs';
 import * as Activities from './systems/activities.mjs';
+import * as Calendar from './systems/calendar.mjs';
 import { SummonHelpers, registerSummonHooks } from './systems/summon.mjs';
 import { ChannelHelpers, registerChannelHooks } from './systems/channel.mjs';
 import { AIProfiles, registerAIHooks, aiSetFactionFocus } from './systems/ai.mjs';
@@ -90,6 +91,10 @@ Hooks.once('init', function () {
     // Non-combat activity timing (systems/activities.mjs): prices doors,
     // locks, searches and crafts in the same ticks combat uses.
     activities: { ...Activities },
+    // Calendar + sky (systems/calendar.mjs): the date comes from core's
+    // CalendarData; this adds moon phase, eclipses and quarter days — the
+    // state the eight authored lunar rituals have been waiting on.
+    calendar: { ...Calendar },
     // GM faction-focus command (ai.mjs): stamp aiFocusTarget on every
     // AI-profiled unit of a disposition. Console/macro v1.
     aiSetFactionFocus,

@@ -107,7 +107,7 @@ export function computeActivityTime(actor, key, opts = {}) {
  * Advance the world clock. GM-only at the server level, so non-GM clients
  * route to the active GM the same way combatant writes do.
  */
-async function advanceWorldTime(seconds) {
+export async function advanceWorldTime(seconds) {
   const whole = Math.round(seconds);
   if (whole <= 0) return;
   if (game.user.isGM) return game.time.advance(whole);

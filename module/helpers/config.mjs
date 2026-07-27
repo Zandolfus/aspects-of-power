@@ -560,6 +560,49 @@ ASPECTSOFPOWER.spellMaxInvestAboveBase = {
  * mod if RL falls outside the table.
  */
 /**
+ * Celestial mechanics (design-calendar-celestial.md, 2026-07-26).
+ *
+ * The world is our planet, so it runs Foundry's Simplified Gregorian calendar
+ * (CONFIG.time.worldCalendarConfig) — months, weekdays, seasons and leap years
+ * all come from core. What core does NOT model is the sky, and the sky is
+ * mechanical here: the Astral Aetherologist's eight lunar-phase rituals are
+ * authored and live in world.skills, waiting on something to tell them which
+ * phase it is.
+ *
+ * `phases` MUST stay byte-identical to those ritual names — they are the join
+ * key between the sky and the content.
+ */
+ASPECTSOFPOWER.celestial = {
+  // Synodic month: new moon to new moon. Real value, so phases drift against
+  // the calendar exactly as they do on Earth and never quite repeat.
+  lunarCycleDays: 29.530588853,
+  // Draconic month: node crossing to node crossing. Eclipses need the moon at
+  // a node AND at syzygy, which is why they are rare instead of monthly.
+  draconicMonthDays: 27.212220817,
+  // World time 0 is defined as a new moon at a node — the cleanest anchor for
+  // a fictional world. Shift either to re-phase the sky without touching math.
+  lunarEpochDays: 0,
+  nodeEpochDays: 0,
+  // How close to a node a syzygy must fall for an eclipse. ~1.5 days gives
+  // roughly the real-world cadence of a few per year.
+  eclipseNodeToleranceDays: 1.5,
+  // The eight phases, in cycle order. Index 0 is new moon.
+  phases: [
+    'New Moon', 'Waxing Crescent', 'First Quarter', 'Waxing Gibbous',
+    'Full Moon', 'Waning Gibbous', 'Last Quarter', 'Waning Crescent',
+  ],
+  // Astronomical quarter days. Core's seasons are MONTH-banded (Spring =
+  // months 3-5), which is fine for a label but wrong for a solstice ritual,
+  // so the real dates live here.
+  quarterDays: {
+    'Spring Equinox': { month: 3, day: 20 },
+    'Summer Solstice': { month: 6, day: 21 },
+    'Autumn Equinox': { month: 9, day: 22 },
+    'Winter Solstice': { month: 12, day: 21 },
+  },
+};
+
+/**
  * Non-combat activity registry (design-celerity-realtime.md step 4).
  *
  *   time = cost x qualityMult / Celerity(named stat)
