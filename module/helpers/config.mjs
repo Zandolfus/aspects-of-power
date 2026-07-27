@@ -560,6 +560,28 @@ ASPECTSOFPOWER.spellMaxInvestAboveBase = {
  * mod if RL falls outside the table.
  */
 /**
+ * Weapon STYLES (design-weapon-proficiencies.md; broken out as a first-class
+ * axis 2026-07-26). A style is how your hands are ARRANGED, as opposed to the
+ * weapon TYPE in them:
+ *   TYPE  -> proficiency passives with riders (`tagConfig.profFor`)
+ *   STYLE -> unlocks skills (`tagConfig.requiresStyle`)
+ * Detected live from equipped gear by systems/weapon-styles.mjs — never
+ * stored, so swapping weapons changes what you can do immediately.
+ *
+ * `inPlay` records the live footprint when this was authored, so later scope
+ * decisions start from evidence rather than assumption.
+ */
+ASPECTSOFPOWER.weaponStyles = {
+  'two-handed':          { label: 'Two-Handed',          inPlay: 9 },
+  'single-weapon':       { label: 'Single Weapon',       inPlay: 19 },
+  'sword-and-board':     { label: 'Sword and Board',     inPlay: 2 },
+  'blade-and-implement': { label: 'Blade and Implement', inPlay: 1 },
+  'dual-wield':          { label: 'Dual Wield',          inPlay: 0 },
+  'implement-only':      { label: 'Implement Only',      inPlay: null },
+  unarmed:               { label: 'Unarmed',             inPlay: null },
+};
+
+/**
  * Affinity usage-gating (design-affinity-dictionary.md, RULED design-first
  * 2026-07-03; engine shipped 2026-07-26).
  *

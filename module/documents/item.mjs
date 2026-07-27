@@ -4070,6 +4070,22 @@ export class AspectsofPowerItem extends Item {
    * @private
    */
   async roll(options = {}) {
+    // Style / weapon-type gate (design-weapon-proficiencies.md). A skill that
+    // names a required arrangement or weapon is unusable without it — the same
+    // shape as the existing requires_armor_pierce family. Checked before any
+    // cost is paid so a refused skill never charges the actor.
+    if (this.type === 'skill' && this.actor) {
+      const tc = this.system?.tagConfig ?? {};
+      if (tc.requiresStyle || tc.requiresWeaponTag) {
+        const { canUseSkill } = await import('../systems/weapon-styles.mjs');
+        const verdict = canUseSkill(this.actor, this);
+        if (!verdict.allowed) {
+          ui.notifications?.warn(verdict.reason);
+          return;
+        }
+      }
+    }
+
     // Consumables have no roll grammar — their entry point is useConsumable().
     // The character sheet knows that (the flask button calls it directly), but
     // `rollItemMacro` calls roll() blindly, so a ritual medium dragged to the

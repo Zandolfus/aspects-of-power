@@ -346,6 +346,29 @@ export class SkillData extends foundry.abstract.TypeDataModel {
         // reconciles; it does not by itself hand you the affinities.
         unifiedAffinities: new fields.ArrayField(new fields.StringField({ blank: false })),
 
+        // ── Weapon proficiency + style (design-weapon-proficiencies.md) ──
+        // profFor: this passive is the proficiency for a weapon TYPE key from
+        // CONFIG.weaponWeights ('hammer', 'axe', 'dagger'...). Mastery is the
+        // skill's own rarity — highest rarity wins.
+        profFor: new fields.StringField({ initial: '' }),
+        // Gates. requiresStyle names a CONFIG.weaponStyles key (how the hands
+        // are arranged); requiresWeaponTag names a weapon TYPE that must be
+        // held. Both are checked at roll time.
+        requiresStyle: new fields.StringField({ initial: '' }),
+        requiresWeaponTag: new fields.StringField({ initial: '' }),
+        // Riders, all proportional per the no-flat-constants house rule.
+        // Hammer: fraction of the armour term that simply does not apply.
+        profArmorBypassPct: new fields.NumberField({ initial: 0, min: 0, max: 1 }),
+        // Axe: MULTIPLIES durability damage already being dealt, rather than
+        // adding a slice of the strike. Ruled 2026-07-26 — a multiplier cannot
+        // reach through a wall that is stopping everything, so a fully-armoured
+        // tank stays immune and only those already taking damage degrade faster.
+        profDurabilityMult: new fields.NumberField({ initial: 1, min: 1 }),
+        // Dual-wield: off-hand contributes this share of its blockDR, and the
+        // arrangement costs a little accuracy.
+        profOffhandBlockCoef: new fields.NumberField({ initial: 0, min: 0, max: 1 }),
+        profHitMalusPct: new fields.NumberField({ initial: 0, min: 0, max: 1 }),
+
         // Marked subsystem (per [design-ice-maiden.md] / Marked for Death,
         // Feint, etc.). When non-zero, the spawned debuff carries the
         // caster's UUID + bonus so the apply-damage handler can multiply
