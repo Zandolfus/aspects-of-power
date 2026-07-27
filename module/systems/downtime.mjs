@@ -1,0 +1,168 @@
+/**
+ * Downtime declare/resolve barrier (design-calendar-celestial.md, RULED
+ * 2026-07-26).
+ *
+ * Out of combat, players DECLARE actions that take time. Nothing resolves
+ * until every participant has declared, or the GM forces it. The clock then
+ * advances to the SHORTEST outstanding action — whoever finishes first
+ * resolves and immediately declares again, while longer work keeps running.
+ *
+ * That is the same discrete-event shape the celerity tracker uses in combat:
+ * advance to the next completion, not to the last. It means a six-hour craft
+ * never blocks a five-minute lockpick — the lockpicker simply acts many times
+ * while the smith works, and the party stays on one canonical date.
+ *
+ * Declarations live on the actor (`flags.aspectsofpower.downtime`), so a
+ * player writes their own without any socket; only the CLOCK is GM-gated.
+ *
+ * Console usage:
+ *   const D = game.aspectsofpower.downtime;
+ *   D.declare(actor, 'pickLock');
+ *   D.roster();                    // who is busy until when
+ *   D.advance();                   // to the next completion (GM)
+ *   D.advance({ force: true });    // even if someone hasn't declared
+ */
+
+import { ActivityHelpers } from './activities.mjs';
+import { nextCompletionDelta } from '../helpers/formulas.mjs';
+
+const FLAG_SCOPE = 'aspectsofpower';
+const FLAG_KEY = 'downtime';
+
+export { nextCompletionDelta };
+
+/** Actors expected to declare: every active non-GM user's assigned character. */
+export function participants() {
+  const actors = new Map();
+  for (const user of game.users) {
+    if (user.isGM || !user.active || !user.character) continue;
+    actors.set(user.character.id, user.character);
+  }
+  // Anyone already mid-action counts too, even an NPC the GM declared for.
+  for (const actor of game.actors) {
+    if (actor.flags?.[FLAG_SCOPE]?.[FLAG_KEY]) actors.set(actor.id, actor);
+  }
+  return [...actors.values()];
+}
+
+/** Live declarations with their remaining time. */
+export function roster() {
+  const now = game.time.worldTime;
+  return participants().map(actor => {
+    const d = actor.flags?.[FLAG_SCOPE]?.[FLAG_KEY] ?? null;
+    return {
+      actor,
+      declaration: d,
+      remaining: d ? Math.max(0, d.endTime - now) : null,
+      display: d ? ActivityHelpers.formatSeconds(Math.max(0, d.endTime - now)) : null,
+    };
+  });
+}
+
+/** True when nobody is still being waited on. */
+export function allDeclared() {
+  const r = roster();
+  return r.length > 0 && r.every(e => e.declaration);
+}
+
+/**
+ * Declare a timed action. Computes the duration from the activity framework
+ * (so a fast character genuinely finishes sooner) and stores the window; it
+ * does NOT move the clock — that is the barrier's job.
+ */
+export async function declare(actor, activityKey, opts = {}) {
+  const timing = ActivityHelpers.computeActivityTime(actor, activityKey, opts);
+  if (!timing) {
+    ui.notifications?.warn(`Unknown activity: ${activityKey}`);
+    return null;
+  }
+  const now = game.time.worldTime;
+  const declaration = {
+    activityKey,
+    label: timing.label,
+    quality: timing.qualityScaled ? timing.qualityKey : null,
+    seconds: Math.round(timing.seconds),
+    startTime: now,
+    endTime: now + Math.round(timing.seconds),
+    display: timing.display,
+  };
+  await actor.setFlag(FLAG_SCOPE, FLAG_KEY, declaration);
+  ChatMessage.create({
+    speaker: ChatMessage.getSpeaker({ actor }),
+    content: `<p><em>${actor.name} begins: <strong>${timing.label}</strong> (${timing.display}).</em></p>`,
+  });
+  return declaration;
+}
+
+/** Abandon an outstanding declaration. Partial progress is not credited. */
+export async function cancel(actor) {
+  if (!actor.flags?.[FLAG_SCOPE]?.[FLAG_KEY]) return false;
+  await actor.unsetFlag(FLAG_SCOPE, FLAG_KEY);
+  return true;
+}
+
+/**
+ * Advance the clock to the next completion and resolve whatever finishes.
+ *
+ * @param {object} [options]
+ * @param {boolean} [options.force]   Advance even if someone hasn't declared.
+ * @param {number}  [options.seconds] Advance by an explicit amount instead.
+ * @returns {{advanced:number, resolved:string[], waitingOn:string[]}|null}
+ */
+export async function advance({ force = false, seconds = null } = {}) {
+  const entries = roster();
+  const waiting = entries.filter(e => !e.declaration).map(e => e.actor.name);
+  if (waiting.length && !force && seconds == null) {
+    ui.notifications?.warn(`Still waiting on: ${waiting.join(', ')}`);
+    return { advanced: 0, resolved: [], waitingOn: waiting };
+  }
+
+  const now = game.time.worldTime;
+  const declared = entries.filter(e => e.declaration).map(e => e.declaration);
+  const delta = seconds != null ? Math.round(seconds) : nextCompletionDelta(declared, now);
+  if (delta == null) {
+    ui.notifications?.warn('No declared actions to advance to.');
+    return { advanced: 0, resolved: [], waitingOn: waiting };
+  }
+
+  if (delta > 0) await ActivityHelpers.advanceWorldTime(delta);
+  const then = now + delta;
+
+  // Resolve everything due at the new time. Ties all resolve together, which
+  // is correct — they genuinely finished at the same moment.
+  const resolved = [];
+  for (const entry of entries) {
+    const d = entry.declaration;
+    if (!d || d.endTime > then) continue;
+    await ActivityHelpers.performActivity(entry.actor, d.activityKey, {
+      quality: d.quality ?? undefined,
+      advanceTime: false,          // the barrier already spent the time
+      note: `<em>Declared downtime, completed on the clock.</em>`,
+    });
+    await entry.actor.unsetFlag(FLAG_SCOPE, FLAG_KEY);
+    resolved.push(entry.actor.name);
+  }
+  return { advanced: delta, resolved, waitingOn: waiting };
+}
+
+/** Roster as chat, so the table can see who is busy and for how long. */
+export async function postRoster() {
+  const entries = roster();
+  const { celestialState } = await import('./calendar.mjs');
+  const sky = celestialState();
+  const rows = entries.map(e => `<tr><td>${e.actor.name}</td>`
+    + `<td>${e.declaration ? e.declaration.label : '<em>not declared</em>'}</td>`
+    + `<td style="text-align:right">${e.display ?? '—'}</td></tr>`).join('');
+  await ChatMessage.create({
+    whisper: ChatMessage.getWhisperRecipients('GM'),
+    content: `<div class="craft-result"><h3>Downtime — ${sky.date}</h3>`
+      + `<p class="hint">${sky.moon.name}, ${Math.round(sky.moon.illumination * 100)}% lit</p><hr>`
+      + (rows ? `<table style="width:100%">${rows}</table>` : '<p><em>Nobody is doing anything.</em></p>')
+      + `<p class="hint">${allDeclared() ? 'All declared — ready to advance.' : 'Waiting on declarations.'}</p>`
+      + `</div>`,
+  });
+}
+
+export const DowntimeHelpers = {
+  declare, cancel, advance, roster, participants, allDeclared, postRoster, nextCompletionDelta,
+};

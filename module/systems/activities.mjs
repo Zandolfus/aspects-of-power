@@ -30,6 +30,11 @@ function secondsToTicks(seconds) {
   return (Number(seconds) || 0) * 1000 / (sc.TICK_MS ?? 0.072);
 }
 
+/** World seconds as human time, using the same bands as tick durations. */
+export function formatSeconds(seconds) {
+  return formatTicksAsTime(secondsToTicks(seconds));
+}
+
 /**
  * Which ability drives this activity. Order: explicit override, then the
  * activity's named stat, then the performing skill's own roll ability
@@ -182,11 +187,30 @@ export async function activityDialog(actor) {
     .map(([k, q]) => `<option value="${k}"${k === 'standard' ? ' selected' : ''}>${q.label} (x${q.mult})</option>`)
     .join('');
 
+  // Downtime context: who is already busy, and whether the clock can move.
+  // Shown here rather than in a separate app so the one door players already
+  // know also answers "what is everyone else doing".
+  const { DowntimeHelpers } = await import('./downtime.mjs');
+  const mine = actor.flags?.aspectsofpower?.downtime ?? null;
+  const busyRows = DowntimeHelpers.roster()
+    .filter(e => e.declaration)
+    .map(e => `<li>${e.actor.name} — ${e.declaration.label} (${e.display} left)</li>`)
+    .join('');
+  const downtimeBlock = (mine || busyRows)
+    ? `<hr><p style="font-size:11px;opacity:0.8">In progress:</p><ul style="font-size:11px;margin:0">${
+        busyRows || '<li><em>nobody</em></li>'}</ul>`
+      + (DowntimeHelpers.allDeclared()
+        ? `<p style="font-size:11px;color:#4caf50">All declared — the clock can advance.</p>`
+        : `<p style="font-size:11px;opacity:0.7">Waiting on declarations.</p>`)
+    : '';
+
   const content = `<form><p>Times shown for <strong>${actor.name}</strong>.</p>`
     + `<table class="activity-rows" style="width:100%">${rowsFor('standard')}</table>`
     + `<p><label>Quality: <select class="activity-quality" name="quality">${qualityOpts}</select></label>`
     + ` <span style="font-size:11px;opacity:0.7">(applies to quality-scaled work only)</span></p>`
-    + `<p style="font-size:11px;opacity:0.7">Performing an activity advances the world clock.</p></form>`;
+    + `<p style="font-size:11px;opacity:0.7"><strong>Perform</strong> resolves it now and spends the time.`
+    + ` <strong>Declare</strong> starts it and waits for the table — the clock then advances to whoever`
+    + ` finishes first.</p>${downtimeBlock}</form>`;
 
   return foundry.applications.api.DialogV2.wait({
     window: { title: 'Perform Activity' },
@@ -218,6 +242,21 @@ export async function activityDialog(actor) {
           return performActivity(actor, key, { quality: form.querySelector('.activity-quality')?.value });
         },
       },
+      {
+        action: 'declare', label: 'Declare', icon: 'fas fa-hourglass-start',
+        callback: async (event, button, dialog) => {
+          const form = dialog?.element?.querySelector('form') ?? button.form;
+          const key = form?.querySelector('input[name="activity"]:checked')?.value;
+          if (!key) return null;
+          return DowntimeHelpers.declare(actor, key,
+            { quality: form.querySelector('.activity-quality')?.value });
+        },
+      },
+      // The clock is GM-gated at the server level, so only they get the lever.
+      ...(game.user.isGM ? [{
+        action: 'advance', label: 'Advance clock', icon: 'fas fa-forward',
+        callback: async () => DowntimeHelpers.advance(),
+      }] : []),
       { action: 'cancel', label: 'Cancel' },
     ],
   });
@@ -250,5 +289,6 @@ export function registerActivityHud() {
 }
 
 export const ActivityHelpers = {
-  computeActivityTime, performActivity, activityDialog, advanceWorldTime, secondsToTicks,
+  computeActivityTime, performActivity, activityDialog, advanceWorldTime,
+  secondsToTicks, formatSeconds,
 };

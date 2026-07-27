@@ -171,6 +171,30 @@ export function activityTicks(cost, mod, opts = {}) {
 }
 
 /**
+ * Downtime barrier: seconds until the next declared action completes
+ * (design-calendar-celestial.md, RULED 2026-07-26 — the clock advances to the
+ * SHORTEST outstanding action so whoever finishes first can declare again; a
+ * six-hour craft must never block a five-minute lockpick).
+ *
+ * Lives here rather than in downtime.mjs so it stays importable in plain node
+ * for the golden tests — that module reaches Foundry through the activity
+ * framework.
+ *
+ * @param {Array<{endTime:number}>} declarations
+ * @param {number} now
+ * @returns {number|null} null when nothing is outstanding
+ */
+export function nextCompletionDelta(declarations, now) {
+  const remaining = (declarations ?? [])
+    .map(d => d.endTime - now)
+    .filter(r => Number.isFinite(r));
+  if (!remaining.length) return null;
+  // An overdue action (the GM advanced past it by hand) resolves immediately
+  // rather than dragging the clock backwards.
+  return Math.max(0, Math.min(...remaining));
+}
+
+/**
  * Perceive-to-react decision (design-celerity-realtime.md, RULED 2026-07-02).
  * Pure half of celerity.perceiveGate — the caller resolves actors to their
  * build-neutral reference mods and ranks, this decides.
