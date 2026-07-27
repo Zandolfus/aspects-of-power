@@ -368,14 +368,23 @@ class CraftingSkills {
     // APPROACH a ritual's cap, never exceed the ladder.
     const maxMaterials = Math.max(1, (sc.ritualMaxMaterials ?? {})[rarity] ?? 1);
     const chosenGems = [sourceGem];
+    // How many of a given stack are already committed. Gems stack (quantity>1),
+    // so availability is per-UNIT, not per-item — dedup by id would let a
+    // "Sapphire x2" contribute only one stone, which made the whole lever
+    // unusable for stacked materials (the common case).
+    const committedOf = (id) => chosenGems.filter(c => c.id === id).length;
     while (chosenGems.length < maxMaterials) {
-      const remaining = gemMaterials.filter(g => !chosenGems.some(c => c.id === g.id));
+      const remaining = gemMaterials.filter(g => committedOf(g.id) < (g.system?.quantity ?? 1));
       if (!remaining.length) break;
       const sumSoFar = chosenGems.reduce((t, g) => t + (g.system?.progress ?? 0), 0);
-      const moreButtons = remaining.map(g => ({
-        action: g.id,
-        label: `${g.name} [${g.system.rarity ?? 'common'}, progress ${g.system?.progress ?? 0}]`,
-      }));
+      const moreButtons = remaining.map(g => {
+        const left = (g.system?.quantity ?? 1) - committedOf(g.id);
+        return {
+          action: g.id,
+          label: `${g.name} [${g.system.rarity ?? 'common'}, progress ${g.system?.progress ?? 0}]`
+               + `${left > 1 ? ` — ${left} left` : ''}`,
+        };
+      });
       moreButtons.push({ action: 'done', label: `Done — inscribe with ${chosenGems.length} material${chosenGems.length === 1 ? '' : 's'}` });
       const more = await foundry.applications.api.DialogV2.wait({
         window: { title: `${item.name} — Add Material (${chosenGems.length}/${maxMaterials})` },
@@ -392,9 +401,16 @@ class CraftingSkills {
       chosenGems.push(extra);
     }
     const materialProgress = chosenGems.reduce((t, g) => t + (g.system?.progress ?? 0), 0);
+    // Tally per stack so a repeated gem reads "Raw Sapphire x2", not twice over.
+    const gemTally = new Map();
+    for (const g of chosenGems) gemTally.set(g.id, (gemTally.get(g.id) ?? 0) + 1);
+    const tallyText = [...gemTally.entries()].map(([id, n]) => {
+      const g = chosenGems.find(x => x.id === id);
+      return `${g.name}${n > 1 ? ` ×${n}` : ''}`;
+    }).join(', ');
     const materialLabel = chosenGems.length === 1
       ? `${chosenGems[0].name} — progress ${materialProgress}`
-      : `${chosenGems.length} materials (${chosenGems.map(g => g.name).join(', ')}) — summed progress ${materialProgress}`;
+      : `${chosenGems.length} materials (${tallyText}) — summed progress ${materialProgress}`;
     const currentMana = Math.round(actor.system?.mana?.value ?? 0);
     const initialMana = Math.max(minMana, Math.min(currentMana, minMana || 1));
 
@@ -490,19 +506,24 @@ class CraftingSkills {
     const manaInvested = setupResult.mana;
     const progress = Math.round(weights.wisdom * wisdomMod + weights.material * materialProgress + weights.mana * manaInvested);
 
-    // Re-fetch every chosen gem in case state shifted while dialogs were open.
-    const liveGems = chosenGems.map(g => actor.items.get(g.id)).filter(Boolean);
-    if (liveGems.length !== chosenGems.length) {
+    // Re-fetch every chosen stack and confirm it still holds the UNITS we took
+    // (dialogs were open; quantities may have shifted).
+    const shortfall = [...gemTally.entries()].find(([id, n]) => {
+      const live = actor.items.get(id);
+      return !live || (live.system.quantity ?? 1) < n;
+    });
+    if (shortfall) {
       ChatMessage.create({ speaker, rollMode,
-        content: '<p><em>Inscribe failed: a material is no longer available. (No mana/material spent.)</em></p>' });
+        content: '<p><em>Inscribe failed: a material is no longer available in the quantity selected. (No mana/material spent.)</em></p>' });
       return;
     }
 
-    // ── Always consume: EVERY selected material + the invested mana ──
-    for (const g of liveGems) {
-      const q = g.system.quantity ?? 1;
-      if (q <= 1) await g.delete();
-      else await g.update({ 'system.quantity': q - 1 });
+    // ── Always consume: EVERY selected material UNIT + the invested mana ──
+    for (const [id, n] of gemTally.entries()) {
+      const live = actor.items.get(id);
+      const q = live.system.quantity ?? 1;
+      if (q <= n) await live.delete();
+      else await live.update({ 'system.quantity': q - n });
     }
     if (manaInvested > 0) {
       const manaNow = Math.round(actor.system?.mana?.value ?? 0);
