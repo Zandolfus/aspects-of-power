@@ -26,8 +26,15 @@
 import { ActivityHelpers } from './activities.mjs';
 import { nextCompletionDelta } from '../helpers/formulas.mjs';
 
+// Engine namespace per the flag-namespace law: `flags.aspectsofpower` (no
+// hyphen) for engine/combat state. NOTE it is NOT a registered package id, so
+// setFlag/unsetFlag REJECT it ("Flag scope is not valid or not currently
+// active") — the whole codebase writes this namespace with update() and dot
+// paths, and `-=` to delete. Do not reach for setFlag here.
 const FLAG_SCOPE = 'aspectsofpower';
 const FLAG_KEY = 'downtime';
+const FLAG_PATH = `flags.${FLAG_SCOPE}.${FLAG_KEY}`;
+const FLAG_UNSET = `flags.${FLAG_SCOPE}.-=${FLAG_KEY}`;
 
 export { nextCompletionDelta };
 
@@ -86,7 +93,7 @@ export async function declare(actor, activityKey, opts = {}) {
     endTime: now + Math.round(timing.seconds),
     display: timing.display,
   };
-  await actor.setFlag(FLAG_SCOPE, FLAG_KEY, declaration);
+  await actor.update({ [FLAG_PATH]: declaration });
   ChatMessage.create({
     speaker: ChatMessage.getSpeaker({ actor }),
     content: `<p><em>${actor.name} begins: <strong>${timing.label}</strong> (${timing.display}).</em></p>`,
@@ -97,7 +104,7 @@ export async function declare(actor, activityKey, opts = {}) {
 /** Abandon an outstanding declaration. Partial progress is not credited. */
 export async function cancel(actor) {
   if (!actor.flags?.[FLAG_SCOPE]?.[FLAG_KEY]) return false;
-  await actor.unsetFlag(FLAG_SCOPE, FLAG_KEY);
+  await actor.update({ [FLAG_UNSET]: null });
   return true;
 }
 
@@ -139,7 +146,7 @@ export async function advance({ force = false, seconds = null } = {}) {
       advanceTime: false,          // the barrier already spent the time
       note: `<em>Declared downtime, completed on the clock.</em>`,
     });
-    await entry.actor.unsetFlag(FLAG_SCOPE, FLAG_KEY);
+    await entry.actor.update({ [FLAG_UNSET]: null });
     resolved.push(entry.actor.name);
   }
   return { advanced: delta, resolved, waitingOn: waiting };
