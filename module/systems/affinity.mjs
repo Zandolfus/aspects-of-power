@@ -7,13 +7,18 @@
  * items unless they also have ice affinity, which would be rare for a fire
  * person."
  *
- * ── SHIPPED DISABLED ON PURPOSE ──
- * `CONFIG.ASPECTSOFPOWER.affinityGating.enabled` defaults to FALSE, because as
- * of 2026-07-26 the live world cannot pass this gate: ZERO actors declare any
- * affinity, while 127 of 410 items carry an affinity tag and every PC has
- * between one and seven of them EQUIPPED. Turning it on before actors have
- * rosters would strip the party. Grant affinities first, dry-run with
- * `auditGating()`, then enable.
+ * ── OPPOSITION-ONLY GATE (RULED 2026-07-26) ──
+ * Wear what you like; you are blocked ONLY by a diametrically opposed
+ * affinity. Lacking an affinity is not a barrier. That is what makes the gate
+ * safe to run live — an actor with no roster is never blocked by anything.
+ *
+ * ── HISTORY ──
+ * First shipped DISABLED under the strict reading ("must possess the
+ * affinity"), because that would have blocked 105 equipped items across 18
+ * actors on day one — ZERO actors declare an affinity while 127 of 410 items
+ * carry an affinity tag. The opposition-only rule removes that cliff, so the
+ * gate now ships ENABLED: it is inert until affinities are granted, then bites
+ * only on a genuine clash.
  *
  * Roster source is direction A (affinity passives), the route already chosen in
  * design-affinity-dictionary: an actor "has" fire because they carry a passive
@@ -23,7 +28,7 @@
  * Console usage:
  *   const A = game.aspectsofpower.affinity;
  *   A.actorAffinities(actor);        // what they can channel
- *   A.canUseItem(actor, item);       // {allowed, missing, opposed}
+ *   A.canUseItem(actor, item);       // {allowed, required, conflicts}
  *   A.auditGating();                 // what WOULD break if enabled
  */
 
@@ -39,10 +44,10 @@ export function knownAffinities() {
 }
 
 /**
- * Pull affinity keys off a tag list. Aliases are resolved here rather than in
- * the data, so a mis-keyed tag degrades to the right affinity instead of
- * silently resolving to nothing (the live world has 26 items tagged
- * `air-affinity` against a dictionary that calls it `wind`).
+ * Pull affinity keys off a tag list. Aliases catch mis-keyed tags so they
+ * degrade to the right affinity instead of resolving to nothing. (The world's
+ * 26 `air-affinity` items were migrated to `wind-affinity` on 2026-07-26; the
+ * alias stays as a net for future slips.)
  */
 export function affinitiesFromTags(tags = []) {
   const aliases = cfg().tagAliases ?? {};
@@ -77,51 +82,66 @@ export function itemAffinities(item) {
 /**
  * May this actor use this item?
  *
- * @returns {{allowed:boolean, required:string[], missing:string[],
- *            opposed:string[], reason:string}}
+ * @returns {{allowed:boolean, required:string[], conflicts:string[],
+ *            reason:string}}
  */
 export function canUseItem(actor, item) {
   const required = [...itemAffinities(item)];
-  const ok = { allowed: true, required, missing: [], opposed: [], reason: '' };
+  const ok = { allowed: true, required, conflicts: [], reason: '' };
   if (!cfg().enabled) return ok;
   if (!required.length) return ok;            // untagged gear is universal
 
+  // ── OPPOSITION-ONLY (RULED 2026-07-26) ──
+  // Anyone may wear anything UNLESS they hold a diametrically opposed
+  // affinity. Lacking an affinity is no barrier — you are simply untrained,
+  // not fighting yourself. This deliberately replaces the stricter
+  // "must possess the affinity" reading of the 2026-07-03 ruling, which would
+  // have blocked 105 equipped items across 18 actors on day one.
   const owned = actorAffinities(actor);
-  const missing = required.filter(a => !owned.has(a));
-  if (!missing.length) return { ...ok, allowed: true };
+  if (!owned.size) return ok;                 // no affinity, nothing to clash
 
-  // Opposed affinities are the flavour of the ruling: a fire person holding an
-  // ice item is not merely untrained, they are working against themselves.
   const dict = globalThis.CONFIG?.ASPECTSOFPOWER?.affinities ?? {};
-  const opposed = missing.filter(a =>
-    [...owned].some(o => (dict[o]?.opposed ?? []).includes(a)));
+  // Checked BOTH directions. The dictionary is symmetric today (verified: 24
+  // pairs, zero asymmetric), but authoring only one side later should not
+  // silently open a hole.
+  const conflicts = [];
+  for (const need of required) {
+    const clash = [...owned].find(o =>
+      (dict[o]?.opposed ?? []).includes(need) || (dict[need]?.opposed ?? []).includes(o));
+    if (clash) conflicts.push({ item: need, actor: clash });
+  }
+  if (!conflicts.length) return ok;
 
   return {
-    allowed: false, required, missing, opposed,
-    reason: opposed.length
-      ? `${item.name} is attuned to ${opposed.join(', ')}, which opposes your affinity.`
-      : `${item.name} requires the ${missing.join(', ')} affinity.`,
+    allowed: false, required,
+    conflicts: conflicts.map(c => `${c.item} vs your ${c.actor}`),
+    reason: `${item.name} is attuned to ${conflicts.map(c => c.item).join(', ')}, `
+          + `which opposes your ${[...new Set(conflicts.map(c => c.actor))].join(', ')} affinity.`,
   };
 }
 
 /**
- * Dry run: what would break if the gate were switched on right now.
- * Report BEFORE enabling — this is the whole reason it ships disabled.
+ * Dry run the RULE regardless of the switch: who is currently blocked, and by
+ * what. Also reports affinity-shaped tags that resolve to nothing (content
+ * bugs). Run it after granting affinities, before anyone complains.
  */
-export function auditGating() {
+export function auditGating({ assumeEnabled = true } = {}) {
+  const wasEnabled = cfg().enabled;
+  if (assumeEnabled) cfg().enabled = true;   // dry run the rule, not the switch
   const rows = [];
   let blockedEquipped = 0;
   for (const actor of game.actors) {
     const owned = [...actorAffinities(actor)];
     const equipped = actor.items.filter(i => i.type === 'item' && i.system?.equipped);
-    const blocked = equipped.filter(i => {
-      const req = [...itemAffinities(i)];
-      return req.length && req.some(a => !owned.includes(a));
-    });
+    // Audit through canUseItem itself — an audit with its own copy of the rule
+    // is an audit that will eventually lie about the rule.
+    const blocked = equipped
+      .map(i => ({ i, v: canUseItem(actor, i) }))
+      .filter(x => !x.v.allowed);
     if (!blocked.length) continue;
     blockedEquipped += blocked.length;
     rows.push({ actor: actor.name, owned,
-      blocked: blocked.map(i => `${i.name} [${[...itemAffinities(i)].join(',')}]`) });
+      blocked: blocked.map(x => `${x.i.name} [${x.v.conflicts.join('; ')}]`) });
   }
   // Tags that look like affinities but resolve to nothing — content bugs.
   const unresolved = new Map();
@@ -136,13 +156,15 @@ export function auditGating() {
       }
     }
   }
-  return {
-    enabled: !!cfg().enabled,
+  const result = {
+    enabled: wasEnabled,
     actorsAffected: rows.length,
     blockedEquippedItems: blockedEquipped,
     unresolvedAffinityTags: Object.fromEntries(unresolved),
     detail: rows,
   };
+  cfg().enabled = wasEnabled;
+  return result;
 }
 
 /** Hook target for the equip path; returns true when the equip may proceed. */

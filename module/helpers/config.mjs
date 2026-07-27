@@ -566,14 +566,15 @@ ASPECTSOFPOWER.spellMaxInvestAboveBase = {
  * "Someone with fire affinity cannot use ice affinity items unless they also
  * have ice affinity, which would be rare for a fire person."
  *
- * DEFAULT OFF, and it must stay off until actors carry affinity rosters: as of
- * 2026-07-26 ZERO actors declare an affinity while 127 of 410 items carry an
- * affinity tag, with every PC wearing between one and seven. Enabling it blind
- * would strip the party. Grant affinities, run
- * `game.aspectsofpower.affinity.auditGating()`, then flip this.
+ * LOOSENED 2026-07-26: opposition-only. Anyone may wear anything UNLESS they
+ * hold a diametrically opposed affinity — lacking an affinity is no barrier.
+ * That is what makes it safe to run live: an actor with no roster can never be
+ * blocked, so the 105-equipped-item cliff of the strict reading disappears and
+ * the rule only bites once affinities are actually granted.
+ * Dry-run any time with `game.aspectsofpower.affinity.auditGating()`.
  */
 ASPECTSOFPOWER.affinityGating = {
-  enabled: false,
+  enabled: true,
   // `air-affinity` is on 26 live items but the dictionary calls it `wind`, and
   // `air-affinity` is not even in the tag registry. Aliasing resolves them
   // rather than leaving 26 items attuned to nothing. (Fix the data too — this
