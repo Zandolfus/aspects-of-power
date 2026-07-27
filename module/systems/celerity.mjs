@@ -18,6 +18,7 @@
 
 import { AspectsofPowerItem } from '../documents/item.mjs';
 import { weaponStatBlend, perceiveGateDecision } from '../helpers/formulas.mjs';
+import { tickDotsFor } from './dot.mjs';
 
 const HYBRID_60_40_WIS_DEX = (a) => 0.6 * (a.wisdom?.mod ?? 0) + 0.4 * (a.dexterity?.mod ?? 0);
 const _MAGIC_TYPES_FOR_SPEED = new Set(['magic', 'magic_melee', 'magic_projectile']);
@@ -696,27 +697,10 @@ export async function runRoundStart(combat, combatant) {
   // 1. DoTs: any effect placed by this actor on any combatant ticks now.
   //    Fired BEFORE the caster's own onStartTurn so debuff DoTs land at
   //    the canonical "start of caster round" moment.
-  const applierUuid = actor.uuid;
-  for (const c of combat.combatants) {
-    if (!c.actor) continue;
-    for (const effect of c.actor.effects) {
-      const sys = effect.system ?? {};
-      if (!sys.dot || sys.applierActorUuid !== applierUuid || effect.disabled) continue;
-      const rawDamage = sys.dotDamage ?? 0;
-      if (rawDamage <= 0) continue;
-      const drValue = c.actor.system.defense?.dr?.value ?? 0;
-      const damage  = Math.max(0, rawDamage - drValue);
-      const health  = c.actor.system.health;
-      const newHealth = Math.max(0, health.value - damage);
-      await c.actor.update({ 'system.health.value': newHealth });
-      ChatMessage.create({
-        whisper: ChatMessage.getWhisperRecipients('GM'),
-        content: `<p><strong>${c.actor.name}</strong> takes <strong>${damage}</strong> damage from ${effect.name} (DR: −${drValue}). `
-               + `Health: ${newHealth} / ${health.max}`
-               + `${newHealth === 0 ? ' &mdash; <em>Incapacitated!</em>' : ''}</p>`,
-      });
-    }
-  }
+  // Stacks are parallel effects but their damage POOLS before DR is charged
+  // once — shared with the legacy turn tick via systems/dot.mjs so the two
+  // paths cannot drift apart again.
+  await tickDotsFor(combat, actor.uuid);
 
   // 2. The actor's own round-start mechanics: regen, sustain upkeep,
   //    debuff break rolls, effect expiry. Despite the legacy name, this

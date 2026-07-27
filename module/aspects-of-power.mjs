@@ -39,6 +39,7 @@ import * as Celerity from './systems/celerity.mjs';
 import * as Activities from './systems/activities.mjs';
 import * as Calendar from './systems/calendar.mjs';
 import * as Downtime from './systems/downtime.mjs';
+import { DotHelpers } from './systems/dot.mjs';
 import { SummonHelpers, registerSummonHooks } from './systems/summon.mjs';
 import { ChannelHelpers, registerChannelHooks } from './systems/channel.mjs';
 import { AIProfiles, registerAIHooks, aiSetFactionFocus } from './systems/ai.mjs';
@@ -1319,30 +1320,9 @@ Hooks.on('combatTurnChange', async (combat, _prior, current) => {
   const applierUuid = combatant.actor.uuid;
 
   // Check every combatant for DoT effects placed by the current actor.
-  for (const c of combat.combatants) {
-    if (!c.actor) continue;
-    for (const effect of c.actor.effects) {
-      const sys = effect.system ?? {};
-      if (!sys.dot || sys.applierActorUuid !== applierUuid || effect.disabled) continue;
-
-      const rawDamage = sys.dotDamage ?? 0;
-      if (rawDamage <= 0) continue;
-
-      const drValue = c.actor.system.defense?.dr?.value ?? 0;
-      const damage  = Math.max(0, rawDamage - drValue);
-      const health  = c.actor.system.health;
-      const newHealth = Math.max(0, health.value - damage);
-      await c.actor.update({ 'system.health.value': newHealth });
-
-      ChatMessage.create({
-        whisper: ChatMessage.getWhisperRecipients('GM'),
-        content: `<p><strong>${c.actor.name}</strong> takes <strong>${damage}</strong> `
-               + `${sys.dotDamageType ?? 'physical'} damage from ${effect.name} (DR: −${drValue}). `
-               + `Health: ${newHealth} / ${health.max}`
-               + `${newHealth === 0 ? ' &mdash; <em>Incapacitated!</em>' : ''}</p>`,
-      });
-    }
-  }
+  // Shared with the celerity round-start tick via systems/dot.mjs — the two
+  // copies of this loop had already drifted once.
+  await DotHelpers.tickDotsFor(combat, applierUuid);
 });
 
 /* -------------------------------------------- */
