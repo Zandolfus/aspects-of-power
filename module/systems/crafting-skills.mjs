@@ -518,6 +518,14 @@ class CraftingSkills {
       return;
     }
 
+    // The medium is named and imaged after the stone it was cut from, so grab
+    // that identity BEFORE consumption — a fully-spent stack gets deleted.
+    // (Regression guard: the multi-material rewrite in 5273345 replaced the
+    // old single-gem re-fetch with the tally check above and dropped this
+    // binding, leaving `liveSrc` undefined in both result branches — every
+    // inscribe threw AFTER eating the materials and mana.)
+    const liveSrc = actor.items.get(sourceGem.id) ?? sourceGem;
+
     // ── Always consume: EVERY selected material UNIT + the invested mana ──
     for (const [id, n] of gemTally.entries()) {
       const live = actor.items.get(id);
