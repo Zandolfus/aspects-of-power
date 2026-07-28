@@ -12,7 +12,7 @@ import {
   houseHitFormula, hybridAbilityMod, weaponStatBlend, spellDamageRef,
   spellInvestDamage, strikeInvestDamage, infusionDamage, investSelfDamage,
   effectiveDodgeValue, splitEvenlyWithRemainder, perceiveGateDecision, activityTicks, nextCompletionDelta,
-  proficiencyMultiplier,
+  proficiencyMultiplier, parryMassMultiplier,
 } from '../module/helpers/formulas.mjs';
 import { moonState, moonNodeAngle, nextSyzygy, eclipseAtSyzygy, planetStates,
          meteorShowersOn, cometStates, julianDay, civilDate, worldTimeForDate } from '../module/systems/calendar.mjs';
@@ -289,6 +289,30 @@ eq('unknown rarity is neutral', pm('bogus_tier'), 1);
 // skill wielded with divine proficiency reaches 2.4x, double today's ceiling.
 eq('compounds with skill rarity', +(RAR.divine.mult * pm('divine')).toFixed(3), 2.4);
 eq('unproficient divine skill', +(RAR.divine.mult * pm('not_proficient')).toFixed(3), 0.4);
+
+// -- Parry mass ratio (RULED 2026-07-27, k=0.3 "gentle"). Weights are the
+// live weaponWeights table; the rule is min(1, (defW/atkW)^k).
+const PMC = { parryMassExponent: 0.3, unarmedWeight: 40 };
+const pmm = (d, a) => +parryMassMultiplier(d, a, PMC).toFixed(2);
+eq('parry dagger vs greatsword', pmm(60, 200), 0.7);
+eq('parry sword vs greatsword', pmm(100, 200), 0.81);
+eq('parry spear vs greataxe', pmm(70, 220), 0.71);
+// CAPPED AT 1 - out-massing your attacker is never a bonus, because a light
+// weapon is agile. Asymmetry is the point.
+eq('parry sword vs dagger capped', pmm(100, 60), 1);
+eq('parry like vs like', pmm(200, 200), 1);
+// Emergent and deliberately kept: a greatshield is the natural answer to a
+// greatsword, with nothing special-casing shields.
+eq('parry greatshield vs greatsword', pmm(190, 200), 0.98);
+// Defender weight FLOORS at unarmed - two live actors carry Basic Parry with
+// nothing equipped, and an unfloored ratio would zero their parry outright.
+eq('parry empty-handed floors', pmm(0, 200), pmm(40, 200));
+eq('parry empty vs empty', pmm(0, 0), 1);
+// k <= 0 disables the rule entirely.
+eq('parry rule disabled', parryMassMultiplier(60, 220, { parryMassExponent: 0 }), 1);
+// THE LIVE CASE THAT MOTIVATED IT: Gabriel's dagger parry rolled 993 against
+// Phil's greatsword hit of 956 and won. Under the rule it no longer does.
+eq('Gabriel dagger no longer parries Phil claymore', Math.round(993 * pmm(60, 200)) >= 956, false);
 
 if (failures) { console.error(`\n${failures} FAILURES`); process.exit(1); }
 console.log('\nAll pure-function tests pass.');

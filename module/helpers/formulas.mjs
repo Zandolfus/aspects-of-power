@@ -272,3 +272,47 @@ export function proficiencyMultiplier(rarity, rarities = null, anchor = null) {
   if (!anchorMult || !ownMult) return 1;
   return ownMult / anchorMult;
 }
+
+/**
+ * Parry mass ratio (design-weapon-proficiencies.md, RULED 2026-07-27:
+ * "it's hard to parry a huge sword").
+ *
+ * Parry is binary — the defender's roll negates the attack outright when it
+ * meets the hit total — and the DEFENDER's weapon weight already feeds their
+ * blend. The attacker's weight did nothing, so a dagger turned aside a
+ * claymore exactly as well as another claymore did. Live proof before this
+ * shipped: Gabriel's dagger parry rolled 993 against Phil's greatsword hit of
+ * 956 and simply won.
+ *
+ * The parry is scaled by the mass ratio of the two weapons:
+ *
+ *   mult = min(1, (defenderWeight / attackerWeight) ^ k)      k = 0.3
+ *
+ * CAPPED AT 1: being outmassed is a penalty, but out-massing someone is not a
+ * bonus. A claymore is not better at parrying a dagger than a dagger is —
+ * light weapons are agile, which is the whole reason the ratio is not
+ * symmetric.
+ *
+ * The defender weight FLOORS at unarmed. Two live actors carry Basic Parry
+ * with nothing equipped, and an unfloored ratio would zero their parry
+ * outright rather than merely disadvantage it.
+ *
+ * Emergent and deliberately kept: a greatshield (190) parrying a greatsword
+ * (200) lands at x0.98, so shields are the natural answer to heavy weapons
+ * without anything special-casing them.
+ *
+ * @param {number} defenderWeight Weight of the parrying implement.
+ * @param {number} attackerWeight Weight of the incoming weapon.
+ * @param {object} [cfg]          {parryMassExponent, unarmedWeight} override.
+ * @returns {number} Multiplier on the parry total, in (0, 1].
+ */
+export function parryMassMultiplier(defenderWeight, attackerWeight, cfg = null) {
+  const C = globalThis.CONFIG?.ASPECTSOFPOWER ?? {};
+  const t = cfg ?? C.defenseTuning ?? {};
+  const k = t.parryMassExponent ?? 0.3;
+  if (!(k > 0)) return 1;
+  const floor = t.unarmedWeight ?? C.weaponWeights?.unarmed ?? 40;
+  const dw = Math.max(defenderWeight || 0, floor);
+  const aw = Math.max(attackerWeight || 0, floor);
+  return Math.min(1, Math.pow(dw / aw, k));
+}

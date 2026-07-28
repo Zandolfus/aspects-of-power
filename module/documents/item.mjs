@@ -1,13 +1,13 @@
 import { EquipmentSystem } from '../systems/equipment.mjs';
 import { getPositionalTags } from '../helpers/positioning.mjs';
-import { houseHitFormula, hybridAbilityMod, weaponStatBlend, spellDamageRef, spellInvestDamage, strikeInvestDamage, infusionDamage, investSelfDamage as computeInvestSelfDamage, effectiveDodgeValue, splitEvenlyWithRemainder } from '../helpers/formulas.mjs';
+import { houseHitFormula, hybridAbilityMod, weaponStatBlend, spellDamageRef, spellInvestDamage, strikeInvestDamage, infusionDamage, investSelfDamage as computeInvestSelfDamage, effectiveDodgeValue, splitEvenlyWithRemainder, parryMassMultiplier } from '../helpers/formulas.mjs';
 import { recordActionFired, declareAction, isInActiveCombat, computeActionWait, referenceRoundLength, computeWindupMultiplier, getScrambleStacks, addScrambleStack, applyDodgeCost, findCombatantForActor, perceiveGate } from '../systems/celerity.mjs';
 import { getThreatRadiusFt, actorIsDashing } from '../systems/engagement-halts.mjs';
 import { selectTargetOnCanvas, skillNeedsTargetPrompt, skillTargetsAtFire, selectMarkerOnCanvas } from '../canvas/target-prompt.mjs';
 import { regionTokenOverlap, segmentIntersect } from '../helpers/geometry.mjs';
 import { CraftingSkillsMixin } from '../systems/crafting-skills.mjs';
 import { executeGmAction as executeGmActionImpl } from '../systems/gm-actions.mjs';
-import { proficiencyDamageMult } from '../systems/weapon-styles.mjs';
+import { proficiencyDamageMult, heldWeaponWeight } from '../systems/weapon-styles.mjs';
 
 /**
  * Check if an actor is an assigned player character (not just owned).
@@ -1019,19 +1019,29 @@ export class AspectsofPowerItem extends Item {
           });
         } else if (rType === 'parry') {
           const parryRoll = await reactionSkill.roll({ parryOnly: true });
-          const parryTotal = parryRoll ? Math.round(parryRoll.total) : 0;
+          const rawParry = parryRoll ? Math.round(parryRoll.total) : 0;
+          // MASS RATIO (ruled 2026-07-27) — it is hard to parry a huge sword.
+          // The defender's own weapon weight already feeds their blend, but the
+          // attacker's did nothing, so a dagger turned a claymore aside exactly
+          // as well as another claymore. Capped at 1: being outmassed is a
+          // penalty, out-massing is not a bonus.
+          const massMult = parryMassMultiplier(
+            heldWeaponWeight(targetActor), heldWeaponWeight(this.actor));
+          const parryTotal = Math.round(rawParry * massMult);
+          const massNote = massMult < 1
+            ? ` <em>(outmassed: x${massMult.toFixed(2)} of ${rawParry})</em>` : '';
           if (parryTotal >= hitTotal) {
             isHit = false;
             reactionLine = `<p><em>${targetActor.name} parries with <strong>${reactionSkill.name}</strong>! `
-                         + `(${parryTotal} vs ${hitTotal})</em></p>`;
+                         + `(${parryTotal} vs ${hitTotal})${massNote}</em></p>`;
             ChatMessage.create({ speaker: reactionSpeaker,
-              content: `<p><strong>${targetActor.name}</strong> parries the blow with <strong>${reactionSkill.name}</strong>! (${parryTotal} vs ${hitTotal})</p>`,
+              content: `<p><strong>${targetActor.name}</strong> parries the blow with <strong>${reactionSkill.name}</strong>! (${parryTotal} vs ${hitTotal})${massNote}</p>`,
             });
           } else {
             reactionLine = `<p><em>${targetActor.name} fails to parry with <strong>${reactionSkill.name}</strong> `
-                         + `(${parryTotal} vs ${hitTotal})</em></p>`;
+                         + `(${parryTotal} vs ${hitTotal})${massNote}</em></p>`;
             ChatMessage.create({ speaker: reactionSpeaker,
-              content: `<p><strong>${targetActor.name}</strong> attempts to parry with <strong>${reactionSkill.name}</strong> but fails! (${parryTotal} vs ${hitTotal})</p>`,
+              content: `<p><strong>${targetActor.name}</strong> attempts to parry with <strong>${reactionSkill.name}</strong> but fails! (${parryTotal} vs ${hitTotal})${massNote}</p>`,
             });
           }
         } else if (rType === 'barrier') {

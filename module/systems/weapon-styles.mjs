@@ -188,6 +188,27 @@ export function proficiencyDamageMult(actor, weapon = null) {
 }
 
 /**
+ * Heaviest equipped weapon weight, used as "the mass in your hands" by the
+ * parry mass rule. Shields COUNT here (unlike blockDR, which excludes them to
+ * avoid double-dipping with their armorBonus) because a shield is exactly what
+ * you would raise against a heavy blow — which is what makes a greatshield the
+ * natural answer to a greatsword.
+ *
+ * Returns 0 when nothing resolvable is held; callers floor it.
+ *
+ * @param {Actor} actor
+ * @returns {number}
+ */
+export function heldWeaponWeight(actor) {
+  const table = globalThis.CONFIG?.ASPECTSOFPOWER?.weaponWeights ?? {};
+  let best = 0;
+  for (const w of equippedWeapons(actor)) {
+    for (const t of weaponTypesOfItem(w)) best = Math.max(best, table[t] ?? 0);
+  }
+  return best;
+}
+
+/**
  * May this skill be used with what the actor currently has, and knows?
  * Gates on `requiresStyle` (the arrangement), `requiresWeaponTag` (the type
  * in hand), and `styleSkill` (the governing Passive the actor must OWN).
@@ -217,5 +238,6 @@ export function canUseSkill(actor, skill) {
 
 export const WeaponStyleHelpers = {
   weaponTypesOf, weaponTypesOfItem, detectStyles, hasStyle,
-  proficiencyFor, activeProficiencies, proficiencyDamageMult, canUseSkill,
+  proficiencyFor, activeProficiencies, proficiencyDamageMult,
+  heldWeaponWeight, canUseSkill,
 };

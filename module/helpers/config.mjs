@@ -390,6 +390,12 @@ ASPECTSOFPOWER.defenseTuning = {
   // ~364 (the 30-60% design band). Shields excluded — they already grant
   // armorBonus via craftShieldArmorValues.
   blockDRCoef: 80,
+  // Parry mass ratio (RULED 2026-07-27, k=0.3 "gentle"): a parry is scaled by
+  // min(1, (defenderWeaponWeight / attackerWeaponWeight) ^ k), so heavy weapons
+  // are hard to turn aside. At 0.3 a dagger parries a greatsword at x0.70 and a
+  // sword at x0.81 — a real thumb on the scale that never decides the exchange
+  // on weapon choice alone. Set to 0 to disable. See formulas.parryMassMultiplier.
+  parryMassExponent: 0.3,
   // Shrapnel: instead of the old pool-cost multiplier, shrapnel attacks
   // penalize the dodge roll by this fraction (fragments are hard to dodge).
   shrapnelDodgePenalty: 0.25,
