@@ -51,10 +51,22 @@ export function weaponTypesOfItem(item) {
   return (item?.system?.tags ?? []).filter(t => table[t] != null);
 }
 
-/** Every weapon TYPE key the actor is currently wielding. */
+/**
+ * Every weapon TYPE key the actor is currently wielding.
+ *
+ * Empty hands resolve to `unarmed` rather than to nothing. Fists are a weapon
+ * type with a weight (40) like any other, and without this an Unarmed
+ * Proficiency could never resolve — the resolver reads equipped items, and a
+ * brawler equips nothing.
+ *
+ * Deliberately EMPTY HANDS ONLY: holding anything at all, shield or implement
+ * included, suppresses it. Modelling a free off-hand would mean deciding which
+ * hand each item occupies, which nothing else in the system tracks.
+ */
 export function weaponTypesOf(actor) {
   const found = new Set();
   for (const w of equippedWeapons(actor)) for (const t of weaponTypesOfItem(w)) found.add(t);
+  if (!found.size) found.add('unarmed');
   return [...found];
 }
 
