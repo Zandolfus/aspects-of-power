@@ -239,7 +239,28 @@ ASPECTSOFPOWER.spellstrike = {
  * DR-strip (toughDR layer) is separate (drStrip flag). Legacy %-fields kept for
  * back-compat/migration only; the calc no longer reads them.
  */
+/**
+ * ── THE FLAT-IDENTITY RULE (RULED 2026-07-28) ──
+ * A weapon's signature mechanic is a property of the WEAPON and does not scale
+ * with the wielder's mastery. Hammer pierce and axe wear are both FLAT.
+ *
+ * Mastery expresses itself as DAMAGE and nothing else
+ * (systems/weapon-styles.proficiencyDamageMult). A divine hammer master pierces
+ * exactly as deeply as someone who picked one up this morning — they simply hit
+ * far harder with it.
+ *
+ * Chosen for symmetry after the two mechanics were nearly ruled differently.
+ * The practical argument: laddering axe wear reopens the multi-axe case (wear
+ * scales linearly with attacker count, so five masters strip a kit in ~5 rounds
+ * at 20%), and fixing that needs per-round attacker tracking that
+ * degradeDurability cannot do — it is called once per damage application with
+ * no knowledge of how many attackers exist. Rather than ladder one and not the
+ * other, neither ladders.
+ *
+ * If this is ever revisited, BOTH move together.
+ */
 ASPECTSOFPOWER.armorAnswer = {
+  // FLAT, never laddered by mastery — see the flat-identity rule above.
   pierceHitFrac:       0.23,   // pierce flat = frac × attacker hit
   pierceWeaponTypes:  ['hammer', 'mace'],
   crushHitFrac:        0.10,   // crush flat, PER application = frac × applier hit
@@ -254,9 +275,11 @@ ASPECTSOFPOWER.armorAnswer = {
   // 1-3 rounds. Wearing on absorbed damage inverts it: the heavier the wall,
   // the harder it works, the faster it wears. HP mitigation is untouched.
   //
-  // 10% FLAT, no mastery ladder — the sim showed the RATE, not the model,
-  // drove the multi-axe problem. Rounds to strip a heavy kit with 5 axes:
-  // 20% → 5 rounds; 10% → 10. A solo axe never strips anyone.
+  // 10% FLAT, no mastery ladder — per the flat-identity rule above, and because
+  // the sim showed the RATE, not the model, drove the multi-axe problem.
+  // Rounds to strip a heavy kit with 5 axes: 20% → 5 rounds; 10% → 10.
+  // A solo axe never strips anyone. Note the gate is HOLDING an axe, not owning
+  // any axe proficiency — untrained hands wear armour at the same rate.
   // Anchored to the ATTACKER's hit, so a gang of inferiors cannot grind down a
   // superior's kit (verified: 8 weak axes leave the best-armoured actor
   // intact). Set to 0 to disable.
