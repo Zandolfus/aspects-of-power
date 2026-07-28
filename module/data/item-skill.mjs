@@ -364,14 +364,25 @@ export class SkillData extends foundry.abstract.TypeDataModel {
         requiresStyle: new fields.StringField({ initial: '' }),
         requiresWeaponTag: new fields.StringField({ initial: '' }),
         styleSkill: new fields.StringField({ initial: '' }),
-        // Riders, all proportional per the no-flat-constants house rule.
-        // Hammer: fraction of the armour term that simply does not apply.
-        profArmorBypassPct: new fields.NumberField({ initial: 0, min: 0, max: 1 }),
-        // Axe: MULTIPLIES durability damage already being dealt, rather than
-        // adding a slice of the strike. Ruled 2026-07-26 — a multiplier cannot
-        // reach through a wall that is stopping everything, so a fully-armoured
-        // tank stays immune and only those already taking damage degrade faster.
-        profDurabilityMult: new fields.NumberField({ initial: 1, min: 1 }),
+        // NOTE (2026-07-28): `profArmorBypassPct` and `profDurabilityMult` were
+        // declared here and never read by anything. Both are now DELETED rather
+        // than wired, because sims disqualified both shapes:
+        //
+        //   profArmorBypassPct (a fraction of the TARGET's armour) is exactly
+        //   the shape the 2026-07-18 flat armor-answer rework rejected — it
+        //   lets a lower-grade attacker strip a fixed share of a superior's
+        //   armour regardless of how hard they actually swing (a weak hit of
+        //   166 would still remove 434 of Phil's 867). Hammers already pierce
+        //   at a flat 0.23 × attacker hit; deepening THAT fraction is the
+        //   grade-safe way to express hammer mastery.
+        //
+        //   profDurabilityMult (multiply the damage that got through) is inert:
+        //   a round-by-round cascade sim found no case at any multiplier from
+        //   x1 to x4 where a piece ever broke. Superseded by armorAnswer
+        //   .axeWearRate, which wears armour by what it STOPPED.
+        //
+        // Left as a comment, not a field, so nobody re-adds them without
+        // re-reading why they went.
         // Dual-wield: off-hand contributes this share of its blockDR, and the
         // arrangement costs a little accuracy.
         profOffhandBlockCoef: new fields.NumberField({ initial: 0, min: 0, max: 1 }),

@@ -245,6 +245,23 @@ ASPECTSOFPOWER.armorAnswer = {
   crushHitFrac:        0.10,   // crush flat, PER application = frac × applier hit
   armorCrushMaxStacks: 3,      // cap on crush stacks that contribute
   burnMeltRate:        0.5,    // default armor-melt rate (× Σ burn dotDamage)
+  // ── AXE WEAR (design-weapon-proficiencies.md, RULED 2026-07-28) ──
+  // Armour is worn by what it STOPPED (min(hit, wall) × rate), not by what got
+  // through. The previously-ruled "multiply the damage that got through" model
+  // is provably inert — a cascade sim found NO case at any multiplier from x1
+  // to x4 where a piece ever broke, because a wall thick enough to matter lets
+  // nothing through, and anything that does get through kills the target in
+  // 1-3 rounds. Wearing on absorbed damage inverts it: the heavier the wall,
+  // the harder it works, the faster it wears. HP mitigation is untouched.
+  //
+  // 10% FLAT, no mastery ladder — the sim showed the RATE, not the model,
+  // drove the multi-axe problem. Rounds to strip a heavy kit with 5 axes:
+  // 20% → 5 rounds; 10% → 10. A solo axe never strips anyone.
+  // Anchored to the ATTACKER's hit, so a gang of inferiors cannot grind down a
+  // superior's kit (verified: 8 weak axes leave the best-armoured actor
+  // intact). Set to 0 to disable.
+  axeWearRate:        0.10,
+  axeWeaponTypes:     ['axe', 'greataxe'],
   // ── legacy %-fields (SUPERSEDED by flat, kept for migration back-compat) ──
   pierceFraction:     0.35,
   armorCrushPerStack: 0.10,

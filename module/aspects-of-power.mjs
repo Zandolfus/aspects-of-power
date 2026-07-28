@@ -2491,7 +2491,47 @@ Hooks.on('renderChatMessageHTML', (message, html) => {
         const effectiveDR = Math.max(0, drValue - affinityDR);
         const postBarrierDmg = barrierAbsorbed ? Math.max(0, incomingDmg - (barrier?.value ?? 0)) : incomingDmg;
         const totalDurabilityDmg = Math.max(0, postBarrierDmg - mitigation - effectiveDR);
-        if (totalDurabilityDmg > 0) await EquipmentSystem.degradeDurability(target, totalDurabilityDmg, damageType);
+
+        // AXE WEAR (design-weapon-proficiencies.md, RULED 2026-07-28) — armour
+        // is worn by what it STOPPED, not by what leaked past it.
+        //
+        // The previously-ruled model (multiply the damage that got through) is
+        // provably inert: a round-by-round cascade sim found firstBreak === null
+        // in every case at every multiplier from x1 to x4, because the two
+        // requirements are mutually exclusive. If the wall is thick enough for
+        // armour to matter, nothing gets through, so nothing degrades. If damage
+        // does get through, the target dies in 1-3 rounds, long before armour
+        // fails. There was no window in which it could ever fire.
+        //
+        // Wearing on what was ABSORBED inverts that: the heavier the wall, the
+        // more work it does, the faster it wears. HP mitigation is untouched -
+        // a tank still takes zero - they simply cannot be a wall indefinitely.
+        //
+        // Anchored to min(hit, wall) so it scales with the ATTACKER's output,
+        // never the target's armour. That is what keeps the stat gap absolute:
+        // a gang of inferiors cannot grind down a superior's kit, verified at
+        // up to 8 weak attackers against the best-armoured actor in the world.
+        // Rate 10% flat (no mastery ladder) because the sim showed the RATE,
+        // not the model, drove the multi-axe problem: at 20% five axes strip a
+        // heavy kit in 5 rounds; at 10% they need 10 and a solo axe never does.
+        const _aaCfg = CONFIG.ASPECTSOFPOWER.armorAnswer ?? {};
+        const wearRate = _aaCfg.axeWearRate ?? 0;
+        let axeWear = 0;
+        if (wearRate > 0 && damageType === 'physical' && attackerActorUuid) {
+          try {
+            const atkActor = await fromUuid(attackerActorUuid);
+            const { weaponTypesOf } = await import('./systems/weapon-styles.mjs');
+            const types = atkActor ? weaponTypesOf(atkActor) : [];
+            const axeTypes = _aaCfg.axeWeaponTypes ?? ['axe', 'greataxe'];
+            if (types.some(t => axeTypes.includes(t))) {
+              const stopped = Math.min(postBarrierDmg, mitigation + effectiveDR);
+              axeWear = Math.max(0, Math.round(stopped * wearRate));
+            }
+          } catch { /* attacker gone — no wear rather than a thrown handler */ }
+        }
+
+        const durDmg = totalDurabilityDmg + axeWear;
+        if (durDmg > 0) await EquipmentSystem.degradeDurability(target, durDmg, damageType);
       }
 
       const breakdown = parts.length ? ` (${parts.join(', ')})` : '';
