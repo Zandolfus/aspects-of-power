@@ -612,6 +612,7 @@ ASPECTSOFPOWER.weaponCombinations = {
 
   // Single hand / nothing.
   'single-weapon':       { label: 'Single Weapon', hands: 1, kind: 'melee', inPlay: 2 },
+  'shield-alone':        { label: 'Shield Alone',  hands: 1, kind: 'melee', types: ['shield', 'greatshield', 'buckler'], inPlay: 0 },
   unarmed:               { label: 'Unarmed',       hands: 0, kind: 'melee', inPlay: 0 },
 
   // RANGED — its own axis. Bows and firearms are two-handed in the literal

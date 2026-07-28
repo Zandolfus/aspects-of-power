@@ -127,6 +127,12 @@ export function detectStyles(actor) {
   // ── Mixed and single ──
   if (melee.length === 1 && shields.length >= 1) out.push('sword-and-board');
   if (melee.length === 1 && implements_.length >= 1) out.push('blade-and-implement');
+  // A lone shield and nothing else. Without this it fell through every branch
+  // into `other`, the junk bucket, which no skill can gate on — a silent hole
+  // found by actually equipping one.
+  if (shields.length === 1 && !melee.length && !implements_.length && !ranged.length) {
+    out.push('shield-alone');
+  }
   if (melee.length === 1 && !twoHanders.length && !shields.length && !implements_.length) {
     out.push('single-weapon');
   }
