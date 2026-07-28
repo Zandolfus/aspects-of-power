@@ -39,8 +39,30 @@ export class ClassData extends foundry.abstract.TypeDataModel {
       }), { initial: [] }),
 
       // UUIDs of compendium skill items this class grants. Mirrors the
-      // profession + equipment grantedSkills pattern.
+      // profession + equipment grantedSkills pattern. Applied by
+      // systems/template-grants.mjs.
       grantedSkills: new fields.ArrayField(new fields.StringField(), { initial: [] }),
+
+      // Weapon proficiencies this class confers, and at what MASTERY
+      // (design-weapon-proficiencies.md). A plain grantedSkills UUID list
+      // cannot express this: the very same Sword Proficiency is `common` for a
+      // Light Warrior's finesse weapons and `inferior` for a Heavy Warrior's
+      // one-handers, so the tier has to travel with the grant rather than
+      // living on the source skill.
+      //
+      // Enumerated per TYPE, not per group — "two-handed common" is stored as
+      // one entry each for greatsword, greataxe, polearm and quarterstaff, so
+      // the table stays explicit and a new weapon type never silently joins a
+      // class's repertoire.
+      //
+      // Resolution is BEST-TIER-WINS across every template on the actor's
+      // history, and grants are upgrade-only: advancing a class can raise a
+      // proficiency but never demote one (the design notes' "gain Uncommon
+      // Archery IF NOT ALREADY").
+      profGrants: new fields.ArrayField(new fields.SchemaField({
+        type:   new fields.StringField({ initial: '' }),   // CONFIG.weaponWeights key
+        rarity: new fields.StringField({ initial: 'common' }),
+      }), { initial: [] }),
     };
   }
 }

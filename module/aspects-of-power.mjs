@@ -42,6 +42,7 @@ import * as Downtime from './systems/downtime.mjs';
 import { DotHelpers } from './systems/dot.mjs';
 import * as Affinity from './systems/affinity.mjs';
 import * as WeaponStyles from './systems/weapon-styles.mjs';
+import * as TemplateGrants from './systems/template-grants.mjs';
 import { SummonHelpers, registerSummonHooks } from './systems/summon.mjs';
 import { ChannelHelpers, registerChannelHooks } from './systems/channel.mjs';
 import { AIProfiles, registerAIHooks, aiSetFactionFocus } from './systems/ai.mjs';
@@ -107,6 +108,10 @@ Hooks.once('init', function () {
     affinity: { ...Affinity },
     // Weapon TYPE proficiency + STYLE detection (systems/weapon-styles.mjs).
     weaponStyles: { ...WeaponStyles },
+    // Class/race/profession grants (systems/template-grants.mjs). Rebuilt from
+    // the lost migration/local/sync_granted_skills.js the schema still cites.
+    // Cumulative and upgrade-only; dry-run with syncAll({dryRun:true}).
+    templateGrants: { ...TemplateGrants },
     // GM faction-focus command (ai.mjs): stamp aiFocusTarget on every
     // AI-profiled unit of a disposition. Console/macro v1.
     aiSetFactionFocus,
