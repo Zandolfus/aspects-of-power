@@ -521,9 +521,17 @@ export class AspectsofPowerItem extends Item {
     const dbRaw = rollData.roll.diceBonus ?? 1;
     // Same precedence the invest paths use: an explicit diceBonus wins,
     // otherwise the rarity-derived effective multiplier.
-    const db  = (applyRarityMult && (!dbRaw || dbRaw === 1))
+    const dbBase = (applyRarityMult && (!dbRaw || dbRaw === 1))
       ? (this._resolveRarityMods?.()?.effectiveMult ?? dbRaw)
       : dbRaw;
+    // Weapon proficiency applies EITHER WAY. effectiveMult already carries it,
+    // but an explicit diceBonus bypasses effectiveMult entirely — so without
+    // this a skill could opt out of proficiency scaling just by authoring a
+    // diceBonus, which is exactly the sort of silent exemption a content author
+    // would never notice. Multiplied on top of the authored value instead.
+    const db = (applyRarityMult && dbRaw && dbRaw !== 1)
+      ? dbBase * this._proficiencyDamageMult()
+      : dbBase;
     const dic = rollData.roll.dice || '0';
     const typ = rollData.roll.type;
 
