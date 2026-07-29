@@ -262,7 +262,10 @@ ASPECTSOFPOWER.spellstrike = {
 ASPECTSOFPOWER.armorAnswer = {
   // FLAT, never laddered by mastery — see the flat-identity rule above.
   pierceHitFrac:       0.23,   // pierce flat = frac × attacker hit
-  pierceWeaponTypes:  ['hammer', 'mace'],
+  // Blunt weapons transmit through armour. `mace` was listed here from the
+  // start but is NOT a key in weaponWeights, so it has never matched anything —
+  // kept only so removing it is a deliberate act rather than a silent one.
+  pierceWeaponTypes:  ['hammer', 'greathammer', 'mace'],
   crushHitFrac:        0.10,   // crush flat, PER application = frac × applier hit
   armorCrushMaxStacks: 3,      // cap on crush stacks that contribute
   burnMeltRate:        0.5,    // default armor-melt rate (× Σ burn dotDamage)
@@ -636,6 +639,7 @@ ASPECTSOFPOWER.weaponCombinations = {
   // Two-handed melee, discipline-specific.
   '2h-greatsword':       { label: 'Two-Handed Greatsword', hands: 2, kind: 'melee', types: ['greatsword'], inPlay: 1 },
   '2h-greataxe':         { label: 'Two-Handed Greataxe',   hands: 2, kind: 'melee', types: ['greataxe'],   inPlay: 1 },
+  '2h-greathammer':      { label: 'Two-Handed Greathammer', hands: 2, kind: 'melee', types: ['greathammer'], inPlay: 1 },
   '2h-polearm':          { label: 'Two-Handed Polearm',    hands: 2, kind: 'melee', types: ['polearm', 'spear', 'quarterstaff'], inPlay: 0 },
   'two-handed':          { label: 'Two-Handed',            hands: 2, kind: 'melee', generic: true, inPlay: 1 },
 
@@ -945,6 +949,10 @@ ASPECTSOFPOWER.weaponWeights = {
   polearm:   180,
   greatsword: 200,
   greataxe:  220,
+  // Greathammer sits at the top of the melee table. The one-handed pair sets
+  // the spacing — hammer 130 is ten over axe 120 — so the two-handed pair
+  // keeps it: greathammer 230 is ten over greataxe 220.
+  greathammer: 230,
   // Defensive weapons. Shields were craftable (buckler/shield/greatshield are
   // all in craftItemTypes) but had NO weight, so they resolved to no weapon
   // type at all — Phil's greatshield read as untyped and could not be part of
@@ -1514,6 +1522,7 @@ ASPECTSOFPOWER.craftItemTypes = {
   rapier:       { category: 'armaments', tags: ['weapon', '1H', 'rapier'],                      slot: 'weaponry' },
   greatsword:   { category: 'armaments', tags: ['weapon', '2H', 'greatsword'],                  slot: 'weaponry' },
   greataxe:     { category: 'armaments', tags: ['weapon', '2H', 'greataxe'],                    slot: 'weaponry' },
+  greathammer:  { category: 'armaments', tags: ['weapon', '2H', 'greathammer'],                 slot: 'weaponry' },
   polearm:      { category: 'armaments', tags: ['weapon', '2H', 'polearm'],                     slot: 'weaponry' },
   quarterstaff: { category: 'armaments', tags: ['weapon', '2H', 'quarterstaff'],                slot: 'weaponry' },
   staff:        { category: 'armaments', tags: ['weapon', '2H', 'staff'],                       slot: 'weaponry' },

@@ -120,6 +120,7 @@ export function detectStyles(actor) {
     const t = typesOf(twoHanders);
     if (t.includes('greatsword')) out.push('2h-greatsword');
     if (t.includes('greataxe')) out.push('2h-greataxe');
+    if (t.includes('greathammer')) out.push('2h-greathammer');
     if (t.some(x => ['polearm', 'spear', 'quarterstaff'].includes(x))) out.push('2h-polearm');
     out.push('two-handed');
   }
