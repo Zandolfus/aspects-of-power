@@ -681,17 +681,26 @@ ASPECTSOFPOWER.weaponStyles = ASPECTSOFPOWER.weaponCombinations;
  *
  *   not_proficient 0.33x · rusty 0.67x · common 1.00x · legendary 1.67x · divine 2.00x
  *
- * ABSENCE IS NEUTRAL, never a penalty. An actor with no proficiency passive
- * for the weapon in hand multiplies by 1.0. This is load-bearing: ~110 NPCs
- * swing natural weapons and every current PC owns zero proficiencies, so a
- * penalty-on-absence rule would silently nerf the entire world the moment it
- * shipped. The sub-common tiers only bite when someone actually OWNS a rusty
- * or not_proficient passive — a deliberate authored statement ("out of
- * practice"), which is also the only way the flavour makes sense.
+ * LACKING A PROFICIENCY COUNTS AS `untrainedRarity` (rusty, 0.67x) — ruled
+ * 2026-07-29 — but ONLY for actors who own at least one proficiency passive.
+ * A trained fighter picking up an unfamiliar weapon fumbles with it; a wolf is
+ * not "unproficient with its own teeth".
+ *
+ * That scoping is load-bearing. Applied literally the penalty hit 205 of 211
+ * actors for -33%, because 186 resolve through the `unarmed` fallback — every
+ * beast and construct whose natural weapons carry no type tag. Keying on
+ * ownership makes it self-scoping: grant a creature proficiencies and it opts
+ * in, and the bestiary stays untouched until someone decides otherwise.
+ *
+ * Spells are unaffected regardless: only weapon-flavoured roll types are
+ * proficiency-scaled, and magic uses its own.
  */
 ASPECTSOFPOWER.weaponProficiency = {
   enabled: true,
   anchor: 'common',
+  // What an untrained-but-tracked actor is treated as. Set to 'common' to
+  // restore the old absence-is-neutral behaviour for tracked actors too.
+  untrainedRarity: 'rusty',
   // Applies to weapon-flavoured roll types only; spells are not proficiency-scaled.
   rollTypes: ['str_weapon', 'dex_weapon', 'phys_melee', 'phys_ranged', 'weapon'],
 };

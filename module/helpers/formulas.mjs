@@ -252,11 +252,10 @@ export function splitEvenlyWithRemainder(total, keys) {
  *
  *   not_proficient 0.33x · rusty 0.67x · common 1.00x · legendary 1.67x · divine 2.00x
  *
- * `rarity` null/unknown means the actor owns NO proficiency for the weapon in
- * hand, which returns 1 — absence is neutral, never a penalty. That rule is
- * load-bearing: ~110 NPCs swing untyped natural weapons and no PC owned a
- * proficiency when this shipped, so penalising absence would have silently
- * nerfed the whole world in one commit.
+ * `rarity` null/unknown returns 1. This helper only maps a rarity to a
+ * multiplier — the POLICY for what an untrained hand counts as lives in
+ * systems/weapon-styles.proficiencyDamageMult, which (since 2026-07-29) treats
+ * it as `rusty` for proficiency-tracked actors and neutral for everyone else.
  *
  * @param {string|null} rarity  The proficiency passive's rarity, or null if none.
  * @param {object} [rarities]   skillRarities override (defaults to CONFIG).

@@ -176,14 +176,24 @@ export function activeProficiencies(actor) {
  *
  *   mult = skillRarities[prof.rarity].mult / skillRarities[anchor].mult
  *
- * ABSENCE IS NEUTRAL — an actor with no proficiency for the weapon in hand
- * returns 1.0, never a penalty. This is load-bearing: ~110 NPCs swing natural
- * weapons and no PC owns a proficiency yet, so penalising absence would nerf
- * the entire world on the commit that shipped it. The sub-common tiers only
- * bite when someone actually OWNS a rusty / not_proficient passive.
+ * LACKING A PROFICIENCY COUNTS AS RUSTY (ruled 2026-07-29) — but only for
+ * actors who are PROFICIENCY-TRACKED, meaning they own at least one
+ * proficiency passive. A trained fighter picking up an unfamiliar weapon
+ * fumbles with it; a wolf is not "unproficient with its own teeth".
+ *
+ * That scoping is load-bearing. Applying the penalty literally would have hit
+ * 205 of 211 actors for -33%, because 186 of them resolve through the
+ * `unarmed` fallback — every beast and construct whose natural weapons carry
+ * no type tag. Keying on ownership makes the rule self-scoping: grant a
+ * creature proficiencies and it opts in, and the bestiary stays untouched
+ * until someone decides otherwise.
  *
  * When several types are held (a wand in one hand, a sword in the other) the
  * BEST applicable proficiency wins — you are credited for the hand you know.
+ * KNOWN GAP: this is not yet scoped to the weapon the attack actually used, so
+ * a shield bash from someone holding a mastered greatsword takes the
+ * greatsword's multiplier. Pass `weapon` to scope it; the call site in
+ * item.mjs does not yet.
  *
  * @param {Actor} actor
  * @param {Item} [weapon] Resolve against one weapon; omit to use everything held.
@@ -193,15 +203,18 @@ export function proficiencyDamageMult(actor, weapon = null) {
   const cfg = globalThis.CONFIG?.ASPECTSOFPOWER?.weaponProficiency ?? {};
   if (cfg.enabled === false) return 1;
 
+  // Untracked actors are neutral, exactly as before. The penalty only exists
+  // for someone who has demonstrably been trained in SOMETHING.
+  const tracked = (actor?.items ?? []).some(i =>
+    i.type === 'skill' && i.system?.tagConfig?.profFor);
+  if (!tracked) return 1;
+
+  const untrained = proficiencyMultiplier(cfg.untrainedRarity ?? 'rusty');
   const types = weapon ? weaponTypesOfItem(weapon) : weaponTypesOf(actor);
-  const found = [];
-  for (const t of types) {
+  const found = types.map(t => {
     const p = proficiencyFor(actor, t);
-    if (!p) continue;                       // untracked type contributes nothing
-    found.push(proficiencyMultiplier(p.system?.rarity ?? null));
-  }
-  // No proficiency owned for anything in hand -> neutral, never a penalty.
-  // Own one and it applies, including the sub-common tiers.
+    return p ? proficiencyMultiplier(p.system?.rarity ?? null) : untrained;
+  });
   return found.length ? Math.max(...found) : 1;
 }
 
