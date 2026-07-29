@@ -189,12 +189,11 @@ export function activeProficiencies(actor) {
  * creature proficiencies and it opts in, and the bestiary stays untouched
  * until someone decides otherwise.
  *
- * When several types are held (a wand in one hand, a sword in the other) the
- * BEST applicable proficiency wins — you are credited for the hand you know.
- * KNOWN GAP: this is not yet scoped to the weapon the attack actually used, so
- * a shield bash from someone holding a mastered greatsword takes the
- * greatsword's multiplier. Pass `weapon` to scope it; the call site in
- * item.mjs does not yet.
+ * Pass `weapon` and the multiplier is judged against THAT weapon alone — which
+ * is what the attack path does (ruled 2026-07-29: "it should be based on the
+ * weapon you are swinging"). Omit it and the best of everything held wins,
+ * which is the right answer for callers that are asking about the actor rather
+ * than about one strike.
  *
  * @param {Actor} actor
  * @param {Item} [weapon] Resolve against one weapon; omit to use everything held.

@@ -238,7 +238,34 @@ export class AspectsofPowerItem extends Item {
     if (cfg.enabled === false || !this.actor) return 1;
     const rollTypes = cfg.rollTypes ?? [];
     if (!rollTypes.includes(this.system?.roll?.type)) return 1;
-    return proficiencyDamageMult(this.actor) || 1;
+    return proficiencyDamageMult(this.actor, this._proficiencyWeapon()) || 1;
+  }
+
+  /**
+   * Which weapon should this skill's proficiency be judged against?
+   * (RULED 2026-07-29: "It should be based on the weapon you are swinging.")
+   *
+   * `requiresWeaponTag` wins, because `_resolveWeaponForSkill` deliberately
+   * EXCLUDES shields — it exists to find the thing whose weight drives the
+   * damage formula, so a shield bash would otherwise be judged against the
+   * greatsword on the wielder's back. Shield Bash declares `shield`, so asking
+   * the skill what it needs finds the right object.
+   *
+   * Falls back to the damage-formula weapon, then to null, which lets
+   * proficiencyDamageMult use everything held (and resolve empty hands to
+   * `unarmed`) exactly as before.
+   *
+   * @returns {Item|null}
+   */
+  _proficiencyWeapon() {
+    const tag = this.system?.tagConfig?.requiresWeaponTag;
+    if (tag) {
+      const match = this.actor.items.find(i => i.type === 'item'
+        && i.system?.slot === 'weaponry' && i.system?.equipped === true
+        && (i.system?.tags ?? []).includes(tag));
+      if (match) return match;
+    }
+    return this._resolveWeaponForSkill?.() ?? null;
   }
 
   /**
