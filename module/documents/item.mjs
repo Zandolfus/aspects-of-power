@@ -5512,7 +5512,14 @@ export class AspectsofPowerItem extends Item {
       // Execute chained skills after all parent tags have resolved.
       await this._executeChainedSkills(hitResults, targets, speaker, rollMode,
         { investedAmount, parentDamage: dmgRoll?.total ?? 0,
-          autoRiders: !!options.aiAutoInvest || !_isPlayerCharacter(this.actor) });
+          // PLAYERS KEEP FULL CONTROL: gate on OWNERSHIP, not on who happens to
+          // be logged in. _isPlayerCharacter requires a non-GM user to be
+          // ACTIVE with this actor assigned, so a GM driving a PC -- or a
+          // player who stepped away -- silently lost the right to decide
+          // whether to spend their own stamina. hasPlayerOwner is true for any
+          // player-owned actor regardless of who is online; only genuine NPCs
+          // auto-fire.
+          autoRiders: !!options.aiAutoInvest || !this.actor?.hasPlayerOwner });
 
       // Mark initial targets as affected on persistent AOEs. Keys are token
       // ids and values are CLOCK TICKS — the re-tick eligibility check
@@ -5666,7 +5673,7 @@ export class AspectsofPowerItem extends Item {
     // Execute chained skills after all parent tags have resolved.
     await this._executeChainedSkills(hitResults, null, speaker, rollMode,
       { investedAmount, parentDamage: dmgRoll?.total ?? 0,
-        autoRiders: !!options.aiAutoInvest || !_isPlayerCharacter(this.actor) });
+        autoRiders: !!options.aiAutoInvest || !this.actor?.hasPlayerOwner });
 
     await this._applySustainEffect(speaker);
     return dmgRoll;
