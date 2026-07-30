@@ -270,7 +270,17 @@ ASPECTSOFPOWER.armorAnswer = {
   // crushHitFrac until 2026-07-30, which was simply wrong — the code always
   // multiplied dmgRoll.total, never the hit total. Old key still read as a
   // fallback so any stale reference keeps working.
-  crushDamageFrac:     0.10,
+  //
+  // 0.05 RULED 2026-07-30 from a 2D sweep against the live roster. At 0.10+
+  // crush stops being a heavy-armour answer and becomes a universal armour
+  // DELETER — three stacks of George's greataxe zeroed every mid-tier wall in
+  // the party (Frieda 357→0, Harvey 352→0). At 0.05 it dents them (357→153)
+  // and still does its real job: Phil's 912 layer → 708, which turns George's
+  // 186/hit into 390/hit and opens a ~2-round kill window inside the 3-round
+  // stack duration. The collateral is academic anyway — George already kills
+  // mid-tier targets in under a round WITHOUT crush, so the coefficient is
+  // tuned purely on the top-two-walls case, which is the only one it decides.
+  crushDamageFrac:     0.05,
   armorCrushMaxStacks: 3,      // cap on crush stacks that contribute
   burnMeltRate:        0.5,    // default armor-melt rate (× Σ burn dotDamage)
   // ── AXE WEAR (design-weapon-proficiencies.md, RULED 2026-07-28) ──
