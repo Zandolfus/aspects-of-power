@@ -318,6 +318,15 @@ export class SkillData extends foundry.abstract.TypeDataModel {
         // cooldown or a stack cap — see the riders config block.
         procTrigger:        new fields.StringField({ initial: '' }),
         procAttackTags:     new fields.ArrayField(new fields.StringField(), { initial: [] }),
+        // Per-rider cost coefficient; 0 = use config.riders.procCostDamageFrac.
+        // Needed because the cost scales with the PARENT's damage while stamina
+        // pools do not scale with weapon weight: at the 0.20 default a greataxe
+        // user (1354 damage, 225 pool) could never afford his own rider, while
+        // a dagger user (300 damage, 400 pool) affords six. A rider built for
+        // heavy weapons therefore wants a LOWER coefficient — each hit already
+        // lands for far more, so a smaller slice of it is still a large
+        // absolute cost. Armor Crush runs at 0.05 for exactly this reason.
+        procCostFrac:       new fields.NumberField({ initial: 0, min: 0, max: 1 }),
         debuffScaleWithAttack: new fields.NumberField({ initial: 0, min: 0, max: 1 }),
         debuffDirectional:  new fields.BooleanField({ initial: false }),
         debuffDealsDamage:  new fields.BooleanField({ initial: false }),

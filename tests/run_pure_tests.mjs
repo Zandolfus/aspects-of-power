@@ -395,6 +395,21 @@ eq('proc cost of a zero-damage parent still costs', psc(0, 0.20), 1);
 eq('proc cost never negative', psc(-500, 0.20), 1);
 eq('proc disabled at frac 0', psc(300, 0), 0);
 
+// -- Per-rider cost coefficient. The 0.20 default was calibrated on Gabriel's
+// 300-damage Strike; a greataxe user lands 1354 with a SMALLER pool (225 vs
+// 400), so cost scales with damage while pools do not scale with weapon
+// weight. A heavy-weapon rider needs a lower fraction. GOLDEN from the live
+// roster 2026-07-30.
+eq('crush at 0.20 is unaffordable for George (1354 dmg, 225 pool)',
+   procStaminaCost(1354, 0.20) > 225, true);
+eq('crush at 0.05 is affordable for George', procStaminaCost(1354, 0.05), 68);
+eq('crush at 0.05 affordable for Phil (1023 dmg, 184 pool)',
+   procStaminaCost(1023, 0.05) <= 184, true);
+// armorCrushMaxStacks is 3, so the cost only needs to permit ~3 procs.
+eq('George affords 3 crush stacks', Math.floor(225 / procStaminaCost(1354, 0.05)) >= 3, true);
+// Bleed keeps the default and stays where it was tuned.
+eq('bleed default unchanged for Strike', procStaminaCost(300, 0.20), 60);
+
 if (failures) { console.error(`\n${failures} FAILURES`); process.exit(1); }
 console.log('\nAll pure-function tests pass.');
 

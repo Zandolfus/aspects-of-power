@@ -5788,7 +5788,12 @@ export class AspectsofPowerItem extends Item {
           if (hitResult?.isHit !== true) continue;
           if (hitResult?.fullyBlocked === true) continue;
           if (hitResult?.piercedMitigation !== true) continue;
-          const cost = procStaminaCost(chainContext?.parentDamage ?? 0);
+          // Per-rider coefficient wins over the config default: a rider built
+          // for heavy weapons needs a lower fraction, because cost scales with
+          // the parent's damage while stamina pools do not scale with weapon
+          // weight (see the procCostFrac schema note).
+          const frac = (chainedItem.system?.tagConfig?.procCostFrac ?? 0) || null;
+          const cost = procStaminaCost(chainContext?.parentDamage ?? 0, frac);
           const pool = Math.round(this.actor.system.stamina?.value ?? 0);
           if (pool < cost) {
             ChatMessage.create({
