@@ -745,6 +745,17 @@ ASPECTSOFPOWER.riders = {
   // Trigger key riders subscribe to. Attacker-side counterpart to the
   // defender-side reactionTrigger vocabulary (self_attacked, self_struck…).
   procTriggerPierced: 'self_attack_pierced',
+  // How far past the base cost an `invest`-tagged rider may be pushed, as a
+  // multiple of that base. The proc cost was a flat toll with a yes/no prompt;
+  // invest-tagging turns it into a lever — how hard you wrench the wound open —
+  // and this bounds it. 3.0 keeps a full three-stack crush affordable on the
+  // heaviest hitter (George: base 68, ceiling 204, pool 225) so the ceiling
+  // binds on the STAMINA POOL rather than on an arbitrary cap, which is where
+  // the interesting decision lives. Magnitude scales LINEARLY with the invest
+  // (dotInvestScale / crushInvestScale), unlike the ^0.2 curve on swings and
+  // casts: a rider has no windup and no cast time, so the pool is the only
+  // thing paying for it, and a flat curve would make the lever inert.
+  maxInvestMult: 3.0,
 };
 
 ASPECTSOFPOWER.weaponProficiency = {

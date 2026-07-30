@@ -1,6 +1,6 @@
 import { EquipmentSystem } from '../systems/equipment.mjs';
 import { getPositionalTags } from '../helpers/positioning.mjs';
-import { houseHitFormula, hybridAbilityMod, weaponStatBlend, spellDamageRef, spellInvestDamage, strikeInvestDamage, infusionDamage, investSelfDamage as computeInvestSelfDamage, effectiveDodgeValue, splitEvenlyWithRemainder, parryMassMultiplier, lunarPhaseMultiplier, dotTickDamage, procStaminaCost, riderDamageBase } from '../helpers/formulas.mjs';
+import { houseHitFormula, hybridAbilityMod, weaponStatBlend, spellDamageRef, spellInvestDamage, strikeInvestDamage, infusionDamage, investSelfDamage as computeInvestSelfDamage, effectiveDodgeValue, splitEvenlyWithRemainder, parryMassMultiplier, lunarPhaseMultiplier, dotTickDamage, procStaminaCost, crushFlatAmount, riderMaxInvest } from '../helpers/formulas.mjs';
 import { recordActionFired, declareAction, isInActiveCombat, computeActionWait, referenceRoundLength, computeWindupMultiplier, getScrambleStacks, addScrambleStack, applyDodgeCost, findCombatantForActor, perceiveGate } from '../systems/celerity.mjs';
 import { getThreatRadiusFt, actorIsDashing } from '../systems/engagement-halts.mjs';
 import { selectTargetOnCanvas, skillNeedsTargetPrompt, skillTargetsAtFire, selectMarkerOnCanvas } from '../canvas/target-prompt.mjs';
@@ -322,18 +322,33 @@ export class AspectsofPowerItem extends Item {
    * @param {string} args.resourceLabel  Lowercase resource label ("mana", "stamina").
    * @param {string} args.potencyLabel   Display label for the potency stat ("Int", "Str/Dex blend", etc.).
    * @param {string} args.label        Skill name for dialog title.
+   * @param {number} [args.windup]     Weapon windup multiplier (weight×mult/100).
+   *                                   1 for spells, which have no windup term.
+   * @param {number} [args.truePool]   The actor's ACTUAL resource pool, when
+   *                                   `maxPool` is a lower slider ceiling.
+   * @param {number} [args.flatBonus]  Flat damage added after the curve (weapon
+   *                                   buffs), so the preview totals what lands.
    * @returns {Promise<number|null>}   Selected invest amount, or null on cancel.
    */
-  async _promptResourceInvest({ baseCost, safeInvest, maxPool, potency, multiplier, resourceLabel, potencyLabel, label, channelStat = null, channelFactor = null, hardCap = false, damageRef = null }) {
+  async _promptResourceInvest({ baseCost, safeInvest, maxPool, potency, multiplier, resourceLabel, potencyLabel, label, channelStat = null, channelFactor = null, hardCap = false, damageRef = null, windup = 1, truePool = null, flatBonus = 0 }) {
     const safeCeiling = baseCost + safeInvest;
     const startInvest = baseCost;
-    // Damage curve: potency × multiplier × (invested/ref)^0.2 — very flat,
-    // invest is a small lever. Self-damage: linear in excess/safeInvest.
+    // Damage curve: potency × multiplier × windup × (invested/ref)^0.2 — very
+    // flat, invest is a small lever. Self-damage: linear in excess/safeInvest.
     // `damageRef` overrides the denominator so this preview matches the actual
     // roll: spells normalize by a fixed grade-relative ref (spellDamageRef — the 65f8a42 tier fix), not
     // their own baseMana; weapons pass none and keep baseCost.
+    //
+    // WINDUP (2026-07-30): the preview called spellInvestDamage on BOTH paths,
+    // which has no weapon-weight term — so a dagger previewed 501 for a swing
+    // that dealt 300 (1.67× over) and a greataxe under-read by the inverse.
+    // This is now literally the function the strike path calls, with windup 1
+    // for spells (mathematically identical to the old spellInvestDamage call).
+    // Code standard 2: a dialog preview and its real path MUST call the same
+    // function — see [[playbook-damage-measurement]].
     const dmgRef = Math.max(1, damageRef ?? baseCost);
-    const computeDmg = (v) => spellInvestDamage(potency, multiplier, v, dmgRef);
+    const computeDmg = (v) => strikeInvestDamage(potency, multiplier, windup, v, dmgRef)
+      + Math.max(0, Math.round(flatBonus));
     const computeSelfDmg = (v) => computeInvestSelfDamage(potency, v, baseCost, safeInvest);
     // Channel time for spell invest — Wis_mod controls rate per design memo.
     const computeChannelTime = (channelStat && channelFactor)
@@ -348,6 +363,18 @@ export class AspectsofPowerItem extends Item {
 
     const ceilingLabel = hardCap ? 'Max invest' : 'Safe ceiling';
     const ceilingValue = hardCap ? maxPool : safeCeiling;
+    // `maxPool` is the SLIDER ceiling, not the pool — the weapon path clamps it
+    // so worst-case self-damage can't exceed current HP, which made a 400-stamina
+    // rogue read "Pool: 14". Show the real pool, and the cap separately when the
+    // two differ.
+    const shownPool = Math.round(truePool ?? maxPool);
+    const sliderCapRow = (!hardCap && shownPool !== maxPool)
+      ? `<div>Max invest: <strong>${maxPool}</strong> <span style="font-size:11px;color:#888;">(self-damage cap)</span></div>`
+      : '';
+    const windupCell = (windup !== 1)
+      ? `<div>Windup: <strong>${windup.toFixed(2)}×</strong></div>` : '';
+    const flatRow = (flatBonus > 0)
+      ? `<div>Weapon buff: <strong>+${Math.round(flatBonus)}</strong></div>` : '';
     const selfDmgRow = hardCap ? '' : `
           <div class="self-dmg-row" style="grid-column:1 / -1;">
             Self-damage: <strong class="self-dmg-display">${computeSelfDmg(startInvest)}</strong>
@@ -358,8 +385,11 @@ export class AspectsofPowerItem extends Item {
         <div class="invest-meta" style="display:grid;grid-template-columns:1fr 1fr;gap:4px;margin-bottom:8px;font-size:12px;">
           <div>Base ${resourceLabel}: <strong>${baseCost}</strong></div>
           <div>${ceilingLabel}: <strong>${ceilingValue}</strong></div>
-          <div>Pool: <strong>${maxPool}</strong></div>
+          <div>Pool: <strong>${shownPool}</strong></div>
+          ${sliderCapRow}
           <div>${potencyLabel} × Mult: <strong>${potency} × ${multiplier}</strong></div>
+          ${windupCell}
+          ${flatRow}
         </div>
         <div class="form-group">
           <label>Invest: <span class="invest-display">${startInvest}</span> ${resourceLabel}</label>
@@ -367,11 +397,11 @@ export class AspectsofPowerItem extends Item {
         </div>
         <div class="invest-readouts" style="display:grid;grid-template-columns:1fr 1fr;gap:4px;margin-top:8px;">
           <div>Predicted damage: <strong class="dmg-display">${computeDmg(startInvest)}</strong></div>
-          <div>Pool after: <strong class="remaining-display">${maxPool - startInvest}</strong></div>
+          <div>Pool after: <strong class="remaining-display">${shownPool - startInvest}</strong></div>
           ${channelRow}
           ${selfDmgRow}
         </div>
-        <p class="hint" style="font-size:11px;margin-top:8px;">Damage = ${potencyLabel} × multiplier × (invested/base)^0.2.${computeChannelTime ? ' Channel time scales with invest / Wis.' : ''}${hardCap ? '' : ` Excess past safe ceiling deals ${potencyLabel} × (excess/safe) self-damage.`}</p>
+        <p class="hint" style="font-size:11px;margin-top:8px;">Damage = ${potencyLabel} × multiplier${windup !== 1 ? ' × windup' : ''} × (invested/base)^0.2.${computeChannelTime ? ' Channel time scales with invest / Wis.' : ''}${hardCap ? '' : ` Excess past safe ceiling deals ${potencyLabel} × (excess/safe) self-damage.`}</p>
       </div>`;
 
     // DialogV2.wait with a `render` hook, not a hand-rolled promise: the static
@@ -412,7 +442,7 @@ export class AspectsofPowerItem extends Item {
           const dmg = computeDmg(v);
           investDisplay.textContent = v;
           dmgDisplay.textContent = dmg;
-          remainingDisplay.textContent = maxPool - v;
+          remainingDisplay.textContent = shownPool - v;
           if (channelDisplay && computeChannelTime) channelDisplay.textContent = computeChannelTime(v);
           if (selfDmgDisplay && selfDmgRowEl) {
             const selfDmg = computeSelfDmg(v);
@@ -438,12 +468,16 @@ export class AspectsofPowerItem extends Item {
    *
    * @returns {Promise<{stamina:number, mana:number}|null>}
    */
-  async _promptDualResourceInvest({ stamina, mana, multiplier, label, potencyLabel, channelStat = null, channelFactor = null, baseWait = 0 }) {
+  async _promptDualResourceInvest({ stamina, mana, multiplier, label, potencyLabel, channelStat = null, channelFactor = null, baseWait = 0, windup = 1, flatBonus = 0 }) {
     const safeCeiling = stamina.baseCost + stamina.safeInvest;
     const startStam = stamina.baseCost;
     const startMana = mana.baseCost;
 
-    const computeStrike = (sv) => strikeInvestDamage(stamina.potency, multiplier, 1, sv, Math.max(stamina.baseCost, 1));
+    // Windup was hardcoded to 1 here, same preview-drift bug as the single
+    // dialog — an infused strike is still a weapon swing and carries the
+    // weight term (2026-07-30, [[playbook-damage-measurement]]).
+    const _flat = Math.max(0, Math.round(flatBonus));
+    const computeStrike = (sv) => strikeInvestDamage(stamina.potency, multiplier, windup, sv, Math.max(stamina.baseCost, 1)) + _flat;
     // Infusion preview must mirror the real formula: Int × coef × (mana/dmgRef)^0.2
     // (fusion penalty coef + grade-relative fixed ref). Fall back to legacy
     // (coef 1, baseCost denom) if the caller didn't supply the new fields.
@@ -465,6 +499,8 @@ export class AspectsofPowerItem extends Item {
           <div>Infusion base (mana): <strong>${mana.baseCost}</strong></div>
           <div>${potencyLabel} × Mult: <strong>${stamina.potency} × ${multiplier}</strong></div>
           <div>Int mod: <strong>${mana.potency}</strong></div>
+          ${windup !== 1 ? `<div>Windup: <strong>${windup.toFixed(2)}×</strong></div>` : ''}
+          ${_flat > 0 ? `<div>Weapon buff: <strong>+${_flat}</strong></div>` : ''}
         </div>
 
         <div class="form-group" style="margin-top:6px;">
@@ -485,7 +521,7 @@ export class AspectsofPowerItem extends Item {
           <div style="font-size:14px;">Total damage: <strong class="total-display">${computeStrike(startStam) + computeInfusion(startMana)}</strong></div>
         </div>
 
-        <p class="hint" style="font-size:11px;margin-top:8px;">Strike = ${potencyLabel} × multiplier × (stamina/base)^0.2. Infusion = Int × ${infCoef} × (mana/ref)^0.2 (fusion penalty; mana wis-capped like a spell). Stamina excess past safe ceiling deals self-damage; mana has no self-damage.</p>
+        <p class="hint" style="font-size:11px;margin-top:8px;">Strike = ${potencyLabel} × multiplier${windup !== 1 ? ' × windup' : ''} × (stamina/base)^0.2. Infusion = Int × ${infCoef} × (mana/ref)^0.2 (fusion penalty; mana wis-capped like a spell). Stamina excess past safe ceiling deals self-damage; mana has no self-damage.</p>
       </div>`;
 
     // Same uniformity rule as the single-resource invest above: static helper
@@ -559,6 +595,86 @@ export class AspectsofPowerItem extends Item {
           });
         }
 
+      },
+    });
+  }
+
+  /**
+   * Invest dialog for an `invest`-tagged RIDER proc (Hemorrhage, Armor Crush).
+   *
+   * A rider without the tag gets a flat cost and a yes/no prompt. With it, the
+   * cost becomes the FLOOR of a slider and the effect's magnitude scales
+   * linearly off what is actually committed — "how hard do you tear the wound
+   * open". Cancel/close still declines the proc entirely, so the skip option
+   * the flat prompt provided is preserved.
+   *
+   * @returns {Promise<number|null>} stamina to commit, or null to decline.
+   */
+  async _promptRiderInvest({ riderItem, parentName, targetName, baseCost, maxInvest, pool }) {
+    const tc = riderItem.system?.tagConfig ?? {};
+    const hasDot   = (tc.debuffDealsDamage ?? false) || (riderItem.system.tags ?? []).includes('shred');
+    const dotScale = tc.dotInvestScale ?? 1.0;
+    const crushOn  = ((riderItem.system.tags ?? []).includes('crush'))
+                  || ((tc.debuffArmorCrush ?? 0) > 0);
+    const crushScale = tc.crushInvestScale ?? 1.0;
+    const dotAt   = (v) => Math.max(0, Math.round(dotScale * v));
+    const crushAt = (v) => Math.max(0, Math.round(crushScale * v));
+
+    const readouts = [
+      hasDot  ? `<div>Damage per round: <strong class="rider-dot">${dotAt(baseCost)}</strong></div>` : '',
+      crushOn ? `<div>Armour removed: <strong class="rider-crush">${crushAt(baseCost)}</strong></div>` : '',
+    ].filter(Boolean).join('');
+
+    const content = `
+      <div class="resource-invest rider-invest">
+        <p style="margin:0 0 6px;">${parentName} pierced <strong>${targetName}</strong>.</p>
+        <div class="invest-meta" style="display:grid;grid-template-columns:1fr 1fr;gap:4px;margin-bottom:8px;font-size:12px;">
+          <div>Base cost: <strong>${baseCost}</strong></div>
+          <div>Max invest: <strong>${maxInvest}</strong></div>
+          <div>Stamina: <strong>${pool}</strong></div>
+        </div>
+        <div class="form-group">
+          <label>Invest: <span class="invest-display">${baseCost}</span> stamina</label>
+          <input type="range" name="invest" min="${baseCost}" max="${maxInvest}" value="${baseCost}" step="1" style="width:100%;" />
+        </div>
+        <div class="invest-readouts" style="display:grid;grid-template-columns:1fr 1fr;gap:4px;margin-top:8px;">
+          ${readouts}
+          <div>Stamina after: <strong class="remaining-display">${pool - baseCost}</strong></div>
+        </div>
+        <p class="hint" style="font-size:11px;margin-top:8px;">Scales linearly with what you commit. Cancel to let the wound close.</p>
+      </div>`;
+
+    return foundry.applications.api.DialogV2.wait({
+      window: { title: `${riderItem.name}` },
+      content,
+      buttons: [
+        {
+          action: 'confirm',
+          label: 'Apply',
+          default: true,
+          callback: (event, button) => {
+            const v = parseInt(button.form.elements.invest?.value, 10);
+            return Math.min(Math.max(baseCost, v || baseCost), maxInvest);
+          },
+        },
+        { action: 'cancel', label: 'Skip', callback: () => null },
+      ],
+      close: () => null,
+      render: (event, dialog) => {
+        const root = dialog?.element ?? dialog;
+        const slider = root?.querySelector('input[name="invest"]');
+        if (!slider) return;
+        const investDisplay = root.querySelector('.invest-display');
+        const dotDisplay    = root.querySelector('.rider-dot');
+        const crushDisplay  = root.querySelector('.rider-crush');
+        const remaining     = root.querySelector('.remaining-display');
+        slider.addEventListener('input', () => {
+          const v = parseInt(slider.value, 10);
+          investDisplay.textContent = v;
+          if (dotDisplay)   dotDisplay.textContent   = dotAt(v);
+          if (crushDisplay) crushDisplay.textContent = crushAt(v);
+          remaining.textContent = pool - v;
+        });
       },
     });
   }
@@ -3186,12 +3302,21 @@ export class AspectsofPowerItem extends Item {
     // as the bleed): a bigger blow crushes more armour. Before this, crush used
     // its own roll while the DoT used the parent's — the two rider magnitudes
     // disagreed. riderDamageBase is now the single source for both.
+    //
+    // With the `invest` tag it rides the stamina COMMITTED to the crush instead
+    // (same override the DoT tick takes), so leaning on the proc buys more
+    // armour off. Identical at base invest — see crushFlatAmount.
     const _crushFrac = CONFIG.ASPECTSOFPOWER.armorAnswer?.crushDamageFrac
                     ?? CONFIG.ASPECTSOFPOWER.armorAnswer?.crushHitFrac ?? 0.10;
-    const _crushBase = riderDamageBase(rollData.roll?.parentDamage ?? 0, dmgRoll?.total ?? 0);
-    const armorCrushFlat = armorCrushVal > 0
-      ? Math.max(0, Math.round(_crushFrac * _crushBase))
-      : 0;
+    const armorCrushFlat = crushFlatAmount({
+      enabled: armorCrushVal > 0,
+      hasInvestTag: _hasInvestTag,
+      investAmount: _investAmt,
+      investScale: this.system.tagConfig?.crushInvestScale ?? 1.0,
+      crushFrac: _crushFrac,
+      parentDamage: rollData.roll?.parentDamage ?? 0,
+      ownDamage: dmgRoll?.total ?? 0,
+    });
     // Armor-MELT rate for burn effects (design-burn-status.md): opt-in via
     // tagConfig.debuffArmorMelt; only on a damaging DoT (its tick is the base).
     const armorMeltRate = (dealsDmg && (this.system.tagConfig?.debuffArmorMelt ?? 0) > 0)
@@ -4876,6 +5001,14 @@ export class AspectsofPowerItem extends Item {
         const { effectiveMult } = this._resolveRarityMods();
         const multiplier = (dbVal !== 1) ? dbVal : effectiveMult;
 
+        // Windup and the weapon buff are resolved BEFORE the invest dialog so
+        // the preview can include them — they are terms of the damage the swing
+        // actually deals, and a preview that omits them is a lie the player
+        // commits stamina against (2026-07-30).
+        const windup = computeWindupMultiplier(this, weapon);
+        const _wpnBuffPre = this.actor.system?.weaponStrikeBuff ?? null;
+        const weaponBuffDmg = Math.max(0, Math.round(_wpnBuffPre?.damage ?? 0));
+
         if (livePool < baseStamina) {
           ChatMessage.create({
             speaker, rollMode, ...(whisperGM ? { whisper: whisperGM } : {}),
@@ -4955,7 +5088,7 @@ export class AspectsofPowerItem extends Item {
             multiplier, label, potencyLabel,
             channelStat: wisMod,
             channelFactor: sc.celerity?.CHANNEL_FACTOR ?? null,
-            baseWait,
+            baseWait, windup, flatBonus: weaponBuffDmg,
           });
           if (result === null) return; // cancelled
           invested = result.stamina;
@@ -4965,6 +5098,7 @@ export class AspectsofPowerItem extends Item {
             baseCost: baseStamina, safeInvest, maxPool,
             potency: statBlend, multiplier,
             resourceLabel: 'stamina', potencyLabel, label,
+            windup, truePool: livePool, flatBonus: weaponBuffDmg,
           });
         }
         if (invested === null) return; // cancelled
@@ -4976,7 +5110,7 @@ export class AspectsofPowerItem extends Item {
         // weapons hit harder per swing (GS 2.0×), light hit lighter (dagger
         // 0.6×) — raw DPS-neutral with wait ∝ weight; the defense layer
         // (one big dodge vs many scrambling dodges) provides the archetype RPS.
-        const windup = computeWindupMultiplier(this, weapon);
+        // Resolved above the invest dialog so the preview shows the same number.
         const strikeDmg = strikeInvestDamage(statBlend, multiplier, windup, invested, baseStamina);
         if (useInfused && manaInvested > 0) {
           infusedManaCost = manaInvested;
@@ -4989,9 +5123,10 @@ export class AspectsofPowerItem extends Item {
         // (aggregated on the actor by prepareDerivedData). Recorded on rollData
         // so the per-affinity damage breakdown routes this portion through the
         // buff's affinity DR. Applies to melee AND ranged strikes (flaming
-        // arrows), NOT to spells/vehicle-spellstrikes.
-        const weaponBuff = this.actor.system?.weaponStrikeBuff ?? null;
-        const weaponBuffDmg = Math.max(0, Math.round(weaponBuff?.damage ?? 0));
+        // arrows), NOT to spells/vehicle-spellstrikes. Read above the dialog
+        // (weaponBuffDmg) so the preview includes it; re-read here only for the
+        // affinity list that routes its share through the buff's DR.
+        const weaponBuff = _wpnBuffPre;
         if (weaponBuffDmg > 0) {
           rollData.roll.weaponBuffDamage = weaponBuffDmg;
           rollData.roll.weaponBuffAffinities = [...(weaponBuff.affinities ?? [])];
@@ -5798,6 +5933,11 @@ export class AspectsofPowerItem extends Item {
         // trigger IS the pierce condition, and each proc pays its own cost.
         // Cost scales with the parent's damage — that is the whole rate limit;
         // no cooldown, no stack cap (config.riders).
+        // Set by the rider gate when an `invest`-tagged rider takes a variable
+        // commitment, and used below to override the parent's investedAmount on
+        // the rider's own rollData — a rider's magnitude rides ITS OWN invest,
+        // not the strike's.
+        let riderInvest = null;
         if (chain._rider) {
           if (hitResult?.isHit !== true) continue;
           if (hitResult?.fullyBlocked === true) continue;
@@ -5809,6 +5949,13 @@ export class AspectsofPowerItem extends Item {
           const frac = (chainedItem.system?.tagConfig?.procCostFrac ?? 0) || null;
           const cost = procStaminaCost(chainContext?.parentDamage ?? 0, frac);
           const pool = Math.round(this.actor.system.stamina?.value ?? 0);
+          // `invest` tag turns the flat toll into a lever: the cost is the floor
+          // of a slider and the rider's magnitude scales linearly off what is
+          // committed. At base invest the result is identical to the flat
+          // formula (dotInvestScale 0.5 × 0.20-cost = the old 0.10 dotScale;
+          // crushInvestScale 1.0 × 0.05-cost = the old 0.05 crush), so this is
+          // purely additive — nothing is nerfed by adding the tag.
+          const riderInvests = (chainedItem.system.tags ?? []).includes('invest');
           if (pool < cost) {
             ChatMessage.create({
               speaker, rollMode, ...(whisperGM ? { whisper: whisperGM } : {}),
@@ -5822,27 +5969,39 @@ export class AspectsofPowerItem extends Item {
           // rogue's pool on targets already bleeding or about to die. AI and
           // non-player actors take it automatically — a GM driving a dozen
           // hostiles cannot be prompted per swing.
+          let spend = cost;
           if (!chainContext?.autoRiders) {
             const tName = targetToken?.document?.name ?? 'the target';
-            const proceed = await foundry.applications.api.DialogV2.wait({
-              window: { title: `${chainedItem.name}` },
-              content: `<p>${this.name} pierced <strong>${tName}</strong>.</p>`
-                     + `<p>Apply <strong>${chainedItem.name}</strong> for `
-                     + `<strong>${cost}</strong> stamina? `
-                     + `<span class="hint">(${pool} → ${pool - cost})</span></p>`,
-              buttons: [
-                { action: 'yes', label: `Apply (${cost})`, default: true, callback: () => true },
-                { action: 'no', label: 'Skip', callback: () => false },
-              ],
-              close: () => false,
-            });
-            if (!proceed) continue;
+            if (riderInvests) {
+              const maxInvest = riderMaxInvest(cost, pool);
+              const chosen = await this._promptRiderInvest({
+                riderItem: chainedItem, parentName: this.name, targetName: tName,
+                baseCost: cost, maxInvest, pool,
+              });
+              if (chosen === null) continue;
+              spend = Math.min(Math.max(cost, chosen), pool);
+            } else {
+              const proceed = await foundry.applications.api.DialogV2.wait({
+                window: { title: `${chainedItem.name}` },
+                content: `<p>${this.name} pierced <strong>${tName}</strong>.</p>`
+                       + `<p>Apply <strong>${chainedItem.name}</strong> for `
+                       + `<strong>${cost}</strong> stamina? `
+                       + `<span class="hint">(${pool} → ${pool - cost})</span></p>`,
+                buttons: [
+                  { action: 'yes', label: `Apply (${cost})`, default: true, callback: () => true },
+                  { action: 'no', label: 'Skip', callback: () => false },
+                ],
+                close: () => false,
+              });
+              if (!proceed) continue;
+            }
           }
-          await this.actor.update({ 'system.stamina.value': pool - cost });
+          if (riderInvests) riderInvest = spend;
+          await this.actor.update({ 'system.stamina.value': pool - spend });
           ChatMessage.create({
             speaker, rollMode, ...(whisperGM ? { whisper: whisperGM } : {}),
             content: `<p><em>${this.actor.name} tears the wound open — `
-                   + `<strong>${chainedItem.name}</strong> (${cost} stamina).</em></p>`,
+                   + `<strong>${chainedItem.name}</strong> (${spend} stamina).</em></p>`,
           });
         }
 
@@ -5889,6 +6048,15 @@ export class AspectsofPowerItem extends Item {
         if (chainContext?.parentDamage != null) {
           chainRollData.roll = { ...(chainRollData.roll ?? {}),
             parentDamage: Math.max(0, Math.round(chainContext.parentDamage)) };
+        }
+        // An `invest`-tagged RIDER paid its own stamina above, and that — not
+        // the parent's invest — is what its magnitude rides. Overrides the
+        // carry-down, so the two invest semantics don't collide: a hand-wired
+        // chain step still inherits the parent's commitment (the chain is free),
+        // while a rider that charged for itself scales on its own charge.
+        if (riderInvest != null) {
+          chainRollData.roll = { ...(chainRollData.roll ?? {}),
+            investedAmount: Math.max(0, Math.round(riderInvest)) };
         }
         const chainLabel = `[chain] ${chainedItem.name}`;
         const { hitFormula: cHitF, dmgFormula: cDmgF } = chainedItem._buildRollFormulas(chainRollData, { applyRarityMult: true });

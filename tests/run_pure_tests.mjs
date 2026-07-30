@@ -13,6 +13,7 @@ import {
   spellInvestDamage, strikeInvestDamage, infusionDamage, investSelfDamage,
   effectiveDodgeValue, splitEvenlyWithRemainder, perceiveGateDecision, activityTicks, nextCompletionDelta,
   proficiencyMultiplier, parryMassMultiplier, lunarPhaseMultiplier, dotTickDamage, procStaminaCost, riderDamageBase,
+  crushFlatAmount, riderMaxInvest,
 } from '../module/helpers/formulas.mjs';
 import { moonState, moonNodeAngle, nextSyzygy, eclipseAtSyzygy, planetStates,
          meteorShowersOn, cometStates, julianDay, civilDate, worldTimeForDate } from '../module/systems/calendar.mjs';
@@ -426,6 +427,61 @@ eq('3 stacks vs Phil armour+blockDR 912',
 eq('bleed and crush share the base',
    dotTickDamage({ ownDamage: 1015, parentDamage: 1354, dotScale: 0.10 })
      === Math.round(0.10 * riderDamageBase(1354, 1015)), true);
+
+// -- INVEST-DIALOG PREVIEW PARITY (2026-07-30). The dialog previewed damage
+// with spellInvestDamage on BOTH paths, which has no weapon-weight term: a
+// dagger swing previewed 501 and dealt 300. The preview now calls the same
+// function the strike path does, so these two must stay welded together.
+// GOLDEN live: Gabriel blend 715, mult 0.7, dagger windup 0.6, invest = base.
+eq('preview matches the real dagger strike',
+   strikeInvestDamage(715, 0.7, 0.6, 2, 2), 300);
+// The OLD preview showed blend x mult with no windup - 500 here, 501 live off
+// the unrounded blend. The invariant is the RATIO: the error is exactly 1/windup,
+// so a dagger read 1.67x high and a greataxe 0.45x low.
+eq('the OLD preview error was exactly 1/windup',
+   Math.abs(spellInvestDamage(715, 0.7, 2, 2) / strikeInvestDamage(715, 0.7, 0.6, 2, 2) - 1 / 0.6) < 0.01, true);
+// windup 1 makes the two functions identical, which is what keeps the SPELL
+// dialog byte-for-byte unchanged by the switch.
+for (const [p, m, v, r] of [[715, 0.7, 2, 2], [900, 1.4, 50, 12], [1085, 0.35, 7, 40]]) {
+  eq(`spell preview unchanged at windup 1 (${p}/${m}/${v}/${r})`,
+     strikeInvestDamage(p, m, 1, v, r) === spellInvestDamage(p, m, v, r), true);
+}
+// The error flips sign at weight 100 - light overstated, heavy understated.
+eq('preview overstated a dagger', spellInvestDamage(715, 0.7, 2, 2) > strikeInvestDamage(715, 0.7, 0.6, 2, 2), true);
+eq('preview understated a greataxe', spellInvestDamage(715, 0.7, 2, 2) < strikeInvestDamage(715, 0.7, 2.2, 2, 2), true);
+
+// -- crushFlatAmount: structural twin of dotTickDamage.
+const cfa = (o) => crushFlatAmount(o);
+// GOLDEN: George Royal Axe 1354 parent, own roll 1015, shipped frac 0.05.
+eq('crush off the parent at 0.05', cfa({ parentDamage: 1354, ownDamage: 1015, crushFrac: 0.05 }), 68);
+eq('crush direct falls back to its own roll', cfa({ ownDamage: 1015, crushFrac: 0.05 }), 51);
+eq('crush disabled by the ON gate', cfa({ enabled: false, parentDamage: 1354, crushFrac: 0.05 }), 0);
+eq('crush never negative', cfa({ parentDamage: -900, crushFrac: 0.05 }), 0);
+// THE CONTINUITY GUARANTEE: at BASE invest, invest-tagging changes nothing.
+// base cost = procStaminaCost(parent, 0.05) = 68; crushInvestScale 1.0 -> 68.
+const _crushBaseCost = procStaminaCost(1354, 0.05);
+eq('invest-tagged crush is identical at base invest',
+   cfa({ hasInvestTag: true, investAmount: _crushBaseCost, investScale: 1.0 })
+     === cfa({ parentDamage: 1354, ownDamage: 1015, crushFrac: 0.05 }), true);
+// And leaning on it scales linearly - that is the whole point of the lever.
+eq('crush doubles at double invest', cfa({ hasInvestTag: true, investAmount: 136, investScale: 1.0 }), 136);
+// A recorded invest of ZERO falls back to the damage anchor rather than
+// silently applying a crush effect worth no armour at all.
+eq('invest-tagged crush with no invest falls back, never zero',
+   cfa({ hasInvestTag: true, investAmount: 0, parentDamage: 1354, crushFrac: 0.05 }), 68);
+// Same continuity for the bleed: dotInvestScale 0.5 x the 0.20 cost == dotScale 0.10.
+const _bleedBaseCost = procStaminaCost(300, 0.20);
+eq('invest-tagged bleed is identical at base invest',
+   dotTickDamage({ hasInvestTag: true, investAmount: _bleedBaseCost, investScale: 0.5 })
+     === dotTickDamage({ parentDamage: 300, dotScale: 0.10 }), true);
+
+// -- riderMaxInvest: the ceiling on a rider's commitment.
+eq('rider ceiling is 3x base when the pool allows', riderMaxInvest(60, 400, 3.0), 180);
+eq('rider ceiling binds on the POOL for a heavy hitter', riderMaxInvest(68, 225, 3.0), 204);
+eq('rider ceiling never below base', riderMaxInvest(68, 10, 3.0), 68);
+eq('rider ceiling floors a negative pool at base', riderMaxInvest(68, -5, 3.0), 68);
+// George's 3 crush stacks must still fit in his pool at the ceiling's floor.
+eq('George still affords 3 base-invest crush stacks', 3 * 68 <= 225, true);
 
 if (failures) { console.error(`\n${failures} FAILURES`); process.exit(1); }
 console.log('\nAll pure-function tests pass.');

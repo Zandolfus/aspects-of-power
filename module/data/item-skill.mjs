@@ -342,6 +342,13 @@ export class SkillData extends foundry.abstract.TypeDataModel {
         // stored on the effect as armorCrushFlat — this field is now just the
         // ON gate (any non-zero enables crush; magnitude comes from config).
         debuffArmorCrush:   new fields.NumberField({ initial: 0, min: 0, max: 1 }),
+        // `invest` tag on a crush debuff: the flat armour reduction scales on
+        // the stamina COMMITTED to the crush instead of a fixed fraction of the
+        // parent blow. crushFlat = crushInvestScale × invested. At scale 1.0 and
+        // the shipped 0.05 proc cost the base-invest result is byte-identical to
+        // the fixed formula, so the lever is purely additive: leaning in buys
+        // more armour off, and paying nothing extra changes nothing.
+        crushInvestScale:   new fields.NumberField({ initial: 1.0, min: 0 }),
         // Armor MELT rate (design-burn-status.md): >0 means this (burn) debuff
         // melts armor by this rate × its per-tick dotDamage, summed globally.
         // Default 0 = no melt. Canonical Burn sets ~config burnMeltRate (0.5).

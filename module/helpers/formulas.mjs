@@ -428,3 +428,60 @@ export function dotTickDamage({
   const base = riderDamageBase(parentDamage, ownDamage);
   return Math.max(0, Math.round(base * dotScale * defenseMultiplier));
 }
+
+/**
+ * FLAT armour reduction a crush debuff stores at apply time.
+ *
+ * Exact structural twin of dotTickDamage — same `invest`-tag override, same
+ * riderDamageBase fallback — because crush and bleed are the same subsystem
+ * wearing different hats, and the one time they were written separately they
+ * drifted (crush used its own roll while the bleed used the parent's).
+ *
+ * With the `invest` tag the amount rides the stamina COMMITTED to the crush
+ * rather than a fixed slice of the parent blow. At crushInvestScale 1.0 and the
+ * shipped procCostFrac 0.05 the base-invest result equals crushDamageFrac 0.05
+ * × parent exactly, so tagging an existing crush changes nothing until the
+ * player chooses to lean on it.
+ *
+ * @param {object} o
+ * @param {boolean} [o.enabled]        armorCrushVal > 0 — the ON gate.
+ * @param {boolean} [o.hasInvestTag]   Skill carries the `invest` tag.
+ * @param {number}  [o.investAmount]   Stamina committed to this proc.
+ * @param {number}  [o.investScale]    Armour removed per point invested.
+ * @param {number}  [o.crushFrac]      Fallback fraction of the base damage.
+ * @param {number}  [o.parentDamage]   Damage of the strike that spawned it.
+ * @param {number}  [o.ownDamage]      The crush skill's own roll.
+ * @returns {number} Absolute armour reduction, never negative.
+ */
+export function crushFlatAmount({
+  enabled = true, hasInvestTag = false, investAmount = 0, investScale = 1,
+  crushFrac = 0.05, parentDamage = 0, ownDamage = 0,
+} = {}) {
+  if (!enabled) return 0;
+  // An invest of 0 means no commitment was RECORDED (a direct cast of a rider
+  // passive, a zero-cost parent), not "crush nothing". Falling through to the
+  // damage-anchored branch keeps a crush that reaches a target from silently
+  // applying an effect worth zero armour — the no-op failure class this
+  // codebase keeps rediscovering. The DoT tick deliberately does NOT do this:
+  // a bleed with nothing invested legitimately ticks for nothing.
+  if (hasInvestTag && investAmount > 0) {
+    return Math.max(0, Math.round(investScale * investAmount));
+  }
+  return Math.max(0, Math.round(crushFrac * riderDamageBase(parentDamage, ownDamage)));
+}
+
+/**
+ * Ceiling on an `invest`-tagged rider's commitment: `mult` × its base cost,
+ * clamped to the pool, never below the base. On the heaviest hitters the POOL
+ * binds first, which is the decision worth having (config.riders.maxInvestMult).
+ *
+ * @param {number} baseCost  procStaminaCost for this proc.
+ * @param {number} pool      Current stamina.
+ * @param {number} [mult]    Multiple of base allowed; defaults to config.
+ * @returns {number}
+ */
+export function riderMaxInvest(baseCost, pool, mult = null) {
+  const C = globalThis.CONFIG?.ASPECTSOFPOWER?.riders ?? {};
+  const m = mult ?? C.maxInvestMult ?? 3.0;
+  return Math.max(baseCost, Math.min(Math.max(0, pool), Math.floor(baseCost * m)));
+}
