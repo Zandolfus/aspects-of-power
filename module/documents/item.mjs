@@ -5504,7 +5504,8 @@ export class AspectsofPowerItem extends Item {
 
       // Execute chained skills after all parent tags have resolved.
       await this._executeChainedSkills(hitResults, targets, speaker, rollMode,
-        { investedAmount, parentDamage: dmgRoll?.total ?? 0 });
+        { investedAmount, parentDamage: dmgRoll?.total ?? 0,
+          autoRiders: !!options.aiAutoInvest || !_isPlayerCharacter(this.actor) });
 
       // Mark initial targets as affected on persistent AOEs. Keys are token
       // ids and values are CLOCK TICKS — the re-tick eligibility check
@@ -5657,7 +5658,8 @@ export class AspectsofPowerItem extends Item {
 
     // Execute chained skills after all parent tags have resolved.
     await this._executeChainedSkills(hitResults, null, speaker, rollMode,
-      { investedAmount, parentDamage: dmgRoll?.total ?? 0 });
+      { investedAmount, parentDamage: dmgRoll?.total ?? 0,
+        autoRiders: !!options.aiAutoInvest || !_isPlayerCharacter(this.actor) });
 
     await this._applySustainEffect(speaker);
     return dmgRoll;
@@ -5787,6 +5789,27 @@ export class AspectsofPowerItem extends Item {
                      + `(need ${cost}, have ${pool}).</em></p>`,
             });
             continue;
+          }
+          // ASK, don't auto-spend. The cost is meant to be a decision, and a
+          // rider that fires on every piercing swing would otherwise drain a
+          // rogue's pool on targets already bleeding or about to die. AI and
+          // non-player actors take it automatically — a GM driving a dozen
+          // hostiles cannot be prompted per swing.
+          if (!chainContext?.autoRiders) {
+            const tName = targetToken?.document?.name ?? 'the target';
+            const proceed = await foundry.applications.api.DialogV2.wait({
+              window: { title: `${chainedItem.name}` },
+              content: `<p>${this.name} pierced <strong>${tName}</strong>.</p>`
+                     + `<p>Apply <strong>${chainedItem.name}</strong> for `
+                     + `<strong>${cost}</strong> stamina? `
+                     + `<span class="hint">(${pool} → ${pool - cost})</span></p>`,
+              buttons: [
+                { action: 'yes', label: `Apply (${cost})`, default: true, callback: () => true },
+                { action: 'no', label: 'Skip', callback: () => false },
+              ],
+              close: () => false,
+            });
+            if (!proceed) continue;
           }
           await this.actor.update({ 'system.stamina.value': pool - cost });
           ChatMessage.create({
