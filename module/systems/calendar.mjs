@@ -122,9 +122,16 @@ export function worldTimeForDate(year, month, day, hour = 0, minute = 0, second 
  * is full. The phase INDEX rounds to the nearest eighth so each named phase is
  * CENTRED on its exact moment — what a person looking up would say.
  */
-export function moonState(worldTime, c = null) {
+/**
+ * `worldTime` DEFAULTS to now. It used to be a required positional, which meant
+ * `moonState()` silently produced NaN elongation rather than throwing — and a
+ * caller guarding with Number.isFinite would then quietly fall back to "no
+ * moon effect" with nothing to show it had failed. That is exactly how the
+ * lunar empowerment shipped dead in `44d6ec6`. Defaulting removes the trap.
+ */
+export function moonState(worldTime = null, c = null) {
   const k = c ?? cfg();
-  const T = julianCenturies(worldTime, k);
+  const T = julianCenturies(worldTime ?? game.time.worldTime, k);
   const el = k.moonElongation ?? { atEpoch: 297.8501921, degPerCentury: 445267.1114034 };
   const phases = k.phases ?? ['New Moon', 'Waxing Crescent', 'First Quarter', 'Waxing Gibbous',
     'Full Moon', 'Waning Gibbous', 'Last Quarter', 'Waning Crescent'];

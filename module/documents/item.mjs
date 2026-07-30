@@ -255,7 +255,11 @@ export class AspectsofPowerItem extends Item {
     const idx = phases.indexOf(declared || this.name);
     if (idx < 0) return 1;
 
-    const elong = game.aspectsofpower?.calendar?.moonState?.()?.elongation;
+    // Pass worldTime EXPLICITLY. Omitting it is what made this ship dead in
+    // `44d6ec6`: moonState had no default, so it returned NaN elongation and the
+    // finite-check below quietly reported "no moon effect".
+    const elong = game.aspectsofpower?.calendar
+      ?.moonState?.(game.time.worldTime)?.elongation;
     if (!Number.isFinite(elong)) return 1;
     return lunarPhaseMultiplier(idx, elong);
   }
