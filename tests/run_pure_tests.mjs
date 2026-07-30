@@ -12,7 +12,7 @@ import {
   houseHitFormula, hybridAbilityMod, weaponStatBlend, spellDamageRef,
   spellInvestDamage, strikeInvestDamage, infusionDamage, investSelfDamage,
   effectiveDodgeValue, splitEvenlyWithRemainder, perceiveGateDecision, activityTicks, nextCompletionDelta,
-  proficiencyMultiplier, parryMassMultiplier,
+  proficiencyMultiplier, parryMassMultiplier, lunarPhaseMultiplier,
 } from '../module/helpers/formulas.mjs';
 import { moonState, moonNodeAngle, nextSyzygy, eclipseAtSyzygy, planetStates,
          meteorShowersOn, cometStates, julianDay, civilDate, worldTimeForDate } from '../module/systems/calendar.mjs';
@@ -313,6 +313,29 @@ eq('parry rule disabled', parryMassMultiplier(60, 220, { parryMassExponent: 0 })
 // THE LIVE CASE THAT MOTIVATED IT: Gabriel's dagger parry rolled 993 against
 // Phil's greatsword hit of 956 and won. Under the rule it no longer does.
 eq('Gabriel dagger no longer parries Phil claymore', Math.round(993 * pmm(60, 200)) >= 956, false);
+
+// -- Lunar phase multiplier (RULED 2026-07-29, amp 0.40). Phase centres are
+// real elongations: new 0deg, first quarter 90, full 180, last quarter 270.
+const lpm = (idx, elong) => +lunarPhaseMultiplier(idx, elong, 0.40).toFixed(3);
+// Your own moon, exactly overhead: full boost.
+eq('lunar new moon at 0deg', lpm(0, 0), 1.4);
+eq('lunar full moon at 180deg', lpm(4, 180), 1.4);
+// The opposite phase: full penalty.
+eq('lunar new moon at full sky', lpm(0, 180), 0.6);
+eq('lunar full moon at new sky', lpm(4, 0), 0.6);
+// Ninety degrees off is exactly neutral - cos(90) is zero.
+eq('lunar quarter off is neutral', lpm(0, 90), 1);
+eq('lunar quarter off other way', lpm(4, 90), 1);
+// GOLDEN, from the live sky on 2024-12-04 22:00 (Waxing Crescent, 47.5deg).
+eq('lunar waxing crescent on its night', lpm(1, 47.5), 1.4);
+eq('lunar waning gibbous opposite it', lpm(5, 47.5), 0.6);
+// Wrap-around must take the SHORT way round: index 7 sits at 315deg, which is
+// 45deg from 0deg, not 315.
+eq('lunar wraps the short way', lpm(7, 0), lpm(1, 0));
+// Amplitude 0 disables it entirely.
+eq('lunar disabled at amp 0', lunarPhaseMultiplier(4, 0, 0), 1);
+// Nonsense input is neutral rather than NaN.
+eq('lunar bad index neutral', lunarPhaseMultiplier(NaN, 90, 0.4), 1);
 
 if (failures) { console.error(`\n${failures} FAILURES`); process.exit(1); }
 console.log('\nAll pure-function tests pass.');

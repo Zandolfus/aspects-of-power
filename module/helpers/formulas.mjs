@@ -315,3 +315,37 @@ export function parryMassMultiplier(defenderWeight, attackerWeight, cfg = null) 
   const aw = Math.max(attackerWeight || 0, floor);
   return Math.min(1, Math.pow(dw / aw, k));
 }
+
+/**
+ * Lunar phase multiplier (design-calendar-celestial.md, RULED 2026-07-29:
+ * lunar rituals are EMPOWERED in their own phase and WEAKENED out of it).
+ *
+ * Each of the eight named phases sits at a known elongation — new moon at 0
+ * degrees, full moon at 180, stepping 45 — so "how far is the sky from this
+ * ritual's moon" is a real angle rather than an invented step table:
+ *
+ *   mult = 1 + amp x cos(delta)
+ *
+ * Peak at your own phase, trough at the phase opposite it, and a smooth blend
+ * between. Three properties that fall out for free rather than being designed:
+ * the neighbouring phases are MILDLY empowered, the multiplier moves
+ * continuously as the moon does (no cliff when a phase name ticks over), and
+ * the trough always lands on the true opposite phase.
+ *
+ * @param {number} ritualPhaseIndex  0..7, New Moon through Waning Crescent.
+ * @param {number} currentElongation Moon-sun elongation in degrees, 0..360.
+ * @param {number} [amp]             Swing amplitude; 0.40 = x1.40 down to x0.60.
+ * @returns {number}
+ */
+export function lunarPhaseMultiplier(ritualPhaseIndex, currentElongation, amp = null) {
+  // Amplitude lives with the phase list in CONFIG.celestial, so there is one
+  // source of truth for the moon rather than two.
+  const C = globalThis.CONFIG?.ASPECTSOFPOWER?.celestial ?? {};
+  const a = amp ?? C.lunarAmplitude ?? 0;
+  if (!(a > 0)) return 1;
+  if (!Number.isFinite(ritualPhaseIndex) || !Number.isFinite(currentElongation)) return 1;
+  const centre = ((ritualPhaseIndex % 8) + 8) % 8 * 45;
+  let d = Math.abs(((centre - currentElongation) % 360 + 360) % 360);
+  if (d > 180) d = 360 - d;
+  return 1 + a * Math.cos(d * Math.PI / 180);
+}

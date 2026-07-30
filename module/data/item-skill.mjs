@@ -547,6 +547,13 @@ export class SkillData extends foundry.abstract.TypeDataModel {
         //     no Medium produced.
         ritualChargesProduced: new fields.NumberField({ initial: 1, min: 1, integer: true }),
         ritualMinMana:         new fields.NumberField({ initial: 0, min: 0, integer: true }),
+        // Which moon this ritual belongs to, for the phase empowerment in
+        // CONFIG.celestial.lunarAmplitude. Normally LEFT BLANK: the eight
+        // authored lunar rituals are named byte-identically to the eight
+        // phases, and that name IS the join key. Set this only for lunar
+        // content named something else — a "Blood Moon Rite" that should count
+        // as Full Moon.
+        lunarPhase: new fields.StringField({ initial: '' }),
         // Per-ritual override: which skill does the inscribed Medium fire on
         // activation? Default empty = activate the ritual skill itself (legacy
         // single-skill rituals like Winds of Time). Set when the ritual is a

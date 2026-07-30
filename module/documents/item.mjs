@@ -1,6 +1,6 @@
 import { EquipmentSystem } from '../systems/equipment.mjs';
 import { getPositionalTags } from '../helpers/positioning.mjs';
-import { houseHitFormula, hybridAbilityMod, weaponStatBlend, spellDamageRef, spellInvestDamage, strikeInvestDamage, infusionDamage, investSelfDamage as computeInvestSelfDamage, effectiveDodgeValue, splitEvenlyWithRemainder, parryMassMultiplier } from '../helpers/formulas.mjs';
+import { houseHitFormula, hybridAbilityMod, weaponStatBlend, spellDamageRef, spellInvestDamage, strikeInvestDamage, infusionDamage, investSelfDamage as computeInvestSelfDamage, effectiveDodgeValue, splitEvenlyWithRemainder, parryMassMultiplier, lunarPhaseMultiplier } from '../helpers/formulas.mjs';
 import { recordActionFired, declareAction, isInActiveCombat, computeActionWait, referenceRoundLength, computeWindupMultiplier, getScrambleStacks, addScrambleStack, applyDodgeCost, findCombatantForActor, perceiveGate } from '../systems/celerity.mjs';
 import { getThreatRadiusFt, actorIsDashing } from '../systems/engagement-halts.mjs';
 import { selectTargetOnCanvas, skillNeedsTargetPrompt, skillTargetsAtFire, selectMarkerOnCanvas } from '../canvas/target-prompt.mjs';
@@ -218,13 +218,46 @@ export class AspectsofPowerItem extends Item {
     // Absence is NEUTRAL, never a penalty — see systems/weapon-styles.mjs.
     const profMult = this._proficiencyDamageMult();
 
+    // LUNAR PHASE (ruled 2026-07-29) — a lunar ritual is empowered under its
+    // own moon and weakened under the opposite one. Folded in here for the same
+    // reason proficiency is: this method feeds the plain roll path and both
+    // invest paths, so one attachment covers all three.
+    const lunarMult = this._lunarPhaseMult();
+
     return {
       rarityMult,
       profMult,
-      effectiveMult:             Math.max(0, rarityMult * dmgFactor * profMult),
+      lunarMult,
+      effectiveMult:             Math.max(0, rarityMult * dmgFactor * profMult * lunarMult),
       costMultiplier:            1 + costMod,
       effectiveWeightMultiplier: 1 + weightMod,
     };
+  }
+
+  /**
+   * Lunar phase multiplier for THIS skill, or 1 when it does not apply.
+   * Which moon the skill belongs to comes from `tagConfig.lunarPhase` if set,
+   * otherwise from the skill's NAME matched against CONFIG.celestial.phases —
+   * the eight authored rituals are named byte-identically to the eight phases
+   * precisely so that join works without per-skill authoring.
+   * @returns {number}
+   */
+  _lunarPhaseMult() {
+    const cel = CONFIG.ASPECTSOFPOWER?.celestial ?? {};
+    if (!(cel.lunarAmplitude > 0)) return 1;
+    const needTag = cel.lunarRequiresTag;
+    // The tag gate stops a non-lunar skill that happens to share a name from
+    // being caught by accident.
+    if (needTag && !(this.system?.tags ?? []).includes(needTag)) return 1;
+
+    const phases = cel.phases ?? [];
+    const declared = this.system?.tagConfig?.lunarPhase || '';
+    const idx = phases.indexOf(declared || this.name);
+    if (idx < 0) return 1;
+
+    const elong = game.aspectsofpower?.calendar?.moonState?.()?.elongation;
+    if (!Number.isFinite(elong)) return 1;
+    return lunarPhaseMultiplier(idx, elong);
   }
 
   /**

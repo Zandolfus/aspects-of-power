@@ -791,6 +791,29 @@ ASPECTSOFPOWER.celestial = {
     'Full Moon', 'Waning Gibbous', 'Last Quarter', 'Waning Crescent',
   ],
 
+  // Lunar ritual empowerment (RULED 2026-07-29: empowered in phase, weakened
+  // out of it — the hard "only in your phase" gate was declined).
+  //
+  //   mult = 1 + lunarAmplitude x cos(delta)
+  //
+  // where delta is the real angle between the ritual's own phase centre (index
+  // x 45 degrees: new moon 0, full moon 180) and the moon's current elongation.
+  // Deriving it from the actual angle rather than a step table buys three
+  // things for free: neighbouring phases are MILDLY empowered, the multiplier
+  // moves continuously as the moon does instead of jumping when a phase name
+  // ticks over, and the trough always lands on the true opposite phase.
+  //
+  // At 0.40 a ritual cast under its own moon is x1.40 and under the opposite
+  // moon x0.60 — a 2.33x spread, so waiting for your phase is a real decision
+  // (worst-case wait is half a synodic month, about 14.8 days). Set to 0 to
+  // disable. Which phase a skill belongs to is resolved from its NAME against
+  // the `phases` list above, so the byte-identical naming is load-bearing;
+  // `tagConfig.lunarPhase` overrides it for content named something else.
+  lunarAmplitude: 0.40,
+  // A skill must carry this tag to be phase-scaled at all, so a non-lunar skill
+  // that happens to share a name is never caught by accident.
+  lunarRequiresTag: 'lunar',
+
   // Astronomical quarter days. Core's seasons are MONTH-banded (Spring =
   // months 3-5), which is fine for a label but wrong for a solstice ritual,
   // so the real dates live here.
