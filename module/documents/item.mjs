@@ -5764,6 +5764,38 @@ export class AspectsofPowerItem extends Item {
         // Per-target so an AOE that bled through some targets but not
         // others (boss with high armor vs minions) chains only on the
         // pierced ones.
+        // ── RIDER gate: on-pierce + stamina cost ────────────────────────
+        // Checked BEFORE the shared chain gates below. A rider fires off every
+        // qualifying swing, so the no-pierce case is the COMMON case and must
+        // exit silently — the requires_armor_pierce gate further down posts a
+        // chat line, which at ~6 attacks/round would be pure spam.
+        //
+        // Riders subscribe to the attack rather than being wired to it, so the
+        // trigger IS the pierce condition, and each proc pays its own cost.
+        // Cost scales with the parent's damage — that is the whole rate limit;
+        // no cooldown, no stack cap (config.riders).
+        if (chain._rider) {
+          if (hitResult?.isHit !== true) continue;
+          if (hitResult?.fullyBlocked === true) continue;
+          if (hitResult?.piercedMitigation !== true) continue;
+          const cost = procStaminaCost(chainContext?.parentDamage ?? 0);
+          const pool = Math.round(this.actor.system.stamina?.value ?? 0);
+          if (pool < cost) {
+            ChatMessage.create({
+              speaker, rollMode, ...(whisperGM ? { whisper: whisperGM } : {}),
+              content: `<p><em>${chainedItem.name} didn't trigger — not enough stamina `
+                     + `(need ${cost}, have ${pool}).</em></p>`,
+            });
+            continue;
+          }
+          await this.actor.update({ 'system.stamina.value': pool - cost });
+          ChatMessage.create({
+            speaker, rollMode, ...(whisperGM ? { whisper: whisperGM } : {}),
+            content: `<p><em>${this.actor.name} tears the wound open — `
+                   + `<strong>${chainedItem.name}</strong> (${cost} stamina).</em></p>`,
+          });
+        }
+
         const chainTags = chainedItem.system.tags ?? [];
         const isAttackChild = chainTags.includes('attack')
           || chainTags.includes('debuff') || chainTags.includes('restoration')
@@ -5781,31 +5813,6 @@ export class AspectsofPowerItem extends Item {
             });
             continue;
           }
-        }
-
-        // ── RIDER gate: on-pierce + stamina cost ────────────────────────
-        // Riders subscribe to the attack rather than being wired to it, so
-        // they carry their own pierce requirement (the trigger IS on-pierce)
-        // and pay per proc. Cost scales with the parent's damage, which is
-        // what rate-limits them — no cooldown, no stack cap (config.riders).
-        if (chain._rider) {
-          if (hitResult?.piercedMitigation !== true) continue;   // silent: the common case
-          const cost = procStaminaCost(chainContext?.parentDamage ?? 0);
-          const pool = Math.round(this.actor.system.stamina?.value ?? 0);
-          if (pool < cost) {
-            ChatMessage.create({
-              speaker, rollMode, ...(whisperGM ? { whisper: whisperGM } : {}),
-              content: `<p><em>${chainedItem.name} didn't trigger — not enough stamina `
-                     + `(need ${cost}, have ${pool}).</em></p>`,
-            });
-            continue;
-          }
-          await this.actor.update({ 'system.stamina.value': pool - cost });
-          ChatMessage.create({
-            speaker, rollMode, ...(whisperGM ? { whisper: whisperGM } : {}),
-            content: `<p><em>${this.actor.name} tears the wound open — `
-                   + `<strong>${chainedItem.name}</strong> (${cost} stamina).</em></p>`,
-          });
         }
 
         // Build the chained skill's own rolls.
