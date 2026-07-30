@@ -1062,9 +1062,25 @@ export class AspectsofPowerItem extends Item {
           // penalty, out-massing is not a bonus.
           const massMult = parryMassMultiplier(
             heldWeaponWeight(targetActor), heldWeaponWeight(this.actor));
-          const parryTotal = Math.round(rawParry * massMult);
-          const massNote = massMult < 1
-            ? ` <em>(outmassed: x${massMult.toFixed(2)} of ${rawParry})</em>` : '';
+          // PROFICIENCY SCALES THE PARRY too (ruled 2026-07-29). Judged against
+          // the implement actually doing the parrying, so Shield Block is rated
+          // on the shield rather than on whatever else the defender carries.
+          //
+          // Simmed and accepted with eyes open: because parry is a hard
+          // threshold, the full ladder makes it a CLIFF rather than a curve —
+          // a dagger parry against a greatsword sits near 0% up to rare and
+          // near 100% at legendary. It also means a legendary dagger master
+          // parries about as well as a novice with a greatshield, so mastery
+          // can overturn the mass rule at the top of the ladder. That is the
+          // ruled intent: skill should be able to beat physics eventually.
+          const parryProf = proficiencyDamageMult(
+            targetActor, reactionSkill._proficiencyWeapon?.() ?? null);
+          const parryTotal = Math.round(rawParry * massMult * parryProf);
+          const bits = [];
+          if (massMult < 1) bits.push(`outmassed x${massMult.toFixed(2)}`);
+          if (parryProf !== 1) bits.push(`proficiency x${parryProf.toFixed(2)}`);
+          const massNote = bits.length
+            ? ` <em>(${bits.join(', ')} of ${rawParry})</em>` : '';
           if (parryTotal >= hitTotal) {
             isHit = false;
             reactionLine = `<p><em>${targetActor.name} parries with <strong>${reactionSkill.name}</strong>! `

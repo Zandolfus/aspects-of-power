@@ -1,3 +1,8 @@
+// Weapon proficiency scales the guard as well as the strike. Safe to import
+// here: systems/weapon-styles.mjs pulls only from helpers/formulas.mjs, so it
+// cannot create the actor->item cycle the code standards forbid.
+import { proficiencyDamageMult } from '../systems/weapon-styles.mjs';
+
 /**
  * Disposition-targeting filter for auras. Returns true if `otherDisp` is a
  * valid target given the source's `myDisp` and the aura's `targeting` mode.
@@ -338,6 +343,7 @@ export class AspectsofPowerActor extends Actor {
       const dt = CONFIG.ASPECTSOFPOWER.defenseTuning ?? {};
       const coef = dt.blockDRCoef ?? 0;
       let bestWeight = 0;
+      let bestItem = null;
       if (coef > 0) {
         const table = CONFIG.ASPECTSOFPOWER.weaponWeights ?? {};
         for (const i of this.items) {
@@ -345,13 +351,29 @@ export class AspectsofPowerActor extends Actor {
           if ((i.system.tags ?? []).includes('shield')) continue;
           if (i.system.durability?.value <= 0 && i.system.durability?.max > 0) continue;
           for (const tag of (i.system.tags ?? [])) {
-            if (table[tag] != null) { bestWeight = Math.max(bestWeight, table[tag]); break; }
+            if (table[tag] != null) {
+              if (table[tag] > bestWeight) { bestWeight = table[tag]; bestItem = i; }
+              break;
+            }
           }
         }
       }
       const strM = systemData.abilities.strength.mod;
+      // PROFICIENCY SCALES THE GUARD (ruled 2026-07-29: proficiency should
+      // alter everything to do with the weapon, not just damage). Scaled by the
+      // proficiency of the weapon actually providing the guard, so a master
+      // blocks with a claymore far better than someone holding one for the
+      // first time. Untracked actors and untrained-but-neutral cases return 1,
+      // so this is inert for most of the world — see weapon-styles.
+      //
+      // Simmed before shipping: proportionate and never saturates, but the
+      // benefit CONCENTRATES on heavy weapons because blockDR is weight-derived
+      // (a dagger's guard barely moves across the whole ladder). At `rare` a
+      // greatsword wielder's wall can fully stop the heaviest attack in the
+      // game — an accepted threshold, not an accident.
+      const profMult = bestItem ? proficiencyDamageMult(this, bestItem) : 1;
       systemData.defense.blockDR = bestWeight > 0
-        ? Math.round(coef * (bestWeight / 100) * (1 + strM / 1085))
+        ? Math.round(coef * (bestWeight / 100) * (1 + strM / 1085) * profMult)
         : 0;
     }
 
