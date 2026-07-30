@@ -5745,7 +5745,15 @@ export class AspectsofPowerItem extends Item {
 
       const chainedItem = this.actor.items.get(chain.skillId);
       if (!chainedItem || chainedItem.type !== 'skill') continue;
-      if (chainedItem.system.skillType === 'Passive') continue;
+      // Passives are not valid HAND-WIRED chain steps (a chain step is an
+      // action the parent triggers, and a passive has no action to take), but
+      // they ARE the natural shape for a RIDER: "you bleed people when you get
+      // through their armour" is a property of how you fight, not something
+      // you spend an action on. Same precedent as retaliation passives, which
+      // already auto-fire off the reaction triggers. The rider path dispatches
+      // the skill's tag handlers directly rather than going through roll(), so
+      // the user-clicked-passive short-circuit never applies here.
+      if (chainedItem.system.skillType === 'Passive' && !chain._rider) continue;
 
       // Determine target list: AOE targets or [null] (single-target uses game.user.targets).
       const targets = aoeTargets ?? [null];
