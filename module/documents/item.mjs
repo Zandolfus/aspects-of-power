@@ -1,6 +1,6 @@
 import { EquipmentSystem } from '../systems/equipment.mjs';
 import { getPositionalTags } from '../helpers/positioning.mjs';
-import { houseHitFormula, hybridAbilityMod, weaponStatBlend, spellDamageRef, spellInvestDamage, strikeInvestDamage, infusionDamage, investSelfDamage as computeInvestSelfDamage, effectiveDodgeValue, splitEvenlyWithRemainder, parryMassMultiplier, lunarPhaseMultiplier, dotTickDamage, procStaminaCost } from '../helpers/formulas.mjs';
+import { houseHitFormula, hybridAbilityMod, weaponStatBlend, spellDamageRef, spellInvestDamage, strikeInvestDamage, infusionDamage, investSelfDamage as computeInvestSelfDamage, effectiveDodgeValue, splitEvenlyWithRemainder, parryMassMultiplier, lunarPhaseMultiplier, dotTickDamage, procStaminaCost, riderDamageBase } from '../helpers/formulas.mjs';
 import { recordActionFired, declareAction, isInActiveCombat, computeActionWait, referenceRoundLength, computeWindupMultiplier, getScrambleStacks, addScrambleStack, applyDodgeCost, findCombatantForActor, perceiveGate } from '../systems/celerity.mjs';
 import { getThreatRadiusFt, actorIsDashing } from '../systems/engagement-halts.mjs';
 import { selectTargetOnCanvas, skillNeedsTargetPrompt, skillTargetsAtFire, selectMarkerOnCanvas } from '../canvas/target-prompt.mjs';
@@ -3178,12 +3178,19 @@ export class AspectsofPowerItem extends Item {
       hasCrush ? _crushDefault : 0,
       this.system.tagConfig?.debuffArmorCrush ?? 0,
     );
-    // FLAT crush amount (flat rework 2026-07-18): anchored to THIS applier's hit
-    // at apply time (crushHitFrac × dmgRoll) → grade-correct. armorCrushVal is
-    // now just the ON gate; the flat value is what _getArmorCrushFlat sums.
-    const _crushHitFrac = CONFIG.ASPECTSOFPOWER.armorAnswer?.crushHitFrac ?? 0.10;
+    // FLAT crush amount (flat rework 2026-07-18): anchored to the applier's
+    // DAMAGE at apply time → grade-correct. armorCrushVal is now just the ON
+    // gate; the flat value is what _getArmorCrushFlat sums.
+    //
+    // Sizes off the PARENT when this is a rider (RULED 2026-07-30, same rule
+    // as the bleed): a bigger blow crushes more armour. Before this, crush used
+    // its own roll while the DoT used the parent's — the two rider magnitudes
+    // disagreed. riderDamageBase is now the single source for both.
+    const _crushFrac = CONFIG.ASPECTSOFPOWER.armorAnswer?.crushDamageFrac
+                    ?? CONFIG.ASPECTSOFPOWER.armorAnswer?.crushHitFrac ?? 0.10;
+    const _crushBase = riderDamageBase(rollData.roll?.parentDamage ?? 0, dmgRoll?.total ?? 0);
     const armorCrushFlat = armorCrushVal > 0
-      ? Math.max(0, Math.round(_crushHitFrac * (dmgRoll?.total ?? 0)))
+      ? Math.max(0, Math.round(_crushFrac * _crushBase))
       : 0;
     // Armor-MELT rate for burn effects (design-burn-status.md): opt-in via
     // tagConfig.debuffArmorMelt; only on a damaging DoT (its tick is the base).

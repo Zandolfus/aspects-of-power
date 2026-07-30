@@ -399,6 +399,25 @@ export function procStaminaCost(parentDamage, frac = null) {
   return Math.max(1, Math.ceil(Math.max(0, parentDamage) * f));
 }
 
+/**
+ * THE base a rider's magnitude sizes off.
+ *
+ * A rider is caused by the blow that spawned it, so a bigger strike bleeds
+ * harder and crushes more armour (RULED 2026-07-30). A DIRECT cast has no
+ * parent and falls back to its own roll.
+ *
+ * Shared by every rider magnitude — bleed ticks and armour crush both call it —
+ * so the two can never drift apart the way they had before this existed:
+ * dotTickDamage preferred the parent while crush silently used its own roll.
+ *
+ * @param {number} parentDamage  Damage of the attack that spawned the rider; 0 if direct.
+ * @param {number} ownDamage     The rider's own damage roll.
+ * @returns {number}
+ */
+export function riderDamageBase(parentDamage = 0, ownDamage = 0) {
+  return parentDamage > 0 ? parentDamage : Math.max(0, ownDamage);
+}
+
 export function dotTickDamage({
   ownDamage = 0, parentDamage = 0, dotScale = 0.1, hasInvestTag = false,
   investAmount = 0, investScale = 1, defenseMultiplier = 1,
@@ -406,8 +425,6 @@ export function dotTickDamage({
   if (hasInvestTag) {
     return Math.max(0, Math.round(investScale * Math.max(0, investAmount) * defenseMultiplier));
   }
-  // A chain-spawned rider prefers the parent strike's total; a direct cast has
-  // no parent and falls back to its own roll.
-  const base = parentDamage > 0 ? parentDamage : ownDamage;
+  const base = riderDamageBase(parentDamage, ownDamage);
   return Math.max(0, Math.round(base * dotScale * defenseMultiplier));
 }

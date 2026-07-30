@@ -39,7 +39,7 @@ export class AopEffectData extends foundry.data.ActiveEffectTypeDataModel {
       armorCrush:       new fields.NumberField({ initial: 0, min: 0 }),
       // FLAT armor reduction this crush debuff contributes while active, summed
       // across stacks in the mitigation calc. Anchored to the APPLIER's hit at
-      // apply time (crushHitFrac × dmgRoll) so it's grade-correct — never a
+      // apply time (crushDamageFrac × the applier's DAMAGE) so it's grade-correct — never a
       // fraction of the target's armor. design-burn-status.md.
       armorCrushFlat:   new fields.NumberField({ initial: 0, min: 0 }),
       // Armor-MELT rate (design-burn-status.md): when > 0, this (burn) effect

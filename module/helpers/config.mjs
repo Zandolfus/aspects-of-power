@@ -233,7 +233,7 @@ ASPECTSOFPOWER.spellstrike = {
  * target grade and let a lower-grade attacker strip a huge absolute chunk of a
  * superior's armor). All grade-correct by construction:
  *   pierce  = pierceHitFrac × attacker hit          (weapon/tag property, per-hit)
- *   crush   = Σ crushHitFrac × applier hit           (stacking debuff, stored flat)
+ *   crush   = Σ crushDamageFrac × applier DAMAGE     (stacking debuff, stored flat)
  *   melt    = Σ armorMeltRate × burn-stack dotDamage (global; design-burn-status)
  *   armorAfter = max(0, armor+blockDR − pierce − crush − melt)
  * DR-strip (toughDR layer) is separate (drStrip flag). Legacy %-fields kept for
@@ -266,7 +266,11 @@ ASPECTSOFPOWER.armorAnswer = {
   // start but is NOT a key in weaponWeights, so it has never matched anything —
   // kept only so removing it is a deliberate act rather than a silent one.
   pierceWeaponTypes:  ['hammer', 'greathammer', 'mace'],
-  crushHitFrac:        0.10,   // crush flat, PER application = frac × applier hit
+  // Crush flat, PER application = frac × the applier's DAMAGE. Named
+  // crushHitFrac until 2026-07-30, which was simply wrong — the code always
+  // multiplied dmgRoll.total, never the hit total. Old key still read as a
+  // fallback so any stale reference keeps working.
+  crushDamageFrac:     0.10,
   armorCrushMaxStacks: 3,      // cap on crush stacks that contribute
   burnMeltRate:        0.5,    // default armor-melt rate (× Σ burn dotDamage)
   // ── AXE WEAR (design-weapon-proficiencies.md, RULED 2026-07-28) ──

@@ -338,7 +338,7 @@ export class SkillData extends foundry.abstract.TypeDataModel {
         // per-affinity set) set this — generic DoTs leave it false.
         debuffDRStrip:      new fields.BooleanField({ initial: false }),
         // Armor Crush opt-in (armor-answer system): >0 means this debuff crushes
-        // armor. FLAT amount is computed at apply (crushHitFrac × dmgRoll) and
+        // armor. FLAT amount is computed at apply (crushDamageFrac × applier DAMAGE) and
         // stored on the effect as armorCrushFlat — this field is now just the
         // ON gate (any non-zero enables crush; magnitude comes from config).
         debuffArmorCrush:   new fields.NumberField({ initial: 0, min: 0, max: 1 }),

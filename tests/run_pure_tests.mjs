@@ -12,7 +12,7 @@ import {
   houseHitFormula, hybridAbilityMod, weaponStatBlend, spellDamageRef,
   spellInvestDamage, strikeInvestDamage, infusionDamage, investSelfDamage,
   effectiveDodgeValue, splitEvenlyWithRemainder, perceiveGateDecision, activityTicks, nextCompletionDelta,
-  proficiencyMultiplier, parryMassMultiplier, lunarPhaseMultiplier, dotTickDamage, procStaminaCost,
+  proficiencyMultiplier, parryMassMultiplier, lunarPhaseMultiplier, dotTickDamage, procStaminaCost, riderDamageBase,
 } from '../module/helpers/formulas.mjs';
 import { moonState, moonNodeAngle, nextSyzygy, eclipseAtSyzygy, planetStates,
          meteorShowersOn, cometStates, julianDay, civilDate, worldTimeForDate } from '../module/systems/calendar.mjs';
@@ -409,6 +409,23 @@ eq('crush at 0.05 affordable for Phil (1023 dmg, 184 pool)',
 eq('George affords 3 crush stacks', Math.floor(225 / procStaminaCost(1354, 0.05)) >= 3, true);
 // Bleed keeps the default and stays where it was tuned.
 eq('bleed default unchanged for Strike', procStaminaCost(300, 0.20), 60);
+
+// -- riderDamageBase: the ONE rule both rider magnitudes size off (RULED
+// 2026-07-30). Before it existed, dotTickDamage preferred the parent while
+// armour crush silently used its own roll, so the two disagreed.
+eq('rider prefers the parent', riderDamageBase(1354, 1015), 1354);
+eq('direct cast falls back to its own roll', riderDamageBase(0, 1015), 1015);
+eq('no parent and no roll is zero', riderDamageBase(0, 0), 0);
+eq('negative own roll floors at zero', riderDamageBase(0, -99), 0);
+// GOLDEN: George Royal Axe 1354 parent, Armor Crush own roll 1015, frac 0.10.
+// Crush per stack was 101 off its own roll; off the parent it is 135.
+eq('crush per stack off the parent', Math.round(0.10 * riderDamageBase(1354, 1015)), 135);
+eq('3 stacks vs Phil armour+blockDR 912',
+   912 - 3 * Math.round(0.10 * riderDamageBase(1354, 1015)), 507);
+// Bleed and crush now agree on the base.
+eq('bleed and crush share the base',
+   dotTickDamage({ ownDamage: 1015, parentDamage: 1354, dotScale: 0.10 })
+     === Math.round(0.10 * riderDamageBase(1354, 1015)), true);
 
 if (failures) { console.error(`\n${failures} FAILURES`); process.exit(1); }
 console.log('\nAll pure-function tests pass.');
