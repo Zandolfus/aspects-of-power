@@ -1,4 +1,4 @@
-﻿/**
+/**
  * Pure-function regression tests â€” run in plain node (no Foundry):
  *   node tests/run_pure_tests.mjs
  *
@@ -12,7 +12,7 @@ import {
   houseHitFormula, hybridAbilityMod, weaponStatBlend, spellDamageRef,
   spellInvestDamage, strikeInvestDamage, infusionDamage, investSelfDamage,
   effectiveDodgeValue, splitEvenlyWithRemainder, perceiveGateDecision, activityTicks, nextCompletionDelta,
-  proficiencyMultiplier, parryMassMultiplier, lunarPhaseMultiplier,
+  proficiencyMultiplier, parryMassMultiplier, lunarPhaseMultiplier, dotTickDamage,
 } from '../module/helpers/formulas.mjs';
 import { moonState, moonNodeAngle, nextSyzygy, eclipseAtSyzygy, planetStates,
          meteorShowersOn, cometStates, julianDay, civilDate, worldTimeForDate } from '../module/systems/calendar.mjs';
@@ -336,6 +336,39 @@ eq('lunar wraps the short way', lpm(7, 0), lpm(1, 0));
 eq('lunar disabled at amp 0', lunarPhaseMultiplier(4, 0, 0), 1);
 // Nonsense input is neutral rather than NaN.
 eq('lunar bad index neutral', lunarPhaseMultiplier(NaN, 90, 0.4), 1);
+
+// -- DoT tick damage (RULED 2026-07-30: a chained rider sizes off the strike
+// that spawned it). GOLDEN numbers measured live 2026-07-30 from Gabriel's kit
+// against Phil: Hemorrhage's own roll 461, Infused Strike 821, and the same
+// strike Feint-marked (+25%) 1026. dotScale 0.1 on Hemorrhage.
+const dtd = (o) => dotTickDamage(o);
+// A DIRECT cast has no parent and still uses its own roll - the old behaviour,
+// which must not regress.
+eq('dot direct cast uses own roll', dtd({ ownDamage: 461, dotScale: 0.1 }), 46);
+// Chained off a plain Infused Strike: the bleed now rides the strike.
+eq('dot chained off plain strike', dtd({ ownDamage: 461, parentDamage: 821, dotScale: 0.1 }), 82);
+// Chained off the FEINTED strike - the number the ruling was stated with.
+eq('dot chained off feinted strike', dtd({ ownDamage: 461, parentDamage: 1026, dotScale: 0.1 }), 103);
+// THE POINT OF THE RULING: setup must change the payoff. Feinting the parent
+// strike has to move the bleed; under the old own-roll behaviour it did not.
+eq('dot setup changes payoff',
+   dtd({ ownDamage: 461, parentDamage: 1026, dotScale: 0.1 })
+     > dtd({ ownDamage: 461, parentDamage: 821, dotScale: 0.1 }), true);
+// And it must clear a real wall where the old value never could: 3 stacks pool
+// before DR is charged once, against Phil's DR 256.
+eq('dot 3 stacks beat Phil DR when parent-sized',
+   3 * dtd({ ownDamage: 461, parentDamage: 1026, dotScale: 0.1 }) > 256, true);
+eq('dot 3 stacks were dead when self-sized',
+   3 * dtd({ ownDamage: 461, dotScale: 0.1 }) > 256, false);
+// The `invest` tag still overrides both damage numbers entirely.
+eq('dot invest tag ignores damage', dtd({ ownDamage: 461, parentDamage: 1026,
+   hasInvestTag: true, investAmount: 50, investScale: 1 }), 50);
+eq('dot invest tag scales', dtd({ hasInvestTag: true, investAmount: 50, investScale: 2 }), 100);
+// Partial defense scales the tick, and nothing ever goes negative.
+eq('dot halved by partial defense',
+   dtd({ ownDamage: 461, parentDamage: 1026, dotScale: 0.1, defenseMultiplier: 0.5 }), 51);
+eq('dot never negative', dtd({ ownDamage: -999, dotScale: 0.1 }), 0);
+eq('dot no input is zero', dtd({}), 0);
 
 if (failures) { console.error(`\n${failures} FAILURES`); process.exit(1); }
 console.log('\nAll pure-function tests pass.');

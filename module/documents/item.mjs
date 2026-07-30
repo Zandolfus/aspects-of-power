@@ -1,6 +1,6 @@
 import { EquipmentSystem } from '../systems/equipment.mjs';
 import { getPositionalTags } from '../helpers/positioning.mjs';
-import { houseHitFormula, hybridAbilityMod, weaponStatBlend, spellDamageRef, spellInvestDamage, strikeInvestDamage, infusionDamage, investSelfDamage as computeInvestSelfDamage, effectiveDodgeValue, splitEvenlyWithRemainder, parryMassMultiplier, lunarPhaseMultiplier } from '../helpers/formulas.mjs';
+import { houseHitFormula, hybridAbilityMod, weaponStatBlend, spellDamageRef, spellInvestDamage, strikeInvestDamage, infusionDamage, investSelfDamage as computeInvestSelfDamage, effectiveDodgeValue, splitEvenlyWithRemainder, parryMassMultiplier, lunarPhaseMultiplier, dotTickDamage } from '../helpers/formulas.mjs';
 import { recordActionFired, declareAction, isInActiveCombat, computeActionWait, referenceRoundLength, computeWindupMultiplier, getScrambleStacks, addScrambleStack, applyDodgeCost, findCombatantForActor, perceiveGate } from '../systems/celerity.mjs';
 import { getThreatRadiusFt, actorIsDashing } from '../systems/engagement-halts.mjs';
 import { selectTargetOnCanvas, skillNeedsTargetPrompt, skillTargetsAtFire, selectMarkerOnCanvas } from '../canvas/target-prompt.mjs';
@@ -3098,10 +3098,19 @@ export class AspectsofPowerItem extends Item {
     const _hasInvestTag = (this.system.tags ?? []).includes('invest');
     const _investAmt = Math.max(0, Math.round(rollData.roll?.investedAmount ?? rollData.roll?.cost ?? 0));
     const _investScale = this.system.tagConfig?.dotInvestScale ?? 1.0;
+    // `parentDamage` is present only when _executeChainedSkills spawned this
+    // rider, and makes the bleed size off the strike that caused it rather
+    // than off its own roll — see formulas.dotTickDamage for why.
     const dotDmg = dealsDmg
-      ? (_hasInvestTag
-          ? Math.max(0, Math.round(_investScale * _investAmt * defenseMultiplier))
-          : Math.max(0, Math.round(dmgRoll.total * dotScale * defenseMultiplier)))
+      ? dotTickDamage({
+          ownDamage: dmgRoll?.total ?? 0,
+          parentDamage: rollData.roll?.parentDamage ?? 0,
+          dotScale,
+          hasInvestTag: _hasInvestTag,
+          investAmount: _investAmt,
+          investScale: _investScale,
+          defenseMultiplier,
+        })
       : 0;
 
     // Build effect data with optional DoT flags.
@@ -5494,7 +5503,8 @@ export class AspectsofPowerItem extends Item {
       }
 
       // Execute chained skills after all parent tags have resolved.
-      await this._executeChainedSkills(hitResults, targets, speaker, rollMode, { investedAmount });
+      await this._executeChainedSkills(hitResults, targets, speaker, rollMode,
+        { investedAmount, parentDamage: dmgRoll?.total ?? 0 });
 
       // Mark initial targets as affected on persistent AOEs. Keys are token
       // ids and values are CLOCK TICKS — the re-tick eligibility check
@@ -5646,7 +5656,8 @@ export class AspectsofPowerItem extends Item {
     }
 
     // Execute chained skills after all parent tags have resolved.
-    await this._executeChainedSkills(hitResults, null, speaker, rollMode, { investedAmount });
+    await this._executeChainedSkills(hitResults, null, speaker, rollMode,
+      { investedAmount, parentDamage: dmgRoll?.total ?? 0 });
 
     await this._applySustainEffect(speaker);
     return dmgRoll;
@@ -5757,6 +5768,18 @@ export class AspectsofPowerItem extends Item {
         if (chainContext?.investedAmount != null) {
           chainRollData.roll = { ...(chainRollData.roll ?? {}),
             investedAmount: Math.max(0, Math.round(chainContext.investedAmount)) };
+        }
+        // Carry the PARENT's damage total the same way, so a DoT rider sizes
+        // off the strike that spawned it (RULED 2026-07-30 — "Hemorrhage should
+        // be chained to the strike that spawned it"). Riders roll their own
+        // (deliberately small) damage for the direct hit; only the tick reads
+        // this. Without it a Feint-boosted 1026 strike left the same ~46 bleed
+        // as an unbuffed one, which severed the rotation's payoff from its
+        // setup and kept the bleed under every realistic DR. See
+        // formulas.dotTickDamage.
+        if (chainContext?.parentDamage != null) {
+          chainRollData.roll = { ...(chainRollData.roll ?? {}),
+            parentDamage: Math.max(0, Math.round(chainContext.parentDamage)) };
         }
         const chainLabel = `[chain] ${chainedItem.name}`;
         const { hitFormula: cHitF, dmgFormula: cDmgF } = chainedItem._buildRollFormulas(chainRollData, { applyRarityMult: true });

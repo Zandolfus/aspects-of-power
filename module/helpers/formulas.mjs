@@ -349,3 +349,46 @@ export function lunarPhaseMultiplier(ritualPhaseIndex, currentElongation, amp = 
   if (d > 180) d = 360 - d;
   return 1 + a * Math.cos(d * Math.PI / 180);
 }
+
+/**
+ * DoT per-tick damage.
+ *
+ * RULED 2026-07-30: a rider spawned by a chain sizes off the STRIKE THAT
+ * SPAWNED IT, not off its own deliberately-small damage roll. Hemorrhage is
+ * the canonical case — it is chained to the strike that caused the bleeding,
+ * so a bigger strike bleeds harder.
+ *
+ * Before this, `_handleDebuffTag` computed the tick from the rider's own roll,
+ * which severed the payoff from the setup: a Feint-boosted 1026 strike left
+ * exactly the same bleed as an unbuffed one, a flat ~46. Against a DR-256
+ * target that is dead at every stack count (3 x 46 = 138 < 256), whereas
+ * sizing off the parent gives 3 x 102 = 306 and finally breaks through. The
+ * bleed COEFFICIENT was never the problem; the missing parent link was.
+ *
+ * The `invest` tag still overrides both: those DoTs ride the resource
+ * committed to the parent, not any damage number (design-hemorrhage-bleed,
+ * design-chained-skills).
+ *
+ * @param {object} o
+ * @param {number} [o.ownDamage]          The rider's own damage roll total.
+ * @param {number} [o.parentDamage]       Damage total of the strike that spawned
+ *                                        it; 0/absent for a direct cast.
+ * @param {number} [o.dotScale]           Fraction of the base that ticks.
+ * @param {boolean} [o.hasInvestTag]      Skill carries the `invest` tag.
+ * @param {number} [o.investAmount]       Resource committed (parent's, for a rider).
+ * @param {number} [o.investScale]        Multiplier on the invested amount.
+ * @param {number} [o.defenseMultiplier]  Partial-defense scaling from the parent hit.
+ * @returns {number} Rounded per-tick damage, never negative.
+ */
+export function dotTickDamage({
+  ownDamage = 0, parentDamage = 0, dotScale = 0.1, hasInvestTag = false,
+  investAmount = 0, investScale = 1, defenseMultiplier = 1,
+} = {}) {
+  if (hasInvestTag) {
+    return Math.max(0, Math.round(investScale * Math.max(0, investAmount) * defenseMultiplier));
+  }
+  // A chain-spawned rider prefers the parent strike's total; a direct cast has
+  // no parent and falls back to its own roll.
+  const base = parentDamage > 0 ? parentDamage : ownDamage;
+  return Math.max(0, Math.round(base * dotScale * defenseMultiplier));
+}
