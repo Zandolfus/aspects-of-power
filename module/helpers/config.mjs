@@ -699,6 +699,40 @@ ASPECTSOFPOWER.weaponStyles = ASPECTSOFPOWER.weaponCombinations;
  * Spells are unaffected regardless: only weapon-flavoured roll types are
  * proficiency-scaled, and magic uses its own.
  */
+/**
+ * RIDERS — skills that fire off your OWN attacks rather than being spent as an
+ * action (design: "Hemorrhage can trigger on any physical attack Gabriel makes").
+ *
+ * Rate-limited by RESOURCE COST, not by cooldowns or stack caps (RULED
+ * 2026-07-30): nothing in this system has a cooldown yet, and a stack cap is a
+ * video-game abstraction with no in-world meaning. Bleeding someone costs
+ * effort, so the rider charges stamina scaled to the blow that caused it.
+ *
+ * Cost is a fraction of the PARENT'S DAMAGE, not its hit total. Hit is
+ * near-constant across a character's kit (rarity multiplies damage, not
+ * accuracy), so a hit-based cost is a flat fee that makes bread-and-butter
+ * skills the WORST rider vehicles and the high-rarity burst the best — exactly
+ * backwards. Damage-based keeps stamina-per-bleed-point uniform across the kit
+ * and stops it taxing accuracy builds (archers have the highest hit totals in
+ * the game and would otherwise pay most for the same effect).
+ *
+ * On 0.20: DoT ticks bypass armour and face only DR, so the cost is really
+ * buying ACCESS to armoured targets, not damage — a direct light-weapon hit is
+ * ~119 damage/stamina where it lands and ZERO against 11 of 14 party members,
+ * while a bleed is ~1 damage/stamina but non-zero against those same 11.
+ * Because stacks pool before DR is charged once, the coefficient decides WHICH
+ * targets are bleedable at all: at 0.20 a rogue reaches roughly DR 170, and
+ * the heaviest tank (DR 256, needing 9 stacks = 540 stamina against a 400 pool)
+ * stays out of reach — consistent with hard matchups existing on level.
+ */
+ASPECTSOFPOWER.riders = {
+  // Stamina charged per rider proc = frac × the parent attack's damage.
+  procCostDamageFrac: 0.20,
+  // Trigger key riders subscribe to. Attacker-side counterpart to the
+  // defender-side reactionTrigger vocabulary (self_attacked, self_struck…).
+  procTriggerPierced: 'self_attack_pierced',
+};
+
 ASPECTSOFPOWER.weaponProficiency = {
   enabled: true,
   anchor: 'common',

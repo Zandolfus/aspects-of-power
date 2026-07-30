@@ -380,6 +380,25 @@ export function lunarPhaseMultiplier(ritualPhaseIndex, currentElongation, amp = 
  * @param {number} [o.defenseMultiplier]  Partial-defense scaling from the parent hit.
  * @returns {number} Rounded per-tick damage, never negative.
  */
+/**
+ * Stamina charged when a RIDER fires off your own attack (config.riders).
+ *
+ * Keyed to the parent's DAMAGE, not its hit total — see the riders config
+ * block for why. Rounded up so a rider is never free, and floored at 1 so a
+ * zero-damage parent still costs something rather than becoming an infinite
+ * proc engine.
+ *
+ * @param {number} parentDamage  Damage total of the attack that triggered it.
+ * @param {number} [frac]        Fraction of that damage to charge.
+ * @returns {number} Stamina cost, minimum 1.
+ */
+export function procStaminaCost(parentDamage, frac = null) {
+  const C = globalThis.CONFIG?.ASPECTSOFPOWER?.riders ?? {};
+  const f = frac ?? C.procCostDamageFrac ?? 0.20;
+  if (!(f > 0)) return 0;
+  return Math.max(1, Math.ceil(Math.max(0, parentDamage) * f));
+}
+
 export function dotTickDamage({
   ownDamage = 0, parentDamage = 0, dotScale = 0.1, hasInvestTag = false,
   investAmount = 0, investScale = 1, defenseMultiplier = 1,

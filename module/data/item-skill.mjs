@@ -299,6 +299,25 @@ export class SkillData extends foundry.abstract.TypeDataModel {
         }), { initial: [] }),
         debuffDuration:     new fields.NumberField({ initial: 1, integer: true, min: 0 }),
         debuffStackable:    new fields.BooleanField({ initial: false }),
+        // ── RIDER subscription (config.riders, RULED 2026-07-30) ─────────
+        // A rider fires off the OWNER'S OWN attacks instead of being spent as
+        // an action or hand-wired onto one parent via chainedSkills. It is the
+        // attacker-side counterpart to reactionTrigger, which only ever
+        // described things happening TO you (self_attacked, self_struck…).
+        //
+        // `procTrigger` — currently 'self_attack_pierced' (fires when one of
+        // the owner's attacks got past the target's armour/veil into the DR
+        // layer). Empty = not a rider. On-pierce is self-limiting: the rider
+        // never fires against walls the owner cannot already beat.
+        //
+        // `procAttackTags` — ALL of these must be present on the triggering
+        // attack. ['physical'] gives "any physical attack I make". Empty means
+        // any attack, which is almost never what an author wants.
+        //
+        // Rate limiting is the STAMINA COST (formulas.procStaminaCost), not a
+        // cooldown or a stack cap — see the riders config block.
+        procTrigger:        new fields.StringField({ initial: '' }),
+        procAttackTags:     new fields.ArrayField(new fields.StringField(), { initial: [] }),
         debuffScaleWithAttack: new fields.NumberField({ initial: 0, min: 0, max: 1 }),
         debuffDirectional:  new fields.BooleanField({ initial: false }),
         debuffDealsDamage:  new fields.BooleanField({ initial: false }),

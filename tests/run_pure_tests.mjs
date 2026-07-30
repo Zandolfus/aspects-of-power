@@ -12,7 +12,7 @@ import {
   houseHitFormula, hybridAbilityMod, weaponStatBlend, spellDamageRef,
   spellInvestDamage, strikeInvestDamage, infusionDamage, investSelfDamage,
   effectiveDodgeValue, splitEvenlyWithRemainder, perceiveGateDecision, activityTicks, nextCompletionDelta,
-  proficiencyMultiplier, parryMassMultiplier, lunarPhaseMultiplier, dotTickDamage,
+  proficiencyMultiplier, parryMassMultiplier, lunarPhaseMultiplier, dotTickDamage, procStaminaCost,
 } from '../module/helpers/formulas.mjs';
 import { moonState, moonNodeAngle, nextSyzygy, eclipseAtSyzygy, planetStates,
          meteorShowersOn, cometStates, julianDay, civilDate, worldTimeForDate } from '../module/systems/calendar.mjs';
@@ -369,6 +369,31 @@ eq('dot halved by partial defense',
    dtd({ ownDamage: 461, parentDamage: 1026, dotScale: 0.1, defenseMultiplier: 0.5 }), 51);
 eq('dot never negative', dtd({ ownDamage: -999, dotScale: 0.1 }), 0);
 eq('dot no input is zero', dtd({}), 0);
+
+// -- Rider proc stamina cost (RULED 2026-07-30: cost = 0.20 x parent DAMAGE).
+// GOLDEN from Gabriel's live kit measured 2026-07-30 on the REAL damage path
+// (strikeInvestDamage, windup 0.6 dagger): Strike 300, Infused Strike 400,
+// Sneak Attack 601, Hemorrhage 225.
+const psc = (d, f) => procStaminaCost(d, f);
+eq('proc cost Strike (B&B)', psc(300, 0.20), 60);
+eq('proc cost Infused Strike (B&B)', psc(400, 0.20), 80);
+eq('proc cost Sneak Attack', psc(601, 0.20), 121);
+eq('proc cost Hemorrhage', psc(225, 0.20), 45);
+// THE POINT OF DAMAGE-BASING: stamina per bleed point is UNIFORM across the
+// kit. A hit-based cost was a flat ~50 for every skill (hit is near-constant
+// because rarity multiplies damage, not accuracy), which made the
+// bread-and-butter the worst rider vehicle and the divine burst the best.
+const perBleed = (d) => psc(d, 0.20) / (d * 0.1);
+eq('uniform cost per bleed point: Strike vs Sneak',
+   Math.abs(perBleed(300) - perBleed(601)) < 0.02, true);
+eq('uniform cost per bleed point: Strike vs Hemorrhage',
+   Math.abs(perBleed(300) - perBleed(225)) < 0.02, true);
+// Never free, never zero, never negative.
+eq('proc cost rounds UP', psc(101, 0.20), 21);
+eq('proc cost minimum 1', psc(1, 0.20), 1);
+eq('proc cost of a zero-damage parent still costs', psc(0, 0.20), 1);
+eq('proc cost never negative', psc(-500, 0.20), 1);
+eq('proc disabled at frac 0', psc(300, 0), 0);
 
 if (failures) { console.error(`\n${failures} FAILURES`); process.exit(1); }
 console.log('\nAll pure-function tests pass.');

@@ -1,6 +1,6 @@
 import { EquipmentSystem } from '../systems/equipment.mjs';
 import { getPositionalTags } from '../helpers/positioning.mjs';
-import { houseHitFormula, hybridAbilityMod, weaponStatBlend, spellDamageRef, spellInvestDamage, strikeInvestDamage, infusionDamage, investSelfDamage as computeInvestSelfDamage, effectiveDodgeValue, splitEvenlyWithRemainder, parryMassMultiplier, lunarPhaseMultiplier, dotTickDamage } from '../helpers/formulas.mjs';
+import { houseHitFormula, hybridAbilityMod, weaponStatBlend, spellDamageRef, spellInvestDamage, strikeInvestDamage, infusionDamage, investSelfDamage as computeInvestSelfDamage, effectiveDodgeValue, splitEvenlyWithRemainder, parryMassMultiplier, lunarPhaseMultiplier, dotTickDamage, procStaminaCost } from '../helpers/formulas.mjs';
 import { recordActionFired, declareAction, isInActiveCombat, computeActionWait, referenceRoundLength, computeWindupMultiplier, getScrambleStacks, addScrambleStack, applyDodgeCost, findCombatantForActor, perceiveGate } from '../systems/celerity.mjs';
 import { getThreatRadiusFt, actorIsDashing } from '../systems/engagement-halts.mjs';
 import { selectTargetOnCanvas, skillNeedsTargetPrompt, skillTargetsAtFire, selectMarkerOnCanvas } from '../canvas/target-prompt.mjs';
@@ -5706,9 +5706,36 @@ export class AspectsofPowerItem extends Item {
     });
   }
 
+  /**
+   * Riders that subscribe to THIS attack, discovered on the actor rather than
+   * enumerated by the parent (config.riders). Returns synthetic chain entries
+   * so they run down the same execution path as hand-wired chainedSkills —
+   * one code path means a rider's DoT sizes off the parent automatically,
+   * exactly like a wired chain.
+   *
+   * A rider must (a) subscribe to the pierced trigger, (b) match every tag in
+   * procAttackTags against THIS attack, and (c) not be the attack itself.
+   * Affordability is checked at fire time, per-target, since each proc is paid
+   * for separately.
+   */
+  _discoverRiders() {
+    const cfg = CONFIG.ASPECTSOFPOWER.riders ?? {};
+    const key = cfg.procTriggerPierced ?? 'self_attack_pierced';
+    const myTags = this.system.tags ?? [];
+    const out = [];
+    for (const s of (this.actor?.items ?? [])) {
+      if (s.type !== 'skill' || s.id === this.id) continue;
+      if ((s.system?.tagConfig?.procTrigger ?? '') !== key) continue;
+      const need = s.system?.tagConfig?.procAttackTags ?? [];
+      if (!need.every(t => myTags.includes(t))) continue;
+      out.push({ skillId: s.id, trigger: 'on-hit', _rider: true });
+    }
+    return out;
+  }
+
   async _executeChainedSkills(hitResults, aoeTargets, speaker, rollMode, chainContext = {}) {
     const whisperGM = !_isPlayerCharacter(this.actor) ? ChatMessage.getWhisperRecipients('GM') : undefined;
-    const chains = this.system.chainedSkills ?? [];
+    const chains = [...(this.system.chainedSkills ?? []), ...this._discoverRiders()];
     if (chains.length === 0) return;
 
     for (const chain of chains) {
@@ -5754,6 +5781,31 @@ export class AspectsofPowerItem extends Item {
             });
             continue;
           }
+        }
+
+        // ── RIDER gate: on-pierce + stamina cost ────────────────────────
+        // Riders subscribe to the attack rather than being wired to it, so
+        // they carry their own pierce requirement (the trigger IS on-pierce)
+        // and pay per proc. Cost scales with the parent's damage, which is
+        // what rate-limits them — no cooldown, no stack cap (config.riders).
+        if (chain._rider) {
+          if (hitResult?.piercedMitigation !== true) continue;   // silent: the common case
+          const cost = procStaminaCost(chainContext?.parentDamage ?? 0);
+          const pool = Math.round(this.actor.system.stamina?.value ?? 0);
+          if (pool < cost) {
+            ChatMessage.create({
+              speaker, rollMode, ...(whisperGM ? { whisper: whisperGM } : {}),
+              content: `<p><em>${chainedItem.name} didn't trigger — not enough stamina `
+                     + `(need ${cost}, have ${pool}).</em></p>`,
+            });
+            continue;
+          }
+          await this.actor.update({ 'system.stamina.value': pool - cost });
+          ChatMessage.create({
+            speaker, rollMode, ...(whisperGM ? { whisper: whisperGM } : {}),
+            content: `<p><em>${this.actor.name} tears the wound open — `
+                   + `<strong>${chainedItem.name}</strong> (${cost} stamina).</em></p>`,
+          });
         }
 
         // Build the chained skill's own rolls.
