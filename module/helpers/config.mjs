@@ -706,7 +706,13 @@ ASPECTSOFPOWER.weaponProficiency = {
   // restore the old absence-is-neutral behaviour for tracked actors too.
   untrainedRarity: 'rusty',
   // Applies to weapon-flavoured roll types only; spells are not proficiency-scaled.
-  rollTypes: ['str_weapon', 'dex_weapon', 'phys_melee', 'phys_ranged', 'weapon'],
+  // `phys_melee` was dropped 2026-07-30: melee already implies physical, so
+  // str_weapon/dex_weapon cover it and magic_melee covers the magical side. It
+  // had no branch in _buildRollFormulas (fell to the generic else, which sets
+  // hitFormula = null — no to-hit roll at all) and is absent from
+  // ASPECTSOFPOWER.rollTypes, so it could not even be authored. This list was
+  // the last live reference. World content migrated in the same change.
+  rollTypes: ['str_weapon', 'dex_weapon', 'phys_ranged', 'weapon'],
 };
 
 /**
