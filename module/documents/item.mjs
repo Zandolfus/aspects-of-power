@@ -4847,6 +4847,10 @@ export class AspectsofPowerItem extends Item {
               channelFactor: sc.celerity?.CHANNEL_FACTOR ?? null,
               hardCap: true,                              // hide safe-ceiling/self-damage rows
               damageRef: spellDamageRef(gradeFactor),
+              // maxPool here is the WIS-capped invest ceiling, so without this
+              // the hardCap layout printed the same number twice — once labelled
+              // "Max invest" and once labelled "Pool".
+              truePool: livePool,
             });
         if (invested === null) {
           if (preplacedTemplateDoc) await this._gmDeleteRegion(canvas.scene, preplacedTemplateDoc.id);
