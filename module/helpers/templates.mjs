@@ -6,10 +6,9 @@
 export const preloadHandlebarsTemplates = async function () {
   return foundry.applications.handlebars.loadTemplates([
     // Actor partials.
-    'systems/aspects-of-power/templates/actor/parts/actor-features.hbs',
     'systems/aspects-of-power/templates/actor/parts/actor-items.hbs',
-    'systems/aspects-of-power/templates/actor/parts/actor-skills.hbs',
     'systems/aspects-of-power/templates/actor/parts/actor-effects.hbs',
+    'systems/aspects-of-power/templates/actor/parts/equipped-slots.hbs',
     // Item partials
     'systems/aspects-of-power/templates/item/parts/item-effects.hbs',
     // Shared partials

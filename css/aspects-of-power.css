@@ -1,4 +1,54 @@
 @import url("https://fonts.googleapis.com/css2?family=Roboto:wght@400;700&display=swap");
+
+/* ── System palette ──
+   Custom properties scoped to the system's own root classes - NOT :root,
+   so nothing leaks into core Foundry or other systems' UI. The dialog and
+   tracker root classes render outside .aspects-of-power windows, so they
+   carry the palette themselves. Values are byte-identical to the literals
+   they replaced. */
+.aspects-of-power,
+.application.aspects-of-power,
+.level-up-dialog,
+.spend-fp-dialog,
+.quick-actions-dialog,
+.celerity-tracker-root {
+  /* parchment structure */
+  --aop-border: #c9c7b8;         /* light tan border / active button fill */
+  --aop-parchment: #eeede0;      /* parchment text on dark + groove borders */
+  --aop-border-faint: #7a7971;   /* faint section/chip borders */
+  /* dark-surface grays */
+  --aop-border-dark: #555;
+  --aop-border-darker: #444;
+  --aop-bg-input: #222;
+  --aop-bg-raised: #333;
+  --aop-text-muted: #888;
+  --aop-text-soft: #aaa;
+  --aop-gray-dim: #666;          /* disabled text + quiet chip borders */
+  --aop-text-bright: #fff;
+  /* accents */
+  --aop-accent: #ffca28;         /* amber highlight (stars, break-free, hovers) */
+  --aop-accent-blue: #4488ff;    /* free points / AOE / casting range */
+  --aop-danger: #ef5350;
+  --aop-danger-dark: #c62828;    /* debuff chrome */
+  --aop-warning: #cc4400;        /* caps + encumbrance */
+  /* resource bars: fill (dark) and label (bright) pairs */
+  --aop-health: #c62828;
+  --aop-mana: #1565c0;
+  --aop-stamina: #f9a825;
+  --aop-overhealth: #2e7d32;
+  --aop-barrier: #5c6bc0;
+  --aop-health-bright: #ef5350;
+  --aop-mana-bright: #42a5f5;
+  --aop-stamina-bright: #ffca28;
+  --aop-overhealth-bright: #66bb6a;
+  --aop-barrier-bright: #7986cb;
+  /* black overlays, faint to strong */
+  --aop-overlay-faint: rgba(0, 0, 0, 0.03);
+  --aop-overlay-soft: rgba(0, 0, 0, 0.05);
+  --aop-overlay: rgba(0, 0, 0, 0.15);
+  --aop-overlay-mid: rgba(0, 0, 0, 0.2);
+  --aop-overlay-strong: rgba(0, 0, 0, 0.25);
+}
 /* Global styles */
 .window-app {
   font-family: "Roboto", sans-serif;
@@ -249,15 +299,15 @@
   bottom: -2px;
   right: -2px;
   cursor: pointer;
-  border: 1px solid #555;
+  border: 1px solid var(--aop-border-dark);
   border-radius: 3px;
-  background: #222;
+  background: var(--aop-bg-input);
   padding: 1px;
   line-height: 0;
 }
 .aspects-of-power .sheet-header .wounded-img-picker:hover {
   border-color: #c33;
-  background: #333;
+  background: var(--aop-bg-raised);
 }
 .aspects-of-power .sheet-header .wounded-img.placeholder {
   opacity: 0.4;
@@ -270,18 +320,18 @@
   bottom: -2px;
   left: -2px;
   cursor: pointer;
-  border: 1px solid #555;
+  border: 1px solid var(--aop-border-dark);
   border-radius: 3px;
-  background: #222;
+  background: var(--aop-bg-input);
   padding: 3px 4px;
   font-size: 14px;
-  color: #aaa;
+  color: var(--aop-text-soft);
   line-height: 1;
 }
 .aspects-of-power .sheet-header .progress-btn-picker:hover {
-  border-color: #ffca28;
-  color: #ffca28;
-  background: #333;
+  border-color: var(--aop-accent);
+  color: var(--aop-accent);
+  background: var(--aop-bg-raised);
 }
 .progress-roll-result {
   padding: 4px 0;
@@ -353,21 +403,21 @@
 .aspects-of-power .bar-track {
   flex: 1;
   height: 14px;
-  background: #333;
+  background: var(--aop-bg-raised);
   border-radius: 3px;
   overflow: hidden;
-  border: 1px solid #555;
+  border: 1px solid var(--aop-border-dark);
 }
 .aspects-of-power .bar-fill {
   height: 100%;
   border-radius: 2px;
   transition: width 0.3s ease;
 }
-.aspects-of-power .bar-fill-health   { background: #c62828; }
-.aspects-of-power .bar-fill-mana     { background: #1565c0; }
-.aspects-of-power .bar-fill-stamina  { background: #f9a825; }
-.aspects-of-power .bar-fill-overhealth { background: #2e7d32; }
-.aspects-of-power .bar-fill-barrier  { background: #5c6bc0; }
+.aspects-of-power .bar-fill-health   { background: var(--aop-health); }
+.aspects-of-power .bar-fill-mana     { background: var(--aop-mana); }
+.aspects-of-power .bar-fill-stamina  { background: var(--aop-stamina); }
+.aspects-of-power .bar-fill-overhealth { background: var(--aop-overhealth); }
+.aspects-of-power .bar-fill-barrier  { background: var(--aop-barrier); }
 .aspects-of-power .bar-values {
   display: flex;
   align-items: center;
@@ -381,8 +431,8 @@
   text-align: right;
   height: 20px;
   padding: 0 4px;
-  border: 1px solid #555;
-  background: #222;
+  border: 1px solid var(--aop-border-dark);
+  background: var(--aop-bg-input);
   color: #eee;
   -moz-appearance: textfield;
 }
@@ -401,11 +451,11 @@
   opacity: 0.6;
   margin-left: 2px;
 }
-.aspects-of-power .resource-health .bar-label { color: #ef5350; }
-.aspects-of-power .resource-mana .bar-label   { color: #42a5f5; }
-.aspects-of-power .resource-stamina .bar-label { color: #ffca28; }
-.aspects-of-power .resource-overhealth .bar-label { color: #66bb6a; }
-.aspects-of-power .resource-barrier .bar-label { color: #7986cb; }
+.aspects-of-power .resource-health .bar-label { color: var(--aop-health-bright); }
+.aspects-of-power .resource-mana .bar-label   { color: var(--aop-mana-bright); }
+.aspects-of-power .resource-stamina .bar-label { color: var(--aop-stamina-bright); }
+.aspects-of-power .resource-overhealth .bar-label { color: var(--aop-overhealth-bright); }
+.aspects-of-power .resource-barrier .bar-label { color: var(--aop-barrier-bright); }
 .aspects-of-power .clear-overhealth,
 .aspects-of-power .clear-barrier {
   cursor: pointer;
@@ -416,7 +466,7 @@
 .aspects-of-power .clear-overhealth:hover,
 .aspects-of-power .clear-barrier:hover {
   opacity: 1;
-  color: #ef5350;
+  color: var(--aop-danger);
 }
 .aspects-of-power .resource-barrier .affinity-chip {
   font-size: 9px;
@@ -434,10 +484,10 @@
 }
 .aspects-of-power .defense-block {
   flex: 1;
-  border: 1px solid #444;
+  border: 1px solid var(--aop-border-darker);
   border-radius: 4px;
   padding: 4px 8px;
-  background: rgba(0,0,0,0.15);
+  background: var(--aop-overlay);
 }
 .aspects-of-power .defense-row {
   display: flex;
@@ -467,10 +517,10 @@
 }
 .aspects-of-power .identity-block {
   flex: 1;
-  border: 1px solid #444;
+  border: 1px solid var(--aop-border-darker);
   border-radius: 4px;
   padding: 4px 8px;
-  background: rgba(0,0,0,0.15);
+  background: var(--aop-overlay);
   display: flex;
   flex-direction: column;
   gap: 2px;
@@ -493,8 +543,8 @@
   height: 20px;
   text-align: center;
   padding: 0;
-  border: 1px solid #555;
-  background: #222;
+  border: 1px solid var(--aop-border-dark);
+  background: var(--aop-bg-input);
   color: #eee;
 }
 .aspects-of-power .identity-row .template-name {
@@ -532,7 +582,7 @@
 /* Skill affinity chips */
 .aspects-of-power .skill-affinities {
   margin-bottom: 8px;
-  border-bottom: 1px solid #c9c7b8;
+  border-bottom: 1px solid var(--aop-border);
   padding-bottom: 8px;
 }
 .aspects-of-power .affinity-chips {
@@ -547,7 +597,7 @@
   align-items: center;
   gap: 4px;
   background: #4a7c9e;
-  color: #fff;
+  color: var(--aop-text-bright);
   border-radius: 10px;
   padding: 2px 8px;
   font-size: 11px;
@@ -578,7 +628,7 @@
 /* Skill tag UI */
 .aspects-of-power .skill-tags {
   margin-bottom: 8px;
-  border-bottom: 1px solid #c9c7b8;
+  border-bottom: 1px solid var(--aop-border);
   padding-bottom: 8px;
 }
 .aspects-of-power .skill-tag-chips {
@@ -601,7 +651,7 @@
   align-items: center;
   gap: 8px;
   padding: 6px 8px;
-  border: 1px solid #555;
+  border: 1px solid var(--aop-border-dark);
   border-radius: 4px;
   background: #2a2a2a;
   cursor: pointer;
@@ -609,11 +659,11 @@
 }
 .aspects-of-power.quick-actions-dialog .quick-action:hover {
   background: #3a3a3a;
-  border-color: #ffca28;
+  border-color: var(--aop-accent);
 }
 .aspects-of-power.quick-actions-dialog .quick-action img {
   flex: 0 0 auto;
-  border: 1px solid #444;
+  border: 1px solid var(--aop-border-darker);
   border-radius: 3px;
 }
 .aspects-of-power.quick-actions-dialog .quick-action-name {
@@ -624,7 +674,7 @@
 .aspects-of-power.quick-actions-dialog .quick-action-cost {
   flex: 0 0 auto;
   font-size: 11px;
-  color: #888;
+  color: var(--aop-text-muted);
   font-style: italic;
 }
 .aspects-of-power.quick-actions-dialog .quick-actions-footer {
@@ -643,7 +693,7 @@
   display: none;
 }
 .aspects-of-power .skill-favorite-toggle .fa-star {
-  color: #ffca28;
+  color: var(--aop-accent);
   font-size: 16px;
   opacity: 0.6;
   transition: opacity 0.15s ease;
@@ -658,7 +708,7 @@
   display: inline-flex;
   align-items: center;
   background: transparent !important;
-  border: 1px solid #7a7971;
+  border: 1px solid var(--aop-border-faint);
   border-radius: 3px;
   padding: 2px 18px 2px 8px;
   font-size: 11px;
@@ -687,7 +737,7 @@
   align-items: center;
   gap: 4px;
   background: #4a4a3a;
-  border: 1px solid #7a7971;
+  border: 1px solid var(--aop-border-faint);
   border-radius: 3px;
   padding: 2px 8px;
   font-size: 11px;
@@ -699,7 +749,7 @@
   font-weight: bold;
   line-height: 1;
 }
-.aspects-of-power .skill-tag-chip .skill-tag-remove:hover { opacity: 1; color: #ef5350; }
+.aspects-of-power .skill-tag-chip .skill-tag-remove:hover { opacity: 1; color: var(--aop-danger); }
 .aspects-of-power .skill-tag-autocomplete {
   position: relative;
 }
@@ -718,7 +768,7 @@
   padding: 0;
   list-style: none;
   background: #302e2a;
-  border: 1px solid #7a7971;
+  border: 1px solid var(--aop-border-faint);
   border-top: none;
   border-radius: 0 0 3px 3px;
   max-height: 150px;
@@ -740,8 +790,8 @@
 .aspects-of-power .tag-config {
   margin-top: 8px;
   padding: 6px 8px;
-  background: rgba(0, 0, 0, 0.03);
-  border: 1px solid #c9c7b8;
+  background: var(--aop-overlay-faint);
+  border: 1px solid var(--aop-border);
   border-radius: 3px;
   display: grid;
   grid-template-columns: auto 1fr;
@@ -776,7 +826,7 @@
 }
 .aspects-of-power .attr-entry .multiplier-label {
   font-size: 0.85em;
-  color: #666;
+  color: var(--aop-gray-dim);
 }
 .aspects-of-power .attr-entry .attr-value {
   width: 48px;
@@ -800,7 +850,7 @@
 /* Skill group collapsible sections */
 .aspects-of-power .skill-group {
   margin-bottom: 4px;
-  border: 1px solid #7a7971;
+  border: 1px solid var(--aop-border-faint);
   border-radius: 3px;
 }
 .aspects-of-power .skill-group-header {
@@ -808,15 +858,15 @@
   align-items: center;
   gap: 6px;
   padding: 4px 8px;
-  background: rgba(0, 0, 0, 0.15);
+  background: var(--aop-overlay);
   cursor: pointer;
   font-weight: bold;
   font-size: 13px;
-  color: #eeede0;
+  color: var(--aop-parchment);
   user-select: none;
 }
 .aspects-of-power .skill-group-header:hover {
-  background: rgba(0, 0, 0, 0.25);
+  background: var(--aop-overlay-strong);
 }
 .aspects-of-power .skill-group-count {
   font-weight: normal;
@@ -842,7 +892,7 @@
   gap: 12px;
 }
 .aspects-of-power .defense-section {
-  border: 1px solid #7a7971;
+  border: 1px solid var(--aop-border-faint);
   border-radius: 4px;
   padding: 8px 12px;
   background: rgba(0, 0, 0, 0.1);
@@ -850,8 +900,8 @@
 .aspects-of-power .defense-section h3 {
   margin: 0 0 8px 0;
   font-size: 14px;
-  color: #eeede0;
-  border-bottom: 1px solid #7a7971;
+  color: var(--aop-parchment);
+  border-bottom: 1px solid var(--aop-border-faint);
   padding-bottom: 4px;
 }
 .aspects-of-power .defense-grid {
@@ -864,18 +914,18 @@
   flex-direction: column;
   align-items: center;
   padding: 6px 8px;
-  background: rgba(0, 0, 0, 0.2);
+  background: var(--aop-overlay-mid);
   border-radius: 3px;
 }
 .aspects-of-power .defense-cell label {
   font-size: 11px;
-  color: #c9c7b8;
+  color: var(--aop-border);
   margin-bottom: 2px;
 }
 .aspects-of-power .defense-cell .defense-value {
   font-size: 16px;
   font-weight: bold;
-  color: #eeede0;
+  color: var(--aop-parchment);
 }
 .aspects-of-power .immunity-chips {
   display: flex;
@@ -902,21 +952,21 @@
 .aspects-of-power .stats-view-btn {
   flex: 1;
   padding: 4px 8px;
-  border: 1px solid #7a7971;
+  border: 1px solid var(--aop-border-faint);
   border-radius: 3px;
-  background: rgba(0, 0, 0, 0.15);
-  color: #eeede0;
+  background: var(--aop-overlay);
+  color: var(--aop-parchment);
   cursor: pointer;
   font-size: 12px;
   font-weight: bold;
   text-align: center;
 }
 .aspects-of-power .stats-view-btn:hover {
-  background: rgba(0, 0, 0, 0.25);
+  background: var(--aop-overlay-strong);
 }
 .aspects-of-power .stats-view-btn.active {
   background: rgba(0, 0, 0, 0.4);
-  border-color: #c9c7b8;
+  border-color: var(--aop-border);
 }
 
 /* Additional slots checkboxes */
@@ -940,17 +990,17 @@
   align-items: center;
   margin-bottom: 8px;
   padding: 4px 8px;
-  background: rgba(0, 0, 0, 0.2);
-  border: 1px dashed #c9c7b8;
+  background: var(--aop-overlay-mid);
+  border: 1px dashed var(--aop-border);
   border-radius: 3px;
-  color: #eeede0;
+  color: var(--aop-parchment);
 }
 .aspects-of-power .loadout-btn {
   padding: 3px 10px;
-  border: 1px solid #7a7971;
+  border: 1px solid var(--aop-border-faint);
   border-radius: 3px;
-  background: rgba(0, 0, 0, 0.15);
-  color: #eeede0;
+  background: var(--aop-overlay);
+  color: var(--aop-parchment);
   cursor: pointer;
   font-size: 12px;
   font-weight: bold;
@@ -959,9 +1009,9 @@
   background: rgba(0, 0, 0, 0.3);
 }
 .aspects-of-power .loadout-btn.active {
-  background: #c9c7b8;
+  background: var(--aop-border);
   color: #1a1a1a;
-  border-color: #c9c7b8;
+  border-color: var(--aop-border);
 }
 
 /* Gear set toggle */
@@ -973,20 +1023,20 @@
 .aspects-of-power .gear-toggle-btn {
   flex: 1;
   padding: 4px 8px;
-  border: 1px solid #7a7971;
+  border: 1px solid var(--aop-border-faint);
   border-radius: 3px;
-  background: rgba(0, 0, 0, 0.15);
-  color: #eeede0;
+  background: var(--aop-overlay);
+  color: var(--aop-parchment);
   cursor: pointer;
   font-size: 12px;
   font-weight: bold;
 }
 .aspects-of-power .gear-toggle-btn:hover {
-  background: rgba(0, 0, 0, 0.25);
+  background: var(--aop-overlay-strong);
 }
 .aspects-of-power .gear-toggle-btn.active {
   background: rgba(0, 0, 0, 0.4);
-  border-color: #c9c7b8;
+  border-color: var(--aop-border);
 }
 .aspects-of-power .gear-set-shared {
   margin-top: 8px;
@@ -1008,22 +1058,22 @@
   border-top: 1px solid rgba(255, 193, 7, 0.3);
   font-size: 12px;
   font-weight: bold;
-  color: #eeede0;
+  color: var(--aop-parchment);
   pointer-events: none;
 }
 .aspects-of-power .skill-reactions-header,
 .aspects-of-power .skill-reactions-header .item-name,
 .aspects-of-power .skill-reactions-header .item-name * {
-  color: #eeede0 !important;
+  color: var(--aop-parchment) !important;
 }
 .aspects-of-power .skill-reaction {
   border-left: 2px solid rgba(255, 193, 7, 0.3);
 }
 .aspects-of-power .skill-reaction .item-name h4 {
-  color: #eeede0;
+  color: var(--aop-parchment);
 }
 .aspects-of-power .skill-group .items-list .item .item-name h4 {
-  color: #eeede0;
+  color: var(--aop-parchment);
 }
 
 /* Legacy overhealth/barrier styles removed — now using resource-bar-row layout */
@@ -1032,8 +1082,8 @@
   margin: 2px 0;
   padding: 0;
   align-items: center;
-  background: rgba(0, 0, 0, 0.05);
-  border: 2px groove #eeede0;
+  background: var(--aop-overlay-soft);
+  border: 2px groove var(--aop-parchment);
   font-weight: bold;
 }
 .aspects-of-power .items-header > * {
@@ -1045,7 +1095,7 @@
   padding-left: 5px;
   text-align: left;
   display: flex;
-  color: #eeede0;
+  color: var(--aop-parchment);
 }
 .aspects-of-power .items-list {
   list-style: none;
@@ -1088,7 +1138,7 @@
 .aspects-of-power .items-list .item {
   align-items: center;
   padding: 2px 2px;
-  border-bottom: 1px solid #c9c7b8;
+  border-bottom: 1px solid var(--aop-border);
   min-height: 28px;
 }
 .aspects-of-power .items-list .item:last-child {
@@ -1110,8 +1160,8 @@
 }
 .aspects-of-power .items-list .item-prop {
   text-align: center;
-  border-left: 1px solid #c9c7b8;
-  border-right: 1px solid #c9c7b8;
+  border-left: 1px solid var(--aop-border);
+  border-right: 1px solid var(--aop-border);
   font-size: 12px;
 }
 .aspects-of-power .items-list .items-header {
@@ -1119,8 +1169,8 @@
   margin: 2px 0;
   padding: 0;
   align-items: center;
-  background: rgba(0, 0, 0, 0.05);
-  border: 2px groove #eeede0;
+  background: var(--aop-overlay-soft);
+  border: 2px groove var(--aop-parchment);
   font-weight: bold;
 }
 .aspects-of-power .items-list .items-header > * {
@@ -1130,7 +1180,7 @@
 .aspects-of-power .items-list .items-header .item-name {
   padding-left: 5px;
   text-align: left;
-  color: #eeede0;
+  color: var(--aop-parchment);
 }
 .aspects-of-power .item-formula {
   flex: 0 0 200px;
@@ -1140,8 +1190,8 @@
 .aspects-of-power .effects .item .effect-duration,
 .aspects-of-power .effects .item .effect-controls {
   text-align: center;
-  border-left: 1px solid #c9c7b8;
-  border-right: 1px solid #c9c7b8;
+  border-left: 1px solid var(--aop-border);
+  border-right: 1px solid var(--aop-border);
   font-size: 12px;
 }
 .aspects-of-power .effects .item .effect-controls {
@@ -1151,7 +1201,7 @@
 .aspects-of-power .tag-editor {
   margin-top: 8px;
   padding: 6px;
-  border: 1px solid #444;
+  border: 1px solid var(--aop-border-darker);
   border-radius: 4px;
   background: rgba(0,0,0,0.1);
 }
@@ -1196,10 +1246,10 @@
   align-items: center;
   gap: 3px;
   padding: 2px 6px;
-  border: 1px solid #666;
+  border: 1px solid var(--aop-gray-dim);
   border-radius: 4px;
   font-size: 11px;
-  background: rgba(0,0,0,0.2);
+  background: var(--aop-overlay-mid);
 }
 .aspects-of-power .tag-chip-label {
   font-weight: bold;
@@ -1216,7 +1266,7 @@
 }
 .aspects-of-power .tag-remove:hover {
   opacity: 1;
-  color: #ef5350;
+  color: var(--aop-danger);
 }
 
 /* ── Token Ruler Stamina Cost ── */
@@ -1238,14 +1288,14 @@
   font-weight: bold;
   padding: 4px 8px;
   background: rgba(198, 40, 40, 0.2);
-  border: 1px solid #c62828;
+  border: 1px solid var(--aop-danger-dark);
   border-radius: 4px 4px 0 0;
-  color: #ef5350;
+  color: var(--aop-danger);
 }
 .aspects-of-power .debuff-card {
-  border: 1px solid #444;
+  border: 1px solid var(--aop-border-darker);
   border-top: none;
-  background: rgba(0,0,0,0.15);
+  background: var(--aop-overlay);
   padding: 6px 8px;
 }
 .aspects-of-power .debuff-card:last-child {
@@ -1262,8 +1312,8 @@
   flex: 1;
 }
 .aspects-of-power .debuff-type-badge {
-  background: #c62828;
-  color: #fff;
+  background: var(--aop-danger-dark);
+  color: var(--aop-text-bright);
   padding: 1px 8px;
   border-radius: 3px;
   font-weight: bold;
@@ -1296,7 +1346,7 @@
   text-transform: uppercase;
 }
 .aspects-of-power .debuff-field .break-value {
-  color: #ffca28;
+  color: var(--aop-accent);
   font-weight: bold;
 }
 .aspects-of-power .debuff-field .break-stat-label {
@@ -1304,7 +1354,7 @@
   font-size: 10px;
 }
 .aspects-of-power .debuff-field.dot-field span {
-  color: #ef5350;
+  color: var(--aop-danger);
 }
 .aspects-of-power .break-free-btn {
   margin-top: 4px;
@@ -1312,14 +1362,14 @@
   font-size: 11px;
   font-weight: bold;
   cursor: pointer;
-  border: 1px solid #ffca28;
+  border: 1px solid var(--aop-accent);
   background: rgba(255, 202, 40, 0.15);
-  color: #ffca28;
+  color: var(--aop-accent);
   border-radius: 3px;
 }
 .aspects-of-power .break-free-btn:hover {
   background: rgba(255, 202, 40, 0.3);
-  color: #fff;
+  color: var(--aop-text-bright);
 }
 .aspects-of-power .break-free-btn i {
   margin-right: 4px;
@@ -1352,7 +1402,7 @@
 .aspects-of-power .aoe-config .hint {
   grid-column: 1 / -1;
   font-size: 0.8em;
-  color: #888;
+  color: var(--aop-text-muted);
   font-style: italic;
 }
 
@@ -1364,15 +1414,15 @@
   gap: 16px;
   padding: 4px 8px;
   margin-bottom: 8px;
-  background: rgba(0, 0, 0, 0.03);
-  border: 1px solid #c9c7b8;
+  background: var(--aop-overlay-faint);
+  border: 1px solid var(--aop-border);
   border-radius: 3px;
   font-size: 0.85em;
   color: #4b4a44;
 }
 .aspects-of-power .stat-header {
-  background: rgba(0, 0, 0, 0.05);
-  border: 2px groove #eeede0;
+  background: var(--aop-overlay-soft);
+  border: 2px groove var(--aop-parchment);
   padding: 2px 0;
   margin-bottom: 2px;
   font-weight: bold;
@@ -1397,7 +1447,7 @@
 .aspects-of-power .stat-row {
   align-items: center;
   padding: 1px 0;
-  border-bottom: 1px solid #c9c7b8;
+  border-bottom: 1px solid var(--aop-border);
   font-size: 13px;
 }
 .aspects-of-power .stat-row:last-child {
@@ -1418,7 +1468,7 @@
   text-align: center;
 }
 .aspects-of-power .stat-row .capped {
-  color: #cc4400;
+  color: var(--aop-warning);
 }
 .aspects-of-power .stat-row .raw-value {
   font-size: 0.8em;
@@ -1434,8 +1484,8 @@
   gap: 16px;
   padding: 6px 8px;
   margin-top: 8px;
-  background: rgba(0, 0, 0, 0.03);
-  border: 1px solid #c9c7b8;
+  background: var(--aop-overlay-faint);
+  border: 1px solid var(--aop-border);
   border-radius: 3px;
   font-size: 13px;
 }
@@ -1453,8 +1503,8 @@
   gap: 12px;
   padding: 4px 8px;
   margin-bottom: 8px;
-  background: rgba(0, 0, 0, 0.03);
-  border: 1px solid #c9c7b8;
+  background: var(--aop-overlay-faint);
+  border: 1px solid var(--aop-border);
   border-radius: 3px;
   font-size: 13px;
 }
@@ -1463,7 +1513,7 @@
   white-space: nowrap;
 }
 .aspects-of-power .encumbered-warn {
-  color: #cc4400;
+  color: var(--aop-warning);
   font-weight: bold;
   margin-left: 6px;
 }
@@ -1481,7 +1531,7 @@
   transition: width 0.3s;
 }
 .aspects-of-power .carry-bar-inner.over-capacity {
-  background: #cc4400;
+  background: var(--aop-warning);
 }
 
 /* Slot groups */
@@ -1492,7 +1542,7 @@
   margin-bottom: 10px;
 }
 .aspects-of-power .slot-group {
-  border: 1px solid #c9c7b8;
+  border: 1px solid var(--aop-border);
   border-radius: 3px;
   padding: 4px 6px;
   background: rgba(0, 0, 0, 0.02);
@@ -1503,10 +1553,10 @@
   font-size: 12px;
   margin-bottom: 2px;
   padding-bottom: 2px;
-  border-bottom: 1px solid #c9c7b8;
+  border-bottom: 1px solid var(--aop-border);
 }
 .aspects-of-power .slot-count {
-  color: #888;
+  color: var(--aop-text-muted);
   font-size: 11px;
 }
 .aspects-of-power .slot-empty {
@@ -1571,7 +1621,7 @@
 }
 .aspects-of-power .durability-text {
   font-size: 10px;
-  color: #888;
+  color: var(--aop-text-muted);
   white-space: nowrap;
 }
 
@@ -1584,8 +1634,8 @@
   margin: 2px 0;
   padding: 0;
   align-items: center;
-  background: rgba(0, 0, 0, 0.05);
-  border: 2px groove #eeede0;
+  background: var(--aop-overlay-soft);
+  border: 2px groove var(--aop-parchment);
   font-weight: bold;
   font-size: 12px;
 }
@@ -1596,7 +1646,7 @@
 .aspects-of-power .unequipped-item {
   align-items: center;
   padding: 1px 2px;
-  border-bottom: 1px solid #c9c7b8;
+  border-bottom: 1px solid var(--aop-border);
   font-size: 13px;
 }
 .aspects-of-power .unequipped-item:last-child {
@@ -1644,7 +1694,7 @@
 .aspects-of-power .consumable-col-effect {
   flex: 1 1 140px;
   font-size: 11px;
-  color: #aaa;
+  color: var(--aop-text-soft);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -1698,8 +1748,8 @@
 .aspects-of-power .equip-section {
   margin-top: 8px;
   padding: 6px 8px;
-  background: rgba(0, 0, 0, 0.03);
-  border: 1px solid #c9c7b8;
+  background: var(--aop-overlay-faint);
+  border: 1px solid var(--aop-border);
   border-radius: 3px;
 }
 .aspects-of-power .equip-section h4 {
@@ -1728,7 +1778,7 @@
 }
 .aspects-of-power .stat-bonus-row a {
   cursor: pointer;
-  color: #888;
+  color: var(--aop-text-muted);
 }
 .aspects-of-power .item-bonus-row {
   align-items: center;
@@ -1747,25 +1797,25 @@
 }
 .aspects-of-power .item-bonus-row a {
   cursor: pointer;
-  color: #888;
+  color: var(--aop-text-muted);
 }
 .aspects-of-power .augment-slot {
   gap: 6px;
   margin-bottom: 4px;
   align-items: center;
   padding: 4px 6px;
-  border: 1px dashed #555;
+  border: 1px dashed var(--aop-border-dark);
   border-radius: 3px;
   min-height: 32px;
 }
 .aspects-of-power .augment-slot.filled {
   border-style: solid;
-  border-color: #888;
+  border-color: var(--aop-text-muted);
   background: rgba(255, 255, 255, 0.05);
 }
 .aspects-of-power .augment-slot.empty {
-  border-color: #444;
-  color: #666;
+  border-color: var(--aop-border-darker);
+  color: var(--aop-gray-dim);
 }
 .aspects-of-power .augment-slot .augment-icon {
   flex: 0 0 24px;
@@ -1777,18 +1827,18 @@
 }
 .aspects-of-power .augment-slot .augment-bonuses {
   flex: 1;
-  color: #aaa;
+  color: var(--aop-text-soft);
   font-size: 11px;
 }
 .aspects-of-power .augment-slot .augment-remove {
   cursor: pointer;
-  color: #888;
+  color: var(--aop-text-muted);
 }
 .aspects-of-power .augment-slot .augment-remove:hover {
   color: #ff4444;
 }
 .aspects-of-power .augment-slot .augment-empty-slot {
-  color: #666;
+  color: var(--aop-gray-dim);
   font-style: italic;
   font-size: 11px;
 }
@@ -1815,7 +1865,7 @@
 }
 .aspects-of-power .chain-entry a {
   cursor: pointer;
-  color: #888;
+  color: var(--aop-text-muted);
 }
 .aspects-of-power .chain-add {
   cursor: pointer;
@@ -1831,7 +1881,7 @@
 .aspects-of-power .rank-tier-section {
   margin-bottom: 12px;
   padding: 6px;
-  border: 1px solid #444;
+  border: 1px solid var(--aop-border-darker);
   border-radius: 4px;
 }
 .aspects-of-power .rank-tier-header {
@@ -1841,7 +1891,7 @@
 .aspects-of-power .rank-tier-header .tier-range {
   font-weight: normal;
   font-size: 12px;
-  color: #888;
+  color: var(--aop-text-muted);
 }
 .aspects-of-power .rank-gains-row {
   display: flex;
@@ -1864,7 +1914,7 @@
   text-align: center;
 }
 .aspects-of-power .free-points-field input {
-  border-color: #4488ff;
+  border-color: var(--aop-accent-blue);
 }
 
 /* -------------------------------------------- */
@@ -1882,12 +1932,12 @@
 }
 .level-up-dialog .level-type-option {
   padding: 8px;
-  border: 1px solid #555;
+  border: 1px solid var(--aop-border-dark);
   border-radius: 4px;
   cursor: pointer;
 }
 .level-up-dialog .level-type-option:hover:not(.disabled) {
-  border-color: #4488ff;
+  border-color: var(--aop-accent-blue);
   background: rgba(68, 136, 255, 0.1);
 }
 .level-up-dialog .level-type-option.disabled {
@@ -1903,7 +1953,7 @@
 }
 .level-up-dialog .level-type-detail {
   font-size: 12px;
-  color: #888;
+  color: var(--aop-text-muted);
 }
 .level-up-dialog .rank-change-notice {
   padding: 6px;
@@ -1921,7 +1971,7 @@
 .spend-fp-dialog .gains-header {
   font-weight: bold;
   font-size: 12px;
-  border-bottom: 1px solid #555;
+  border-bottom: 1px solid var(--aop-border-dark);
   padding-bottom: 4px;
   margin-bottom: 4px;
 }
@@ -1962,8 +2012,8 @@
   line-height: 20px;
   text-align: center;
   cursor: pointer;
-  border: 1px solid #555;
-  background: #333;
+  border: 1px solid var(--aop-border-dark);
+  background: var(--aop-bg-raised);
   color: #ccc;
   border-radius: 3px;
 }
@@ -1971,8 +2021,8 @@
 .level-up-dialog .free-point-inc:hover,
 .spend-fp-dialog .free-point-dec:hover,
 .spend-fp-dialog .free-point-inc:hover {
-  background: #555;
-  color: #fff;
+  background: var(--aop-border-dark);
+  color: var(--aop-text-bright);
 }
 .level-up-dialog .gains-total,
 .spend-fp-dialog .gains-total {
@@ -2028,12 +2078,12 @@
 }
 .aspects-of-power .free-points-badge {
   font-size: 11px;
-  color: #4488ff;
+  color: var(--aop-accent-blue);
   margin-top: 2px;
 }
 .aspects-of-power button.free-points-badge {
   background: transparent;
-  border: 1px solid #4488ff;
+  border: 1px solid var(--aop-accent-blue);
   border-radius: 3px;
   padding: 1px 6px;
   cursor: pointer;
