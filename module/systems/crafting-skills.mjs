@@ -9,7 +9,7 @@
  * byte-identical to its previous class-body form (no object-literal comma
  * surgery); the export collects the prototype methods into a plain mixin.
  */
-import { hybridAbilityMod, itemWeightLb } from '../helpers/formulas.mjs';
+import { hybridAbilityMod, itemWeightLb, spatialCapacityLb } from '../helpers/formulas.mjs';
 
 class CraftingSkills {
   /**
@@ -2093,6 +2093,13 @@ class CraftingSkills {
             // Set at craft so new gear is never weightless; deliberately NOT
             // rarity-scaled, so a masterwork helm weighs what a crude one does.
             weight: itemWeightLb({ slot: outputSlot, material: outputMaterial, tags: craftedFreeTags }),
+            // SPATIAL STORAGE: a `spatial`-tagged craft folds space. Capacity
+            // derives from the craft like armorBonus does, so a better
+            // jeweller makes a roomier ring (design-spatial-storage.md).
+            spatialCapacity: craftedFreeTags.includes(
+              CONFIG.ASPECTSOFPOWER.spatialStorage?.requiredTag ?? 'spatial')
+              ? spatialCapacityLb({ progress: totalProgress, slot: outputSlot, rarity: qualityData.rarity })
+              : 0,
           },
         }]);
       }

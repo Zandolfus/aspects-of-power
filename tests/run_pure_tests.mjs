@@ -13,7 +13,7 @@ import {
   spellInvestDamage, strikeInvestDamage, infusionDamage, investSelfDamage,
   effectiveDodgeValue, splitEvenlyWithRemainder, perceiveGateDecision, activityTicks, nextCompletionDelta,
   proficiencyMultiplier, proficiencyHitMultiplier, parryMassMultiplier, lunarPhaseMultiplier, dotTickDamage, procStaminaCost, riderDamageBase,
-  crushFlatAmount, riderMaxInvest, itemWeightLb, KG_TO_LB,
+  crushFlatAmount, riderMaxInvest, itemWeightLb, KG_TO_LB, spatialCapacityLb, carriedWeightLb,
 } from '../module/helpers/formulas.mjs';
 import { moonState, moonNodeAngle, nextSyzygy, eclipseAtSyzygy, planetStates,
          meteorShowersOn, cometStates, julianDay, civilDate, worldTimeForDate } from '../module/systems/calendar.mjs';
@@ -564,6 +564,58 @@ eq('metal boots would have put John over', johnMetalBoots > 513, true);
 // so the story rules it out.
 const johnGold = 22 * 19.30 * KG_TO_LB + iw({ slot: 'boots', material: 'leather' });
 eq('gold density is impossible for John', johnGold / 2.5 > 311, true);
+
+// -- SPATIAL STORAGE (RULED 2026-07-30). Folded space: contents weigh nothing
+// to the carrier. Capacity is DERIVED from the craft like armorBonus, so a
+// better jeweller makes a roomier ring instead of the number drifting.
+const SCFG = {
+  spatialStorage: { capacityCoef: 4.0, retrieveWaitFraction: 1.0, requiredTag: 'spatial' },
+  craftSlotValues: { ring: 0.50, necklace: 0.40, chest: 0.50, back: 0.10 },
+  skillRarities: { common: { mult: 0.6 }, uncommon: { mult: 0.7 }, rare: { mult: 0.8 }, legendary: { mult: 1.0 } },
+};
+const cap = (o) => spatialCapacityLb({ ...o, cfg: SCFG });
+// GOLDEN: Willy's Ring of Folded Distances - progress 450, ring, rare.
+eq('spatial: Willy ring capacity', cap({ progress: 450, slot: 'ring', rarity: 'rare' }), 720);
+// It must fit the case that motivated the feature: John's 521 lb spare harness.
+eq('spatial: Willy ring fits John spare set', cap({ progress: 450, slot: 'ring', rarity: 'rare' }) >= 521, true);
+// Better craft -> roomier. That is the whole reason for deriving it.
+eq('spatial: higher progress is roomier',
+   cap({ progress: 900, slot: 'ring', rarity: 'rare' }) > cap({ progress: 450, slot: 'ring', rarity: 'rare' }), true);
+eq('spatial: higher rarity is roomier',
+   cap({ progress: 450, slot: 'ring', rarity: 'legendary' }) > cap({ progress: 450, slot: 'ring', rarity: 'rare' }), true);
+// Not a storage unless it resolves.
+eq('spatial: no progress is not a storage', cap({ progress: 0, slot: 'ring', rarity: 'rare' }), 0);
+eq('spatial: unknown slot is not a storage', cap({ progress: 450, slot: 'nope', rarity: 'rare' }), 0);
+
+// -- carriedWeightLb: what actually lands on your back.
+const RING = 'ring1', BAG = 'bag1';
+const inv = [
+  { id: 'armour', weight: 139, quantity: 1, storedIn: '' },
+  { id: 'spare',  weight: 139, quantity: 1, storedIn: RING },
+  { id: 'ore',    weight: 10,  quantity: 5, storedIn: RING },
+  { id: RING,     weight: 0.1, quantity: 1, storedIn: '' },
+];
+eq('carried: stored items weigh nothing while the ring is equipped',
+   carriedWeightLb(inv, [RING]), 139.1);
+// THE LOAD-BEARING RULE: unequip the ring and the contents come back.
+eq('carried: unequipped storage drops its contents on your back',
+   carriedWeightLb(inv, []), 328.1);
+eq('carried: quantity is respected',
+   carriedWeightLb([{ id: 'x', weight: 10, quantity: 5, storedIn: '' }], []), 50);
+// NO LAUNDERING BY NESTING. A bag inside the ring is not itself equipped, so
+// whatever is in the BAG still weighs - only the bag's own mass is hidden.
+const nested = [
+  { id: BAG,    weight: 2,  quantity: 1, storedIn: RING },
+  { id: 'loot', weight: 80, quantity: 1, storedIn: BAG },
+  { id: RING,   weight: 0.1, quantity: 1, storedIn: '' },
+];
+eq('carried: nesting cannot launder weight away', carriedWeightLb(nested, [RING]), 80.1);
+// Both equipped is a legitimate two-storage setup, not an exploit.
+eq('carried: two equipped storages both work', carriedWeightLb(nested, [RING, BAG]), 0.1);
+// A storage not on the actor at all cannot hide anything.
+eq('carried: storedIn pointing at nothing still weighs',
+   carriedWeightLb([{ id: 'a', weight: 50, quantity: 1, storedIn: 'ghost' }], [RING]), 50);
+eq('carried: empty inventory', carriedWeightLb([], [RING]), 0);
 
 if (failures) { console.error(`\n${failures} FAILURES`); process.exit(1); }
 console.log('\nAll pure-function tests pass.');

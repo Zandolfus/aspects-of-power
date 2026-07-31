@@ -1087,6 +1087,33 @@ ASPECTSOFPOWER.materialDensity = {
  */
 ASPECTSOFPOWER.volumelessMaterials = ['jewelry'];
 
+/**
+ * SPATIAL STORAGE (design-spatial-storage.md, RULED 2026-07-30).
+ *
+ * Folded space: contents weigh nothing to the carrier. Capacity is DERIVED
+ * from the craft the same way armorBonus is —
+ *
+ *   capacity_lb = progress x craftSlotValues[slot] x rarityMult x capacityCoef
+ *
+ * so a better jeweller makes a roomier ring and capacity tracks the power
+ * curve instead of drifting from it. `capacityCoef` is the only free number.
+ *
+ * At 4.0, Willy's Ring of Folded Distances (progress 450, ring slot 0.50,
+ * rare 0.8) holds 450 x 0.50 x 0.8 x 4.0 = 720 lb — enough for John's 521 lb
+ * spare harness with room to spare, which is the case that motivated this.
+ *
+ * REQUIRES the `spatial` tag to craft one, so spatial storage stays gated on
+ * space-affinity materials rather than being a property any ring can have.
+ */
+ASPECTSOFPOWER.spatialStorage = {
+  capacityCoef: 4.0,
+  // Retrieving from folded space costs an action. Expressed as a fraction of
+  // the actor's own baseline action wait, so it scales with celerity like
+  // every other timing in the system rather than being a flat tick count.
+  retrieveWaitFraction: 1.0,
+  requiredTag: 'spatial',
+};
+
 /** Specific materials, overriding the class default where known. */
 ASPECTSOFPOWER.materialSpeciesDensity = {
   fulgurite: 10.49,   // silver — the world's metal

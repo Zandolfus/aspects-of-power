@@ -445,6 +445,48 @@ export async function applyDodgeCost(actor) {
 }
 
 /**
+ * Charge the actor a fraction of their own action wait, outside the normal
+ * declare/fire path — the same debt mechanism a dodge uses, generalised.
+ *
+ * Reaching into folded space is the first consumer (design-spatial-storage):
+ * retrieving costs an action, and expressing it as a FRACTION OF OWN TEMPO
+ * rather than flat ticks means a fast character loses less clock than a slow
+ * one, exactly like every other timing in the system.
+ *
+ * Returns 0 out of combat — there is no clock to charge against.
+ *
+ * @param {Actor} actor
+ * @param {number} fraction  Multiple of the actor's baseline action wait.
+ * @returns {Promise<number>} ticks charged.
+ */
+export async function chargeActionCost(actor, fraction = 1.0) {
+  const combatant = findCombatantForActor(actor);
+  if (!combatant || !(fraction > 0)) return 0;
+  const fl = combatant.flags?.aspectsofpower ?? {};
+  const da = fl.declaredAction;
+
+  let basis;
+  if (da?.wait) basis = da.wait;
+  else if (fl.lastActionWait) basis = fl.lastActionWait;
+  else {
+    const sc = CONFIG.ASPECTSOFPOWER.celerity;
+    const dex = Math.max(1, actor.system.abilities?.dexterity?.mod ?? 1);
+    basis = Math.round(sc.BASELINE_WEIGHT * sc.SCALE / dex);
+  }
+  const cost = Math.max(1, Math.round(fraction * basis));
+
+  if (da?.scheduledTick != null) {
+    await _safeCombatantUpdate(combatant, {
+      'flags.aspectsofpower.declaredAction.scheduledTick': da.scheduledTick + cost,
+      'flags.aspectsofpower.nextActionTick': (fl.nextActionTick ?? da.scheduledTick) + cost,
+    });
+  } else {
+    await _safeCombatantUpdate(combatant, { 'flags.aspectsofpower.dodgeDebt': (fl.dodgeDebt ?? 0) + cost });
+  }
+  return cost;
+}
+
+/**
  * Find the actor's combatant in the active combat (if any).
  * Returns null when the actor isn't in combat or no combat is started.
  */

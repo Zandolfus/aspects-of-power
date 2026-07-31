@@ -568,6 +568,55 @@ export function itemWeightLb({ slot = '', material = '', species = '', tags = []
 }
 
 /**
+ * Spatial-storage capacity in POUNDS, derived from the craft exactly as
+ * armorBonus is (design-spatial-storage.md, RULED 2026-07-30):
+ *
+ *   capacity = progress x craftSlotValues[slot] x rarityMult x capacityCoef
+ *
+ * Deriving rather than authoring means a better jeweller makes a roomier ring
+ * and capacity tracks the power curve — the same reason armour value is
+ * derived. Returns 0 when the item is not a storage.
+ *
+ * @param {object} o
+ * @param {number} [o.progress]  item.system.progress
+ * @param {string} [o.slot]      item.system.slot
+ * @param {string} [o.rarity]    item.system.rarity
+ * @param {object} [o.cfg]       CONFIG.ASPECTSOFPOWER override, for tests
+ * @returns {number} pounds, rounded.
+ */
+export function spatialCapacityLb({ progress = 0, slot = '', rarity = 'common', cfg = null } = {}) {
+  const C = cfg ?? globalThis.CONFIG?.ASPECTSOFPOWER ?? {};
+  const coef = C.spatialStorage?.capacityCoef ?? 4.0;
+  const slotVal = (C.craftSlotValues ?? {})[slot];
+  const rarityMult = (C.skillRarities ?? {})[rarity]?.mult;
+  if (!(progress > 0) || !(slotVal > 0) || !(rarityMult > 0) || !(coef > 0)) return 0;
+  return Math.round(progress * slotVal * rarityMult * coef);
+}
+
+/**
+ * Total pounds an actor is actually carrying, given spatial storage.
+ *
+ * An item is weightless only while the storage holding it is BOTH present and
+ * EQUIPPED — an unequipped ring is a ring, not a portal, so its contents come
+ * crashing back onto your back. That is also what stops "store the storage"
+ * from laundering weight away: a nested storage that is not itself equipped
+ * carries its contents normally.
+ *
+ * @param {Array<{id:string, weight:number, quantity:number, storedIn:string}>} items
+ * @param {Set<string>|Array<string>} equippedStorageIds  ids of EQUIPPED storages
+ * @returns {number} pounds carried, 1dp
+ */
+export function carriedWeightLb(items = [], equippedStorageIds = []) {
+  const live = equippedStorageIds instanceof Set ? equippedStorageIds : new Set(equippedStorageIds);
+  let total = 0;
+  for (const it of items) {
+    if (it.storedIn && live.has(it.storedIn)) continue;
+    total += (Number(it.weight) || 0) * (it.quantity ?? 1);
+  }
+  return Math.round(total * 10) / 10;
+}
+
+/**
  * Ceiling on an `invest`-tagged rider's commitment: `mult` × its base cost,
  * clamped to the pool, never below the base. On the heaviest hitters the POOL
  * binds first, which is the decision worth having (config.riders.maxInvestMult).

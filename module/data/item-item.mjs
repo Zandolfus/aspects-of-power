@@ -24,6 +24,20 @@ export class ItemItemData extends foundry.abstract.TypeDataModel {
       // Material type — determines which repair skills can target this item.
       material:    new fields.StringField({ initial: '' }),
 
+      // ── SPATIAL STORAGE (design-spatial-storage.md, RULED 2026-07-30) ──
+      // Folded space: what is inside weighs nothing to the carrier.
+      //
+      // `spatialCapacity` > 0 marks this item AS a storage, and holds its
+      // capacity in POUNDS. Derived at craft from progress x slot x rarity,
+      // the same shape as armorBonus — a better jeweller makes a roomier ring,
+      // so capacity tracks the power curve instead of drifting from it.
+      spatialCapacity: new fields.NumberField({ initial: 0, min: 0 }),
+      // `storedIn` holds the ID of the storage item this one lives inside.
+      // Weight is excluded from carryWeight only while that storage is present
+      // AND equipped — an unequipped ring is a ring, not a portal, so its
+      // contents come crashing back onto your back.
+      storedIn:    new fields.StringField({ initial: '' }),
+
       // Progress determines derived values (durability max, stats in the future).
       progress:    new fields.NumberField({ initial: 0, min: 0, integer: true }),
 

@@ -42,6 +42,7 @@ import * as Downtime from './systems/downtime.mjs';
 import { DotHelpers } from './systems/dot.mjs';
 import * as Affinity from './systems/affinity.mjs';
 import * as WeaponStyles from './systems/weapon-styles.mjs';
+import * as SpatialStorage from './systems/spatial-storage.mjs';
 import * as TemplateGrants from './systems/template-grants.mjs';
 import { SummonHelpers, registerSummonHooks } from './systems/summon.mjs';
 import { ChannelHelpers, registerChannelHooks } from './systems/channel.mjs';
@@ -108,6 +109,9 @@ Hooks.once('init', function () {
     affinity: { ...Affinity },
     // Weapon TYPE proficiency + STYLE detection (systems/weapon-styles.mjs).
     weaponStyles: { ...WeaponStyles },
+    // Spatial storage - folded space, contents weigh nothing while the
+    // storage is EQUIPPED (systems/spatial-storage.mjs).
+    spatial: { ...SpatialStorage },
     // Class/race/profession grants (systems/template-grants.mjs). Rebuilt from
     // the lost migration/local/sync_granted_skills.js the schema still cites.
     // Cumulative and upgrade-only; dry-run with syncAll({dryRun:true}).

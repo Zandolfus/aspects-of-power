@@ -2,6 +2,7 @@
 // here: systems/weapon-styles.mjs pulls only from helpers/formulas.mjs, so it
 // cannot create the actor->item cycle the code standards forbid.
 import { proficiencyDamageMult } from '../systems/weapon-styles.mjs';
+import { carriedWeightLb } from '../helpers/formulas.mjs';
 
 /**
  * Disposition-targeting filter for auras. Returns true if `otherDisp` is a
@@ -434,11 +435,36 @@ export class AspectsofPowerActor extends Actor {
     // proportional stamina-cost-by-encumbrance (token._preUpdateMovement)
     // handles the low-level "instantly overloaded" feel that +50 papered over.
     systemData.carryCapacity = Math.max(1, Math.round(systemData.abilities.strength.mod * 2.5));
-    systemData.carryWeight = 0;
+    // SPATIAL STORAGE: contents of an EQUIPPED storage weigh nothing to the
+    // carrier (design-spatial-storage.md). Equipped is load-bearing — an
+    // unequipped ring is a ring, not a portal, and its contents come back onto
+    // your back. It is also what stops nesting from laundering weight away.
+    const equippedStorages = new Set();
     for (const item of this.items) {
-      systemData.carryWeight += (item.system.weight ?? 0) * (item.system.quantity ?? 1);
+      if ((item.system?.spatialCapacity ?? 0) > 0 && item.system?.equipped) equippedStorages.add(item.id);
     }
-    systemData.carryWeight = Math.round(systemData.carryWeight * 10) / 10;
+    systemData.spatialStorages = [];
+    for (const item of this.items) {
+      if ((item.system?.spatialCapacity ?? 0) <= 0) continue;
+      let used = 0;
+      for (const inner of this.items) {
+        if (inner.system?.storedIn === item.id) {
+          used += (inner.system.weight ?? 0) * (inner.system.quantity ?? 1);
+        }
+      }
+      systemData.spatialStorages.push({
+        id: item.id, name: item.name, equipped: !!item.system.equipped,
+        capacity: item.system.spatialCapacity,
+        used: Math.round(used * 10) / 10,
+        free: Math.round((item.system.spatialCapacity - used) * 10) / 10,
+        over: used > item.system.spatialCapacity,
+      });
+    }
+    systemData.carryWeight = carriedWeightLb(
+      this.items.map(i => ({
+        id: i.id, weight: i.system?.weight ?? 0,
+        quantity: i.system?.quantity ?? 1, storedIn: i.system?.storedIn ?? '',
+      })), equippedStorages);
     systemData.encumbered = systemData.carryWeight > systemData.carryCapacity;
 
     // --- Augment-sourced flat bonuses from equipped items ---
