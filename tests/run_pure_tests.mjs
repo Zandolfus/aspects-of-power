@@ -512,6 +512,7 @@ const WCFG = {
   slotVolume: { chest: 6, legs: 6, head: 2, boots: 2, bracers: 2, gloves: 2, back: 2, shield: 6 },
   materialDensity: { metal: 10.49, leather: 0.95, cloth: 0.30, wood: 0.70, bone: 1.80, crystal: 2.60, gem: 4.00, jewelry: 10.49 },
   materialSpeciesDensity: { fulgurite: 10.49, steel: 7.85, gold: 19.30 },
+  volumelessMaterials: ['jewelry'],
   weaponWeights: { dagger: 60, sword: 100, greatsword: 200, greataxe: 220, shield: 100 },
   weaponVolumeDivisor: 100,
 };
@@ -535,7 +536,11 @@ eq('weight: steel species is lighter than fulgurite',
    iw({ slot: 'chest', material: 'metal', species: 'steel' }) < iw({ slot: 'chest', material: 'metal' }), true);
 // No resolvable volume -> 0, so callers leave jewelry and tools alone rather
 // than zeroing an authored value.
-eq('weight: unknown slot is zero', iw({ slot: 'ring', material: 'jewelry' }), 0);
+eq('weight: unknown slot is zero', iw({ slot: 'ring', material: 'leather' }), 0);
+// Jewellery has no volume model - a circlet is ornament, not a helmet's
+// worth of metal. It keeps its authored weight instead.
+eq('weight: jewellery in an armour slot is volumeless',
+   iw({ slot: 'head', material: 'jewelry' }), 0);
 eq('weight: no material still resolves via metal default', iw({ slot: 'chest' }) > 0, true);
 // RARITY MUST NOT MATTER. A crude and a masterwork fulgurite helm weigh the
 // same - craftsmanship shows up in armour value, not mass.

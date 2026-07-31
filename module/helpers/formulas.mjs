@@ -537,6 +537,12 @@ export function itemWeightLb({ slot = '', material = '', species = '', tags = []
   const div = C.weaponVolumeDivisor ?? 100;
 
   // A shield is a shield wherever it is slotted — they live in `weaponry`.
+  // JEWELLERY HAS NO VOLUME MODEL. A circlet occupies the head slot but is
+  // ornament, not a helmet's worth of material — pricing it by slot volume put
+  // Willy's mana diadem at 46 lb. Anything on this list keeps whatever weight
+  // was authored for it instead.
+  if ((C.volumelessMaterials ?? ['jewelry']).includes(material)) return 0;
+
   const isShield = tags.includes('shield') || tags.includes('greatshield') || tags.includes('buckler');
   let litres = 0;
   if (isShield) litres = vols.shield ?? 0;

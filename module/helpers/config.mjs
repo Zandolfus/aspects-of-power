@@ -1079,6 +1079,14 @@ ASPECTSOFPOWER.materialDensity = {
   bone: 1.80, crystal: 2.60, gem: 4.00, jewelry: 10.49,
 };
 
+/**
+ * Materials with NO volume model — the slot table does not describe them.
+ * A circlet sits in the head slot but is ornament, not a helmet's worth of
+ * metal; pricing it by slot volume made a mana diadem weigh 46 lb. Items in
+ * these materials keep whatever weight was authored for them.
+ */
+ASPECTSOFPOWER.volumelessMaterials = ['jewelry'];
+
 /** Specific materials, overriding the class default where known. */
 ASPECTSOFPOWER.materialSpeciesDensity = {
   fulgurite: 10.49,   // silver — the world's metal
