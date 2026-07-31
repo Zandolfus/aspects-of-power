@@ -70,6 +70,8 @@
       "requires_armor_pierce": "Requires Armor Pierce",
       "mine": "Mine",
       "detonate": "Detonate",
+      "summon": "Summon",
+      "channel": "Channel",
       "movement": "Movement",
       "teleport": "Teleport",
       "leap": "Leap",

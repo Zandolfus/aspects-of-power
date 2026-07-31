@@ -1206,93 +1206,10 @@ ASPECTSOFPOWER.skillCategories = {
 };
 
 /**
- * Tags that define what a skill does when activated.
- * A skill can have multiple tags (e.g. [attack, debuff]).
- */
-ASPECTSOFPOWER.skillTags = {
-  // Section-driving tags (show/hide config sections).
-  attack:      'ASPECTSOFPOWER.Tag.attack',
-  restoration: 'ASPECTSOFPOWER.Tag.restoration',
-  buff:        'ASPECTSOFPOWER.Tag.buff',
-  debuff:      'ASPECTSOFPOWER.Tag.debuff',
-  cleanse:     'ASPECTSOFPOWER.Tag.cleanse',
-  repair:      'ASPECTSOFPOWER.Tag.repair',
-  aoe:         'ASPECTSOFPOWER.Tag.aoe',
-  sustain:     'ASPECTSOFPOWER.Tag.sustain',
-  shrapnel:    'ASPECTSOFPOWER.Tag.shrapnel',
-  invest:      'ASPECTSOFPOWER.Tag.invest',
-  unity:       'ASPECTSOFPOWER.Tag.unity',
-  craft:       'ASPECTSOFPOWER.Tag.craft',
-  // Trigger tags (auto-fire passives).
-  on_death:    'ASPECTSOFPOWER.Tag.on_death',
-  // Chain conditional tags (gate when a chained skill is allowed to fire).
-  requires_armor_pierce: 'ASPECTSOFPOWER.Tag.requires_armor_pierce',
-  // Mine-pair tags (summon places, generic Detonate consumes any).
-  mine:        'ASPECTSOFPOWER.Tag.mine',
-  detonate:    'ASPECTSOFPOWER.Tag.detonate',
-  // Descriptor tags (mechanical effects).
-  magic:       'ASPECTSOFPOWER.Tag.magic',
-  physical:    'ASPECTSOFPOWER.Tag.physical',
-  vocal:       'ASPECTSOFPOWER.Tag.vocal',
-  ranged:      'ASPECTSOFPOWER.Tag.ranged',
-  melee:       'ASPECTSOFPOWER.Tag.melee',
-  infused:     'ASPECTSOFPOWER.Tag.infused',
-  // Armor-answer tags (design-armor-answer-system). pierce = static %-ignore of
-  // the armor layer (read in the mitigation calc). shred = affinity DR-strip,
-  // crush = armor+block reduction (both read in _handleDebuffTag; shred/crush
-  // imply `debuff`).
-  pierce:      'ASPECTSOFPOWER.Tag.pierce',
-  shred:       'ASPECTSOFPOWER.Tag.shred',
-  crush:       'ASPECTSOFPOWER.Tag.crush',
-  // Mobile (design-concurrent-actions, 2026-07-14): skill can be declared and
-  // fired WHILE WALKING (parallel movement track) — potions, pistol shots,
-  // wand bolts, thrown knives. Read by the declareAction/declareMovement
-  // concurrency gates in celerity.mjs. Sprint never permits concurrency.
-  mobile:      'ASPECTSOFPOWER.Tag.mobile',
-  // Affinity tags (set skill damage affinity).
-  fire:          'ASPECTSOFPOWER.Tag.fire',
-  heat:          'ASPECTSOFPOWER.Tag.heat',
-  ice:           'ASPECTSOFPOWER.Tag.ice',
-  lightning:     'ASPECTSOFPOWER.Tag.lightning',
-  earth:         'ASPECTSOFPOWER.Tag.earth',
-  water:         'ASPECTSOFPOWER.Tag.water',
-  wind:          'ASPECTSOFPOWER.Tag.wind',
-  metal:         'ASPECTSOFPOWER.Tag.metal',
-  lunar:         'ASPECTSOFPOWER.Tag.lunar',
-  solar:         'ASPECTSOFPOWER.Tag.solar',
-  space:         'ASPECTSOFPOWER.Tag.space',
-  shadow:        'ASPECTSOFPOWER.Tag.shadow',
-  light:         'ASPECTSOFPOWER.Tag.light',
-  nature:        'ASPECTSOFPOWER.Tag.nature',
-  poison:        'ASPECTSOFPOWER.Tag.poison',
-  blood:         'ASPECTSOFPOWER.Tag.blood',
-  necromantic:   'ASPECTSOFPOWER.Tag.necromantic',
-  holy:          'ASPECTSOFPOWER.Tag.holy',
-  arcane:        'ASPECTSOFPOWER.Tag.arcane',
-  psychic:       'ASPECTSOFPOWER.Tag.psychic',
-  // Debuff subtype tags (auto-add debuff parent, auto-set debuff type).
-  root:          'ASPECTSOFPOWER.Tag.root',
-  immobilized:   'ASPECTSOFPOWER.Tag.immobilized',
-  slow:          'ASPECTSOFPOWER.Tag.slow',
-  chilled:       'ASPECTSOFPOWER.Tag.chilled',
-  frozen:        'ASPECTSOFPOWER.Tag.frozen',
-  sleep:         'ASPECTSOFPOWER.Tag.sleep',
-  stun:          'ASPECTSOFPOWER.Tag.stun',
-  paralysis:     'ASPECTSOFPOWER.Tag.paralysis',
-  fear:          'ASPECTSOFPOWER.Tag.fear',
-  blind:         'ASPECTSOFPOWER.Tag.blind',
-  silence:       'ASPECTSOFPOWER.Tag.silence',
-  weaken:        'ASPECTSOFPOWER.Tag.weaken',
-  deafened:      'ASPECTSOFPOWER.Tag.deafened',
-  taunt:         'ASPECTSOFPOWER.Tag.taunt',
-  charm:         'ASPECTSOFPOWER.Tag.charm',
-  enraged:       'ASPECTSOFPOWER.Tag.enraged',
-  hallucination: 'ASPECTSOFPOWER.Tag.hallucination',
-  dismembered:   'ASPECTSOFPOWER.Tag.dismembered',
-};
-
-/**
- * Tags available per skill category.
+ * Tags available per skill category. combatTags and professionTags are THE
+ * authoritative skill-tag registries — the sheet autocomplete reads them by
+ * skillCategory. (A third parallel registry, skillTags, drifted for months
+ * with zero readers and was deleted 2026-07-31.)
  */
 ASPECTSOFPOWER.combatTags = {
   // Section-driving.
@@ -1313,6 +1230,12 @@ ASPECTSOFPOWER.combatTags = {
   // Mine-pair (summon places, generic Detonate consumes any).
   mine:        'ASPECTSOFPOWER.Tag.mine',
   detonate:    'ASPECTSOFPOWER.Tag.detonate',
+  // Summon (conjured creature) and channel (sustained tick loop) each gate a
+  // whole config section on the skill sheet, but were never in a registry the
+  // autocomplete reads — the sections were reachable only by console-injecting
+  // the tag. Added 2026-07-31.
+  summon:      'ASPECTSOFPOWER.Tag.summon',
+  channel:     'ASPECTSOFPOWER.Tag.channel',
   // Movement-skill family (Stormstride, Charge, Leap, Teleport, Blink, etc.).
   // Marks any skill that affects or executes movement. Used for queryability
   // ("dispel all movement buffs"), Mobility-aura stacking, and the
