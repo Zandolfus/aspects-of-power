@@ -43,27 +43,38 @@ function manaDensity(rarity, refined) {
   return RARITY[ORDER[i]] / RARITY[ANCHOR];
 }
 
-// Mundane baseline densities, kg/L
-const BASE = { metal: 7.85, leather: 0.95, cloth: 0.30, wood: 0.70, bone: 1.80, crystal: 2.60, gem: 3.50 };
+// Mundane baseline densities, kg/L. These are the MATERIAL's own density -
+// gold is heavy because gold is heavy, not because it is magical. Mana density
+// multiplies on top of whichever species you started from.
+const BASE = { metal: 7.85, leather: 0.95, cloth: 0.30, wood: 0.70, bone: 1.80, crystal: 2.60, gem: 3.50,
+               gold: 19.3, silver: 10.49 };
 const VOL  = { chest: 6, legs: 6, shield: 6, head: 2, boots: 2, bracers: 2, gloves: 2, back: 2 };
-const REF  = { silver: 10.49, gold: 19.3, steel: 7.85, lead: 11.34, platinum: 21.45 };
+const REF  = { silver: 10.49, steel: 7.85, lead: 11.34 };
+
+// REACHABLE BAND (RULED 2026-07-30). Divine is godlike and unreachable by
+// mortals - it exists to show the ladder continues, and must never be a design
+// case. Mythic is a super-genius ceiling; legendary is exceptional; the average
+// person tops out at UNCOMMON, which is where the live roster sits.
+const REACHABLE = ['common', 'uncommon', 'rare', 'epic', 'legendary', 'mythic'];
+const BAND = { uncommon: 'the average person', legendary: 'exceptional people', mythic: 'a super genius' };
 
 const pad = (s, n) => String(s).padStart(n);
 const f1 = (x) => Math.round(x * 10) / 10;
 const f2 = (x) => Math.round(x * 100) / 100;
 
-console.log('=== 1. THE MANA-DENSITY LADDER (metal, base 7.85) ===\n');
-console.log('rarity        raw       refined    real-world match');
-for (const r of ['common', 'uncommon', 'rare', 'epic', 'legendary', 'mythic', 'divine']) {
+console.log('=== 1. THE MANA-DENSITY LADDER (steel-species metal, base 7.85) ===');
+console.log('Capped at MYTHIC. Divine is unreachable by mortals and is not a design case.\n');
+console.log('rarity        raw       refined    who reaches it');
+for (const r of REACHABLE) {
   const raw = BASE.metal * manaDensity(r, false);
   const ref = BASE.metal * manaDensity(r, true);
-  let match = '';
-  for (const [k, v] of Object.entries(REF)) if (Math.abs(v - raw) < 0.35) match = `raw ~ ${k}`;
-  for (const [k, v] of Object.entries(REF)) if (Math.abs(v - ref) < 0.35) match += `${match ? ', ' : ''}refined ~ ${k}`;
-  console.log(`${r.padEnd(13)} ${pad(f2(raw), 6)}    ${pad(f2(ref), 7)}    ${match}`);
+  console.log(`${r.padEnd(13)} ${pad(f2(raw), 6)}    ${pad(f2(ref), 7)}    ${BAND[r] ?? ''}`);
 }
 console.log('\nFULGURITE = refined Lightning Metal (Uncommon) = ' + f2(BASE.metal * manaDensity('uncommon', true)) + ' kg/L');
 console.log('Silver is 10.49. The existing ladder puts it there with nothing invented.');
+console.log('\nGOLD is not a mana tier - it is a dense SPECIES (19.3 kg/L mundane). A gold');
+console.log('item is heavy because gold is heavy. Species sets the base, mana density');
+console.log('multiplies on top, and the two are independent.');
 
 console.log('\n=== 2. WEIGHT PER PIECE, by material and mana tier ===\n');
 const show = (cls, rarity, refined, label) => {
@@ -75,8 +86,9 @@ console.log('material                        density     chest        piece     
 show('metal', 'common', false,   'mundane steel');
 show('metal', 'uncommon', false, 'Lightning Metal (raw)');
 show('metal', 'uncommon', true,  'FULGURITE (refined)');
-show('metal', 'epic', false,     'epic metal');
-show('metal', 'divine', true,    'divine refined metal');
+show('metal', 'legendary', false, 'legendary metal (exceptional)');
+show('metal', 'mythic', true,    'mythic refined (super genius)');
+show('gold', 'common', false,    'mundane GOLD (species, not tier)');
 console.log('');
 show('leather', 'common', false, 'mundane leather');
 show('leather', 'rare', false,   'Outer Leather (rare)');
@@ -106,7 +118,19 @@ console.log('\n=== 4. THE CAPACITY QUESTION IS STILL OPEN ===');
 console.log('At the shipped x2.5, a fulgurite harness is 13% of Phil\'s capacity and');
 console.log('a cloth set is 4% of Olivia\'s. Weight exists but nothing feels it.');
 console.log('At x1.0 those become 33% and 11%. At x0.67, 49% and 16%.');
-console.log('\nNote the ladder ALSO makes casters heavier as they climb - a divine cloth');
-console.log('set is ' + f1(22 * BASE.cloth * manaDensity('divine', false)) + ' kg vs ' + f1(22 * BASE.cloth) + ' kg mundane. Mana density is universal, so');
-console.log('robes stop being weightless at the top end. That is the rule working, but it');
-console.log('does mean low-strength casters feel the ladder first.');
+console.log('\n=== 5. HOW FAR THE LADDER ACTUALLY TRAVELS IN PLAY ===');
+console.log('The live roster is UNCOMMON, which is also the average person\'s ceiling. So');
+console.log('the realistic span for almost all content is common -> uncommon, and the');
+console.log('exceptional span reaches legendary. Weight over the REACHABLE band:\n');
+console.log('material         common    uncommon   legendary   mythic    span');
+for (const cls of ['metal', 'leather', 'cloth']) {
+  const setV = VOL.chest + VOL.legs + VOL.head + VOL.boots + VOL.bracers + VOL.gloves + VOL.back;
+  const at = (r) => f1(setV * BASE[cls] * manaDensity(r, false));
+  console.log(`${cls.padEnd(16)} ${pad(at('common'), 6)}  ${pad(at('uncommon'), 9)}  ${pad(at('legendary'), 10)} ${pad(at('mythic'), 8)}`
+    + `    ${pad('x' + f2(manaDensity('mythic', false)), 6)}`);
+}
+console.log('\nSo a mythic set is 1.83x a common one - not a runaway. And because casters');
+console.log('climb the same ladder, robes gain weight too: cloth goes ' + f1(22 * BASE.cloth)
+  + ' -> ' + f1(22 * BASE.cloth * manaDensity('mythic', false)) + ' kg.');
+console.log('Low-strength casters feel that before anyone else, since Olivia\'s capacity is');
+console.log('340 against Phil\'s 1835.');
