@@ -2121,3 +2121,168 @@ body.aop-targeting #board canvas {
   overflow-y: auto;
   margin: 0;
 }
+
+/* ==========================================================================
+   Skill sheet rework (2026-07-31) — identity strip, summary bar, and the
+   collapsible section grammar (details.aop-section). Shared aop-* utility
+   classes are intended for reuse as other sheets adopt the same layout.
+   ========================================================================== */
+
+.aspects-of-power .skill-identity-strip {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: flex-end;
+  padding: 6px 8px;
+  margin-bottom: 6px;
+  background: rgba(0, 0, 0, 0.25);
+  border: 1px solid #444;
+  border-radius: 4px;
+}
+.aspects-of-power .skill-identity-strip .aop-field {
+  min-width: 110px;
+}
+
+.aspects-of-power .aop-field {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.aspects-of-power .aop-field-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 6px 10px;
+  align-items: end;
+}
+.aspects-of-power .aop-checkbox-row {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  min-height: 26px;
+}
+.aspects-of-power .aop-check {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+  font-size: 12px;
+  white-space: nowrap;
+}
+.aspects-of-power .aop-muted { color: #888; }
+.aspects-of-power .aop-hint {
+  font-size: 11px;
+  color: #888;
+  margin: 0 0 6px;
+}
+
+.aspects-of-power .skill-summary-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 14px;
+  align-items: baseline;
+  padding: 4px 8px;
+  margin-bottom: 8px;
+  font-size: 11px;
+  background: #1a1a1a;
+  border: 1px solid #444;
+  border-radius: 4px;
+}
+.aspects-of-power .skill-summary-bar strong { color: #9cf; }
+
+.aspects-of-power details.aop-section {
+  border: 1px solid #444;
+  border-radius: 4px;
+  margin-bottom: 6px;
+  background: rgba(0, 0, 0, 0.15);
+}
+.aspects-of-power details.aop-section > summary {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 5px 8px;
+  cursor: pointer;
+  list-style-position: inside;
+  user-select: none;
+}
+.aspects-of-power details.aop-section[open] > summary {
+  border-bottom: 1px solid #333;
+}
+.aspects-of-power .aop-section-title {
+  font-weight: bold;
+  font-size: 13px;
+}
+.aspects-of-power .aop-section-hint {
+  font-size: 11px;
+  color: #888;
+  text-align: right;
+  flex: 1 1 auto;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.aspects-of-power .aop-section-body {
+  padding: 6px 8px 8px;
+}
+
+.aspects-of-power .aop-subblock {
+  margin-top: 8px;
+  padding: 6px 8px;
+  border-left: 2px solid #555;
+  background: rgba(255, 255, 255, 0.02);
+}
+.aspects-of-power .aop-subblock-title {
+  display: block;
+  font-size: 11px;
+  font-weight: bold;
+  color: #aaa;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 4px;
+}
+
+.aspects-of-power .craft-allowed-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 4px;
+  font-size: 11px;
+}
+
+.aspects-of-power .alteration-row {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  margin-bottom: 4px;
+}
+.aspects-of-power .alteration-row select { flex: 1; }
+
+.aspects-of-power .skill-upgrade-btn {
+  font-size: 11px;
+  padding: 2px 8px;
+  margin-left: 6px;
+  flex: 0 0 auto;
+  width: auto;
+  line-height: 1.4;
+}
+
+.aspects-of-power .aop-derived-panel {
+  background: #1a1a1a;
+  border: 1px solid #444;
+  border-radius: 4px;
+  padding: 8px;
+  margin-bottom: 10px;
+  font-size: 11px;
+}
+.aspects-of-power .aop-derived-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: baseline;
+}
+.aspects-of-power .aop-derived-line {
+  margin-top: 6px;
+  color: #aaa;
+}
+.aspects-of-power .aop-derived-alt { margin-right: 8px; }
+.aspects-of-power .aop-val-dmg { color: #9cf; }
+.aspects-of-power .aop-val-cost { color: #fc9; }
+.aspects-of-power .aop-val-weight { color: #cf9; }

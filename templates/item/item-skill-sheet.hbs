@@ -9,7 +9,7 @@
           <input type='checkbox' name='system.favorite' {{#if system.favorite}}checked{{/if}} />
           <i class='fa-star {{#if system.favorite}}fas{{else}}far{{/if}}'></i>
         </label>
-        {{! Rarity chip — sits inline next to the name (matches the tag-chip pattern below). Drives the universal damage multiplier. }}
+        {{! Rarity chip — sits inline next to the name. Drives the universal damage multiplier. }}
         <select name='system.rarity' class='skill-rarity-chip'
                 title='{{localize "ASPECTSOFPOWER.SkillRarity.label"}}'
                 style="color: {{lookup (lookup config.skillRarities system.rarity) 'color'}}; border-color: {{lookup (lookup config.skillRarities system.rarity) 'color'}};">
@@ -20,8 +20,8 @@
             </option>
           {{/each}}
         </select>
-        <button type='button' class='skill-upgrade-btn' title='Create a new linked higher-rarity version on the owning actor.' style='font-size:11px;padding:2px 8px;margin-left:6px;'>
-          ⬆ Upgrade
+        <button type='button' class='skill-upgrade-btn' title='Create a new linked higher-rarity version on the owning actor.'>
+          Upgrade
         </button>
       </h1>
 
@@ -32,7 +32,7 @@
           {{#each system.tags as |tag|}}
             <span class='skill-tag-chip'>
               {{tag}}
-              <a class='skill-tag-remove' data-tag='{{tag}}' title='Remove'>×</a>
+              <a class='skill-tag-remove' data-tag='{{tag}}' title='Remove'>&times;</a>
             </span>
           {{/each}}
         </div>
@@ -44,51 +44,1081 @@
     </div>
   </header>
 
-  {{! Sheet Tab Navigation }}
+  {{! Sheet Tab Navigation — Build holds every authoring control; Description holds prose + the full math readout. }}
   <nav class='sheet-tabs tabs' data-group='primary'>
+    <a class='item' data-tab='build'>Build</a>
     <a class='item' data-tab='description'>Description</a>
-    <a class='item' data-tab='effects'>Effects</a>
-    <a class='item' data-tab='attributes'>Attributes</a>
   </nav>
 
-  {{! Sheet Body }}
   <section class='sheet-body scrollable' data-scrollable>
 
-    {{! Description Tab }}
-    <div class='tab' data-group='primary' data-tab='description'>
-      {{! ── Derived Stats Readout — live "show me the math" panel. Surfaced on Description so it's the first thing visible on open. ── }}
+    {{! ════ BUILD TAB ════ }}
+    <div class='tab' data-group='primary' data-tab='build'>
+
+      {{! ── Identity strip — the decisions that drive everything below, always visible. ── }}
+      <div class='skill-identity-strip'>
+        <div class='aop-field'>
+          <label class='resource-label'>Skill Type</label>
+          <select name='system.skillType'>
+            <option value='Passive' {{#if (eq system.skillType "Passive")}}selected{{/if}}>Passive</option>
+            <option value='Active' {{#if (eq system.skillType "Active")}}selected{{/if}}>Active</option>
+            <option value='Reaction' {{#if (eq system.skillType "Reaction")}}selected{{/if}}>Reaction</option>
+          </select>
+        </div>
+        <div class='aop-field'>
+          <label class='resource-label'>{{localize "ASPECTSOFPOWER.SkillCategory.label"}}</label>
+          <select name='system.skillCategory'>
+            {{#each config.skillCategories as |label key|}}
+              <option value='{{key}}' {{#if (eq key ../system.skillCategory)}}selected{{/if}}>
+                {{localize label}}
+              </option>
+            {{/each}}
+          </select>
+        </div>
+        {{#if (eq system.skillType "Reaction")}}
+        <div class='aop-field'>
+          <label class='resource-label'>Reaction Type</label>
+          <select name='system.reactionType'>
+            {{#each config.reactionTypes as |label key|}}
+              <option value='{{key}}' {{#if (eq key ../system.reactionType)}}selected{{/if}}>{{localize label}}</option>
+            {{/each}}
+          </select>
+        </div>
+        {{/if}}
+        <div class='aop-field aop-components'>
+          <label class='resource-label'>Components</label>
+          <div class='aop-checkbox-row'>
+            <label class='aop-check' title='{{localize "ASPECTSOFPOWER.SkillComponent.requiresSight"}}'>
+              <input type='checkbox' name='system.requiresSight' {{#if system.requiresSight}}checked{{/if}} />
+              Sight
+            </label>
+            <label class='aop-check' title='{{localize "ASPECTSOFPOWER.SkillComponent.vocalComponent"}}'>
+              <input type='checkbox' name='system.vocalComponent' {{#if system.vocalComponent}}checked{{/if}} />
+              Vocal
+            </label>
+            <label class='aop-check' title='{{localize "ASPECTSOFPOWER.SkillComponent.requiresHearing"}}'>
+              <input type='checkbox' name='system.requiresHearing' {{#if system.requiresHearing}}checked{{/if}} />
+              Hearing
+            </label>
+          </div>
+        </div>
+      </div>
+
+      {{! ── Summary bar — the numbers the rest of the sheet produces, at a glance. Full breakdown lives on the Description tab. ── }}
       {{#if derivedStats}}
-      <div class='derived-stats' style='background:#1a1a1a;border:1px solid #444;border-radius:4px;padding:8px;margin-bottom:10px;font-size:11px;'>
-        <div style='display:flex;flex-wrap:wrap;gap:12px;align-items:baseline;'>
-          <div><strong>Rarity:</strong> {{localize derivedStats.rarityLabel}} <span style='color:#888;'>({{derivedStats.rarityMult}})</span></div>
-          <div><strong>Effective Mult:</strong> <span style='color:#9cf;'>{{derivedStats.effectiveMult}}</span>
-            <span style='color:#888;'>= {{derivedStats.rarityMult}}{{#if derivedStats.dmgSum}} + ({{derivedStats.dmgSum}}){{/if}} (floor 0)</span></div>
-          <div><strong>Cost ×:</strong> <span style='color:#fc9;'>{{derivedStats.costMultiplier}}</span>
-            <span style='color:#888;'>= 1{{#if derivedStats.costSum}} + ({{derivedStats.costSum}}){{/if}}</span></div>
-          <div><strong>Weight ×:</strong> <span style='color:#cf9;'>{{derivedStats.effectiveWeightMultiplier}}</span>
-            <span style='color:#888;'>= 1{{#if derivedStats.weightSum}} + ({{derivedStats.weightSum}}){{/if}}</span></div>
+      <div class='skill-summary-bar'>
+        <span title='Effective damage multiplier = rarity + alterations (floor 0).'><strong>Mult</strong> {{derivedStats.effectiveMult}}</span>
+        <span title='Resource cost multiplier = 1 + alteration cost mods.'><strong>Cost</strong> &times;{{derivedStats.costMultiplier}}</span>
+        <span title='Action weight multiplier = 1 + alteration weight mods.'><strong>Weight</strong> &times;{{derivedStats.effectiveWeightMultiplier}}</span>
+        {{#if derivedStats.spellBaseManaScaled}}
+          <span title='Spell base cost at 5ft / 1x (tier x grade x cost mult).'><strong>Base</strong> {{derivedStats.spellBaseManaScaled}} mana</span>
+        {{/if}}
+        <span class='aop-muted'>{{localize derivedStats.rarityLabel}}</span>
+      </div>
+      {{/if}}
+
+      {{! ── SECTION: Cost and Roll ── }}
+      <details class='aop-section' data-section='roll' open>
+        <summary>
+          <span class='aop-section-title'>Cost and Roll</span>
+          <span class='aop-section-hint'>{{#if system.roll.resource}}{{system.roll.resource}} {{system.roll.cost}}{{/if}}{{#if system.roll.type}} &middot; {{system.roll.type}}{{/if}}</span>
+        </summary>
+        <div class='aop-section-body'>
+          {{#if isWeaponPillarType}}
+            <p class='hint aop-hint'>
+              <em>Damage handled by the weapon/ranged pillar &mdash; stat blend from wielded weapon &times; rarity multiplier &times; stamina invest. Ability/Dice/Cost from the schema are only used as a legacy fallback when no weapon is wielded.</em>
+            </p>
+          {{/if}}
+          <div class='aop-field-grid'>
+            {{#unless isWeaponPillarType}}
+            <div class='aop-field'>
+              <label class='resource-label'>{{#if (eq system.roll.statType "hybrid")}}Primary Ability{{else}}Ability{{/if}}</label>
+              <select name='system.roll.abilities' data-dtype='String'>
+                <option value="vitality" {{#if (eq system.roll.abilities "vitality")}}selected{{/if}}>Vitality</option>
+                <option value="endurance" {{#if (eq system.roll.abilities "endurance")}}selected{{/if}}>Endurance</option>
+                <option value="strength" {{#if (eq system.roll.abilities "strength")}}selected{{/if}}>Strength</option>
+                <option value="dexterity" {{#if (eq system.roll.abilities "dexterity")}}selected{{/if}}>Dexterity</option>
+                <option value="toughness" {{#if (eq system.roll.abilities "toughness")}}selected{{/if}}>Toughness</option>
+                <option value="intelligence" {{#if (eq system.roll.abilities "intelligence")}}selected{{/if}}>Intelligence</option>
+                <option value="willpower" {{#if (eq system.roll.abilities "willpower")}}selected{{/if}}>Willpower</option>
+                <option value="wisdom" {{#if (eq system.roll.abilities "wisdom")}}selected{{/if}}>Wisdom</option>
+                <option value="perception" {{#if (eq system.roll.abilities "perception")}}selected{{/if}}>Perception</option>
+              </select>
+            </div>
+            <div class='aop-field'>
+              <label class='resource-label'>Dice</label>
+              <input type='text' name='system.roll.dice' value='{{system.roll.dice}}' data-dtype='String' />
+            </div>
+            {{/unless}}
+            <div class='aop-field'>
+              <label class='resource-label'>Resource</label>
+              <select name='system.roll.resource'>
+                {{#if availableResources}}
+                  {{#each availableResources as |label key|}}
+                    <option value="{{key}}" {{#if (eq key ../system.roll.resource)}}selected{{/if}}>{{localize label}}</option>
+                  {{/each}}
+                {{else}}
+                  <option value="mana" {{#if (eq system.roll.resource "mana")}}selected{{/if}}>Mana</option>
+                  <option value="stamina" {{#if (eq system.roll.resource "stamina")}}selected{{/if}}>Stamina</option>
+                  <option value="health" {{#if (eq system.roll.resource "health")}}selected{{/if}}>Health</option>
+                {{/if}}
+              </select>
+            </div>
+            {{#unless isWeaponPillarType}}
+            <div class='aop-field'>
+              <label class='resource-label'>Cost</label>
+              <input type='number' name='system.roll.cost' value='{{system.roll.cost}}' min='0' step='1' />
+            </div>
+            {{/unless}}
+            <div class='aop-field'>
+              <label class='resource-label'>Skill Type</label>
+              <select name='system.roll.type' data-dtype='String'>
+                {{#if availableRollTypes}}
+                  {{#each availableRollTypes as |label key|}}
+                    <option value="{{key}}" {{#if (eq key ../system.roll.type)}}selected{{/if}}>{{localize label}}</option>
+                  {{/each}}
+                {{else}}
+                  <option value="str_weapon" {{#if (eq system.roll.type "str_weapon")}}selected{{/if}}>Strength Weapon</option>
+                  <option value="dex_weapon" {{#if (eq system.roll.type "dex_weapon")}}selected{{/if}}>Dexterity Weapon</option>
+                  <option value="phys_ranged" {{#if (eq system.roll.type "phys_ranged")}}selected{{/if}}>Physical Ranged</option>
+                  <option value="magic_projectile" {{#if (eq system.roll.type "magic_projectile")}}selected{{/if}}>Magic Projectile</option>
+                  <option value="magic_melee" {{#if (eq system.roll.type "magic_melee")}}selected{{/if}}>Magic Melee</option>
+                  <option value="wisdom_dexterity" {{#if (eq system.roll.type "wisdom_dexterity")}}selected{{/if}}>Wisdom/Dexterity</option>
+                {{/if}}
+              </select>
+            </div>
+          </div>
+
+          {{! Spell Tier block — only for skills tagged 'magic'. Grade auto-derives from the wielder's race rank at cast time. }}
+          {{#if (includes system.tags "magic")}}
+          <div class='aop-field-grid spell-cost-block'>
+            <div class='aop-field'>
+              <label class='resource-label'>{{localize "ASPECTSOFPOWER.SpellTier.label"}}</label>
+              <select name='system.roll.tier' data-dtype='String'>
+                <option value='' {{#if (eq system.roll.tier "")}}selected{{/if}}>&mdash;</option>
+                {{#each config.spellTiers as |label key|}}
+                  <option value='{{key}}' {{#if (eq key ../system.roll.tier)}}selected{{/if}}>{{localize label}}</option>
+                {{/each}}
+              </select>
+            </div>
+            <div class='aop-field'>
+              <label class='resource-label'>{{localize "ASPECTSOFPOWER.SpellTier.baseMana"}}</label>
+              <input type='text' value='{{#if spellBaseMana}}{{spellBaseMana}}{{else}}&mdash;{{/if}}' readonly disabled
+                     title='Computed: tier_factor x grade_factor (grade = caster rank).' />
+            </div>
+            <div class='aop-field'>
+              <label class='resource-label'>Grade (auto)</label>
+              <input type='text' value='caster rank' readonly disabled
+                     title='Spell grade auto-derives from the casting actor&apos;s race rank &mdash; no per-skill setting needed.' />
+            </div>
+          </div>
+          {{/if}}
+        </div>
+      </details>
+
+      {{! ── SECTION: Delivery — who it targets, how it reaches them. ── }}
+      {{#if show.delivery}}
+      <details class='aop-section' data-section='delivery' open>
+        <summary>
+          <span class='aop-section-title'>Delivery</span>
+          <span class='aop-section-hint'>{{#if system.roll.targetDefense}}vs {{system.roll.targetDefense}}{{/if}}{{#if show.aoe}} &middot; {{system.aoe.shape}} {{system.aoe.diameter}}ft{{/if}}</span>
+        </summary>
+        <div class='aop-section-body'>
+
+          {{#if show.attack}}
+          <div class='aop-field-grid'>
+            <div class='aop-field'>
+              <label class='resource-label'>Target Defense</label>
+              <select name='system.roll.targetDefense' data-dtype='String'>
+                <option value="" {{#if (eq system.roll.targetDefense "")}}selected{{/if}}>(none)</option>
+                <option value="melee" {{#if (eq system.roll.targetDefense "melee")}}selected{{/if}}>Melee</option>
+                <option value="ranged" {{#if (eq system.roll.targetDefense "ranged")}}selected{{/if}}>Ranged</option>
+                <option value="mind" {{#if (eq system.roll.targetDefense "mind")}}selected{{/if}}>Mind</option>
+                <option value="soul" {{#if (eq system.roll.targetDefense "soul")}}selected{{/if}}>Soul</option>
+              </select>
+            </div>
+            <div class='aop-field'>
+              <label class='resource-label' title="Optional second defense for 'single blow, two defenses' skills. Damage splits 50/50 across the two halves; toughness applies once.">Secondary Defense</label>
+              <select name='system.roll.secondaryTargetDefense' data-dtype='String'>
+                <option value="" {{#if (eq system.roll.secondaryTargetDefense "")}}selected{{/if}}>(none &mdash; single defense)</option>
+                <option value="melee" {{#if (eq system.roll.secondaryTargetDefense "melee")}}selected{{/if}}>Melee</option>
+                <option value="ranged" {{#if (eq system.roll.secondaryTargetDefense "ranged")}}selected{{/if}}>Ranged</option>
+                <option value="mind" {{#if (eq system.roll.secondaryTargetDefense "mind")}}selected{{/if}}>Mind</option>
+                <option value="soul" {{#if (eq system.roll.secondaryTargetDefense "soul")}}selected{{/if}}>Soul</option>
+              </select>
+            </div>
+            <div class='aop-field'>
+              <label class='resource-label' title="Melee reach in feet. 0 = inherit from the wielded weapon (default 5ft). Set explicitly only when this skill has special reach (e.g. Lunge).">Reach (0 = weapon)</label>
+              <input type='number' name='system.roll.reach' value='{{system.roll.reach}}' min='0' step='1' data-dtype='Number'>
+            </div>
+            <div class='aop-field'>
+              <label class='resource-label'>Damage Type</label>
+              <select name='system.roll.damageType' data-dtype='String'>
+                <option value="physical" {{#if (eq system.roll.damageType "physical")}}selected{{/if}}>Physical (Armor)</option>
+                <option value="magical" {{#if (eq system.roll.damageType "magical")}}selected{{/if}}>Magical (Veil)</option>
+              </select>
+            </div>
+          </div>
+
+          <div class='aop-subblock'>
+            <label class='resource-label checkbox-label'>
+              <input type='checkbox' name='system.tagConfig.forcedMovement' {{#if system.tagConfig.forcedMovement}}checked{{/if}}>
+              {{localize "ASPECTSOFPOWER.ForcedMovement.label"}}
+            </label>
+            {{#if system.tagConfig.forcedMovement}}
+            <div class='aop-field-grid'>
+              <div class='aop-field'>
+                <label class='resource-label'>{{localize "ASPECTSOFPOWER.ForcedMovement.direction"}}</label>
+                <select name='system.tagConfig.forcedMovementDir' data-dtype='String'>
+                  <option value="push" {{#if (eq system.tagConfig.forcedMovementDir "push")}}selected{{/if}}>{{localize "ASPECTSOFPOWER.ForcedMovement.push"}}</option>
+                  <option value="pull" {{#if (eq system.tagConfig.forcedMovementDir "pull")}}selected{{/if}}>{{localize "ASPECTSOFPOWER.ForcedMovement.pull"}}</option>
+                </select>
+              </div>
+              <div class='aop-field'>
+                <label class='resource-label'>{{localize "ASPECTSOFPOWER.ForcedMovement.distance"}}</label>
+                <input type='number' name='system.tagConfig.forcedMovementDist' value='{{system.tagConfig.forcedMovementDist}}' min='5' step='5'>
+              </div>
+            </div>
+            {{/if}}
+          </div>
+          {{/if}}
+
+          {{#if show.aoe}}
+          <div class='aop-subblock aoe-config'>
+            <span class='aop-subblock-title'>Area of Effect</span>
+            <div class='aop-field-grid'>
+              <div class='aop-field'>
+                <label class='resource-label'>{{localize "ASPECTSOFPOWER.AOE.shape"}}</label>
+                <select name='system.aoe.shape'>
+                  {{#each config.aoeShapes as |label key|}}
+                    <option value='{{key}}' {{#if (eq key ../system.aoe.shape)}}selected{{/if}}>
+                      {{localize label}}
+                    </option>
+                  {{/each}}
+                </select>
+              </div>
+
+              {{#if (eq system.aoe.shape "circle")}}
+              <div class='aop-field'>
+                <label class='resource-label'>{{localize "ASPECTSOFPOWER.AOE.diameter"}}</label>
+                <input type='number' name='system.aoe.diameter' value='{{system.aoe.diameter}}' min='5' step='5' />
+              </div>
+              {{/if}}
+
+              {{#if (eq system.aoe.shape "cone")}}
+              <div class='aop-field'>
+                <label class='resource-label'>{{localize "ASPECTSOFPOWER.AOE.length"}}</label>
+                <input type='number' name='system.aoe.diameter' value='{{system.aoe.diameter}}' min='5' step='5' />
+              </div>
+              <div class='aop-field'>
+                <label class='resource-label'>{{localize "ASPECTSOFPOWER.AOE.angle"}}</label>
+                <input type='number' name='system.aoe.angle' value='{{system.aoe.angle}}' min='1' max='360' step='1' />
+              </div>
+              {{/if}}
+
+              {{#if (eq system.aoe.shape "ray")}}
+              <div class='aop-field'>
+                <label class='resource-label'>{{localize "ASPECTSOFPOWER.AOE.length"}}</label>
+                <input type='number' name='system.aoe.diameter' value='{{system.aoe.diameter}}' min='5' step='5' />
+              </div>
+              <div class='aop-field'>
+                <label class='resource-label'>{{localize "ASPECTSOFPOWER.AOE.width"}}</label>
+                <input type='number' name='system.aoe.width' value='{{system.aoe.width}}' min='5' step='5' />
+              </div>
+              {{/if}}
+
+              {{#if (eq system.aoe.shape "rect")}}
+              <div class='aop-field'>
+                <label class='resource-label'>{{localize "ASPECTSOFPOWER.AOE.size"}}</label>
+                <input type='number' name='system.aoe.diameter' value='{{system.aoe.diameter}}' min='5' step='5' />
+              </div>
+              {{/if}}
+
+              <div class='aop-field'>
+                <label class='resource-label' title='Sizes at-or-below this cost no extra mana; sizes above incur 2^n cost growth.'>Base Size (free) (ft)</label>
+                <input type='number' name='system.aoe.baseSize' value='{{system.aoe.baseSize}}' min='5' step='5' />
+              </div>
+              <div class='aop-field'>
+                <label class='resource-label'>{{localize "ASPECTSOFPOWER.AOE.targetingMode"}}</label>
+                <select name='system.aoe.targetingMode'>
+                  {{#each config.aoeTargetingModes as |label key|}}
+                    <option value='{{key}}' {{#if (eq key ../system.aoe.targetingMode)}}selected{{/if}}>
+                      {{localize label}}
+                    </option>
+                  {{/each}}
+                </select>
+              </div>
+              <div class='aop-field'>
+                <label class='resource-label' title='{{localize "ASPECTSOFPOWER.AOE.templateDurationHint"}}'>{{localize "ASPECTSOFPOWER.AOE.templateDuration"}}</label>
+                <input type='number' name='system.aoe.templateDuration' value='{{system.aoe.templateDuration}}' min='0' step='1' />
+              </div>
+              <div class='aop-field'>
+                <label class='resource-label'>{{localize "ASPECTSOFPOWER.Zone.label"}}</label>
+                <select name='system.aoe.zoneEffect'>
+                  {{#each config.zoneEffects as |label key|}}
+                    <option value='{{key}}' {{#if (eq key ../system.aoe.zoneEffect)}}selected{{/if}}>{{localize label}}</option>
+                  {{/each}}
+                </select>
+              </div>
+            </div>
+          </div>
+          {{/if}}
+
+          {{#if show.teleport}}
+          <div class='aop-subblock teleport-config'>
+            <span class='aop-subblock-title'>Teleport</span>
+            <div class='aop-field-grid'>
+              <div class='aop-field'>
+                <label class='resource-label' title='Max teleport distance. 0 = inherit caster casting range (40 + Per.mod/10). Sight always required at declare time.'>Max Distance (ft, 0 = casting range)</label>
+                <input type='number' name='system.tagConfig.teleportMaxDistance' value='{{system.tagConfig.teleportMaxDistance}}' min='0' step='5' />
+              </div>
+            </div>
+          </div>
+          {{/if}}
+
+          {{#if show.leap}}
+          <div class='aop-subblock leap-config'>
+            <span class='aop-subblock-title'>Leap</span>
+            <div class='aop-field-grid'>
+              <div class='aop-field'>
+                <label class='resource-label' title='Max start-to-end distance for the leap arc.'>Max Distance (ft)</label>
+                <input type='number' name='system.tagConfig.leapMaxDistance' value='{{system.tagConfig.leapMaxDistance}}' min='5' step='5' />
+              </div>
+              <div class='aop-field'>
+                <label class='resource-label' title='Vault height. Walls with elevation.top below the apex are bypassed; taller walls still block.'>Apex Height (ft)</label>
+                <input type='number' name='system.tagConfig.leapApexFt' value='{{system.tagConfig.leapApexFt}}' min='0' step='1' />
+              </div>
+            </div>
+          </div>
+          {{/if}}
+
+          {{#if show.granted}}
+          <div class='aop-subblock granted-config'>
+            <span class='aop-subblock-title'>Granted Activation Time</span>
+            <div class='aop-field-grid'>
+              <div class='aop-field'>
+                <label class='resource-label' title='Lower bound of cast wait for teleport/leap (very short hops). Set equal to Max to disable distance scaling.'>Min Fraction (&times; round, at 0 ft)</label>
+                <input type='number' name='system.tagConfig.grantedMinActivationFraction' value='{{system.tagConfig.grantedMinActivationFraction}}' min='0' max='2' step='0.01' />
+              </div>
+              <div class='aop-field'>
+                <label class='resource-label' title='Cast wait at the skill&apos;s max teleport/leap distance. Wait lerps from min to this by distancePicked / maxDistance.'>Max Fraction (&times; round, at max range)</label>
+                <input type='number' name='system.tagConfig.grantedActivationFraction' value='{{system.tagConfig.grantedActivationFraction}}' min='0' max='2' step='0.01' />
+              </div>
+            </div>
+          </div>
+          {{/if}}
+
+        </div>
+      </details>
+      {{/if}}
+
+      {{! ── SECTION: Restoration ── }}
+      {{#if show.restoration}}
+      <details class='aop-section' data-section='restoration' open>
+        <summary>
+          <span class='aop-section-title'>Restoration</span>
+          <span class='aop-section-hint'>{{system.tagConfig.restorationResource}} to {{system.tagConfig.restorationTarget}}</span>
+        </summary>
+        <div class='aop-section-body'>
+          <div class='aop-field-grid'>
+            <div class='aop-field'>
+              <label class='resource-label'>{{localize "ASPECTSOFPOWER.TagConfig.restorationTarget"}}</label>
+              <select name='system.tagConfig.restorationTarget'>
+                {{#each config.restorationTargets as |label key|}}
+                  <option value='{{key}}' {{#if (eq key ../system.tagConfig.restorationTarget)}}selected{{/if}}>
+                    {{localize label}}
+                  </option>
+                {{/each}}
+              </select>
+            </div>
+            <div class='aop-field'>
+              <label class='resource-label'>{{localize "ASPECTSOFPOWER.TagConfig.restorationResource"}}</label>
+              <select name='system.tagConfig.restorationResource'>
+                {{#each config.restorationResources as |label key|}}
+                  <option value='{{key}}' {{#if (eq key ../system.tagConfig.restorationResource)}}selected{{/if}}>
+                    {{localize label}}
+                  </option>
+                {{/each}}
+              </select>
+            </div>
+          </div>
+          {{#if (eq system.tagConfig.restorationResource "health")}}
+          <label class='resource-label checkbox-label'>
+            <input type='checkbox' name='system.tagConfig.restorationOverhealth'
+                   {{#if system.tagConfig.restorationOverhealth}}checked{{/if}} />
+            Overflow into Overhealth
+          </label>
+          {{/if}}
+          {{#if (eq system.tagConfig.restorationResource "barrier")}}
+          <div class='aop-subblock'>
+            <span class='aop-subblock-title'>Barrier</span>
+            <div class='aop-field-grid'>
+              <div class='aop-field'>
+                <label class='resource-label'>Barrier Multiplier</label>
+                <input type='number' name='system.tagConfig.barrierMultiplier'
+                       value='{{system.tagConfig.barrierMultiplier}}' min='0' step='0.1' />
+              </div>
+            </div>
+            <p class='hint'>Barrier HP = Mana spent &times; multiplier. Uses the skill's affinities.</p>
+          </div>
+          {{/if}}
+        </div>
+      </details>
+      {{/if}}
+
+      {{! ── SECTION: Buff ── }}
+      {{#if show.buff}}
+      <details class='aop-section' data-section='buff' open>
+        <summary>
+          <span class='aop-section-title'>Buff</span>
+          <span class='aop-section-hint'>{{system.tagConfig.buffDuration}} rds &middot; {{system.tagConfig.buffTarget}}{{#if system.tagConfig.auraRadius}} &middot; aura {{system.tagConfig.auraRadius}}ft{{/if}}</span>
+        </summary>
+        <div class='aop-section-body'>
+          <label class='resource-label'>{{localize "ASPECTSOFPOWER.TagConfig.buffAttributes"}}</label>
+          {{#each buffAttributeGroups}}
+            <div class='attribute-group'>
+              <span class='group-label'>{{this.label}}</span>
+              <div class='group-entries'>
+                {{#each this.attributes}}
+                  <label class='attr-entry'>
+                    <input type='checkbox' name='system.tagConfig.buffEntries'
+                           value='{{this.key}}' {{#if this.checked}}checked{{/if}} />
+                    {{this.label}}
+                    {{#if this.checked}}
+                      <span class='multiplier-label'>&times;</span>
+                      <input type='number' class='attr-value' data-attr='{{this.key}}'
+                             data-target='buff' value='{{this.value}}' min='0' step='0.1' />
+                    {{/if}}
+                  </label>
+                {{/each}}
+              </div>
+            </div>
+          {{/each}}
+          <div class='aop-field-grid'>
+            <div class='aop-field'>
+              <label class='resource-label'>{{localize "ASPECTSOFPOWER.TagConfig.duration"}}</label>
+              <input type='number' name='system.tagConfig.buffDuration'
+                     value='{{system.tagConfig.buffDuration}}' min='0' step='1' />
+            </div>
+            <div class='aop-field'>
+              <label class='resource-label'>Target</label>
+              <select name='system.tagConfig.buffTarget'>
+                {{#each config.buffTargets as |label key|}}
+                  <option value='{{key}}' {{#if (eq key ../system.tagConfig.buffTarget)}}selected{{/if}}>
+                    {{localize label}}
+                  </option>
+                {{/each}}
+              </select>
+            </div>
+            <div class='aop-field'>
+              <label class='resource-label checkbox-label'>
+                <input type='checkbox' name='system.tagConfig.buffStackable'
+                       {{#if system.tagConfig.buffStackable}}checked{{/if}} />
+                Stackable
+              </label>
+            </div>
+          </div>
+
+          {{#if (includes system.tags "movement")}}
+          <div class='aop-subblock'>
+            <span class='aop-subblock-title'>Movement</span>
+            <div class='aop-field-grid'>
+              <div class='aop-field'>
+                <label class='resource-label' title='Multiplier applied to the target&apos;s movement speed. 2 = double speed, 0.5 = half (slow).'>Speed Buff (&times;)</label>
+                <input type='number' name='system.tagConfig.movementSpeedBuff'
+                       value='{{system.tagConfig.movementSpeedBuff}}' min='0' step='0.1' />
+              </div>
+              <div class='aop-field'>
+                <label class='resource-label' title='Multiplier on stamina cost per ft. 0.5 = efficient, 2 = exhausting.'>Stamina Buff (&times;)</label>
+                <input type='number' name='system.tagConfig.movementStaminaBuff'
+                       value='{{system.tagConfig.movementStaminaBuff}}' min='0' step='0.1' />
+              </div>
+            </div>
+          </div>
+          {{/if}}
+
+          <div class='aop-subblock'>
+            <span class='aop-subblock-title'>Aura</span>
+            <div class='aop-field-grid'>
+              <div class='aop-field'>
+                <label class='resource-label' title='Sustained AOE radius around the buffed actor. 0 = no aura. Ticks each round-start AND on entry.'>Radius (ft)</label>
+                <input type='number' name='system.tagConfig.auraRadius'
+                       value='{{system.tagConfig.auraRadius}}' min='0' step='1' />
+              </div>
+              {{#if system.tagConfig.auraRadius}}
+              <div class='aop-field'>
+                <label class='resource-label'>Effect Type</label>
+                <select name='system.tagConfig.auraEffectType'>
+                  <option value='damage' {{#if (eq system.tagConfig.auraEffectType "damage")}}selected{{/if}}>Damage (apply-button)</option>
+                  <option value='heal' {{#if (eq system.tagConfig.auraEffectType "heal")}}selected{{/if}}>Heal (auto-apply)</option>
+                  <option value='stam' {{#if (eq system.tagConfig.auraEffectType "stam")}}selected{{/if}}>Stamina restore (auto-apply)</option>
+                </select>
+              </div>
+              <div class='aop-field'>
+                <label class='resource-label'>Targets</label>
+                <select name='system.tagConfig.auraTargeting'>
+                  <option value='enemies' {{#if (eq system.tagConfig.auraTargeting "enemies")}}selected{{/if}}>Enemies</option>
+                  <option value='allies' {{#if (eq system.tagConfig.auraTargeting "allies")}}selected{{/if}}>Allies</option>
+                  <option value='all' {{#if (eq system.tagConfig.auraTargeting "all")}}selected{{/if}}>All</option>
+                </select>
+              </div>
+              <div class='aop-field'>
+                <label class='resource-label' title='Fraction of the cast roll applied per tick. 0.3 = 30% per round.'>Scale (&times; roll)</label>
+                <input type='number' name='system.tagConfig.auraScale'
+                       value='{{system.tagConfig.auraScale}}' min='0' max='5' step='0.05' />
+              </div>
+              {{#if (eq system.tagConfig.auraEffectType "damage")}}
+              <div class='aop-field'>
+                <label class='resource-label' title='Damage type (physical / lightning / fire / etc.). Magic-tagged skills route through veil; physical through armor.'>Damage Type</label>
+                <input type='text' name='system.tagConfig.auraDamageType'
+                       value='{{system.tagConfig.auraDamageType}}' />
+              </div>
+              {{/if}}
+              {{#if (eq system.tagConfig.auraEffectType "heal")}}
+              <div class='aop-field'>
+                <label class='resource-label'>Heal Resource</label>
+                <select name='system.tagConfig.auraHealResource'>
+                  <option value='health' {{#if (eq system.tagConfig.auraHealResource "health")}}selected{{/if}}>Health</option>
+                  <option value='mana' {{#if (eq system.tagConfig.auraHealResource "mana")}}selected{{/if}}>Mana</option>
+                  <option value='stamina' {{#if (eq system.tagConfig.auraHealResource "stamina")}}selected{{/if}}>Stamina</option>
+                </select>
+              </div>
+              <div class='aop-field'>
+                <label class='resource-label checkbox-label'>
+                  <input type='checkbox' name='system.tagConfig.auraHealOverhealth'
+                         {{#if system.tagConfig.auraHealOverhealth}}checked{{/if}} />
+                  Overflow into Overhealth
+                </label>
+              </div>
+              {{/if}}
+              {{/if}}
+            </div>
+          </div>
+        </div>
+      </details>
+      {{/if}}
+
+      {{! ── SECTION: Debuff ── }}
+      {{#if show.debuff}}
+      <details class='aop-section' data-section='debuff' open>
+        <summary>
+          <span class='aop-section-title'>Debuff</span>
+          <span class='aop-section-hint'>{{#unless hasDebuffSubtype}}{{system.tagConfig.debuffType}} &middot; {{/unless}}{{system.tagConfig.debuffDuration}} rds{{#if system.tagConfig.debuffDealsDamage}} &middot; DoT {{system.tagConfig.dotScale}}{{/if}}</span>
+        </summary>
+        <div class='aop-section-body'>
+          {{#unless hasDebuffSubtype}}
+          <div class='aop-field-grid'>
+            <div class='aop-field'>
+              <label class='resource-label'>{{localize "ASPECTSOFPOWER.Debuff.label"}}</label>
+              <select name='system.tagConfig.debuffType'>
+                {{#each config.debuffTypes as |label key|}}
+                  <option value='{{key}}' {{#if (eq key ../system.tagConfig.debuffType)}}selected{{/if}}>
+                    {{localize label}}
+                  </option>
+                {{/each}}
+              </select>
+            </div>
+          </div>
+          <label class='resource-label'>{{localize "ASPECTSOFPOWER.TagConfig.debuffAttributes"}}</label>
+          {{#each debuffAttributeGroups}}
+            <div class='attribute-group'>
+              <span class='group-label'>{{this.label}}</span>
+              <div class='group-entries'>
+                {{#each this.attributes}}
+                  <label class='attr-entry'>
+                    <input type='checkbox' name='system.tagConfig.debuffEntries'
+                           value='{{this.key}}' {{#if this.checked}}checked{{/if}} />
+                    {{this.label}}
+                    {{#if this.checked}}
+                      <span class='multiplier-label'>&times;</span>
+                      <input type='number' class='attr-value' data-attr='{{this.key}}'
+                             data-target='debuff' value='{{this.value}}' min='0' step='0.1' />
+                    {{/if}}
+                  </label>
+                {{/each}}
+              </div>
+            </div>
+          {{/each}}
+          <div class='aop-field-grid'>
+            <div class='aop-field'>
+              <label class='resource-label' title='0 = no scaling. 0.5 = debuff is 50% of attack damage.'>Attack Scaling</label>
+              <input type='number' name='system.tagConfig.debuffScaleWithAttack'
+                     value='{{system.tagConfig.debuffScaleWithAttack}}' min='0' max='1' step='0.05' />
+            </div>
+            <div class='aop-field'>
+              <label class='resource-label checkbox-label'>
+                <input type='checkbox' name='system.tagConfig.debuffStackable'
+                       {{#if system.tagConfig.debuffStackable}}checked{{/if}} />
+                Stackable
+              </label>
+            </div>
+            <div class='aop-field'>
+              <label class='resource-label checkbox-label'>
+                <input type='checkbox' name='system.tagConfig.debuffDirectional'
+                       {{#if system.tagConfig.debuffDirectional}}checked{{/if}} />
+                Omnidirectional DR
+              </label>
+            </div>
+          </div>
+          {{/unless}}
+
+          <div class='aop-subblock'>
+            <label class='resource-label checkbox-label'>
+              <input type='checkbox' name='system.tagConfig.debuffDealsDamage'
+                     {{#if system.tagConfig.debuffDealsDamage}}checked{{/if}} />
+              {{localize "ASPECTSOFPOWER.TagConfig.debuffDealsDamage"}}
+            </label>
+            {{#if system.tagConfig.debuffDealsDamage}}
+            <div class='aop-field-grid'>
+              <div class='aop-field'>
+                <label class='resource-label'>{{localize "ASPECTSOFPOWER.TagConfig.debuffDamageType"}}</label>
+                <select name='system.tagConfig.debuffDamageType'>
+                  <option value='physical' {{#if (eq system.tagConfig.debuffDamageType "physical")}}selected{{/if}}>Physical (ignores Armor)</option>
+                  <option value='magical' {{#if (eq system.tagConfig.debuffDamageType "magical")}}selected{{/if}}>Magical (ignores Veil)</option>
+                </select>
+              </div>
+              <div class='aop-field'>
+                <label class='resource-label' title='Per-tick DoT damage as a fraction of the attack roll. 0.1 = 10%, 0 = no DoT damage. Stacks of the same debuff sum.'>DoT Scale</label>
+                <input type='number' name='system.tagConfig.dotScale'
+                       value='{{system.tagConfig.dotScale}}' min='0' max='1' step='0.05' />
+              </div>
+            </div>
+            {{/if}}
+          </div>
+
+          <div class='aop-field-grid'>
+            <div class='aop-field'>
+              <label class='resource-label'>{{localize "ASPECTSOFPOWER.TagConfig.duration"}}</label>
+              <input type='number' name='system.tagConfig.debuffDuration'
+                     value='{{system.tagConfig.debuffDuration}}' min='0' step='1' />
+            </div>
+          </div>
+        </div>
+      </details>
+      {{/if}}
+
+      {{! ── SECTION: Reaction (Reaction skillType OR Passive + retaliation tag) ── }}
+      {{#if show.reaction}}
+      <details class='aop-section' data-section='reaction' open>
+        <summary>
+          <span class='aop-section-title'>Reaction</span>
+          <span class='aop-section-hint'>{{#if system.tagConfig.reactionTrigger}}{{system.tagConfig.reactionTrigger}}{{else}}(no trigger){{/if}}</span>
+        </summary>
+        <div class='aop-section-body'>
+          <div class='aop-field-grid'>
+            <div class='aop-field'>
+              <label class='resource-label'>Trigger</label>
+              <select name='system.tagConfig.reactionTrigger'>
+                <option value='' {{#unless system.tagConfig.reactionTrigger}}selected{{/unless}}>(none)</option>
+                <option value='self_attacked' {{#if (eq system.tagConfig.reactionTrigger "self_attacked")}}selected{{/if}}>Self attacked (pre-damage)</option>
+                <option value='self_damage_taken' {{#if (eq system.tagConfig.reactionTrigger "self_damage_taken")}}selected{{/if}}>Self damage taken (post-defense, pre-HP)</option>
+                <option value='ally_attacked' {{#if (eq system.tagConfig.reactionTrigger "ally_attacked")}}selected{{/if}}>Ally attacked (within range)</option>
+                <option value='self_struck' {{#if (eq system.tagConfig.reactionTrigger "self_struck")}}selected{{/if}}>Self struck (post-resolve)</option>
+                <option value='hp_threshold' {{#if (eq system.tagConfig.reactionTrigger "hp_threshold")}}selected{{/if}}>HP below threshold</option>
+              </select>
+            </div>
+
+            {{#if (eq system.tagConfig.reactionTrigger "ally_attacked")}}
+            <div class='aop-field'>
+              <label class='resource-label' title='How far from this actor an ally must be attacked to fire the reaction.'>Trigger Range (ft)</label>
+              <input type='number' name='system.tagConfig.reactionTriggerRange'
+                     value='{{system.tagConfig.reactionTriggerRange}}' min='0' step='5' />
+            </div>
+            {{/if}}
+
+            {{#if (eq system.tagConfig.reactionTrigger "hp_threshold")}}
+            <div class='aop-field'>
+              <label class='resource-label' title='Fires when HP/maxHP drops below this value. 0.25 = 25%.'>HP Threshold (fraction)</label>
+              <input type='number' name='system.tagConfig.reactionThresholdPct'
+                     value='{{system.tagConfig.reactionThresholdPct}}' min='0' max='1' step='0.05' />
+            </div>
+            {{/if}}
+
+            <div class='aop-field'>
+              <label class='resource-label' title='Rounds between fires. 1 = once per round. 0 = no cooldown (limited only by the actor&apos;s reactions-per-round budget).'>Cooldown (rounds)</label>
+              <input type='number' name='system.tagConfig.reactionCooldown'
+                     value='{{system.tagConfig.reactionCooldown}}' min='0' step='1' />
+            </div>
+
+            <div class='aop-field'>
+              <label class='resource-label' title='Override the default pipeline injection point. Empty = derives from reactionType (dodge=pre-defense, parry=at-defense, barrier=at-damage, retaliation=post-resolve).'>Phase Override (advanced)</label>
+              <select name='system.tagConfig.reactionPhase'>
+                <option value='' {{#unless system.tagConfig.reactionPhase}}selected{{/unless}}>(default for reactionType)</option>
+                <option value='pre_defense' {{#if (eq system.tagConfig.reactionPhase "pre_defense")}}selected{{/if}}>Pre-defense</option>
+                <option value='at_defense' {{#if (eq system.tagConfig.reactionPhase "at_defense")}}selected{{/if}}>At-defense</option>
+                <option value='at_damage_app' {{#if (eq system.tagConfig.reactionPhase "at_damage_app")}}selected{{/if}}>At-damage-application</option>
+                <option value='post_resolve' {{#if (eq system.tagConfig.reactionPhase "post_resolve")}}selected{{/if}}>Post-resolve</option>
+              </select>
+            </div>
+          </div>
+
+          {{#if (eq system.reactionType "guardian")}}
+          <div class='aop-subblock'>
+            <span class='aop-subblock-title'>Guardian</span>
+            <div class='aop-field-grid'>
+              <div class='aop-field'>
+                <label class='resource-label' title='Intercept: the attack is redirected onto you. Cover: your defense roll replaces the ally&apos;s. Redirect: you absorb a share of the damage that lands.'>Mode</label>
+                <select name='system.tagConfig.guardianMode'>
+                  {{#each config.guardianModes as |label key|}}
+                    <option value='{{key}}' {{#if (eq key ../system.tagConfig.guardianMode)}}selected{{/if}}>{{localize label}}</option>
+                  {{/each}}
+                </select>
+              </div>
+              {{#if (eq system.tagConfig.guardianMode "redirect")}}
+              <div class='aop-field'>
+                <label class='resource-label' title='Fraction of the landed damage the guardian absorbs instead of the ally. 0.5 = half.'>Redirect Share</label>
+                <input type='number' name='system.tagConfig.guardianRedirectPct'
+                       value='{{system.tagConfig.guardianRedirectPct}}' min='0' max='1' step='0.05' />
+              </div>
+              {{/if}}
+            </div>
+          </div>
+          {{/if}}
+        </div>
+      </details>
+      {{/if}}
+
+      {{! ── SECTION: Summon ── }}
+      {{#if show.summon}}
+      <details class='aop-section' data-section='summon' open>
+        <summary>
+          <span class='aop-section-title'>Summon</span>
+          <span class='aop-section-hint'>{{system.tagConfig.summonBehaviors.length}} behaviors</span>
+        </summary>
+        <div class='aop-section-body'>
+          <p class='hint'>The conjured creature's brain. Pick ONE brain (stationary / melee / ranged),
+            then stack faculties or a preset. Each adds a tier, and the tier multiplies this skill's
+            resource cost &mdash; a smarter creature costs more to conjure.</p>
+          <div class='attribute-group'>
+            <span class='group-label'>Brains &amp; Faculties</span>
+            <div class='group-entries'>
+              {{#each config.aiBehaviors as |beh key|}}
+                <label class='attr-entry' title='{{beh.category}} &mdash; adds tier {{beh.tier}}'>
+                  <input type='checkbox' name='system.tagConfig.summonBehaviors'
+                         value='{{key}}' {{#if (includes ../system.tagConfig.summonBehaviors key)}}checked{{/if}} />
+                  {{#if beh.label}}{{beh.label}}{{else}}{{key}}{{/if}}
+                  <span class='multiplier-label'>t{{beh.tier}}</span>
+                </label>
+              {{/each}}
+            </div>
+          </div>
+          <div class='attribute-group'>
+            <span class='group-label'>Presets (expand to faculties)</span>
+            <div class='group-entries'>
+              {{#each config.aiBehaviorPresets as |preset key|}}
+                <label class='attr-entry'>
+                  <input type='checkbox' name='system.tagConfig.summonBehaviors'
+                         value='{{key}}' {{#if (includes ../system.tagConfig.summonBehaviors key)}}checked{{/if}} />
+                  {{key}}
+                </label>
+              {{/each}}
+            </div>
+          </div>
+        </div>
+      </details>
+      {{/if}}
+
+      {{! ── SECTION: Mine ── }}
+      {{#if show.mine}}
+      <details class='aop-section' data-section='mine' open>
+        <summary>
+          <span class='aop-section-title'>Mine</span>
+          <span class='aop-section-hint'>capacity {{system.tagConfig.mineCapacity}}</span>
+        </summary>
+        <div class='aop-section-body'>
+          <div class='aop-field-grid'>
+            <div class='aop-field'>
+              <label class='resource-label' title='Max concurrent mines per caster placed by this summon. Excess placements FIFO-evict the oldest. The mine snapshots this skill&apos;s aoe + roll config at placement.'>Mine Capacity</label>
+              <input type='number' name='system.tagConfig.mineCapacity'
+                     value='{{system.tagConfig.mineCapacity}}' min='1' max='10' step='1' />
+            </div>
+          </div>
+        </div>
+      </details>
+      {{/if}}
+
+      {{! ── SECTION: Shrapnel ── }}
+      {{#if show.shrapnel}}
+      <details class='aop-section' data-section='shrapnel' open>
+        <summary>
+          <span class='aop-section-title'>Shrapnel</span>
+          <span class='aop-section-hint'>&times;{{system.tagConfig.shrapnelMultiplier}} pool</span>
+        </summary>
+        <div class='aop-section-body'>
+          <div class='aop-field-grid'>
+            <div class='aop-field'>
+              <label class='resource-label' title='Multiplies the hit total when consuming defense pool. 1.5 = pool depletes 50% faster.'>Defense Pool Multiplier</label>
+              <input type='number' name='system.tagConfig.shrapnelMultiplier'
+                     value='{{system.tagConfig.shrapnelMultiplier}}' min='1.0' max='5.0' step='0.1' />
+            </div>
+          </div>
+        </div>
+      </details>
+      {{/if}}
+
+      {{! ── SECTION: Sustain ── }}
+      {{#if show.sustain}}
+      <details class='aop-section' data-section='sustain' open>
+        <summary>
+          <span class='aop-section-title'>Sustain</span>
+          <span class='aop-section-hint'>{{system.tagConfig.sustainCost}} {{system.tagConfig.sustainResource}}/rd</span>
+        </summary>
+        <div class='aop-section-body'>
+          <div class='aop-field-grid'>
+            <div class='aop-field'>
+              <label class='resource-label'>Upkeep Resource</label>
+              <select name='system.tagConfig.sustainResource'>
+                <option value="mana" {{#if (eq system.tagConfig.sustainResource "mana")}}selected{{/if}}>Mana</option>
+                <option value="stamina" {{#if (eq system.tagConfig.sustainResource "stamina")}}selected{{/if}}>Stamina</option>
+                <option value="health" {{#if (eq system.tagConfig.sustainResource "health")}}selected{{/if}}>Health</option>
+              </select>
+            </div>
+            <div class='aop-field'>
+              <label class='resource-label'>Upkeep Cost (per round)</label>
+              <input type='number' name='system.tagConfig.sustainCost'
+                     value='{{system.tagConfig.sustainCost}}' min='0' step='1' />
+            </div>
+          </div>
+        </div>
+      </details>
+      {{/if}}
+
+      {{! ── SECTION: Profession — craft / gather / repair ── }}
+      {{#if show.craft}}
+      <details class='aop-section' data-section='craft' open>
+        <summary>
+          <span class='aop-section-title'>Craft</span>
+          <span class='aop-section-hint'>{{#if system.craftAllowedTypes.length}}{{system.craftAllowedTypes.length}} types{{else}}all types{{/if}}</span>
+        </summary>
+        <div class='aop-section-body'>
+          <p class='hint'>Check the item types this craft skill can produce. Empty = all types allowed.</p>
+          <div class='craft-allowed-grid'>
+            {{#each @root.config.craftItemTypes as |def key|}}
+              <label class='aop-check'>
+                <input type='checkbox' class='craft-allowed-type' data-type-key='{{key}}'
+                       {{#if (includes ../system.craftAllowedTypes key)}}checked{{/if}} />
+                <span title='{{def.category}}'>{{key}}</span>
+              </label>
+            {{/each}}
+          </div>
+        </div>
+      </details>
+      {{/if}}
+
+      {{#if show.gather}}
+      <details class='aop-section' data-section='gather' open>
+        <summary>
+          <span class='aop-section-title'>Gather</span>
+          <span class='aop-section-hint'>{{#if system.tagConfig.gatherMaterial}}{{system.tagConfig.gatherMaterial}}{{else}}any{{/if}}{{#if system.tagConfig.gatherElement}} &middot; {{system.tagConfig.gatherElement}}{{/if}}</span>
+        </summary>
+        <div class='aop-section-body'>
+          <div class='aop-field-grid'>
+            <div class='aop-field'>
+              <label class='resource-label'>Material Type</label>
+              <select name='system.tagConfig.gatherMaterial'>
+                <option value="">(any)</option>
+                {{#each @root.config.materialTypes as |label key|}}
+                  <option value="{{key}}" {{#if (eq key ../system.tagConfig.gatherMaterial)}}selected{{/if}}>
+                    {{localize label}}
+                  </option>
+                {{/each}}
+              </select>
+            </div>
+            <div class='aop-field'>
+              <label class='resource-label'>Element</label>
+              <select name='system.tagConfig.gatherElement'>
+                <option value="">(none)</option>
+                {{#each @root.config.craftElements as |elDef elKey|}}
+                  <option value="{{elKey}}" {{#if (eq elKey ../system.tagConfig.gatherElement)}}selected{{/if}}>
+                    {{localize elDef.label}}
+                  </option>
+                {{/each}}
+              </select>
+            </div>
+          </div>
+        </div>
+      </details>
+      {{/if}}
+
+      {{#if show.repair}}
+      <details class='aop-section' data-section='repair' open>
+        <summary>
+          <span class='aop-section-title'>Repair</span>
+          <span class='aop-section-hint'>{{system.tagConfig.repairMaterials.length}} materials</span>
+        </summary>
+        <div class='aop-section-body'>
+          <label class='resource-label'>{{localize "ASPECTSOFPOWER.TagConfig.repairMaterials"}}</label>
+          <div class='tag-checkboxes'>
+            {{#each config.materialTypes as |label key|}}
+              <label class='tag-checkbox'>
+                <input type='checkbox' name='system.tagConfig.repairMaterials' value='{{key}}'
+                  {{#if (includes ../system.tagConfig.repairMaterials key)}}checked{{/if}} />
+                {{localize label}}
+              </label>
+            {{/each}}
+          </div>
+        </div>
+      </details>
+      {{/if}}
+
+      {{! ── SECTION: Chained Skills ── }}
+      {{#if system.tags.length}}
+      <details class='aop-section chain-config' data-section='chains' {{#if chainedSkills.length}}open{{/if}}>
+        <summary>
+          <span class='aop-section-title'>{{localize "ASPECTSOFPOWER.Chain.label"}}</span>
+          <span class='aop-section-hint'>{{#if chainedSkills.length}}{{chainedSkills.length}} chained{{else}}none{{/if}}</span>
+        </summary>
+        <div class='aop-section-body'>
+          {{#each chainedSkills}}
+          <div class='chain-entry flexrow' data-chain-index='{{this.index}}'>
+            <select class='chain-skill-select' data-chain-index='{{this.index}}'>
+              <option value=''>-- Select Skill --</option>
+              {{#each ../availableChainSkills}}
+                <option value='{{this.id}}' {{#if (eq this.id ../skillId)}}selected{{/if}}>
+                  {{this.name}}
+                </option>
+              {{/each}}
+            </select>
+            <select class='chain-trigger-select' data-chain-index='{{this.index}}'>
+              <option value='always' {{#if (eq this.trigger "always")}}selected{{/if}}>
+                {{localize "ASPECTSOFPOWER.Chain.always"}}
+              </option>
+              <option value='on-hit' {{#if (eq this.trigger "on-hit")}}selected{{/if}}>
+                {{localize "ASPECTSOFPOWER.Chain.onHit"}}
+              </option>
+              <option value='on-miss' {{#if (eq this.trigger "on-miss")}}selected{{/if}}>
+                {{localize "ASPECTSOFPOWER.Chain.onMiss"}}
+              </option>
+            </select>
+            <a class='chain-delete' data-chain-index='{{this.index}}' title='Remove'>
+              <i class='fas fa-trash'></i>
+            </a>
+          </div>
+          {{/each}}
+
+          <a class='chain-add' title='{{localize "ASPECTSOFPOWER.Chain.add"}}'>
+            <i class='fas fa-plus'></i> {{localize "ASPECTSOFPOWER.Chain.add"}}
+          </a>
+        </div>
+      </details>
+      {{/if}}
+
+      {{! ── SECTION: Alterations ── }}
+      <details class='aop-section alterations-section' data-section='alterations' {{#if system.alterations.length}}open{{/if}}>
+        <summary>
+          <span class='aop-section-title'>{{localize "ASPECTSOFPOWER.Alteration.label"}}</span>
+          <span class='aop-section-hint'>{{#if system.alterations.length}}{{system.alterations.length}} applied{{else}}none{{/if}}</span>
+        </summary>
+        <div class='aop-section-body'>
+          <p class='hint aop-hint'>
+            Effective mult = rarity ({{lookup (lookup config.skillRarities system.rarity) 'mult'}})
+            + &Sigma; alteration dmgMod (floor 0). Cost = base &times; rarityMult &times; (1 + &Sigma; costMod).
+          </p>
+          {{#each system.alterations as |alt idx|}}
+            <div class='alteration-row'>
+              <select name='system.alterations.{{idx}}.id'>
+                <option value=''>&mdash; pick an alteration &mdash;</option>
+                {{#each @root.config.alterationTags as |tag tagKey|}}
+                  <option value='{{tagKey}}' {{#if (eq alt.id tagKey)}}selected{{/if}}>
+                    {{localize tag.label}} (dmg {{tag.dmgMod}}, cost {{tag.costMod}})
+                  </option>
+                {{/each}}
+              </select>
+              <button type='button' class='alteration-delete' data-index='{{idx}}' title='Remove'>&times;</button>
+            </div>
+          {{/each}}
+          <button type='button' class='alteration-add'>+ Add Alteration</button>
+        </div>
+      </details>
+
+      {{! ── SECTION: Advanced — legacy escape hatches. ── }}
+      <details class='aop-section advanced-section' data-section='advanced'>
+        <summary>
+          <span class='aop-section-title'>Advanced</span>
+          <span class='aop-section-hint'>overrides &middot; hybrid stats</span>
+        </summary>
+        <div class='aop-section-body'>
+          <div class='aop-field-grid'>
+            <div class='aop-field'>
+              <label class='resource-label' title='Manual multiplier override &mdash; leave at 1 for the rarity ladder to drive damage.'>Manual Mult Override</label>
+              <input type='number' name='system.roll.diceBonus' value='{{system.roll.diceBonus}}' min='0' step='0.01' />
+            </div>
+            <div class='aop-field'>
+              <label class='resource-label' title='Manual action weight multiplier &mdash; leave at 1 for alteration-derived weight to drive cast time.'>Manual Weight Override</label>
+              <input type='number' name='system.roll.actionWeightMultiplier' value='{{system.roll.actionWeightMultiplier}}' min='0.1' step='0.05' />
+            </div>
+            <div class='aop-field'>
+              <label class='resource-label'>Stat Mode</label>
+              <select name='system.roll.statType' data-dtype='String'>
+                <option value="pure" {{#if (eq system.roll.statType "pure")}}selected{{/if}}>Pure</option>
+                <option value="hybrid" {{#if (eq system.roll.statType "hybrid")}}selected{{/if}}>Hybrid</option>
+              </select>
+            </div>
+            {{#if (eq system.roll.statType "hybrid")}}
+            <div class='aop-field'>
+              <label class='resource-label'>Secondary Ability</label>
+              <select name='system.roll.secondaryAbility' data-dtype='String'>
+                <option value="vitality" {{#if (eq system.roll.secondaryAbility "vitality")}}selected{{/if}}>Vitality</option>
+                <option value="endurance" {{#if (eq system.roll.secondaryAbility "endurance")}}selected{{/if}}>Endurance</option>
+                <option value="strength" {{#if (eq system.roll.secondaryAbility "strength")}}selected{{/if}}>Strength</option>
+                <option value="dexterity" {{#if (eq system.roll.secondaryAbility "dexterity")}}selected{{/if}}>Dexterity</option>
+                <option value="toughness" {{#if (eq system.roll.secondaryAbility "toughness")}}selected{{/if}}>Toughness</option>
+                <option value="intelligence" {{#if (eq system.roll.secondaryAbility "intelligence")}}selected{{/if}}>Intelligence</option>
+                <option value="willpower" {{#if (eq system.roll.secondaryAbility "willpower")}}selected{{/if}}>Willpower</option>
+                <option value="wisdom" {{#if (eq system.roll.secondaryAbility "wisdom")}}selected{{/if}}>Wisdom</option>
+                <option value="perception" {{#if (eq system.roll.secondaryAbility "perception")}}selected{{/if}}>Perception</option>
+              </select>
+            </div>
+            <div class='aop-field'>
+              <label class='resource-label'>Primary Weight</label>
+              <input type='number' name='system.roll.primaryWeight' value='{{system.roll.primaryWeight}}' min='0' max='1' step='0.05' />
+            </div>
+            <div class='aop-field'>
+              <label class='resource-label'>Secondary Weight</label>
+              <input type='number' name='system.roll.secondaryWeight' value='{{system.roll.secondaryWeight}}' min='0' max='1' step='0.05' />
+            </div>
+            {{/if}}
+          </div>
+        </div>
+      </details>
+
+    </div>
+
+    {{! ════ DESCRIPTION TAB ════ }}
+    <div class='tab' data-group='primary' data-tab='description'>
+      {{! Full derived-stats readout — the "show me the math" panel. }}
+      {{#if derivedStats}}
+      <div class='derived-stats aop-derived-panel'>
+        <div class='aop-derived-row'>
+          <div><strong>Rarity:</strong> {{localize derivedStats.rarityLabel}} <span class='aop-muted'>({{derivedStats.rarityMult}})</span></div>
+          <div><strong>Effective Mult:</strong> <span class='aop-val-dmg'>{{derivedStats.effectiveMult}}</span>
+            <span class='aop-muted'>= {{derivedStats.rarityMult}}{{#if derivedStats.dmgSum}} + ({{derivedStats.dmgSum}}){{/if}} (floor 0)</span></div>
+          <div><strong>Cost &times;:</strong> <span class='aop-val-cost'>{{derivedStats.costMultiplier}}</span>
+            <span class='aop-muted'>= 1{{#if derivedStats.costSum}} + ({{derivedStats.costSum}}){{/if}}</span></div>
+          <div><strong>Weight &times;:</strong> <span class='aop-val-weight'>{{derivedStats.effectiveWeightMultiplier}}</span>
+            <span class='aop-muted'>= 1{{#if derivedStats.weightSum}} + ({{derivedStats.weightSum}}){{/if}}</span></div>
         </div>
 
         {{#if derivedStats.alterations.length}}
-          <div style='margin-top:6px;color:#aaa;'>Alterations:
+          <div class='aop-derived-line'>Alterations:
             {{#each derivedStats.alterations as |a|}}
-              <span style='margin-right:8px;'>{{localize a.label}}<span style='color:#666;'> (dmg {{a.dmgMod}}, cost {{a.costMod}}, weight {{a.weightMod}})</span></span>
+              <span class='aop-derived-alt'>{{localize a.label}}<span class='aop-muted'> (dmg {{a.dmgMod}}, cost {{a.costMod}}, weight {{a.weightMod}})</span></span>
             {{/each}}
           </div>
         {{/if}}
 
         {{#if derivedStats.spellBaseManaScaled}}
-          <div style='margin-top:6px;'>
-            <strong>Spell base cost (5ft / 1×):</strong> <span style='color:#fc9;'>{{derivedStats.spellBaseManaScaled}}</span> mana
-            <span style='color:#888;'>(tier × grade × cost mult)</span>
+          <div class='aop-derived-line'>
+            <strong>Spell base cost (5ft / 1&times;):</strong> <span class='aop-val-cost'>{{derivedStats.spellBaseManaScaled}}</span> mana
+            <span class='aop-muted'>(tier &times; grade &times; cost mult)</span>
           </div>
         {{/if}}
 
         {{#if derivedStats.aoeCostScale}}
-          <div style='margin-top:6px;'>
+          <div class='aop-derived-line'>
             <strong>AOE size cost ladder (2^n):</strong>
             {{#each derivedStats.aoeCostScale as |row|}}
-              <span style='margin-right:10px;color:#aaa;'>{{row.ft}}ft = {{#if row.cost}}{{row.cost}}m{{else}}{{row.mult}}×{{/if}}</span>
+              <span class='aop-derived-alt'>{{row.ft}}ft = {{#if row.cost}}{{row.cost}}m{{else}}{{row.mult}}&times;{{/if}}</span>
             {{/each}}
           </div>
         {{/if}}
@@ -98,817 +1128,6 @@
       <prose-mirror name="system.description" value="{{system.description}}" compact>
         {{{enrichedDescription}}}
       </prose-mirror>
-    </div>
-
-    {{! Damage Tab }}
-    <div class='tab effects' data-group='primary' data-tab='effects'>
-
-      {{! ── Skill Category ── }}
-      <div class='skill-category'>
-        <label class='resource-label'>{{localize "ASPECTSOFPOWER.SkillCategory.label"}}</label>
-        <select name='system.skillCategory'>
-          {{#each config.skillCategories as |label key|}}
-            <option value='{{key}}' {{#if (eq key ../system.skillCategory)}}selected{{/if}}>
-              {{localize label}}
-            </option>
-          {{/each}}
-        </select>
-      </div>
-
-      {{! ── AOE Config (driven by aoe tag) ── }}
-      {{#if (includes system.tags "aoe")}}
-      <div class='tag-config aoe-config'>
-        <label class='resource-label'>{{localize "ASPECTSOFPOWER.AOE.shape"}}</label>
-        <select name='system.aoe.shape'>
-          {{#each config.aoeShapes as |label key|}}
-            <option value='{{key}}' {{#if (eq key ../system.aoe.shape)}}selected{{/if}}>
-              {{localize label}}
-            </option>
-          {{/each}}
-        </select>
-
-        {{! Circle: diameter }}
-        {{#if (eq system.aoe.shape "circle")}}
-          <label class='resource-label'>{{localize "ASPECTSOFPOWER.AOE.diameter"}}</label>
-          <input type='number' name='system.aoe.diameter'
-                 value='{{system.aoe.diameter}}' min='5' step='5' />
-        {{/if}}
-
-        {{! Cone: length + angle }}
-        {{#if (eq system.aoe.shape "cone")}}
-          <label class='resource-label'>{{localize "ASPECTSOFPOWER.AOE.length"}}</label>
-          <input type='number' name='system.aoe.diameter'
-                 value='{{system.aoe.diameter}}' min='5' step='5' />
-          <label class='resource-label'>{{localize "ASPECTSOFPOWER.AOE.angle"}}</label>
-          <input type='number' name='system.aoe.angle'
-                 value='{{system.aoe.angle}}' min='1' max='360' step='1' />
-        {{/if}}
-
-        {{! Ray: length + width }}
-        {{#if (eq system.aoe.shape "ray")}}
-          <label class='resource-label'>{{localize "ASPECTSOFPOWER.AOE.length"}}</label>
-          <input type='number' name='system.aoe.diameter'
-                 value='{{system.aoe.diameter}}' min='5' step='5' />
-          <label class='resource-label'>{{localize "ASPECTSOFPOWER.AOE.width"}}</label>
-          <input type='number' name='system.aoe.width'
-                 value='{{system.aoe.width}}' min='5' step='5' />
-        {{/if}}
-
-        {{! Rectangle (square): side length — Foundry rect is always a square }}
-        {{#if (eq system.aoe.shape "rect")}}
-          <label class='resource-label'>{{localize "ASPECTSOFPOWER.AOE.size"}}</label>
-          <input type='number' name='system.aoe.diameter'
-                 value='{{system.aoe.diameter}}' min='5' step='5' />
-        {{/if}}
-
-        {{! Per-skill base size — sizes ≤ this cost the unmodified base mana; sizes above incur 2^n growth. Default 5 = no free area. }}
-        <label class='resource-label' title='Sizes at-or-below this cost no extra mana; sizes above incur 2^n cost growth.'>Base Size (free) (ft)</label>
-        <input type='number' name='system.aoe.baseSize'
-               value='{{system.aoe.baseSize}}' min='5' step='5' />
-
-        <label class='resource-label'>{{localize "ASPECTSOFPOWER.AOE.targetingMode"}}</label>
-        <select name='system.aoe.targetingMode'>
-          {{#each config.aoeTargetingModes as |label key|}}
-            <option value='{{key}}' {{#if (eq key ../system.aoe.targetingMode)}}selected{{/if}}>
-              {{localize label}}
-            </option>
-          {{/each}}
-        </select>
-
-        <label class='resource-label'>{{localize "ASPECTSOFPOWER.AOE.templateDuration"}}</label>
-        <input type='number' name='system.aoe.templateDuration'
-               value='{{system.aoe.templateDuration}}' min='0' step='1' />
-        <span class='hint'>{{localize "ASPECTSOFPOWER.AOE.templateDurationHint"}}</span>
-
-        <label class='resource-label'>{{localize "ASPECTSOFPOWER.Zone.label"}}</label>
-        <select name='system.aoe.zoneEffect'>
-          {{#each config.zoneEffects as |label key|}}
-            <option value='{{key}}' {{#if (eq key ../system.aoe.zoneEffect)}}selected{{/if}}>{{localize label}}</option>
-          {{/each}}
-        </select>
-
-      </div>
-      {{/if}}
-
-      {{! ── Shared Roll Config — Ability/Dice/Cost are hidden for weapon-pillar types (str_weapon/dex_weapon/phys_ranged) since stat_blend × rarity × stamina-invest take over at roll time. Schema retains them for legacy fallback when no weapon is wielded. ── }}
-      <div class='resource'>
-        {{#if isWeaponPillarType}}
-          <p class='hint' style='font-size:11px;color:#888;margin:0 0 6px;'>
-            <em>Damage handled by the weapon/ranged pillar — stat blend from wielded weapon × rarity multiplier × stamina invest. Ability/Dice/Cost from the schema are only used as a legacy fallback when no weapon is wielded.</em>
-          </p>
-        {{/if}}
-        <div class='grid {{#if isWeaponPillarType}}grid-2col{{else}}grid-5col{{/if}}'>
-          {{#unless isWeaponPillarType}}
-          <div class='grid-span-1'>
-            <label class='resource-label'>{{#if (eq system.roll.statType "hybrid")}}Primary Ability{{else}}Ability{{/if}}</label>
-            <select name='system.roll.abilities' data-dtype='String'>
-              <option value="vitality" {{#if (eq system.roll.abilities "vitality")}}selected{{/if}}>Vitality</option>
-              <option value="endurance" {{#if (eq system.roll.abilities "endurance")}}selected{{/if}}>Endurance</option>
-              <option value="strength" {{#if (eq system.roll.abilities "strength")}}selected{{/if}}>Strength</option>
-              <option value="dexterity" {{#if (eq system.roll.abilities "dexterity")}}selected{{/if}}>Dexterity</option>
-              <option value="toughness" {{#if (eq system.roll.abilities "toughness")}}selected{{/if}}>Toughness</option>
-              <option value="intelligence" {{#if (eq system.roll.abilities "intelligence")}}selected{{/if}}>Intelligence</option>
-              <option value="willpower" {{#if (eq system.roll.abilities "willpower")}}selected{{/if}}>Willpower</option>
-              <option value="wisdom" {{#if (eq system.roll.abilities "wisdom")}}selected{{/if}}>Wisdom</option>
-              <option value="perception" {{#if (eq system.roll.abilities "perception")}}selected{{/if}}>Perception</option>
-            </select>
-          </div>
-          <div class='grid-span-1'>
-            <label class='resource-label'>Dice</label>
-            <input type='text' name='system.roll.dice' value='{{system.roll.dice}}' data-dtype='String' />
-          </div>
-          {{/unless}}
-          <div class='grid-span-1'>
-            <label class='resource-label'>Resource</label>
-            <select name='system.roll.resource'>
-              {{#if availableResources}}
-                {{#each availableResources as |label key|}}
-                  <option value="{{key}}" {{#if (eq key ../system.roll.resource)}}selected{{/if}}>{{localize label}}</option>
-                {{/each}}
-              {{else}}
-                <option value="mana" {{#if (eq system.roll.resource "mana")}}selected{{/if}}>Mana</option>
-                <option value="stamina" {{#if (eq system.roll.resource "stamina")}}selected{{/if}}>Stamina</option>
-                <option value="health" {{#if (eq system.roll.resource "health")}}selected{{/if}}>Health</option>
-              {{/if}}
-            </select>
-          </div>
-          {{#unless isWeaponPillarType}}
-          <div class='grid-span-1'>
-            <label class='resource-label'>Cost</label>
-            <input type='number' name='system.roll.cost' value='{{system.roll.cost}}' min='0' step='1' />
-          </div>
-          {{/unless}}
-          <div class='grid-span-1'>
-            <label class='resource-label'>Skill Type</label>
-            <select name='system.roll.type' data-dtype='String'>
-              {{#if availableRollTypes}}
-                {{#each availableRollTypes as |label key|}}
-                  <option value="{{key}}" {{#if (eq key ../system.roll.type)}}selected{{/if}}>{{localize label}}</option>
-                {{/each}}
-              {{else}}
-                <option value="str_weapon" {{#if (eq system.roll.type "str_weapon")}}selected{{/if}}>Strength Weapon</option>
-                <option value="dex_weapon" {{#if (eq system.roll.type "dex_weapon")}}selected{{/if}}>Dexterity Weapon</option>
-                <option value="phys_ranged" {{#if (eq system.roll.type "phys_ranged")}}selected{{/if}}>Physical Ranged</option>
-                <option value="magic_projectile" {{#if (eq system.roll.type "magic_projectile")}}selected{{/if}}>Magic Projectile</option>
-                <option value="magic_melee" {{#if (eq system.roll.type "magic_melee")}}selected{{/if}}>Magic Melee</option>
-                <option value="wisdom_dexterity" {{#if (eq system.roll.type "wisdom_dexterity")}}selected{{/if}}>Wisdom/Dexterity</option>
-              {{/if}}
-            </select>
-          </div>
-        </div>
-
-        {{! ── Spell Tier block — only for skills tagged 'magic'. Grade auto-derives from the wielder's race rank at cast time, so no grade dropdown here. ── }}
-        {{#if (includes system.tags "magic")}}
-        <div class='grid grid-3col spell-cost-block'>
-          <div class='grid-span-1'>
-            <label class='resource-label'>{{localize "ASPECTSOFPOWER.SpellTier.label"}}</label>
-            <select name='system.roll.tier' data-dtype='String'>
-              <option value='' {{#if (eq system.roll.tier "")}}selected{{/if}}>—</option>
-              {{#each config.spellTiers as |label key|}}
-                <option value='{{key}}' {{#if (eq key ../system.roll.tier)}}selected{{/if}}>{{localize label}}</option>
-              {{/each}}
-            </select>
-          </div>
-          <div class='grid-span-1'>
-            <label class='resource-label'>{{localize "ASPECTSOFPOWER.SpellTier.baseMana"}}</label>
-            <input type='text' value='{{#if spellBaseMana}}{{spellBaseMana}}{{else}}—{{/if}}' readonly disabled
-                   title='Computed: tier_factor × grade_factor (grade = caster rank).' />
-          </div>
-          <div class='grid-span-1'>
-            <label class='resource-label'>Grade (auto)</label>
-            <input type='text' value='caster rank' readonly disabled
-                   title='Spell grade auto-derives from the casting actor’s race rank — no per-skill setting needed.' />
-          </div>
-        </div>
-        {{/if}}
-
-        {{! ── Advanced (legacy escape hatches: manual multiplier override, statType, manual action weight). The new schema derives multiplier from rarity + alterations and weight from alterations + manual override; these fields stay for the rare designer-tweaked skill. ── }}
-        <details class='advanced-section' style='margin-top:8px;'>
-          <summary style='cursor:pointer;font-size:12px;color:#888;padding:4px 0;'>Advanced</summary>
-          <div class='grid grid-4col' style='margin-top:6px;'>
-            <div class='grid-span-1'>
-              <label class='resource-label' title='Manual multiplier override — leave at 1 for the rarity ladder to drive damage.'>Manual Mult Override</label>
-              <input type='number' name='system.roll.diceBonus' value='{{system.roll.diceBonus}}' min='0' step='0.01' />
-            </div>
-            <div class='grid-span-1'>
-              <label class='resource-label' title='Manual action weight multiplier — leave at 1 for alteration-derived weight to drive cast time.'>Manual Weight Override</label>
-              <input type='number' name='system.roll.actionWeightMultiplier' value='{{system.roll.actionWeightMultiplier}}' min='0.1' step='0.05' />
-            </div>
-            <div class='grid-span-1'>
-              <label class='resource-label'>Stat Mode</label>
-              <select name='system.roll.statType' data-dtype='String'>
-                <option value="pure" {{#if (eq system.roll.statType "pure")}}selected{{/if}}>Pure</option>
-                <option value="hybrid" {{#if (eq system.roll.statType "hybrid")}}selected{{/if}}>Hybrid</option>
-              </select>
-            </div>
-            {{#if (eq system.roll.statType "hybrid")}}
-              <div class='grid-span-1'>
-                <label class='resource-label'>Secondary Ability</label>
-                <select name='system.roll.secondaryAbility' data-dtype='String'>
-                  <option value="vitality" {{#if (eq system.roll.secondaryAbility "vitality")}}selected{{/if}}>Vitality</option>
-                  <option value="endurance" {{#if (eq system.roll.secondaryAbility "endurance")}}selected{{/if}}>Endurance</option>
-                  <option value="strength" {{#if (eq system.roll.secondaryAbility "strength")}}selected{{/if}}>Strength</option>
-                  <option value="dexterity" {{#if (eq system.roll.secondaryAbility "dexterity")}}selected{{/if}}>Dexterity</option>
-                  <option value="toughness" {{#if (eq system.roll.secondaryAbility "toughness")}}selected{{/if}}>Toughness</option>
-                  <option value="intelligence" {{#if (eq system.roll.secondaryAbility "intelligence")}}selected{{/if}}>Intelligence</option>
-                  <option value="willpower" {{#if (eq system.roll.secondaryAbility "willpower")}}selected{{/if}}>Willpower</option>
-                  <option value="wisdom" {{#if (eq system.roll.secondaryAbility "wisdom")}}selected{{/if}}>Wisdom</option>
-                  <option value="perception" {{#if (eq system.roll.secondaryAbility "perception")}}selected{{/if}}>Perception</option>
-                </select>
-              </div>
-              <div class='grid-span-1'>
-                <label class='resource-label'>Primary Weight</label>
-                <input type='number' name='system.roll.primaryWeight' value='{{system.roll.primaryWeight}}' min='0' max='1' step='0.05' />
-              </div>
-              <div class='grid-span-1'>
-                <label class='resource-label'>Secondary Weight</label>
-                <input type='number' name='system.roll.secondaryWeight' value='{{system.roll.secondaryWeight}}' min='0' max='1' step='0.05' />
-              </div>
-            {{/if}}
-          </div>
-        </details>
-      </div>
-
-      {{! ── Attack Tag Config ── }}
-      {{#if (includes system.tags "attack")}}
-      <div class='tag-config attack-config'>
-        <label class='resource-label'>Target Defense</label>
-        <select name='system.roll.targetDefense' data-dtype='String'>
-          <option value="" {{#if (eq system.roll.targetDefense "")}}selected{{/if}}>(none)</option>
-          <option value="melee" {{#if (eq system.roll.targetDefense "melee")}}selected{{/if}}>Melee</option>
-          <option value="ranged" {{#if (eq system.roll.targetDefense "ranged")}}selected{{/if}}>Ranged</option>
-          <option value="mind" {{#if (eq system.roll.targetDefense "mind")}}selected{{/if}}>Mind</option>
-          <option value="soul" {{#if (eq system.roll.targetDefense "soul")}}selected{{/if}}>Soul</option>
-        </select>
-        <label class='resource-label' title="Optional second defense for 'single blow, two defenses' skills. Damage splits 50/50 across the two halves; toughness applies once.">Secondary Defense</label>
-        <select name='system.roll.secondaryTargetDefense' data-dtype='String'>
-          <option value="" {{#if (eq system.roll.secondaryTargetDefense "")}}selected{{/if}}>(none — single defense)</option>
-          <option value="melee" {{#if (eq system.roll.secondaryTargetDefense "melee")}}selected{{/if}}>Melee</option>
-          <option value="ranged" {{#if (eq system.roll.secondaryTargetDefense "ranged")}}selected{{/if}}>Ranged</option>
-          <option value="mind" {{#if (eq system.roll.secondaryTargetDefense "mind")}}selected{{/if}}>Mind</option>
-          <option value="soul" {{#if (eq system.roll.secondaryTargetDefense "soul")}}selected{{/if}}>Soul</option>
-        </select>
-        <label class='resource-label' title="Melee reach in feet. 0 = inherit from the wielded weapon (default 5ft). Set explicitly only when this skill has special reach (e.g. Lunge with extended reach).">Reach (0 = inherit weapon)</label>
-        <input type='number' name='system.roll.reach' value='{{system.roll.reach}}' min='0' step='1' data-dtype='Number'>
-        <label class='resource-label'>Damage Type</label>
-        <select name='system.roll.damageType' data-dtype='String'>
-          <option value="physical" {{#if (eq system.roll.damageType "physical")}}selected{{/if}}>Physical (Armor)</option>
-          <option value="magical" {{#if (eq system.roll.damageType "magical")}}selected{{/if}}>Magical (Veil)</option>
-        </select>
-        <hr>
-        <label class='resource-label checkbox-label'>
-          <input type='checkbox' name='system.tagConfig.forcedMovement' {{#if system.tagConfig.forcedMovement}}checked{{/if}}>
-          {{localize "ASPECTSOFPOWER.ForcedMovement.label"}}
-        </label>
-        {{#if system.tagConfig.forcedMovement}}
-        <label class='resource-label'>{{localize "ASPECTSOFPOWER.ForcedMovement.direction"}}</label>
-        <select name='system.tagConfig.forcedMovementDir' data-dtype='String'>
-          <option value="push" {{#if (eq system.tagConfig.forcedMovementDir "push")}}selected{{/if}}>{{localize "ASPECTSOFPOWER.ForcedMovement.push"}}</option>
-          <option value="pull" {{#if (eq system.tagConfig.forcedMovementDir "pull")}}selected{{/if}}>{{localize "ASPECTSOFPOWER.ForcedMovement.pull"}}</option>
-        </select>
-        <label class='resource-label'>{{localize "ASPECTSOFPOWER.ForcedMovement.distance"}}</label>
-        <input type='number' name='system.tagConfig.forcedMovementDist' value='{{system.tagConfig.forcedMovementDist}}' min='5' step='5'>
-        {{/if}}
-      </div>
-      {{/if}}
-
-      {{! ── Restoration Tag Config ── }}
-      {{#if (includes system.tags "restoration")}}
-      <div class='tag-config restoration-config'>
-        <label class='resource-label'>{{localize "ASPECTSOFPOWER.TagConfig.restorationTarget"}}</label>
-        <select name='system.tagConfig.restorationTarget'>
-          {{#each config.restorationTargets as |label key|}}
-            <option value='{{key}}' {{#if (eq key ../system.tagConfig.restorationTarget)}}selected{{/if}}>
-              {{localize label}}
-            </option>
-          {{/each}}
-        </select>
-        <label class='resource-label'>{{localize "ASPECTSOFPOWER.TagConfig.restorationResource"}}</label>
-        <select name='system.tagConfig.restorationResource'>
-          {{#each config.restorationResources as |label key|}}
-            <option value='{{key}}' {{#if (eq key ../system.tagConfig.restorationResource)}}selected{{/if}}>
-              {{localize label}}
-            </option>
-          {{/each}}
-        </select>
-        {{#if (eq system.tagConfig.restorationResource "health")}}
-        <label class='resource-label checkbox-label'>
-          <input type='checkbox' name='system.tagConfig.restorationOverhealth'
-                 {{#if system.tagConfig.restorationOverhealth}}checked{{/if}} />
-          Overflow into Overhealth
-        </label>
-        {{/if}}
-        {{#if (eq system.tagConfig.restorationResource "barrier")}}
-        <label class='resource-label'>Barrier Multiplier</label>
-        <input type='number' name='system.tagConfig.barrierMultiplier'
-               value='{{system.tagConfig.barrierMultiplier}}' min='0' step='0.1' />
-        <p class='hint'>Barrier HP = Mana spent &times; multiplier. Uses the skill's affinities.</p>
-        {{/if}}
-      </div>
-      {{/if}}
-
-      {{! ── Buff Tag Config ── }}
-      {{#if (includes system.tags "buff")}}
-      <div class='tag-config buff-config'>
-        <label class='resource-label'>{{localize "ASPECTSOFPOWER.TagConfig.buffAttributes"}}</label>
-        {{#each buffAttributeGroups}}
-          <div class='attribute-group'>
-            <span class='group-label'>{{this.label}}</span>
-            <div class='group-entries'>
-              {{#each this.attributes}}
-                <label class='attr-entry'>
-                  <input type='checkbox' name='system.tagConfig.buffEntries'
-                         value='{{this.key}}' {{#if this.checked}}checked{{/if}} />
-                  {{this.label}}
-                  {{#if this.checked}}
-                    <span class='multiplier-label'>&times;</span>
-                    <input type='number' class='attr-value' data-attr='{{this.key}}'
-                           data-target='buff' value='{{this.value}}' min='0' step='0.1' />
-                  {{/if}}
-                </label>
-              {{/each}}
-            </div>
-          </div>
-        {{/each}}
-        <label class='resource-label dot-toggle'>
-          <input type='checkbox' name='system.tagConfig.buffStackable'
-                 {{#if system.tagConfig.buffStackable}}checked{{/if}} />
-          Stackable
-        </label>
-        <label class='resource-label'>{{localize "ASPECTSOFPOWER.TagConfig.duration"}}</label>
-        <input type='number' name='system.tagConfig.buffDuration'
-               value='{{system.tagConfig.buffDuration}}' min='0' step='1' />
-        <label class='resource-label'>Target</label>
-        <select name='system.tagConfig.buffTarget'>
-          {{#each config.buffTargets as |label key|}}
-            <option value='{{key}}' {{#if (eq key ../system.tagConfig.buffTarget)}}selected{{/if}}>
-              {{localize label}}
-            </option>
-          {{/each}}
-        </select>
-        {{#if (includes system.tags "movement")}}
-        <label class='resource-label'>Movement Speed Buff (×)</label>
-        <input type='number' name='system.tagConfig.movementSpeedBuff'
-               value='{{system.tagConfig.movementSpeedBuff}}' min='0' step='0.1'
-               title='Multiplier applied to the target&apos;s movement speed. 2 = double speed, 0.5 = half (slow).' />
-        <label class='resource-label'>Movement Stamina Buff (×)</label>
-        <input type='number' name='system.tagConfig.movementStaminaBuff'
-               value='{{system.tagConfig.movementStaminaBuff}}' min='0' step='0.1'
-               title='Multiplier on stamina cost per ft. 0.5 = efficient, 2 = exhausting.' />
-        {{/if}}
-        <label class='resource-label'>Aura Radius (ft)</label>
-        <input type='number' name='system.tagConfig.auraRadius'
-               value='{{system.tagConfig.auraRadius}}' min='0' step='1'
-               title='Sustained AOE radius around the buffed actor. 0 = no aura. Ticks each round-start AND on entry. Auto-routes by Effect Type below.' />
-        {{#if system.tagConfig.auraRadius}}
-        <label class='resource-label'>Aura Effect Type</label>
-        <select name='system.tagConfig.auraEffectType'>
-          <option value='damage' {{#if (eq system.tagConfig.auraEffectType "damage")}}selected{{/if}}>Damage (apply-button)</option>
-          <option value='heal' {{#if (eq system.tagConfig.auraEffectType "heal")}}selected{{/if}}>Heal (auto-apply)</option>
-          <option value='stam' {{#if (eq system.tagConfig.auraEffectType "stam")}}selected{{/if}}>Stamina restore (auto-apply)</option>
-        </select>
-        <label class='resource-label'>Aura Targets</label>
-        <select name='system.tagConfig.auraTargeting'>
-          <option value='enemies' {{#if (eq system.tagConfig.auraTargeting "enemies")}}selected{{/if}}>Enemies</option>
-          <option value='allies' {{#if (eq system.tagConfig.auraTargeting "allies")}}selected{{/if}}>Allies</option>
-          <option value='all' {{#if (eq system.tagConfig.auraTargeting "all")}}selected{{/if}}>All</option>
-        </select>
-        <label class='resource-label'>Aura Scale (× roll)</label>
-        <input type='number' name='system.tagConfig.auraScale'
-               value='{{system.tagConfig.auraScale}}' min='0' max='5' step='0.05'
-               title='Fraction of the cast roll applied per tick. 0.3 = 30% per round.' />
-        {{#if (eq system.tagConfig.auraEffectType "damage")}}
-        <label class='resource-label'>Aura Damage Type</label>
-        <input type='text' name='system.tagConfig.auraDamageType'
-               value='{{system.tagConfig.auraDamageType}}'
-               title='Damage type (physical / lightning / fire / etc.). Magic-tagged skills route through veil; physical through armor.' />
-        {{/if}}
-        {{#if (eq system.tagConfig.auraEffectType "heal")}}
-        <label class='resource-label'>Heal Resource</label>
-        <select name='system.tagConfig.auraHealResource'>
-          <option value='health' {{#if (eq system.tagConfig.auraHealResource "health")}}selected{{/if}}>Health</option>
-          <option value='mana' {{#if (eq system.tagConfig.auraHealResource "mana")}}selected{{/if}}>Mana</option>
-          <option value='stamina' {{#if (eq system.tagConfig.auraHealResource "stamina")}}selected{{/if}}>Stamina</option>
-        </select>
-        <label class='resource-label'>
-          <input type='checkbox' name='system.tagConfig.auraHealOverhealth'
-                 {{#if system.tagConfig.auraHealOverhealth}}checked{{/if}} />
-          Overflow into Overhealth
-        </label>
-        {{/if}}
-        {{/if}}
-      </div>
-      {{/if}}
-
-      {{! ── Teleport Tag Config ── }}
-      {{#if (includes system.tags "teleport")}}
-      <div class='tag-config teleport-config'>
-        <label class='resource-label'>Teleport Max Distance (ft, 0 = caster casting range)</label>
-        <input type='number' name='system.tagConfig.teleportMaxDistance'
-               value='{{system.tagConfig.teleportMaxDistance}}' min='0' step='5'
-               title='Max teleport distance. 0 = inherit caster casting range (40 + Per.mod/10). Set > 0 to override (short Blink-style or fixed Mass Teleport). Sight always required at declare time.' />
-      </div>
-      {{/if}}
-
-      {{! ── Leap Tag Config ── }}
-      {{#if (includes system.tags "leap")}}
-      <div class='tag-config leap-config'>
-        <label class='resource-label'>Leap Max Distance (ft)</label>
-        <input type='number' name='system.tagConfig.leapMaxDistance'
-               value='{{system.tagConfig.leapMaxDistance}}' min='5' step='5'
-               title='Max start-to-end distance for the leap arc.' />
-        <label class='resource-label'>Leap Apex Height (ft)</label>
-        <input type='number' name='system.tagConfig.leapApexFt'
-               value='{{system.tagConfig.leapApexFt}}' min='0' step='1'
-               title='Vault height. Walls in scene levels with elevation.top &lt; apex are bypassed; taller walls still block. Token stays at ground elevation throughout (AOEs and engagement evaluate the 2D path).' />
-      </div>
-      {{/if}}
-
-      {{! ── Granted Tag Config (build-neutral activation time) ── }}
-      {{#if (includes system.tags "granted")}}
-      <div class='tag-config granted-config'>
-        <label class='resource-label'>Min Activation Fraction (× round, at 0 ft)</label>
-        <input type='number' name='system.tagConfig.grantedMinActivationFraction'
-               value='{{system.tagConfig.grantedMinActivationFraction}}' min='0' max='2' step='0.01'
-               title='Lower bound of cast wait for teleport/leap (very short hops). Set equal to Max to disable distance scaling.' />
-        <label class='resource-label'>Max Activation Fraction (× round, at max range)</label>
-        <input type='number' name='system.tagConfig.grantedActivationFraction'
-               value='{{system.tagConfig.grantedActivationFraction}}' min='0' max='2' step='0.01'
-               title='Cast wait at the skill&apos;s max teleport/leap distance. Wait lerps from min to this by distancePicked / maxDistance.' />
-      </div>
-      {{/if}}
-
-      {{! ── Reaction Config (Reaction skillType OR Passive + retaliation tag) ── }}
-      {{#if (or (eq system.skillType "Reaction") (and (eq system.skillType "Passive") (includes system.tags "retaliation")))}}
-      <div class='tag-config reaction-config'>
-        <label class='resource-label'>Reaction Trigger</label>
-        <select name='system.tagConfig.reactionTrigger'>
-          <option value='' {{#unless system.tagConfig.reactionTrigger}}selected{{/unless}}>(none)</option>
-          <option value='self_attacked' {{#if (eq system.tagConfig.reactionTrigger "self_attacked")}}selected{{/if}}>Self attacked (pre-damage)</option>
-          <option value='self_damage_taken' {{#if (eq system.tagConfig.reactionTrigger "self_damage_taken")}}selected{{/if}}>Self damage taken (post-defense, pre-HP)</option>
-          <option value='ally_attacked' {{#if (eq system.tagConfig.reactionTrigger "ally_attacked")}}selected{{/if}}>Ally attacked (within range)</option>
-          <option value='self_struck' {{#if (eq system.tagConfig.reactionTrigger "self_struck")}}selected{{/if}}>Self struck (post-resolve)</option>
-          <option value='hp_threshold' {{#if (eq system.tagConfig.reactionTrigger "hp_threshold")}}selected{{/if}}>HP below threshold</option>
-        </select>
-
-        {{#if (eq system.tagConfig.reactionTrigger "ally_attacked")}}
-        <label class='resource-label'>Trigger Range (ft)</label>
-        <input type='number' name='system.tagConfig.reactionTriggerRange'
-               value='{{system.tagConfig.reactionTriggerRange}}' min='0' step='5'
-               title='How far from this actor an ally must be attacked to fire the reaction.' />
-        {{/if}}
-
-        {{#if (eq system.tagConfig.reactionTrigger "hp_threshold")}}
-        <label class='resource-label'>HP Threshold (fraction)</label>
-        <input type='number' name='system.tagConfig.reactionThresholdPct'
-               value='{{system.tagConfig.reactionThresholdPct}}' min='0' max='1' step='0.05'
-               title='Fires when HP/maxHP drops below this value. 0.25 = 25%.' />
-        {{/if}}
-
-        <label class='resource-label'>Cooldown (rounds)</label>
-        <input type='number' name='system.tagConfig.reactionCooldown'
-               value='{{system.tagConfig.reactionCooldown}}' min='0' step='1'
-               title='Rounds between fires. 1 = once per round. 0 = no cooldown (limited only by the actor&apos;s reactions-per-round budget).' />
-
-        <label class='resource-label'>Phase Override (advanced)</label>
-        <select name='system.tagConfig.reactionPhase'
-                title='Override the default pipeline injection point. Empty = derives from reactionType (dodge=pre-defense, parry=at-defense, barrier=at-damage, retaliation=post-resolve).'>
-          <option value='' {{#unless system.tagConfig.reactionPhase}}selected{{/unless}}>(default for reactionType)</option>
-          <option value='pre_defense' {{#if (eq system.tagConfig.reactionPhase "pre_defense")}}selected{{/if}}>Pre-defense</option>
-          <option value='at_defense' {{#if (eq system.tagConfig.reactionPhase "at_defense")}}selected{{/if}}>At-defense</option>
-          <option value='at_damage_app' {{#if (eq system.tagConfig.reactionPhase "at_damage_app")}}selected{{/if}}>At-damage-application</option>
-          <option value='post_resolve' {{#if (eq system.tagConfig.reactionPhase "post_resolve")}}selected{{/if}}>Post-resolve</option>
-        </select>
-
-        {{#if (eq system.reactionType "guardian")}}
-        <label class='resource-label'>Guardian Mode</label>
-        <select name='system.tagConfig.guardianMode'
-                title='Intercept: the attack is redirected onto you. Cover: your defense roll replaces the ally&apos;s. Redirect: you absorb a share of the damage that lands.'>
-          {{#each config.guardianModes as |label key|}}
-            <option value='{{key}}' {{#if (eq key ../system.tagConfig.guardianMode)}}selected{{/if}}>{{localize label}}</option>
-          {{/each}}
-        </select>
-
-        {{#if (eq system.tagConfig.guardianMode "redirect")}}
-        <label class='resource-label'>Redirect Share (fraction)</label>
-        <input type='number' name='system.tagConfig.guardianRedirectPct'
-               value='{{system.tagConfig.guardianRedirectPct}}' min='0' max='1' step='0.05'
-               title='Fraction of the landed damage the guardian absorbs instead of the ally. 0.5 = half.' />
-        {{/if}}
-        {{/if}}
-      </div>
-      {{/if}}
-
-      {{! ── Debuff Tag Config ── }}
-      {{#if (includes system.tags "debuff")}}
-      <div class='tag-config debuff-config'>
-        {{#unless hasDebuffSubtype}}
-        <label class='resource-label'>{{localize "ASPECTSOFPOWER.Debuff.label"}}</label>
-        <select name='system.tagConfig.debuffType'>
-          {{#each config.debuffTypes as |label key|}}
-            <option value='{{key}}' {{#if (eq key ../system.tagConfig.debuffType)}}selected{{/if}}>
-              {{localize label}}
-            </option>
-          {{/each}}
-        </select>
-        <label class='resource-label'>{{localize "ASPECTSOFPOWER.TagConfig.debuffAttributes"}}</label>
-        {{#each debuffAttributeGroups}}
-          <div class='attribute-group'>
-            <span class='group-label'>{{this.label}}</span>
-            <div class='group-entries'>
-              {{#each this.attributes}}
-                <label class='attr-entry'>
-                  <input type='checkbox' name='system.tagConfig.debuffEntries'
-                         value='{{this.key}}' {{#if this.checked}}checked{{/if}} />
-                  {{this.label}}
-                  {{#if this.checked}}
-                    <span class='multiplier-label'>&times;</span>
-                    <input type='number' class='attr-value' data-attr='{{this.key}}'
-                           data-target='debuff' value='{{this.value}}' min='0' step='0.1' />
-                  {{/if}}
-                </label>
-              {{/each}}
-            </div>
-          </div>
-        {{/each}}
-        <label class='resource-label dot-toggle'>
-          <input type='checkbox' name='system.tagConfig.debuffStackable'
-                 {{#if system.tagConfig.debuffStackable}}checked{{/if}} />
-          Stackable
-        </label>
-        <label class='resource-label'>Attack Scaling</label>
-        <input type='number' name='system.tagConfig.debuffScaleWithAttack'
-               value='{{system.tagConfig.debuffScaleWithAttack}}' min='0' max='1' step='0.05'
-               title='0 = no scaling. 0.5 = debuff is 50% of attack damage.' />
-        <label class='resource-label dot-toggle'>
-          <input type='checkbox' name='system.tagConfig.debuffDirectional'
-                 {{#if system.tagConfig.debuffDirectional}}checked{{/if}} />
-          Omnidirectional DR
-        </label>
-        {{/unless}}
-        <label class='resource-label dot-toggle'>
-          <input type='checkbox' name='system.tagConfig.debuffDealsDamage'
-                 {{#if system.tagConfig.debuffDealsDamage}}checked{{/if}} />
-          {{localize "ASPECTSOFPOWER.TagConfig.debuffDealsDamage"}}
-        </label>
-        {{#if system.tagConfig.debuffDealsDamage}}
-        <label class='resource-label'>{{localize "ASPECTSOFPOWER.TagConfig.debuffDamageType"}}</label>
-        <select name='system.tagConfig.debuffDamageType'>
-          <option value='physical' {{#if (eq system.tagConfig.debuffDamageType "physical")}}selected{{/if}}>Physical (ignores Armor)</option>
-          <option value='magical' {{#if (eq system.tagConfig.debuffDamageType "magical")}}selected{{/if}}>Magical (ignores Veil)</option>
-        </select>
-        <label class='resource-label'>DoT Scale</label>
-        <input type='number' name='system.tagConfig.dotScale'
-               value='{{system.tagConfig.dotScale}}' min='0' max='1' step='0.05'
-               title='Per-tick DoT damage as a fraction of the attack roll. 0.1 = 10%, 0 = no DoT damage. Stacks of the same debuff sum.' />
-        {{/if}}
-        <label class='resource-label'>{{localize "ASPECTSOFPOWER.TagConfig.duration"}}</label>
-        <input type='number' name='system.tagConfig.debuffDuration'
-               value='{{system.tagConfig.debuffDuration}}' min='0' step='1' />
-      </div>
-      {{/if}}
-
-      {{! ── Repair Tag Config ── }}
-      {{#if (includes system.tags "repair")}}
-      <div class='tag-config repair-config'>
-        <label class='resource-label'>{{localize "ASPECTSOFPOWER.TagConfig.repairMaterials"}}</label>
-        <div class='tag-checkboxes'>
-          {{#each config.materialTypes as |label key|}}
-            <label class='tag-checkbox'>
-              <input type='checkbox' name='system.tagConfig.repairMaterials' value='{{key}}'
-                {{#if (includes ../system.tagConfig.repairMaterials key)}}checked{{/if}} />
-              {{localize label}}
-            </label>
-          {{/each}}
-        </div>
-      </div>
-      {{/if}}
-
-      {{! ── Mine Tag Config ── (only the summon side has capacity; Detonate has no config) }}
-      {{#if (includes system.tags "mine")}}
-      <div class='tag-config mine-config'>
-        <label class='resource-label'>Mine Capacity</label>
-        <input type='number' name='system.tagConfig.mineCapacity'
-               value='{{system.tagConfig.mineCapacity}}' min='1' max='10' step='1'
-               title='Max concurrent mines per caster placed by this summon. Excess placements FIFO-evict the oldest. The mine snapshots this skill\'s aoe + roll config at placement, so its explosion is this skill\'s identity.' />
-      </div>
-      {{/if}}
-
-      {{! ── Shrapnel Tag Config ── }}
-      {{#if (includes system.tags "shrapnel")}}
-      <div class='tag-config shrapnel-config'>
-        <label class='resource-label'>Defense Pool Multiplier</label>
-        <input type='number' name='system.tagConfig.shrapnelMultiplier'
-               value='{{system.tagConfig.shrapnelMultiplier}}' min='1.0' max='5.0' step='0.1'
-               title='Multiplies the hit total when consuming defense pool. 1.5 = pool depletes 50% faster.' />
-      </div>
-      {{/if}}
-
-      {{! ── Summon Tag Config (AI behavior tags) ── }}
-      {{#if (includes system.tags "summon")}}
-      <div class='tag-config summon-config'>
-        <label class='resource-label'>AI Behaviors</label>
-        <p class='hint'>The conjured creature's brain. Pick ONE brain (stationary / melee / ranged),
-          then stack faculties or a preset. Each adds a tier, and the tier multiplies this skill's
-          resource cost — a smarter creature costs more to conjure.</p>
-        <div class='attribute-group'>
-          <span class='group-label'>Brains &amp; Faculties</span>
-          <div class='group-entries'>
-            {{#each config.aiBehaviors as |beh key|}}
-              <label class='attr-entry' title='{{beh.category}} — adds tier {{beh.tier}}'>
-                <input type='checkbox' name='system.tagConfig.summonBehaviors'
-                       value='{{key}}' {{#if (includes ../system.tagConfig.summonBehaviors key)}}checked{{/if}} />
-                {{#if beh.label}}{{beh.label}}{{else}}{{key}}{{/if}}
-                <span class='multiplier-label'>t{{beh.tier}}</span>
-              </label>
-            {{/each}}
-          </div>
-        </div>
-        <div class='attribute-group'>
-          <span class='group-label'>Presets (expand to faculties)</span>
-          <div class='group-entries'>
-            {{#each config.aiBehaviorPresets as |preset key|}}
-              <label class='attr-entry'>
-                <input type='checkbox' name='system.tagConfig.summonBehaviors'
-                       value='{{key}}' {{#if (includes ../system.tagConfig.summonBehaviors key)}}checked{{/if}} />
-                {{key}}
-              </label>
-            {{/each}}
-          </div>
-        </div>
-      </div>
-      {{/if}}
-
-      {{! ── Gather Tag Config ── }}
-      {{#if (includes system.tags "gather")}}
-      <div class='tag-config gather-config'>
-        <label class='resource-label'>Material Type</label>
-        <select name='system.tagConfig.gatherMaterial'>
-          <option value="">(any)</option>
-          {{#each @root.config.materialTypes as |label key|}}
-            <option value="{{key}}" {{#if (eq key ../system.tagConfig.gatherMaterial)}}selected{{/if}}>
-              {{localize label}}
-            </option>
-          {{/each}}
-        </select>
-        <label class='resource-label'>Element</label>
-        <select name='system.tagConfig.gatherElement'>
-          <option value="">(none)</option>
-          {{#each @root.config.craftElements as |elDef elKey|}}
-            <option value="{{elKey}}" {{#if (eq elKey ../system.tagConfig.gatherElement)}}selected{{/if}}>
-              {{localize elDef.label}}
-            </option>
-          {{/each}}
-        </select>
-      </div>
-      {{/if}}
-
-      {{! ── Craft Tag Config ── }}
-      {{#if (includes system.tags "craft")}}
-      <div class='tag-config craft-config'>
-        <label class='resource-label'><strong>Allowed Item Types</strong></label>
-        <p class='hint'>Check the item types this craft skill can produce. Empty = all types allowed.</p>
-        <div class='craft-allowed-grid' style='display:grid;grid-template-columns:repeat(4,1fr);gap:4px;'>
-          {{#each @root.config.craftItemTypes as |def key|}}
-            <label style='display:flex;gap:4px;align-items:center;font-size:11px;'>
-              <input type='checkbox' class='craft-allowed-type' data-type-key='{{key}}'
-                     {{#if (includes ../system.craftAllowedTypes key)}}checked{{/if}} />
-              <span title='{{def.category}}'>{{key}}</span>
-            </label>
-          {{/each}}
-        </div>
-      </div>
-      {{/if}}
-
-      {{! ── Sustain Tag Config ── }}
-      {{#if (includes system.tags "sustain")}}
-      <div class='tag-config sustain-config'>
-        <label class='resource-label'>Upkeep Resource</label>
-        <select name='system.tagConfig.sustainResource'>
-          <option value="mana" {{#if (eq system.tagConfig.sustainResource "mana")}}selected{{/if}}>Mana</option>
-          <option value="stamina" {{#if (eq system.tagConfig.sustainResource "stamina")}}selected{{/if}}>Stamina</option>
-          <option value="health" {{#if (eq system.tagConfig.sustainResource "health")}}selected{{/if}}>Health</option>
-        </select>
-        <label class='resource-label'>Upkeep Cost (per round)</label>
-        <input type='number' name='system.tagConfig.sustainCost'
-               value='{{system.tagConfig.sustainCost}}' min='0' step='1' />
-      </div>
-      {{/if}}
-
-      {{! ── Skill Chain Config ── }}
-      {{#if system.tags.length}}
-      <div class='tag-config chain-config'>
-        <label class='resource-label' style='grid-column: 1 / -1;'>
-          {{localize "ASPECTSOFPOWER.Chain.label"}}
-        </label>
-
-        {{#each chainedSkills}}
-        <div class='chain-entry flexrow' data-chain-index='{{this.index}}'>
-          <select class='chain-skill-select' data-chain-index='{{this.index}}'>
-            <option value=''>-- Select Skill --</option>
-            {{#each ../availableChainSkills}}
-              <option value='{{this.id}}' {{#if (eq this.id ../skillId)}}selected{{/if}}>
-                {{this.name}}
-              </option>
-            {{/each}}
-          </select>
-          <select class='chain-trigger-select' data-chain-index='{{this.index}}'>
-            <option value='always' {{#if (eq this.trigger "always")}}selected{{/if}}>
-              {{localize "ASPECTSOFPOWER.Chain.always"}}
-            </option>
-            <option value='on-hit' {{#if (eq this.trigger "on-hit")}}selected{{/if}}>
-              {{localize "ASPECTSOFPOWER.Chain.onHit"}}
-            </option>
-            <option value='on-miss' {{#if (eq this.trigger "on-miss")}}selected{{/if}}>
-              {{localize "ASPECTSOFPOWER.Chain.onMiss"}}
-            </option>
-          </select>
-          <a class='chain-delete' data-chain-index='{{this.index}}' title='Remove'>
-            <i class='fas fa-trash'></i>
-          </a>
-        </div>
-        {{/each}}
-
-        <a class='chain-add' title='{{localize "ASPECTSOFPOWER.Chain.add"}}'>
-          <i class='fas fa-plus'></i> {{localize "ASPECTSOFPOWER.Chain.add"}}
-        </a>
-      </div>
-      {{/if}}
-
-    </div>
-
-    {{! Attributes Tab }}
-    <div class='tab attributes' data-group='primary' data-tab='attributes'>
-      <div class='resource'>
-        <label class='resource-label'>{{localize "ASPECTSOFPOWER.SkillCategory.label"}}</label>
-        <select name='system.skillCategory'>
-          {{#each config.skillCategories as |label key|}}
-            <option value='{{key}}' {{#if (eq key ../system.skillCategory)}}selected{{/if}}>
-              {{localize label}}
-            </option>
-          {{/each}}
-        </select>
-      </div>
-      <div class='resource'>
-        <label class='resource-label'>Skill Type</label>
-        <select name='system.skillType'>
-          <option value='Passive' {{#if (eq system.skillType "Passive")}}selected{{/if}}>Passive</option>
-          <option value='Active' {{#if (eq system.skillType "Active")}}selected{{/if}}>Active</option>
-          <option value='Reaction' {{#if (eq system.skillType "Reaction")}}selected{{/if}}>Reaction</option>
-        </select>
-      </div>
-      {{#if (eq system.skillType "Reaction")}}
-      <div class='resource'>
-        <label class='resource-label'>Reaction Type</label>
-        <select name='system.reactionType'>
-          {{#each config.reactionTypes as |label key|}}
-            <option value='{{key}}' {{#if (eq key ../system.reactionType)}}selected{{/if}}>{{localize label}}</option>
-          {{/each}}
-        </select>
-      </div>
-      {{/if}}
-      {{! ── Skill Component Flags ── }}
-      <div class='skill-components'>
-        <label class='resource-label dot-toggle'>
-          <input type='checkbox' name='system.requiresSight'
-                 {{#if system.requiresSight}}checked{{/if}} />
-          {{localize "ASPECTSOFPOWER.SkillComponent.requiresSight"}}
-        </label>
-        <label class='resource-label dot-toggle'>
-          <input type='checkbox' name='system.vocalComponent'
-                 {{#if system.vocalComponent}}checked{{/if}} />
-          {{localize "ASPECTSOFPOWER.SkillComponent.vocalComponent"}}
-        </label>
-        <label class='resource-label dot-toggle'>
-          <input type='checkbox' name='system.requiresHearing'
-                 {{#if system.requiresHearing}}checked{{/if}} />
-          {{localize "ASPECTSOFPOWER.SkillComponent.requiresHearing"}}
-        </label>
-      </div>
-
-    </div>
-
-    {{! ── Alterations editor ── }}
-    <div class='form-section alterations-section'>
-      <h3>{{localize "ASPECTSOFPOWER.Alteration.label"}}</h3>
-      <p class='hint' style='font-size:11px;color:#888;margin:0 0 6px;'>
-        Effective mult = rarity ({{lookup (lookup config.skillRarities system.rarity) 'mult'}})
-        + Σ alteration dmgMod (floor 0). Cost = base × rarityMult × (1 + Σ costMod).
-      </p>
-      {{#each system.alterations as |alt idx|}}
-        <div class='alteration-row' style='display:flex;gap:6px;align-items:center;margin-bottom:4px;'>
-          <select name='system.alterations.{{idx}}.id' style='flex:1;'>
-            <option value=''>— pick an alteration —</option>
-            {{#each @root.config.alterationTags as |tag tagKey|}}
-              <option value='{{tagKey}}' {{#if (eq alt.id tagKey)}}selected{{/if}}>
-                {{localize tag.label}} (dmg {{tag.dmgMod}}, cost {{tag.costMod}})
-              </option>
-            {{/each}}
-          </select>
-          <button type='button' class='alteration-delete' data-index='{{idx}}' title='Remove'>×</button>
-        </div>
-      {{/each}}
-      <button type='button' class='alteration-add'>+ Add Alteration</button>
     </div>
   </section>
 </form>

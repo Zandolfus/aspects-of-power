@@ -123,6 +123,32 @@ export class AspectsofPowerItemSheet extends foundry.applications.api.Handlebars
       const skillTags = this.item.system.tags ?? [];
       context.hasDebuffSubtype = skillTags.some(t => debuffSubtypes[t]);
 
+      // Section visibility flags for the Build tab. Each config section
+      // renders only when its driving tag (or skillType, for reactions) is
+      // present, so a skill reads as exactly the families it participates in.
+      const has = (t) => skillTags.includes(t);
+      const sys = this.item.system;
+      context.show = {
+        attack:      has('attack'),
+        aoe:         has('aoe'),
+        teleport:    has('teleport'),
+        leap:        has('leap'),
+        granted:     has('granted'),
+        delivery:    ['attack', 'aoe', 'teleport', 'leap', 'granted'].some(has),
+        restoration: has('restoration'),
+        buff:        has('buff'),
+        debuff:      has('debuff'),
+        reaction:    sys.skillType === 'Reaction'
+                     || (sys.skillType === 'Passive' && has('retaliation')),
+        summon:      has('summon'),
+        mine:        has('mine'),
+        shrapnel:    has('shrapnel'),
+        sustain:     has('sustain'),
+        craft:       has('craft'),
+        gather:      has('gather'),
+        repair:      has('repair'),
+      };
+
       // Weapon-pillar types own the damage/cost/ability fields — they're
       // overridden at roll time by stat_blend × rarity_mult × stamina_invest.
       // The schema fields stay for the legacy fallback path; UI hides them.
@@ -890,9 +916,15 @@ export class AspectsofPowerItemSheet extends foundry.applications.api.Handlebars
     await this.document.update({ 'system.craftBonuses': [{ type, value, affinity }] });
   }
 
-  /** @override – save scroll position before DOM replacement. */
+  /** @override – save scroll position + section open-states before DOM replacement. */
   _preRender(context, options) {
     this._savedScrollTop = this.element?.querySelector('.sheet-body')?.scrollTop ?? 0;
+    // Collapsible <details> sections reset to their authored default on every
+    // submitOnChange re-render; carry the user's open/closed choices across.
+    this._sectionState = {};
+    this.element?.querySelectorAll('details.aop-section[data-section]')?.forEach(d => {
+      this._sectionState[d.dataset.section] = d.open;
+    });
     return super._preRender(context, options);
   }
 
@@ -902,11 +934,24 @@ export class AspectsofPowerItemSheet extends foundry.applications.api.Handlebars
 
     // AppV2 doesn't auto-instantiate Tabs — bind manually on every render.
     // Use tabGroups.primary to restore the active tab after re-renders caused
-    // by submitOnChange, so the user isn't kicked back to 'description' after
-    // every keystroke on the Damage tab.
-    const initial = this.tabGroups.primary ?? 'description';
+    // by submitOnChange, so the user isn't kicked back to the default tab
+    // after every keystroke.
+    let initial = this.tabGroups.primary
+      ?? (this.item.type === 'skill' ? 'build' : 'description');
+    // Skill sheets replaced the old description/effects/attributes tab trio
+    // with build/description — a stale stored tab id would leave NO tab
+    // active after a re-render, so validate against the current set.
+    if (this.item.type === 'skill' && !['build', 'description'].includes(initial)) initial = 'build';
     new foundry.applications.ux.Tabs({ navSelector: '.sheet-tabs', contentSelector: '.sheet-body', initial })
       .bind(this.element);
+
+    // Restore section open/closed choices captured in _preRender — they beat
+    // the template's authored defaults, but only for sections still rendered.
+    if (this._sectionState) {
+      this.element.querySelectorAll('details.aop-section[data-section]').forEach(d => {
+        if (d.dataset.section in this._sectionState) d.open = this._sectionState[d.dataset.section];
+      });
+    }
 
     // Restore scroll AFTER Tabs.bind() — Tabs changes layout (shows/hides tabs)
     // which can reset scroll position.
