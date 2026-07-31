@@ -504,6 +504,63 @@ export function crushFlatAmount({
   return Math.max(0, Math.round(crushFrac * riderDamageBase(parentDamage, ownDamage)));
 }
 
+/** Kilograms to pounds. carryCapacity is in POUNDS; densities are kg/L. */
+export const KG_TO_LB = 1 / 0.45359237;
+
+/**
+ * Physical weight of an item, in POUNDS: volume x density.
+ *
+ *   armour  -> volume from the slot (shields resolve by TAG, not slot)
+ *   weapons -> volume from weaponWeights / weaponVolumeDivisor, so mass can
+ *              never drift from the weight already driving celerity/windup
+ *
+ * Density is a per-MATERIAL authored value and is deliberately NOT derived
+ * from rarity — a crude fulgurite helm and a masterwork one weigh the same
+ * (design-item-weight.md, RULED 2026-07-30).
+ *
+ * Returns 0 for anything with no resolvable volume (jewelry, consumables,
+ * profession tools), so callers can leave those alone rather than zeroing an
+ * authored value.
+ *
+ * @param {object} o
+ * @param {string} [o.slot]      item.system.slot
+ * @param {string} [o.material]  item.system.material (the CLASS)
+ * @param {string} [o.species]   item.system.materialSpecies, if known
+ * @param {string[]} [o.tags]    item.system.tags (shield + weapon-type detection)
+ * @param {object} [o.cfg]       CONFIG.ASPECTSOFPOWER override, for tests
+ * @returns {number} pounds, rounded to 1dp; 0 when no volume applies.
+ */
+export function itemWeightLb({ slot = '', material = '', species = '', tags = [], cfg = null } = {}) {
+  const C = cfg ?? globalThis.CONFIG?.ASPECTSOFPOWER ?? {};
+  const vols = C.slotVolume ?? {};
+  const wWeights = C.weaponWeights ?? {};
+  const div = C.weaponVolumeDivisor ?? 100;
+
+  // A shield is a shield wherever it is slotted — they live in `weaponry`.
+  const isShield = tags.includes('shield') || tags.includes('greatshield') || tags.includes('buckler');
+  let litres = 0;
+  if (isShield) litres = vols.shield ?? 0;
+  else if (vols[slot] != null) litres = vols[slot];
+  else if (slot === 'weaponry') {
+    // Heaviest matching weapon type wins, mirroring how blockDR and celerity
+    // pick a type off the same table.
+    let best = 0;
+    for (const t of tags) if (wWeights[t] != null && wWeights[t] > best) best = wWeights[t];
+    litres = best > 0 ? best / Math.max(1, div) : 0;
+  }
+  if (!(litres > 0)) return 0;
+
+  // `species ? ... : undefined` deliberately, NOT `species && ...` — an empty
+  // species would evaluate to '' , and `??` does not fall through on '' (only
+  // on null/undefined), so every lookup silently returned 0.
+  const density = (species ? (C.materialSpeciesDensity ?? {})[species] : undefined)
+    ?? (C.materialDensity ?? {})[material]
+    ?? (C.materialDensity ?? {}).metal
+    ?? 0;
+  if (!(density > 0)) return 0;
+  return Math.round(litres * density * KG_TO_LB * 10) / 10;
+}
+
 /**
  * Ceiling on an `invest`-tagged rider's commitment: `mult` × its base cost,
  * clamped to the pool, never below the base. On the heaviest hitters the POOL

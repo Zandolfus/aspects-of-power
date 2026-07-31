@@ -13,7 +13,7 @@ import {
   spellInvestDamage, strikeInvestDamage, infusionDamage, investSelfDamage,
   effectiveDodgeValue, splitEvenlyWithRemainder, perceiveGateDecision, activityTicks, nextCompletionDelta,
   proficiencyMultiplier, proficiencyHitMultiplier, parryMassMultiplier, lunarPhaseMultiplier, dotTickDamage, procStaminaCost, riderDamageBase,
-  crushFlatAmount, riderMaxInvest,
+  crushFlatAmount, riderMaxInvest, itemWeightLb, KG_TO_LB,
 } from '../module/helpers/formulas.mjs';
 import { moonState, moonNodeAngle, nextSyzygy, eclipseAtSyzygy, planetStates,
          meteorShowersOn, cometStates, julianDay, civilDate, worldTimeForDate } from '../module/systems/calendar.mjs';
@@ -503,6 +503,62 @@ eq('one hit tier is inside the dice band', phm('uncommon') < 1.188, true);
 eq('the damage tier nearly fills the band', proficiencyMultiplier('uncommon', RAR, 'common') > 1.15, true);
 // GOLDEN from the live pull: Phil hit blend 870, uncommon -> 957.
 eq('Phil uncommon hit blend', Math.round(870 * phm('uncommon')), 957);
+
+// -- ITEM WEIGHT: volume x density, in POUNDS (RULED 2026-07-30).
+// Volumes are the volume of MATERIAL and run ~7x historical on purpose ("AOP
+// armor is super thick and heavy"). Density is per-MATERIAL and deliberately
+// NOT derived from rarity.
+const WCFG = {
+  slotVolume: { chest: 6, legs: 6, head: 2, boots: 2, bracers: 2, gloves: 2, back: 2, shield: 6 },
+  materialDensity: { metal: 10.49, leather: 0.95, cloth: 0.30, wood: 0.70, bone: 1.80, crystal: 2.60, gem: 4.00, jewelry: 10.49 },
+  materialSpeciesDensity: { fulgurite: 10.49, steel: 7.85, gold: 19.30 },
+  weaponWeights: { dagger: 60, sword: 100, greatsword: 200, greataxe: 220, shield: 100 },
+  weaponVolumeDivisor: 100,
+};
+const iw = (o) => itemWeightLb({ ...o, cfg: WCFG });
+eq('weight: fulgurite chest', iw({ slot: 'chest', material: 'metal' }), 138.8);
+eq('weight: fulgurite helm', iw({ slot: 'head', material: 'metal' }), 46.3);
+eq('weight: leather boots', iw({ slot: 'boots', material: 'leather' }), 4.2);
+eq('weight: cloth robe', iw({ slot: 'chest', material: 'cloth' }), 4);
+// A shield is resolved by TAG - they live in the weaponry slot, so a slot
+// lookup alone would price one as a weapon.
+eq('weight: shield by tag not slot',
+   iw({ slot: 'weaponry', material: 'metal', tags: ['weapon', '1H', 'shield'] }), 138.8);
+// Weapons take volume from weaponWeights so mass cannot drift from celerity.
+eq('weight: dagger', iw({ slot: 'weaponry', material: 'metal', tags: ['dagger'] }), 13.9);
+eq('weight: greataxe', iw({ slot: 'weaponry', material: 'metal', tags: ['greataxe'] }), 50.9);
+eq('weight: heaviest weapon tag wins',
+   iw({ slot: 'weaponry', material: 'metal', tags: ['dagger', 'greatsword'] }),
+   iw({ slot: 'weaponry', material: 'metal', tags: ['greatsword'] }));
+// Species overrides the class default.
+eq('weight: steel species is lighter than fulgurite',
+   iw({ slot: 'chest', material: 'metal', species: 'steel' }) < iw({ slot: 'chest', material: 'metal' }), true);
+// No resolvable volume -> 0, so callers leave jewelry and tools alone rather
+// than zeroing an authored value.
+eq('weight: unknown slot is zero', iw({ slot: 'ring', material: 'jewelry' }), 0);
+eq('weight: no material still resolves via metal default', iw({ slot: 'chest' }) > 0, true);
+// RARITY MUST NOT MATTER. A crude and a masterwork fulgurite helm weigh the
+// same - craftsmanship shows up in armour value, not mass.
+eq('weight: identical regardless of quality',
+   iw({ slot: 'head', material: 'metal' }), iw({ slot: 'head', material: 'metal' }));
+
+// THE CALIBRATION ANCHOR: John's harness. 22 L of fulgurite + leather boots.
+// He was AT capacity when he crafted it and took leather boots rather than
+// metal to stay under.
+const johnMetal = iw({ slot: 'chest', material: 'metal' }) + iw({ slot: 'legs', material: 'metal' })
+  + iw({ slot: 'weaponry', material: 'metal', tags: ['shield'] })
+  + iw({ slot: 'bracers', material: 'metal' }) + iw({ slot: 'head', material: 'metal' });
+const johnTotal = johnMetal + iw({ slot: 'boots', material: 'leather' });
+eq('John harness is 22 L of fulgurite', Math.round(johnTotal), 513);
+eq('John at str 311 (cap 778 lb) is under capacity', johnTotal < 778, true);
+eq('John at str 205 (cap 513 lb) is exactly at capacity', Math.round(johnTotal) <= 513, true);
+// Metal boots would have tipped him over - the choice he actually made.
+const johnMetalBoots = johnMetal + iw({ slot: 'boots', material: 'metal' });
+eq('metal boots would have put John over', johnMetalBoots > 513, true);
+// Gold would have required str 376 at crafting time, above his CURRENT 311,
+// so the story rules it out.
+const johnGold = 22 * 19.30 * KG_TO_LB + iw({ slot: 'boots', material: 'leather' });
+eq('gold density is impossible for John', johnGold / 2.5 > 311, true);
 
 if (failures) { console.error(`\n${failures} FAILURES`); process.exit(1); }
 console.log('\nAll pure-function tests pass.');

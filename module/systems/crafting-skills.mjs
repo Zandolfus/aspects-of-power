@@ -9,7 +9,7 @@
  * byte-identical to its previous class-body form (no object-literal comma
  * surgery); the export collects the prototype methods into a plain mixin.
  */
-import { hybridAbilityMod } from '../helpers/formulas.mjs';
+import { hybridAbilityMod, itemWeightLb } from '../helpers/formulas.mjs';
 
 class CraftingSkills {
   /**
@@ -2089,6 +2089,10 @@ class CraftingSkills {
             augmentSlots,
             tags: craftedFreeTags,
             systemTags: craftedSystemTags,
+            // Physical weight = slot volume x material density (design-item-weight).
+            // Set at craft so new gear is never weightless; deliberately NOT
+            // rarity-scaled, so a masterwork helm weighs what a crude one does.
+            weight: itemWeightLb({ slot: outputSlot, material: outputMaterial, tags: craftedFreeTags }),
           },
         }]);
       }

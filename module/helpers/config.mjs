@@ -1032,6 +1032,68 @@ ASPECTSOFPOWER.referenceRoundLength = {
  * Lookup is by tag in `system.tags`. First matching tag wins.
  * Falls back to `system.weight` if no tag matches (designer escape hatch).
  */
+/**
+ * PHYSICAL WEIGHT — volume x density (design-item-weight.md, RULED 2026-07-30).
+ *
+ *   weight_lb = volume_L(slot) x density_kgPerL(material) / 0.45359237
+ *
+ * Two rulings shape this:
+ *   1. "AOP armor is super thick and heavy." The volumes below are the volume
+ *      of MATERIAL in the piece and run ~7x historical - a 6 L breastplate is
+ *      47 kg where a real one is 5-9. That is deliberate, not a slip.
+ *   2. "Materials get heavier as their mana density increases" - the inverse
+ *      of the usual mithril trope. Density is a per-MATERIAL authored value,
+ *      NOT derived from item rarity: a crude fulgurite helm and a masterwork
+ *      one weigh the same, because craftsmanship shows up in armour value.
+ *
+ * ⚠ carryCapacity is in POUNDS (str.mod x 2.5). Densities here are kg/L, so
+ * every comparison MUST convert. Comparing them directly understates loads by
+ * 2.2x — it produced a false "nobody is near capacity, weights change nothing"
+ * conclusion before it was caught.
+ *
+ * CALIBRATION ANCHOR: John was AT capacity when he first crafted his harness
+ * and took leather boots rather than metal to stay under. At fulgurite =
+ * silver he lands on that line at str ~205 (513 lb vs 555 with metal boots),
+ * and reaches 66% of capacity at his current str 311. Gold density would have
+ * required str 376 at crafting time — above his CURRENT strength — so the
+ * story itself rules it out. See migration/armor_weight_calc.js.
+ */
+ASPECTSOFPOWER.slotVolume = {
+  // Litres of material per piece (user baseline 2026-07-30).
+  chest: 6, legs: 6, head: 2, boots: 2, bracers: 2, gloves: 2, back: 2,
+  shield: 6,          // resolved from the shield/greatshield/buckler TAG, not a slot
+};
+
+/**
+ * Density in kg per litre, keyed by `item.system.material` (the CLASS), with
+ * `item.system.materialSpecies` overriding when a specific material is known.
+ *
+ * ⚠ `metal` defaults to FULGURITE (10.49, silver), because fulgurite is the
+ * only metal that exists in the world right now — "Lightning Metal" IS
+ * fulgurite, just named from a gathering source that has not been built yet.
+ * When mundane steel is introduced it wants an explicit species key at 7.85,
+ * and this default should drop back with it.
+ */
+ASPECTSOFPOWER.materialDensity = {
+  metal: 10.49, leather: 0.95, cloth: 0.30, wood: 0.70,
+  bone: 1.80, crystal: 2.60, gem: 4.00, jewelry: 10.49,
+};
+
+/** Specific materials, overriding the class default where known. */
+ASPECTSOFPOWER.materialSpeciesDensity = {
+  fulgurite: 10.49,   // silver — the world's metal
+  steel: 7.85, iron: 7.87, bronze: 8.80, silver: 10.49, gold: 19.30,
+};
+
+/**
+ * Weapon volume comes from the existing weaponWeights table rather than a
+ * second hand-authored list, so weapon mass can never drift from the weight
+ * that already drives celerity and windup: volume_L = weaponWeight / divisor.
+ * At 100 a dagger is 0.6 L and a greataxe 2.2 L, which in fulgurite is 14 lb
+ * and 51 lb — heavy, consistent with the armour, and retunable with ONE number.
+ */
+ASPECTSOFPOWER.weaponVolumeDivisor = 100;
+
 ASPECTSOFPOWER.weaponWeights = {
   // Melee
   unarmed:    40,
