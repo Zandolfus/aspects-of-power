@@ -31,6 +31,14 @@
 
 'use strict';
 
+/* ⚠ UNITS: carryCapacity is in POUNDS (user, 2026-07-30). Densities below are
+ * kg/L, so every comparison against capacity MUST convert. Getting this wrong
+ * understated every armour load by 2.2x and produced a false conclusion that
+ * "weights alone change nothing" — in pounds the loads are already meaningful
+ * at the SHIPPED str x 2.5 and capacity needs no rework at all. */
+const KG_PER_LB = 0.45359237;
+const LB = (kg) => kg / KG_PER_LB;
+
 // Shipped ladder (CONFIG.ASPECTSOFPOWER.skillRarities), anchored at common.
 const RARITY = { not_proficient: 0.2, neglected: 0.3, rusty: 0.4, inferior: 0.5,
   common: 0.6, uncommon: 0.7, rare: 0.8, epic: 0.9, legendary: 1.0, mythic: 1.1, divine: 1.2 };
@@ -125,10 +133,31 @@ for (const s of SETS) {
     + `      ${pad((kg / cap).toFixed(2), 6)}  ${pad((kg / s.str).toFixed(2), 7)}  ${pad((kg / (s.str * 0.67)).toFixed(2), 8)}`);
 }
 
-console.log('\n=== 4. THE CAPACITY QUESTION IS STILL OPEN ===');
-console.log('At the shipped x2.5, a fulgurite harness is 13% of Phil\'s capacity and');
-console.log('a cloth set is 4% of Olivia\'s. Weight exists but nothing feels it.');
-console.log('At x1.0 those become 33% and 11%. At x0.67, 49% and 16%.');
+console.log('\n=== 4. CAPACITY IS IN POUNDS — AND IT ALREADY WORKS ===');
+console.log('Live metal wearers, armour load vs their lb capacity (str x 2.5):\n');
+console.log('actor      str   cap(lb)  metal L   steel      SILVER      gold');
+for (const p of [
+  { n: 'John', str: 311, cap: 778, L: 22, other: 4.2 },
+  { n: 'Phil', str: 734, cap: 1835, L: 26, other: 4.2 },
+  { n: 'George', str: 879, cap: 2198, L: 18, other: 0 },
+]) {
+  const at = (d) => LB(p.L * d) + p.other;
+  const cell = (d) => `${Math.round(at(d))}lb ${Math.round(100 * at(d) / p.cap)}%`;
+  console.log(`${p.n.padEnd(10)} ${pad(p.str, 4)}  ${pad(p.cap, 6)}  ${pad(p.L, 6)}   ${pad(cell(BASE.metal), 10)} ${pad(cell(REF.silver), 11)} ${pad(cell(BASE.gold), 10)}`);
+}
+console.log('\nJOHN IS THE ANCHOR. He was AT capacity when he first crafted this gear and');
+console.log('had to take leather boots instead of metal to stay under (user, 2026-07-30).');
+console.log('Solving backwards from that anecdote:\n');
+for (const [lbl, d] of [['steel', BASE.metal], ['SILVER', REF.silver], ['gold', BASE.gold]]) {
+  const load = LB(22 * d) + 4.2;
+  const strThen = (load / 2.5);
+  const withMetalBoots = LB(24 * d);
+  console.log(`  ${lbl.padEnd(7)} load ${Math.round(load)} lb -> he was at capacity at str ${Math.round(strThen)}`
+    + `  (metal boots would have been ${Math.round(withMetalBoots)} lb)`
+    + (strThen > 311 ? '   <-- IMPOSSIBLE, exceeds his CURRENT str' : ''));
+}
+console.log('\nStrength only grows, so any density implying a crafting-time strength ABOVE');
+console.log('his current 311 is ruled out by the story itself.');
 console.log('\n=== 5. HOW FAR THE LADDER ACTUALLY TRAVELS IN PLAY ===');
 console.log('The live roster is UNCOMMON, which is also the average person\'s ceiling. So');
 console.log('the realistic span for almost all content is common -> uncommon: ONE tier.');
