@@ -1206,6 +1206,145 @@ ASPECTSOFPOWER.skillCategories = {
 };
 
 /**
+ * Skill creation presets (2026-07-31). One click on the create-time picker
+ * sets skill type, tags, roll config and family defaults, so authoring starts
+ * from "a Strike" or "a Channel" instead of a blank 146-field model. `data` is
+ * a partial update merged onto the fresh skill; tag side-effects that the
+ * sheet's autocomplete would apply (aoe.enabled, tagConfig.channel, affinity
+ * lists) must be included here EXPLICITLY because no autocomplete runs.
+ * Values are starting points, not rulings — every one is editable after.
+ */
+ASPECTSOFPOWER.skillPresets = {
+  blank: {
+    label: 'Blank', group: 'General',
+    hint: 'No defaults. The full sheet, from scratch.',
+    data: null,
+  },
+  strike_str: {
+    label: 'Strike (Strength)', group: 'Martial',
+    hint: 'Melee weapon attack on the strength pillar.',
+    data: { system: { skillType: 'Active', skillCategory: 'combat', tags: ['attack', 'melee', 'physical'],
+      roll: { type: 'str_weapon', resource: 'stamina', targetDefense: 'melee', damageType: 'physical' } } },
+  },
+  strike_dex: {
+    label: 'Strike (Finesse)', group: 'Martial',
+    hint: 'Melee weapon attack on the dexterity pillar.',
+    data: { system: { skillType: 'Active', skillCategory: 'combat', tags: ['attack', 'melee', 'physical'],
+      roll: { type: 'dex_weapon', resource: 'stamina', targetDefense: 'melee', damageType: 'physical' } } },
+  },
+  shot: {
+    label: 'Ranged Shot', group: 'Martial',
+    hint: 'Physical ranged weapon attack (bow, gun, thrown).',
+    data: { system: { skillType: 'Active', skillCategory: 'combat', tags: ['attack', 'ranged', 'physical'],
+      roll: { type: 'phys_ranged', resource: 'stamina', targetDefense: 'ranged', damageType: 'physical' } } },
+  },
+  rider: {
+    label: 'Rider (procs off own attacks)', group: 'Martial',
+    hint: 'Passive that fires when your attack pierces armor - Hemorrhage-style. Configure the debuff it applies.',
+    data: { system: { skillType: 'Passive', skillCategory: 'combat', tags: ['debuff'],
+      tagConfig: { procTrigger: 'self_attack_pierced', debuffDealsDamage: true, dotScale: 0.1, debuffDuration: 3 } } },
+  },
+  proficiency: {
+    label: 'Weapon Proficiency', group: 'Martial',
+    hint: 'The passive that IS your skill with a weapon type. Set Proficiency For, then its rarity is the mastery ladder.',
+    data: { system: { skillType: 'Passive', skillCategory: 'combat', tags: [] } },
+  },
+  bolt: {
+    label: 'Bolt (single target)', group: 'Magic',
+    hint: 'Magic projectile against ranged defense.',
+    data: { system: { skillType: 'Active', skillCategory: 'combat', tags: ['attack', 'magic', 'ranged'], requiresSight: true,
+      roll: { type: 'magic_projectile', resource: 'mana', tier: 'basic', abilities: 'intelligence', targetDefense: 'ranged', damageType: 'magical' } } },
+  },
+  blast: {
+    label: 'Blast (AOE)', group: 'Magic',
+    hint: 'Area spell - circle template, everyone inside.',
+    data: { system: { skillType: 'Active', skillCategory: 'combat', tags: ['attack', 'magic', 'aoe'], requiresSight: true,
+      roll: { type: 'magic_projectile', resource: 'mana', tier: 'high', abilities: 'intelligence', targetDefense: 'ranged', damageType: 'magical' },
+      aoe: { enabled: true, shape: 'circle', diameter: 20, targetingMode: 'all' } } },
+  },
+  channel: {
+    label: 'Channel (sustained beam)', group: 'Magic',
+    hint: 'Tick loop that ramps while sustained. Tag side-effect included.',
+    data: { system: { skillType: 'Active', skillCategory: 'combat', tags: ['attack', 'magic', 'channel'], requiresSight: true,
+      roll: { type: 'magic_projectile', resource: 'mana', tier: 'basic', abilities: 'intelligence', targetDefense: 'ranged', damageType: 'magical' },
+      tagConfig: { channel: true } } },
+  },
+  summon: {
+    label: 'Summon', group: 'Magic',
+    hint: 'Conjure a creature. Pick its brain and faculties on the sheet.',
+    data: { system: { skillType: 'Active', skillCategory: 'combat', tags: ['summon', 'magic'],
+      roll: { resource: 'mana', tier: 'basic', abilities: 'intelligence' } } },
+  },
+  ritual: {
+    label: 'Ritual', group: 'Magic',
+    hint: 'Encoded into a medium out of combat, activated by consuming a charge.',
+    data: { system: { skillType: 'Active', skillCategory: 'combat', tags: ['ritual', 'magic'], ritualGrade: 'E',
+      roll: { resource: 'mana', abilities: 'wisdom' } } },
+  },
+  buff: {
+    label: 'Buff', group: 'Support',
+    hint: 'Timed stat multiplier on self or an ally.',
+    data: { system: { skillType: 'Active', skillCategory: 'combat', tags: ['buff', 'magic'],
+      roll: { resource: 'mana', tier: 'basic', abilities: 'willpower' },
+      tagConfig: { buffTarget: 'selected', buffDuration: 3 } } },
+  },
+  heal: {
+    label: 'Heal', group: 'Support',
+    hint: 'Restore health to a target.',
+    data: { system: { skillType: 'Active', skillCategory: 'combat', tags: ['restoration', 'magic'],
+      roll: { resource: 'mana', tier: 'basic', abilities: 'wisdom' },
+      tagConfig: { restorationTarget: 'selected', restorationResource: 'health' } } },
+  },
+  barrier: {
+    label: 'Barrier', group: 'Support',
+    hint: 'Mana becomes a damage-absorbing shell (HP = mana x multiplier).',
+    data: { system: { skillType: 'Active', skillCategory: 'combat', tags: ['restoration', 'magic'],
+      roll: { resource: 'mana', tier: 'basic', abilities: 'willpower' },
+      tagConfig: { restorationTarget: 'selected', restorationResource: 'barrier', barrierMultiplier: 1 } } },
+  },
+  dot: {
+    label: 'Debuff / DoT', group: 'Support',
+    hint: 'Attack that leaves a stat debuff or damage-over-time on the target.',
+    data: { system: { skillType: 'Active', skillCategory: 'combat', tags: ['attack', 'debuff'],
+      roll: { resource: 'mana', targetDefense: 'melee' },
+      tagConfig: { debuffDealsDamage: true, dotScale: 0.1, debuffDuration: 3 } } },
+  },
+  reaction_dodge: {
+    label: 'Reaction: Dodge', group: 'Reaction',
+    hint: 'Evasive reaction when attacked, before damage.',
+    data: { system: { skillType: 'Reaction', skillCategory: 'combat', reactionType: 'dodge',
+      roll: { resource: 'stamina' },
+      tagConfig: { reactionTrigger: 'self_attacked', reactionCooldown: 1 } } },
+  },
+  reaction_parry: {
+    label: 'Reaction: Parry', group: 'Reaction',
+    hint: 'Meet the blow with your weapon (mass rule applies).',
+    data: { system: { skillType: 'Reaction', skillCategory: 'combat', reactionType: 'parry',
+      roll: { resource: 'stamina' },
+      tagConfig: { reactionTrigger: 'self_attacked', reactionCooldown: 1 } } },
+  },
+  guardian: {
+    label: 'Reaction: Guardian', group: 'Reaction',
+    hint: 'Protect an ally under attack - intercept, cover, or redirect.',
+    data: { system: { skillType: 'Reaction', skillCategory: 'combat', reactionType: 'guardian',
+      roll: { resource: 'stamina' },
+      tagConfig: { reactionTrigger: 'ally_attacked', reactionTriggerRange: 15, reactionCooldown: 1, guardianMode: 'intercept' } } },
+  },
+  craft: {
+    label: 'Craft', group: 'Profession',
+    hint: 'Produce items. Pick allowed types on the sheet.',
+    data: { system: { skillType: 'Active', skillCategory: 'profession', tags: ['craft'],
+      roll: { resource: 'stamina' } } },
+  },
+  gather: {
+    label: 'Gather', group: 'Profession',
+    hint: 'Pull materials from the world.',
+    data: { system: { skillType: 'Active', skillCategory: 'profession', tags: ['gather'],
+      roll: { resource: 'stamina' } } },
+  },
+};
+
+/**
  * Tags available per skill category. combatTags and professionTags are THE
  * authoritative skill-tag registries — the sheet autocomplete reads them by
  * skillCategory. (A third parallel registry, skillTags, drifted for months

@@ -33,6 +33,7 @@ import { deriveItemStats } from './systems/item-derivation.mjs';
 import { getPositionalTags } from './helpers/positioning.mjs';
 // Import systems.
 import { EquipmentSystem } from './systems/equipment.mjs';
+import { SkillPresets } from './systems/skill-presets.mjs';
 import * as MassLeveler from './systems/mass-leveler.mjs';
 import * as TemplateMigration from './systems/template-migration.mjs';
 import * as Celerity from './systems/celerity.mjs';
@@ -435,6 +436,9 @@ Hooks.once('init', function () {
 
   // Initialize the equipment system hooks.
   EquipmentSystem.initialize();
+
+  // Skill creation presets — the create-time archetype picker.
+  SkillPresets.initialize();
 
   // ── Auto-sync cached tags when a template item's tags change ──
   // cachedTags on the actor track is the structured `[{id, value}]` form
