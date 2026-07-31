@@ -2185,8 +2185,8 @@ body.aop-targeting #board canvas {
   align-items: flex-end;
   padding: 6px 8px;
   margin-bottom: 6px;
-  background: rgba(0, 0, 0, 0.25);
-  border: 1px solid #444;
+  background: var(--aop-overlay-strong);
+  border: 1px solid var(--aop-border-darker);
   border-radius: 4px;
 }
 .aspects-of-power .skill-identity-strip .aop-field {
@@ -2217,10 +2217,10 @@ body.aop-targeting #board canvas {
   font-size: 12px;
   white-space: nowrap;
 }
-.aspects-of-power .aop-muted { color: #888; }
+.aspects-of-power .aop-muted { color: var(--aop-text-muted); }
 .aspects-of-power .aop-hint {
   font-size: 11px;
-  color: #888;
+  color: var(--aop-text-muted);
   margin: 0 0 6px;
 }
 
@@ -2233,16 +2233,16 @@ body.aop-targeting #board canvas {
   margin-bottom: 8px;
   font-size: 11px;
   background: #1a1a1a;
-  border: 1px solid #444;
+  border: 1px solid var(--aop-border-darker);
   border-radius: 4px;
 }
 .aspects-of-power .skill-summary-bar strong { color: #9cf; }
 
 .aspects-of-power details.aop-section {
-  border: 1px solid #444;
+  border: 1px solid var(--aop-border-darker);
   border-radius: 4px;
   margin-bottom: 6px;
-  background: rgba(0, 0, 0, 0.15);
+  background: var(--aop-overlay);
 }
 .aspects-of-power details.aop-section > summary {
   display: flex;
@@ -2263,7 +2263,7 @@ body.aop-targeting #board canvas {
 }
 .aspects-of-power .aop-section-hint {
   font-size: 11px;
-  color: #888;
+  color: var(--aop-text-muted);
   text-align: right;
   flex: 1 1 auto;
   overflow: hidden;
@@ -2277,14 +2277,14 @@ body.aop-targeting #board canvas {
 .aspects-of-power .aop-subblock {
   margin-top: 8px;
   padding: 6px 8px;
-  border-left: 2px solid #555;
+  border-left: 2px solid var(--aop-border-dark);
   background: rgba(255, 255, 255, 0.02);
 }
 .aspects-of-power .aop-subblock-title {
   display: block;
   font-size: 11px;
   font-weight: bold;
-  color: #aaa;
+  color: var(--aop-text-soft);
   text-transform: uppercase;
   letter-spacing: 0.5px;
   margin-bottom: 4px;
@@ -2316,7 +2316,7 @@ body.aop-targeting #board canvas {
 
 .aspects-of-power .aop-derived-panel {
   background: #1a1a1a;
-  border: 1px solid #444;
+  border: 1px solid var(--aop-border-darker);
   border-radius: 4px;
   padding: 8px;
   margin-bottom: 10px;
@@ -2330,7 +2330,7 @@ body.aop-targeting #board canvas {
 }
 .aspects-of-power .aop-derived-line {
   margin-top: 6px;
-  color: #aaa;
+  color: var(--aop-text-soft);
 }
 .aspects-of-power .aop-derived-alt { margin-right: 8px; }
 .aspects-of-power .aop-val-dmg { color: #9cf; }
