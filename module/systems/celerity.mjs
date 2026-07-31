@@ -494,11 +494,18 @@ export function findCombatantForActor(actor) {
   const combat = game.combat;
   if (!combat?.started || !actor) return null;
   const token = actor.getActiveTokens?.()[0];
-  if (!token) {
-    // Fallback — match by actorId on linked tokens.
-    return combat.combatants.find(c => c.actorId === actor.id) ?? null;
+  // Token match first — it is the only way to tell two tokens of the same
+  // actor apart. But FALL BACK TO actorId whenever that misses, not only when
+  // there is no token at all: getActiveTokens returns tokens on the VIEWED
+  // scene, so an actor standing on a different scene from the combat matched
+  // nothing and silently read as 'not in combat'. Anything that charges a
+  // cost through this then charged zero without complaining — found when a
+  // spatial retrieve cost 0 ticks against a combat left on another map.
+  if (token) {
+    const byToken = combat.combatants.find(c => c.tokenId === token.id);
+    if (byToken) return byToken;
   }
-  return combat.combatants.find(c => c.tokenId === token.id) ?? null;
+  return combat.combatants.find(c => c.actorId === actor.id) ?? null;
 }
 
 /**
