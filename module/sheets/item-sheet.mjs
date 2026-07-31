@@ -3,6 +3,7 @@ import {
   prepareActiveEffectCategories,
 } from '../helpers/effects.mjs';
 import { SkillUpgradeDialog } from '../apps/skill-upgrade-dialog.mjs';
+import { AIProfiles } from '../systems/ai.mjs';
 
 /**
  * Extend ItemSheetV2 with Aspects of Power-specific behaviour.
@@ -147,7 +148,27 @@ export class AspectsofPowerItemSheet extends foundry.applications.api.Handlebars
         craft:       has('craft'),
         gather:      has('gather'),
         repair:      has('repair'),
+        channel:     has('channel'),
+        ritual:      has('ritual'),
+        unity:       has('unity'),
+        // Riders are Passive combat skills subscribing to procTrigger; the
+        // section is how one is MADE, so it shows for every Passive combat
+        // skill (collapsed unless a trigger is set).
+        rider:       sys.skillType === 'Passive' && sys.skillCategory === 'combat',
+        requirements: sys.skillCategory === 'combat',
       };
+
+      // Lookup lists for the sections that reference other registries.
+      // Weapon TYPE keys double as the profFor / requiresWeaponTag vocabulary.
+      context.weaponTypeKeys = Object.keys(CONFIG.ASPECTSOFPOWER.weaponWeights ?? {});
+      context.aiProfileNames = AIProfiles.all();
+      context.ritualGrades = ['G', 'F', 'E', 'D', 'C', 'B', 'A', 'S'];
+      // Rider filter vocabulary: kind + armor-answer tags, then affinities.
+      // Any combat tag is legal in procAttackTags; these are the useful ones.
+      context.riderFilterTags = [
+        'attack', 'melee', 'ranged', 'physical', 'magic', 'pierce', 'shred', 'crush',
+        ...Object.keys(CONFIG.ASPECTSOFPOWER.affinities ?? {}),
+      ];
 
       // Weapon-pillar types own the damage/cost/ability fields — they're
       // overridden at roll time by stat_blend × rarity_mult × stamina_invest.
@@ -611,6 +632,10 @@ export class AspectsofPowerItemSheet extends foundry.applications.api.Handlebars
 
       const tagConfigData = {
         summonBehaviors:     collectKeys('summonBehaviors'),
+        // Rider attack-tag filter + Unity affinity list — checkbox groups, so
+        // they MUST go through collectKeys (catch-all would collapse them).
+        procAttackTags:      collectKeys('procAttackTags'),
+        unifiedAffinities:   collectKeys('unifiedAffinities'),
         restorationTarget:   str('restorationTarget', 'selected'),
         restorationResource: str('restorationResource', 'health'),
         restorationOverhealth: bool('restorationOverhealth', false),
@@ -1455,6 +1480,12 @@ export class AspectsofPowerItemSheet extends foundry.applications.api.Handlebars
       if (tagKey === 'aoe') {
         updateData['system.aoe.enabled'] = true;
       }
+      // The channel ENGINE gate is the tagConfig.channel boolean, not the tag
+      // (_handleChannelTag early-returns on it). Mirror the aoe pattern so
+      // adding the tag in-sheet actually turns the mechanic on.
+      if (tagKey === 'channel') {
+        updateData['system.tagConfig.channel'] = true;
+      }
       const affinityTags = CONFIG.ASPECTSOFPOWER.affinityTags ?? new Set();
       if (affinityTags.has(tagKey)) {
         const affinities = [...(this.item.system.affinities ?? [])];
@@ -1476,6 +1507,9 @@ export class AspectsofPowerItemSheet extends foundry.applications.api.Handlebars
     if (this.item.type === 'skill') {
       if (tagKey === 'aoe') {
         updateData['system.aoe.enabled'] = false;
+      }
+      if (tagKey === 'channel') {
+        updateData['system.tagConfig.channel'] = false;
       }
       const debuffSubtypes = CONFIG.ASPECTSOFPOWER.debuffSubtypeTags ?? {};
       const behaviorTags = CONFIG.ASPECTSOFPOWER.debuffBehaviorTags ?? {};

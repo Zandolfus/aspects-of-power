@@ -458,6 +458,13 @@
                 <input type='number' name='system.tagConfig.barrierMultiplier'
                        value='{{system.tagConfig.barrierMultiplier}}' min='0' step='0.1' />
               </div>
+              <div class='aop-field'>
+                <label class='resource-label checkbox-label' title='The barrier reforms after being broken instead of ending.'>
+                  <input type='checkbox' name='system.tagConfig.barrierReform'
+                         {{#if system.tagConfig.barrierReform}}checked{{/if}} />
+                  Reforms When Broken
+                </label>
+              </div>
             </div>
             <p class='hint'>Barrier HP = Mana spent &times; multiplier. Uses the skill's affinities.</p>
           </div>
@@ -594,6 +601,50 @@
               {{/if}}
             </div>
           </div>
+
+          <div class='aop-subblock'>
+            <span class='aop-subblock-title'>Weapon Buff (Spellstrike)</span>
+            <div class='aop-field-grid'>
+              <div class='aop-field'>
+                <label class='resource-label' title='Fraction of the cast roll carried onto weapon strikes while this buff is active. 0 = not a weapon buff. Scaling buffs need roll.abilities set.'>Scale (&times; roll)</label>
+                <input type='number' name='system.tagConfig.weaponBuffScale'
+                       value='{{system.tagConfig.weaponBuffScale}}' min='0' max='5' step='0.05' />
+              </div>
+            </div>
+          </div>
+
+          <div class='aop-subblock'>
+            <span class='aop-subblock-title'>Granted Reaction (while buff active)</span>
+            <p class='hint aop-hint'>While this buff sits on its target, the trigger below fires the named skill as a reaction. Leave the trigger empty for a plain buff.</p>
+            <div class='aop-field-grid'>
+              <div class='aop-field'>
+                <label class='resource-label'>Trigger</label>
+                <select name='system.tagConfig.buffReactionTrigger'>
+                  <option value='' {{#unless system.tagConfig.buffReactionTrigger}}selected{{/unless}}>(none)</option>
+                  <option value='self_attacked' {{#if (eq system.tagConfig.buffReactionTrigger "self_attacked")}}selected{{/if}}>Self attacked (pre-damage)</option>
+                  <option value='self_damage_taken' {{#if (eq system.tagConfig.buffReactionTrigger "self_damage_taken")}}selected{{/if}}>Self damage taken</option>
+                  <option value='self_struck' {{#if (eq system.tagConfig.buffReactionTrigger "self_struck")}}selected{{/if}}>Self struck (post-resolve)</option>
+                </select>
+              </div>
+              <div class='aop-field'>
+                <label class='resource-label'>Attack Type Filter</label>
+                <select name='system.tagConfig.buffReactionAttackType'>
+                  <option value='any' {{#if (eq system.tagConfig.buffReactionAttackType "any")}}selected{{/if}}>Any</option>
+                  <option value='melee' {{#if (eq system.tagConfig.buffReactionAttackType "melee")}}selected{{/if}}>Melee</option>
+                  <option value='ranged' {{#if (eq system.tagConfig.buffReactionAttackType "ranged")}}selected{{/if}}>Ranged</option>
+                </select>
+              </div>
+              <div class='aop-field'>
+                <label class='resource-label' title='The skill the reaction fires. Must live on the same actor.'>Reaction Skill</label>
+                <select name='system.tagConfig.buffReactionSkillId'>
+                  <option value='' {{#unless system.tagConfig.buffReactionSkillId}}selected{{/unless}}>(none)</option>
+                  {{#each availableChainSkills}}
+                    <option value='{{this.id}}' {{#if (eq this.id @root.system.tagConfig.buffReactionSkillId)}}selected{{/if}}>{{this.name}}</option>
+                  {{/each}}
+                </select>
+              </div>
+            </div>
+          </div>
         </div>
       </details>
       {{/if}}
@@ -682,9 +733,96 @@
                 <input type='number' name='system.tagConfig.dotScale'
                        value='{{system.tagConfig.dotScale}}' min='0' max='1' step='0.05' />
               </div>
+              <div class='aop-field'>
+                <label class='resource-label' title='Multiplier on dotScale per unit of rider invest (invest-tagged riders only). Magnitude is linear in the invest.'>DoT Invest Scale</label>
+                <input type='number' name='system.tagConfig.dotInvestScale'
+                       value='{{system.tagConfig.dotInvestScale}}' min='0' step='0.05' />
+              </div>
             </div>
             {{/if}}
           </div>
+
+          <div class='aop-subblock'>
+            <span class='aop-subblock-title'>Armor Answer</span>
+            <p class='hint aop-hint'>How this debuff attacks the target's mitigation. Shred strips affinity DR, crush reduces armor and block, melt is the fire answer to flat armor.</p>
+            <div class='aop-field-grid'>
+              <div class='aop-field'>
+                <label class='resource-label checkbox-label' title='Shred: strips affinity DR on application.'>
+                  <input type='checkbox' name='system.tagConfig.debuffDRStrip'
+                         {{#if system.tagConfig.debuffDRStrip}}checked{{/if}} />
+                  DR Strip (shred)
+                </label>
+              </div>
+              <div class='aop-field'>
+                <label class='resource-label' title='Crush: fraction of armor+block removed per application. 0 = none.'>Armor Crush</label>
+                <input type='number' name='system.tagConfig.debuffArmorCrush'
+                       value='{{system.tagConfig.debuffArmorCrush}}' min='0' max='1' step='0.05' />
+              </div>
+              <div class='aop-field'>
+                <label class='resource-label' title='Multiplier on Armor Crush per unit of rider invest (invest-tagged riders only).'>Crush Invest Scale</label>
+                <input type='number' name='system.tagConfig.crushInvestScale'
+                       value='{{system.tagConfig.crushInvestScale}}' min='0' step='0.05' />
+              </div>
+              <div class='aop-field'>
+                <label class='resource-label' title='Melt: FLAT armor reduction as a fraction of the attack roll. The fire answer to armor.'>Armor Melt</label>
+                <input type='number' name='system.tagConfig.debuffArmorMelt'
+                       value='{{system.tagConfig.debuffArmorMelt}}' min='0' max='2' step='0.05' />
+              </div>
+            </div>
+          </div>
+
+          <div class='aop-subblock'>
+            <span class='aop-subblock-title'>Mark</span>
+            <p class='hint aop-hint'>A mark rides the target and pays out later. Either bonus above 0 makes this debuff a mark.</p>
+            <div class='aop-field-grid'>
+              <div class='aop-field'>
+                <label class='resource-label' title='Damage multiplier on the marked target&apos;s incoming damage.'>Damage Bonus (&times;)</label>
+                <input type='number' name='system.tagConfig.markBonus'
+                       value='{{system.tagConfig.markBonus}}' min='0' step='0.05' />
+              </div>
+              <div class='aop-field'>
+                <label class='resource-label' title='Attack multiplier against the marked target.'>Attack Bonus (&times;)</label>
+                <input type='number' name='system.tagConfig.markAttackBonus'
+                       value='{{system.tagConfig.markAttackBonus}}' min='0' step='0.05' />
+              </div>
+              <div class='aop-field'>
+                <label class='resource-label checkbox-label' title='The mark deletes after one trigger.'>
+                  <input type='checkbox' name='system.tagConfig.markExpiresOnHit'
+                         {{#if system.tagConfig.markExpiresOnHit}}checked{{/if}} />
+                  Expires On Hit
+                </label>
+              </div>
+            </div>
+          </div>
+
+          {{#if show.aoe}}
+          <div class='aop-subblock'>
+            <span class='aop-subblock-title'>Zone Save (AOE debuffs)</span>
+            <div class='aop-field-grid'>
+              <div class='aop-field'>
+                <label class='resource-label' title='Defense-pool cost charged when the save model fires. 0 = free.'>Pool Cost</label>
+                <input type='number' name='system.tagConfig.debuffPoolCost'
+                       value='{{system.tagConfig.debuffPoolCost}}' min='0' step='1' />
+              </div>
+              <div class='aop-field'>
+                <label class='resource-label' title='When targets get to resist the zone debuff.'>Save Model</label>
+                <select name='system.tagConfig.saveModel'>
+                  <option value='none' {{#if (eq system.tagConfig.saveModel "none")}}selected{{/if}}>None</option>
+                  <option value='perTick' {{#if (eq system.tagConfig.saveModel "perTick")}}selected{{/if}}>Per Tick</option>
+                  <option value='onEntry' {{#if (eq system.tagConfig.saveModel "onEntry")}}selected{{/if}}>On Entry</option>
+                </select>
+              </div>
+              <div class='aop-field'>
+                <label class='resource-label'>Save Ability</label>
+                <select name='system.tagConfig.saveAbility'>
+                  {{#each config.abilities as |label key|}}
+                    <option value='{{key}}' {{#if (eq key ../system.tagConfig.saveAbility)}}selected{{/if}}>{{localize label}}</option>
+                  {{/each}}
+                </select>
+              </div>
+            </div>
+          </div>
+          {{/if}}
 
           <div class='aop-field-grid'>
             <div class='aop-field'>
@@ -715,6 +853,15 @@
                 <option value='ally_attacked' {{#if (eq system.tagConfig.reactionTrigger "ally_attacked")}}selected{{/if}}>Ally attacked (within range)</option>
                 <option value='self_struck' {{#if (eq system.tagConfig.reactionTrigger "self_struck")}}selected{{/if}}>Self struck (post-resolve)</option>
                 <option value='hp_threshold' {{#if (eq system.tagConfig.reactionTrigger "hp_threshold")}}selected{{/if}}>HP below threshold</option>
+              </select>
+            </div>
+
+            <div class='aop-field'>
+              <label class='resource-label' title='Only react to this kind of incoming attack.'>Attack Type Filter</label>
+              <select name='system.tagConfig.reactionAttackType'>
+                <option value='any' {{#if (eq system.tagConfig.reactionAttackType "any")}}selected{{/if}}>Any</option>
+                <option value='melee' {{#if (eq system.tagConfig.reactionAttackType "melee")}}selected{{/if}}>Melee</option>
+                <option value='ranged' {{#if (eq system.tagConfig.reactionAttackType "ranged")}}selected{{/if}}>Ranged</option>
               </select>
             </div>
 
@@ -814,6 +961,223 @@
               {{/each}}
             </div>
           </div>
+
+          <div class='aop-subblock'>
+            <span class='aop-subblock-title'>Creature</span>
+            <div class='aop-field-grid'>
+              <div class='aop-field'>
+                <label class='resource-label' title='Free-form creature type label carried onto the spawned token.'>Summon Type</label>
+                <input type='text' name='system.tagConfig.summonType'
+                       value='{{system.tagConfig.summonType}}' />
+              </div>
+              <div class='aop-field'>
+                <label class='resource-label' title='Fixed HP for the summon. 0 = derive from the V x vector model.'>HP Override</label>
+                <input type='number' name='system.tagConfig.summonHpOverride'
+                       value='{{system.tagConfig.summonHpOverride}}' min='0' step='1' />
+              </div>
+              <div class='aop-field'>
+                <label class='resource-label' title='Max concurrent summons from this skill.'>Capacity</label>
+                <input type='number' name='system.tagConfig.summonCapacity'
+                       value='{{system.tagConfig.summonCapacity}}' min='1' max='10' step='1' />
+              </div>
+              <div class='aop-field'>
+                <label class='resource-label checkbox-label' title='Recasting at capacity replaces the oldest summon instead of refusing.'>
+                  <input type='checkbox' name='system.tagConfig.summonSwapOnRecast'
+                         {{#if system.tagConfig.summonSwapOnRecast}}checked{{/if}} />
+                  Swap On Recast
+                </label>
+              </div>
+            </div>
+          </div>
+
+          <div class='aop-subblock'>
+            <span class='aop-subblock-title'>Tower / Stub Actor</span>
+            <p class='hint aop-hint'>Stat distribution and extra tag lists remain script-authored (object-valued fields).</p>
+            <div class='aop-field-grid'>
+              <div class='aop-field'>
+                <label class='resource-label checkbox-label' title='Summon is a stationary tower rather than a creature.'>
+                  <input type='checkbox' name='system.tagConfig.summonAsTower'
+                         {{#if system.tagConfig.summonAsTower}}checked{{/if}} />
+                  As Tower
+                </label>
+              </div>
+              <div class='aop-field'>
+                <label class='resource-label' title='UUID of the stub actor the summon is built from.'>Stub Actor UUID</label>
+                <input type='text' name='system.tagConfig.summonStubActorUuid'
+                       value='{{system.tagConfig.summonStubActorUuid}}' />
+              </div>
+              <div class='aop-field'>
+                <label class='resource-label'>AI Profile</label>
+                <select name='system.tagConfig.summonAiProfile'>
+                  {{#each aiProfileNames as |name|}}
+                    <option value='{{name}}' {{#if (eq name @root.system.tagConfig.summonAiProfile)}}selected{{/if}}>{{name}}</option>
+                  {{/each}}
+                </select>
+              </div>
+              <div class='aop-field'>
+                <label class='resource-label' title='UUID of the skill the tower AI fires.'>AI Skill UUID</label>
+                <input type='text' name='system.tagConfig.summonAiSkillUuid'
+                       value='{{system.tagConfig.summonAiSkillUuid}}' />
+              </div>
+            </div>
+          </div>
+        </div>
+      </details>
+      {{/if}}
+
+      {{! ── SECTION: Channel — the engine gate is tagConfig.channel, set by adding the tag. ── }}
+      {{#if show.channel}}
+      <details class='aop-section' data-section='channel' open>
+        <summary>
+          <span class='aop-section-title'>Channel</span>
+          <span class='aop-section-hint'>{{system.tagConfig.channelTickCost}} mana / tick{{#if system.tagConfig.channelRange}} &middot; {{system.tagConfig.channelRange}}ft{{/if}}</span>
+        </summary>
+        <div class='aop-section-body'>
+          <p class='hint aop-hint'>Each cast starts or continues a channel on the target; damage applies per tick and ramps while sustained. Removing the channel tag turns the mechanic off.</p>
+          <div class='aop-field-grid'>
+            <div class='aop-field'>
+              <label class='resource-label' title='Fraction of a reference round between ticks. 0.333 = three ticks per round.'>Tick Interval (&times; round)</label>
+              <input type='number' name='system.tagConfig.channelTickInterval'
+                     value='{{system.tagConfig.channelTickInterval}}' min='0.05' max='2' step='0.01' />
+            </div>
+            <div class='aop-field'>
+              <label class='resource-label' title='Resource charged per tick.'>Tick Cost</label>
+              <input type='number' name='system.tagConfig.channelTickCost'
+                     value='{{system.tagConfig.channelTickCost}}' min='0' step='1' />
+            </div>
+            <div class='aop-field'>
+              <label class='resource-label' title='Damage multiplier the ramp climbs to while the channel holds.'>Ramp Max (&times;)</label>
+              <input type='number' name='system.tagConfig.channelRampMax'
+                     value='{{system.tagConfig.channelRampMax}}' min='1' step='0.1' />
+            </div>
+            <div class='aop-field'>
+              <label class='resource-label' title='Ticks to reach the ramp max.'>Ramp Ticks</label>
+              <input type='number' name='system.tagConfig.channelRampTicks'
+                     value='{{system.tagConfig.channelRampTicks}}' min='1' step='1' />
+            </div>
+            <div class='aop-field'>
+              <label class='resource-label' title='Hard stop after this many ticks. 0 = until broken or out of resource.'>Max Ticks (0 = none)</label>
+              <input type='number' name='system.tagConfig.channelMaxTicks'
+                     value='{{system.tagConfig.channelMaxTicks}}' min='0' step='1' />
+            </div>
+            <div class='aop-field'>
+              <label class='resource-label' title='Break range in feet. 0 = caster casting range.'>Range (ft, 0 = casting)</label>
+              <input type='number' name='system.tagConfig.channelRange'
+                     value='{{system.tagConfig.channelRange}}' min='0' step='5' />
+            </div>
+          </div>
+        </div>
+      </details>
+      {{/if}}
+
+      {{! ── SECTION: Rider — Passive combat skills that fire off the actor's own attacks. ── }}
+      {{#if show.rider}}
+      <details class='aop-section' data-section='rider' {{#if system.tagConfig.procTrigger}}open{{/if}}>
+        <summary>
+          <span class='aop-section-title'>Rider</span>
+          <span class='aop-section-hint'>{{#if system.tagConfig.procTrigger}}{{system.tagConfig.procTrigger}} &middot; {{system.tagConfig.procCostFrac}} dmg-frac{{else}}not a rider{{/if}}</span>
+        </summary>
+        <div class='aop-section-body'>
+          <p class='hint aop-hint'>A rider fires off this actor's OWN attacks, charging stamina scaled to the parent blow's damage. Set a trigger to make this passive a rider.</p>
+          <div class='aop-field-grid'>
+            <div class='aop-field'>
+              <label class='resource-label'>Trigger</label>
+              <select name='system.tagConfig.procTrigger'>
+                <option value='' {{#unless system.tagConfig.procTrigger}}selected{{/unless}}>(none &mdash; not a rider)</option>
+                <option value='self_attack_pierced' {{#if (eq system.tagConfig.procTrigger "self_attack_pierced")}}selected{{/if}}>Own attack pierced armor</option>
+              </select>
+            </div>
+            <div class='aop-field'>
+              <label class='resource-label' title='Stamina cost per proc as a fraction of the parent attack&apos;s damage. 0 falls back to the global riders.procCostDamageFrac.'>Cost Fraction (&times; damage)</label>
+              <input type='number' name='system.tagConfig.procCostFrac'
+                     value='{{system.tagConfig.procCostFrac}}' min='0' max='1' step='0.01' />
+            </div>
+          </div>
+          <div class='aop-subblock'>
+            <span class='aop-subblock-title'>Attack Filter</span>
+            <p class='hint aop-hint'>ALL checked tags must be present on the triggering attack. Empty currently fires on EVERY attack.</p>
+            <div class='craft-allowed-grid'>
+              {{#each riderFilterTags as |tag|}}
+                <label class='aop-check'>
+                  <input type='checkbox' name='system.tagConfig.procAttackTags' value='{{tag}}'
+                         {{#if (includes @root.system.tagConfig.procAttackTags tag)}}checked{{/if}} />
+                  {{tag}}
+                </label>
+              {{/each}}
+            </div>
+          </div>
+        </div>
+      </details>
+      {{/if}}
+
+      {{! ── SECTION: Ritual ── }}
+      {{#if show.ritual}}
+      <details class='aop-section' data-section='ritual' open>
+        <summary>
+          <span class='aop-section-title'>Ritual</span>
+          <span class='aop-section-hint'>grade {{system.ritualGrade}} &middot; {{system.tagConfig.ritualChargesProduced}} charges{{#if system.tagConfig.lunarPhase}} &middot; {{system.tagConfig.lunarPhase}}{{/if}}</span>
+        </summary>
+        <div class='aop-section-body'>
+          <div class='aop-field-grid'>
+            <div class='aop-field'>
+              <label class='resource-label' title='Ritual grade scales prep cost and output (ritualGradeStep per grade).'>Grade</label>
+              <select name='system.ritualGrade'>
+                {{#each ritualGrades as |g|}}
+                  <option value='{{g}}' {{#if (eq g @root.system.ritualGrade)}}selected{{/if}}>{{g}}</option>
+                {{/each}}
+              </select>
+            </div>
+            <div class='aop-field'>
+              <label class='resource-label' title='Charges one successful preparation produces.'>Charges Produced</label>
+              <input type='number' name='system.tagConfig.ritualChargesProduced'
+                     value='{{system.tagConfig.ritualChargesProduced}}' min='1' step='1' />
+            </div>
+            <div class='aop-field'>
+              <label class='resource-label' title='Floor on the preparation mana-invest slider.'>Min Mana</label>
+              <input type='number' name='system.tagConfig.ritualMinMana'
+                     value='{{system.tagConfig.ritualMinMana}}' min='0' step='1' />
+            </div>
+            <div class='aop-field'>
+              <label class='resource-label' title='Which moon phase empowers this ritual. Empty = resolve from the skill&apos;s NAME against the phase list.'>Lunar Phase</label>
+              <select name='system.tagConfig.lunarPhase'>
+                <option value='' {{#unless system.tagConfig.lunarPhase}}selected{{/unless}}>(from name)</option>
+                {{#each config.celestial.phases as |phase|}}
+                  <option value='{{phase}}' {{#if (eq phase @root.system.tagConfig.lunarPhase)}}selected{{/if}}>{{phase}}</option>
+                {{/each}}
+              </select>
+            </div>
+            <div class='aop-field'>
+              <label class='resource-label' title='Skill fired when a charge is consumed. Empty = the ritual skill itself.'>Activation Skill</label>
+              <select name='system.tagConfig.ritualActivationSkillId'>
+                <option value='' {{#unless system.tagConfig.ritualActivationSkillId}}selected{{/unless}}>(this skill)</option>
+                {{#each availableChainSkills}}
+                  <option value='{{this.id}}' {{#if (eq this.id @root.system.tagConfig.ritualActivationSkillId)}}selected{{/if}}>{{this.name}}</option>
+                {{/each}}
+              </select>
+            </div>
+          </div>
+        </div>
+      </details>
+      {{/if}}
+
+      {{! ── SECTION: Unity ── }}
+      {{#if show.unity}}
+      <details class='aop-section' data-section='unity' open>
+        <summary>
+          <span class='aop-section-title'>Unity</span>
+          <span class='aop-section-hint'>{{system.tagConfig.unifiedAffinities.length}} affinities</span>
+        </summary>
+        <div class='aop-section-body'>
+          <p class='hint aop-hint'>Affinities this unity passive grants and reconciles on the owner.</p>
+          <div class='craft-allowed-grid'>
+            {{#each config.affinities as |aff key|}}
+              <label class='aop-check'>
+                <input type='checkbox' name='system.tagConfig.unifiedAffinities' value='{{key}}'
+                       {{#if (includes @root.system.tagConfig.unifiedAffinities key)}}checked{{/if}} />
+                {{localize aff.label}}
+              </label>
+            {{/each}}
+          </div>
         </div>
       </details>
       {{/if}}
@@ -850,6 +1214,11 @@
               <label class='resource-label' title='Multiplies the hit total when consuming defense pool. 1.5 = pool depletes 50% faster.'>Defense Pool Multiplier</label>
               <input type='number' name='system.tagConfig.shrapnelMultiplier'
                      value='{{system.tagConfig.shrapnelMultiplier}}' min='1.0' max='5.0' step='0.1' />
+            </div>
+            <div class='aop-field'>
+              <label class='resource-label' title='Flat bonus added to the shrapnel hit total.'>Hit Bonus</label>
+              <input type='number' name='system.tagConfig.shrapnelHitBonus'
+                     value='{{system.tagConfig.shrapnelHitBonus}}' min='0' max='20' step='1' />
             </div>
           </div>
         </div>
@@ -961,6 +1330,80 @@
       </details>
       {{/if}}
 
+      {{! ── SECTION: Requirements and Proficiency (three axes: TYPE / COMBINATION / STYLE) ── }}
+      {{#if show.requirements}}
+      <details class='aop-section' data-section='requirements'
+               {{#if (or (or system.tagConfig.requiresStyle system.tagConfig.requiresWeaponTag) (or system.tagConfig.styleSkill system.tagConfig.profFor))}}open{{/if}}>
+        <summary>
+          <span class='aop-section-title'>Requirements and Proficiency</span>
+          <span class='aop-section-hint'>{{#if system.tagConfig.profFor}}proficiency: {{system.tagConfig.profFor}}{{else}}{{#if system.tagConfig.requiresStyle}}{{system.tagConfig.requiresStyle}}{{else}}{{#if system.tagConfig.requiresWeaponTag}}{{system.tagConfig.requiresWeaponTag}}{{else}}none{{/if}}{{/if}}{{/if}}</span>
+        </summary>
+        <div class='aop-section-body'>
+          {{#if (eq system.skillType "Passive")}}
+          <div class='aop-subblock'>
+            <span class='aop-subblock-title'>Proficiency Declaration (this passive IS the proficiency)</span>
+            <p class='hint aop-hint'>This passive's own RARITY is the mastery ladder; its multiplier scales damage and to-hit for the declared weapon type.</p>
+            <div class='aop-field-grid'>
+              <div class='aop-field'>
+                <label class='resource-label' title='Weapon TYPE this passive is the proficiency for.'>Proficiency For</label>
+                <select name='system.tagConfig.profFor'>
+                  <option value='' {{#unless system.tagConfig.profFor}}selected{{/unless}}>(not a proficiency)</option>
+                  {{#each weaponTypeKeys as |wt|}}
+                    <option value='{{wt}}' {{#if (eq wt @root.system.tagConfig.profFor)}}selected{{/if}}>{{wt}}</option>
+                  {{/each}}
+                </select>
+              </div>
+              <div class='aop-field'>
+                <label class='resource-label' title='Block coefficient granted to an offhand of this type. 0 = none.'>Offhand Block Coef</label>
+                <input type='number' name='system.tagConfig.profOffhandBlockCoef'
+                       value='{{system.tagConfig.profOffhandBlockCoef}}' min='0' max='1' step='0.05' />
+              </div>
+              <div class='aop-field'>
+                <label class='resource-label' title='To-hit malus fraction while this style is active. 0 = none.'>Hit Malus Pct</label>
+                <input type='number' name='system.tagConfig.profHitMalusPct'
+                       value='{{system.tagConfig.profHitMalusPct}}' min='0' max='1' step='0.05' />
+              </div>
+            </div>
+          </div>
+          {{/if}}
+
+          <div class='aop-subblock'>
+            <span class='aop-subblock-title'>Usage Gates (what must be in hand / known)</span>
+            <div class='aop-field-grid'>
+              <div class='aop-field'>
+                <label class='resource-label' title='Hand arrangement required to use this skill (detected live from equipped gear).'>Requires Combination</label>
+                <select name='system.tagConfig.requiresStyle'>
+                  <option value='' {{#unless system.tagConfig.requiresStyle}}selected{{/unless}}>(none)</option>
+                  {{#each config.weaponCombinations as |combo key|}}
+                    <option value='{{key}}' {{#if (eq key @root.system.tagConfig.requiresStyle)}}selected{{/if}}>{{combo.label}}</option>
+                  {{/each}}
+                </select>
+              </div>
+              <div class='aop-field'>
+                <label class='resource-label' title='Weapon TYPE that must be in hand.'>Requires Weapon Type</label>
+                <select name='system.tagConfig.requiresWeaponTag'>
+                  <option value='' {{#unless system.tagConfig.requiresWeaponTag}}selected{{/unless}}>(none)</option>
+                  {{#each weaponTypeKeys as |wt|}}
+                    <option value='{{wt}}' {{#if (eq wt @root.system.tagConfig.requiresWeaponTag)}}selected{{/if}}>{{wt}}</option>
+                  {{/each}}
+                </select>
+              </div>
+              <div class='aop-field'>
+                <label class='resource-label' title='Name of the governing style Passive the actor must OWN (exact name match).'>Governing Style Skill</label>
+                <input type='text' name='system.tagConfig.styleSkill'
+                       value='{{system.tagConfig.styleSkill}}' />
+              </div>
+              <div class='aop-field'>
+                <label class='resource-label' title='Item id on the actor this skill requires equipped (also set automatically by equipment-granted skills).'>Required Equipment (item id)</label>
+                <input type='text' name='system.requiredEquipment'
+                       value='{{system.requiredEquipment}}' />
+              </div>
+            </div>
+          </div>
+        </div>
+      </details>
+      {{/if}}
+
       {{! ── SECTION: Chained Skills ── }}
       {{#if system.tags.length}}
       <details class='aop-section chain-config' data-section='chains' {{#if chainedSkills.length}}open{{/if}}>
@@ -1052,6 +1495,15 @@
               <select name='system.roll.statType' data-dtype='String'>
                 <option value="pure" {{#if (eq system.roll.statType "pure")}}selected{{/if}}>Pure</option>
                 <option value="hybrid" {{#if (eq system.roll.statType "hybrid")}}selected{{/if}}>Hybrid</option>
+              </select>
+            </div>
+            <div class='aop-field'>
+              <label class='resource-label' title='Second damage affinity for dual-element skills. Empty = single affinity.'>Secondary Affinity</label>
+              <select name='system.roll.secondaryAffinity' data-dtype='String'>
+                <option value='' {{#unless system.roll.secondaryAffinity}}selected{{/unless}}>(none)</option>
+                {{#each config.affinities as |aff key|}}
+                  <option value='{{key}}' {{#if (eq key @root.system.roll.secondaryAffinity)}}selected{{/if}}>{{localize aff.label}}</option>
+                {{/each}}
               </select>
             </div>
             {{#if (eq system.roll.statType "hybrid")}}
