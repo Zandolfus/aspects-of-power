@@ -250,7 +250,10 @@ export class AspectsofPowerItemSheet extends foundry.applications.api.Handlebars
           } catch (e) { /* graceful degrade */ }
           const isPrimary = !seenAug.has(augmentId);
           seenAug.add(augmentId);
-          const cost = 1; // slotCost not snapshotted (always 1 in practice)
+          // slotCost IS snapshotted now (spatial storage costs 2). Fall back
+          // to the live augment doc, then to 1 for pre-snapshot entries.
+          const cost = Math.max(1, Math.round(
+            entry.slotCost ?? (await fromUuid(augmentId).catch(() => null))?.system?.slotCost ?? 1));
           if (isPrimary) {
             const itemParts = (entry.itemBonuses ?? [])
               .filter(b => b.field && b.value)

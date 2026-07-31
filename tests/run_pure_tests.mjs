@@ -13,7 +13,7 @@ import {
   spellInvestDamage, strikeInvestDamage, infusionDamage, investSelfDamage,
   effectiveDodgeValue, splitEvenlyWithRemainder, perceiveGateDecision, activityTicks, nextCompletionDelta,
   proficiencyMultiplier, proficiencyHitMultiplier, parryMassMultiplier, lunarPhaseMultiplier, dotTickDamage, procStaminaCost, riderDamageBase,
-  crushFlatAmount, riderMaxInvest, itemWeightLb, KG_TO_LB, spatialCapacityLb, carriedWeightLb,
+  crushFlatAmount, riderMaxInvest, itemWeightLb, KG_TO_LB, carriedWeightLb,
 } from '../module/helpers/formulas.mjs';
 import { moonState, moonNodeAngle, nextSyzygy, eclipseAtSyzygy, planetStates,
          meteorShowersOn, cometStates, julianDay, civilDate, worldTimeForDate } from '../module/systems/calendar.mjs';
@@ -566,27 +566,9 @@ const johnGold = 22 * 19.30 * KG_TO_LB + iw({ slot: 'boots', material: 'leather'
 eq('gold density is impossible for John', johnGold / 2.5 > 311, true);
 
 // -- SPATIAL STORAGE (RULED 2026-07-30). Folded space: contents weigh nothing
-// to the carrier. Capacity is DERIVED from the craft like armorBonus, so a
-// better jeweller makes a roomier ring instead of the number drifting.
-const SCFG = {
-  spatialStorage: { capacityCoef: 4.0, retrieveWaitFraction: 1.0, requiredTag: 'spatial' },
-  craftSlotValues: { ring: 0.50, necklace: 0.40, chest: 0.50, back: 0.10 },
-  skillRarities: { common: { mult: 0.6 }, uncommon: { mult: 0.7 }, rare: { mult: 0.8 }, legendary: { mult: 1.0 } },
-};
-const cap = (o) => spatialCapacityLb({ ...o, cfg: SCFG });
-// GOLDEN: Willy's Ring of Folded Distances - progress 450, ring, rare.
-eq('spatial: Willy ring capacity', cap({ progress: 450, slot: 'ring', rarity: 'rare' }), 720);
-// It must fit the case that motivated the feature: John's 521 lb spare harness.
-eq('spatial: Willy ring fits John spare set', cap({ progress: 450, slot: 'ring', rarity: 'rare' }) >= 521, true);
-// Better craft -> roomier. That is the whole reason for deriving it.
-eq('spatial: higher progress is roomier',
-   cap({ progress: 900, slot: 'ring', rarity: 'rare' }) > cap({ progress: 450, slot: 'ring', rarity: 'rare' }), true);
-eq('spatial: higher rarity is roomier',
-   cap({ progress: 450, slot: 'ring', rarity: 'legendary' }) > cap({ progress: 450, slot: 'ring', rarity: 'rare' }), true);
-// Not a storage unless it resolves.
-eq('spatial: no progress is not a storage', cap({ progress: 0, slot: 'ring', rarity: 'rare' }), 0);
-eq('spatial: unknown slot is not a storage', cap({ progress: 450, slot: 'nope', rarity: 'rare' }), 0);
-
+// to the carrier. Capacity is AUGMENT-GRANTED (a two-slot augment writes
+// spatialCapacity onto the host via deriveItemStats), so there is no pure
+// capacity formula to test here - only what lands on your back.
 // -- carriedWeightLb: what actually lands on your back.
 const RING = 'ring1', BAG = 'bag1';
 const inv = [

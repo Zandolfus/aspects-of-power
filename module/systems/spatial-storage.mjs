@@ -1,11 +1,12 @@
 /**
  * SPATIAL STORAGE — folded space (design-spatial-storage.md, RULED 2026-07-30).
  *
- * What is inside weighs nothing to the carrier. Two rulings shape it:
+ * What is inside weighs nothing to the carrier. Three rulings shape it:
  *
- *   CAPACITY IS DERIVED FROM THE CRAFT, the same way armorBonus is —
- *   progress x slotValue x rarity x coef. A better jeweller makes a roomier
- *   ring, so capacity tracks the power curve instead of drifting from it.
+ *   IT IS AN AUGMENT COSTING TWO SLOTS. Nothing about a base craft folds
+ *   space — an item is an ordinary ring until a Spatial Storage augment is
+ *   slotted in, and it eats two of the host's slots, so storage competes with
+ *   stats, armour and damage for the same scarce resource.
  *
  *   RETRIEVING COSTS AN ACTION. Reaching into folded space is a turn's worth
  *   of celerity, so a spatial ring is a logistics tool rather than a free
@@ -25,7 +26,6 @@
  *   await S.retrieve(actor, itemId);  // costs an action in combat
  */
 
-import { spatialCapacityLb } from '../helpers/formulas.mjs';
 import { chargeActionCost, isInActiveCombat } from './celerity.mjs';
 
 /** Is this item a spatial storage? */
@@ -34,15 +34,17 @@ export function isStorage(item) {
 }
 
 /**
- * Capacity this item SHOULD have, from its craft. Used at craft time and by
- * the backfill; the stored value is what the rest of the system reads.
+ * Spatial storage is AUGMENT-GRANTED (RULED 2026-07-30) and the augment costs
+ * TWO slots, so it competes with stats, armour and damage for the same scarce
+ * resource. Nothing about the base craft folds space — `spatialCapacity` is
+ * written onto the host by deriveItemStats from the augment's itemBonuses,
+ * and its magnitude rides the augment's scaleWithCrafter magnifier, so it is
+ * the JEWELLER'S skill that decides how much space folds.
+ *
+ * There is deliberately no derivedCapacity() helper here: the derivation lives
+ * in item-derivation with every other augment-granted field, and a second copy
+ * would be exactly the kind of drift this codebase keeps paying for.
  */
-export function derivedCapacity(item) {
-  const s = item?.system ?? {};
-  const req = globalThis.CONFIG?.ASPECTSOFPOWER?.spatialStorage?.requiredTag ?? 'spatial';
-  if (req && !(s.tags ?? []).includes(req)) return 0;
-  return spatialCapacityLb({ progress: s.progress, slot: s.slot, rarity: s.rarity });
-}
 
 /** Every storage the actor owns, with live usage. */
 export function storagesOf(actor) {

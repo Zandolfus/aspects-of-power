@@ -130,6 +130,10 @@ export function deriveItemStats(itemOrPatch) {
   let damageBonus = 0;
   let damageReductionPhysical = 0;
   let damageReductionMagical  = 0;
+  // SPATIAL STORAGE is purely augment-granted (RULED 2026-07-30): the item is
+  // an ordinary ring or amulet until a Spatial Storage augment is slotted into
+  // it. Nothing about the base craft folds space, so this starts at zero.
+  let spatialCapacity = 0;
 
   // ── Augment itemBonuses ──
   // Each augment in `system.augments` is `{ augmentId: <UUID> }`. Resolve
@@ -142,15 +146,29 @@ export function deriveItemStats(itemOrPatch) {
   //   - 'damageReduction.physical|magical' (flat — percentage NOT supported per
   //                                         user note "no % reductions, too powerful")
   //   - 'statBonus.<ability>'              (flat — appends to statBonuses array)
+  //   - 'spatialCapacity'                  (flat — folds space; see below)
   // Augment effect data is SNAPSHOTTED on each slot entry at apply time.
   // Read from the snapshot — no compendium lookup needed (race-free).
   // Legacy entries with no snapshot (`itemBonuses` undefined/empty) are
   // skipped here; they'll get backfilled by the world-augment migration.
   // Both combat-slot (augments) and prof-slot (profAugments) entries can
   // carry itemBonuses (hybrid augs like Engrave/Durability fit either slot).
-  const augs = [...(sys.augments ?? []), ...(sys.profAugments ?? [])];
-  for (const a of augs) {
+  // MULTI-SLOT AUGMENTS occupy `slotCost` CONSECUTIVE entries carrying the
+  // same augmentId (both slotting paths write them that way). Bonuses must
+  // apply ONCE, which is what the slotCost schema note promises — but nothing
+  // actually deduped until spatial storage became the first slotCost>1
+  // augment and would have granted double capacity. Dedupe per slot-list so a
+  // combat copy and a profession copy of the same augment still both count.
+  const augs = [
+    ...(sys.augments ?? []).map(a => ({ a, list: 'c' })),
+    ...(sys.profAugments ?? []).map(a => ({ a, list: 'p' })),
+  ];
+  const seenAugs = new Set();
+  for (const { a, list } of augs) {
     if (!a?.augmentId) continue;
+    const dedupeKey = `${list}:${a.augmentId}`;
+    if (seenAugs.has(dedupeKey)) continue;
+    seenAugs.add(dedupeKey);
     const bonuses = a.itemBonuses ?? [];
     for (const b of bonuses) {
       const field = b.field ?? '';
@@ -174,6 +192,10 @@ export function deriveItemStats(itemOrPatch) {
         damageReductionPhysical += Math.round(value);
       } else if (field === 'damageReduction.magical') {
         damageReductionMagical += Math.round(value);
+      } else if (field === 'spatialCapacity') {
+        // Capacity in POUNDS. Flat only — a percentage of zero is zero, and
+        // an item has no base capacity to scale.
+        spatialCapacity += Math.round(value);
       } else if (field.startsWith('statBonus.')) {
         const ability = field.slice('statBonus.'.length);
         if (ABILITY_KEYS.includes(ability) && value > 0) {
@@ -196,6 +218,7 @@ export function deriveItemStats(itemOrPatch) {
     damageBonus,
     damageReductionPhysical,
     damageReductionMagical,
+    spatialCapacity,
   };
 }
 

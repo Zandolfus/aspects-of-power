@@ -9,7 +9,7 @@
  * byte-identical to its previous class-body form (no object-literal comma
  * surgery); the export collects the prototype methods into a plain mixin.
  */
-import { hybridAbilityMod, itemWeightLb, spatialCapacityLb } from '../helpers/formulas.mjs';
+import { hybridAbilityMod, itemWeightLb } from '../helpers/formulas.mjs';
 
 class CraftingSkills {
   /**
@@ -1312,15 +1312,21 @@ class CraftingSkills {
       value:    scaleValue(b.value),
       affinity: b.affinity ?? '',
     }));
+    const _slotCost = Math.max(1, Math.round(augmentDoc.system?.slotCost ?? 1));
     const snapshotEntry = {
       augmentId:    augmentDoc.uuid,
       itemBonuses:  snapshotItemBonuses,
       craftBonuses: snapshotCraftBonuses,
       grantsTags:   [...(augmentDoc.system?.grantsTags ?? [])],
+      slotCost:     _slotCost,
     };
     // Prune cleared {augmentId: ''} entries so garbage from earlier removes
     // doesn't accumulate and the array stays aligned with actual usage.
-    const updatedAugs = [...currentList.filter(e => e.augmentId), snapshotEntry];
+    // A multi-slot augment occupies `slotCost` consecutive entries with the
+    // same augmentId, matching what the sheet's drag path writes. Consumers
+    // dedupe by id so the bonuses still apply once.
+    const updatedAugs = [...currentList.filter(e => e.augmentId),
+      ...Array.from({ length: _slotCost }, () => snapshotEntry)];
     await targetItem.update({ ['system.' + slotField]: updatedAugs });
 
     if (materialItem) {
@@ -2093,13 +2099,6 @@ class CraftingSkills {
             // Set at craft so new gear is never weightless; deliberately NOT
             // rarity-scaled, so a masterwork helm weighs what a crude one does.
             weight: itemWeightLb({ slot: outputSlot, material: outputMaterial, tags: craftedFreeTags }),
-            // SPATIAL STORAGE: a `spatial`-tagged craft folds space. Capacity
-            // derives from the craft like armorBonus does, so a better
-            // jeweller makes a roomier ring (design-spatial-storage.md).
-            spatialCapacity: craftedFreeTags.includes(
-              CONFIG.ASPECTSOFPOWER.spatialStorage?.requiredTag ?? 'spatial')
-              ? spatialCapacityLb({ progress: totalProgress, slot: outputSlot, rarity: qualityData.rarity })
-              : 0,
           },
         }]);
       }

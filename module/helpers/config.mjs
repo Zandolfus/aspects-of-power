@@ -1090,28 +1090,27 @@ ASPECTSOFPOWER.volumelessMaterials = ['jewelry'];
 /**
  * SPATIAL STORAGE (design-spatial-storage.md, RULED 2026-07-30).
  *
- * Folded space: contents weigh nothing to the carrier. Capacity is DERIVED
- * from the craft the same way armorBonus is —
+ * Folded space: contents weigh nothing to the carrier.
  *
- *   capacity_lb = progress x craftSlotValues[slot] x rarityMult x capacityCoef
+ * IT IS AN AUGMENT, COSTING TWO SLOTS. Nothing about a base craft folds space
+ * - an item is an ordinary ring or amulet until a Spatial Storage augment is
+ * slotted into it, and that augment eats two of the host's augment slots. So
+ * spatial storage competes directly with stats, armour and damage for the same
+ * scarce resource: a rare ring (3 slots) carrying one has a single slot left
+ * for anything else. `slotCost` already existed on the augment schema and both
+ * slotting paths honour it - this is its first real user.
  *
- * so a better jeweller makes a roomier ring and capacity tracks the power
- * curve instead of drifting from it. `capacityCoef` is the only free number.
- *
- * At 4.0, Willy's Ring of Folded Distances (progress 450, ring slot 0.50,
- * rare 0.8) holds 450 x 0.50 x 0.8 x 4.0 = 720 lb — enough for John's 521 lb
- * spare harness with room to spare, which is the case that motivated this.
- *
- * REQUIRES the `spatial` tag to craft one, so spatial storage stays gated on
- * space-affinity materials rather than being a property any ring can have.
+ * Capacity rides the augment's `scaleWithCrafter` magnifier, so it is the
+ * JEWELLER'S skill that decides how much space folds - consistent with the
+ * 2026-07-25 ruling that augment magnitude comes from the crafter.
  */
 ASPECTSOFPOWER.spatialStorage = {
-  capacityCoef: 4.0,
   // Retrieving from folded space costs an action. Expressed as a fraction of
   // the actor's own baseline action wait, so it scales with celerity like
   // every other timing in the system rather than being a flat tick count.
   retrieveWaitFraction: 1.0,
-  requiredTag: 'spatial',
+  // Slots the Spatial Storage augment consumes on its host.
+  augmentSlotCost: 2,
 };
 
 /** Specific materials, overriding the class default where known. */

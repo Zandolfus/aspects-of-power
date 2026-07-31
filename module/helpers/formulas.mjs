@@ -568,32 +568,6 @@ export function itemWeightLb({ slot = '', material = '', species = '', tags = []
 }
 
 /**
- * Spatial-storage capacity in POUNDS, derived from the craft exactly as
- * armorBonus is (design-spatial-storage.md, RULED 2026-07-30):
- *
- *   capacity = progress x craftSlotValues[slot] x rarityMult x capacityCoef
- *
- * Deriving rather than authoring means a better jeweller makes a roomier ring
- * and capacity tracks the power curve — the same reason armour value is
- * derived. Returns 0 when the item is not a storage.
- *
- * @param {object} o
- * @param {number} [o.progress]  item.system.progress
- * @param {string} [o.slot]      item.system.slot
- * @param {string} [o.rarity]    item.system.rarity
- * @param {object} [o.cfg]       CONFIG.ASPECTSOFPOWER override, for tests
- * @returns {number} pounds, rounded.
- */
-export function spatialCapacityLb({ progress = 0, slot = '', rarity = 'common', cfg = null } = {}) {
-  const C = cfg ?? globalThis.CONFIG?.ASPECTSOFPOWER ?? {};
-  const coef = C.spatialStorage?.capacityCoef ?? 4.0;
-  const slotVal = (C.craftSlotValues ?? {})[slot];
-  const rarityMult = (C.skillRarities ?? {})[rarity]?.mult;
-  if (!(progress > 0) || !(slotVal > 0) || !(rarityMult > 0) || !(coef > 0)) return 0;
-  return Math.round(progress * slotVal * rarityMult * coef);
-}
-
-/**
  * Total pounds an actor is actually carrying, given spatial storage.
  *
  * An item is weightless only while the storage holding it is BOTH present and
