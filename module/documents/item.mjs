@@ -7,7 +7,7 @@ import { selectTargetOnCanvas, skillNeedsTargetPrompt, skillTargetsAtFire, selec
 import { regionTokenOverlap, segmentIntersect } from '../helpers/geometry.mjs';
 import { CraftingSkillsMixin } from '../systems/crafting-skills.mjs';
 import { executeGmAction as executeGmActionImpl } from '../systems/gm-actions.mjs';
-import { proficiencyDamageMult, heldWeaponWeight } from '../systems/weapon-styles.mjs';
+import { proficiencyDamageMult, proficiencyHitMult, heldWeaponWeight } from '../systems/weapon-styles.mjs';
 
 /**
  * Check if an actor is an assigned player character (not just owned).
@@ -4612,6 +4612,23 @@ export class AspectsofPowerItem extends Item {
       }
     }
 
+    // ── PROFICIENCY ON TO-HIT (RULED 2026-07-30) ──────────────────────────
+    // Mastery of the weapon type scales accuracy on its own COMPRESSED ladder
+    // (10% per tier vs the damage ladder's ~16.7%) — sim in
+    // migration/proficiency_tohit_sim.js; design-proficiency-tohit.md.
+    // Gated to the same weapon-flavoured roll types as the damage scaling,
+    // and applied AFTER the spellstrike override so a TYPE-2 fusion (weapon
+    // roll type + spellstrike) keeps it on its weapon-derived hit. TYPE-1
+    // vehicles (magic roll type) stay neutral — same scope line the damage
+    // side draws. Parries never reach here (options.parryOnly returns above),
+    // so the defender-side parry proficiency (81b20fa) cannot double-count.
+    // Chained/rider children build their formulas directly and stay neutral.
+    if (hitFormula
+        && (CONFIG.ASPECTSOFPOWER.weaponProficiency?.rollTypes ?? []).includes(rollData.roll.type)) {
+      const _hm = proficiencyHitMult(this.actor, this._proficiencyWeapon());
+      if (_hm !== 1) hitFormula = `(${hitFormula})*${_hm}`;
+    }
+
     // ── Variable resource invest (per design-magic/melee/ranged-system.md) ─
     // Two gated paths share the same dialog:
     //   Spell: mana + attack + tier+grade set                → Int × mult × √invested
@@ -5001,9 +5018,15 @@ export class AspectsofPowerItem extends Item {
         // Multiplier resolution: prefer hand-tuned `diceBonus` (designer-set,
         // non-default value) so existing skills don't drift before migration.
         // Otherwise fall back to the rarity-based effective mult.
+        // An authored diceBonus still carries weapon proficiency (0a25721 —
+        // "an authored diceBonus can no longer opt out of proficiency"; that
+        // commit patched _buildRollFormulas and this path had been missed, so
+        // the REAL damage path let authored skills silently skip the ladder).
         const dbVal = this.system.roll?.diceBonus ?? 1;
         const { effectiveMult } = this._resolveRarityMods();
-        const multiplier = (dbVal !== 1) ? dbVal : effectiveMult;
+        const multiplier = (dbVal !== 1)
+          ? dbVal * this._proficiencyDamageMult()
+          : effectiveMult;
 
         // Windup and the weapon buff are resolved BEFORE the invest dialog so
         // the preview can include them — they are terms of the damage the swing

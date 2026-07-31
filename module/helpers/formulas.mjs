@@ -273,6 +273,40 @@ export function proficiencyMultiplier(rarity, rarities = null, anchor = null) {
 }
 
 /**
+ * Proficiency multiplier for TO-HIT (RULED 2026-07-30: "multiply makes the
+ * most sense. reduce it down to a 10% difference between each rank").
+ *
+ * DELIBERATELY a different, compressed ladder from the damage one. The damage
+ * ratio is ~16.7% per tier, and the whole d20 band is only a 1.188x span —
+ * simmed (migration/proficiency_tohit_sim.js), the full ratio on to-hit flips
+ * the marquee dodge fight from 99% dodged to a coin flip in ONE tier and to
+ * near-automatic in two (163r -> 3r -> 0.9r TTK). At 10% per tier the same
+ * fight walks 99% -> 77% -> 34% -> saturating only at a legendary-vs-common
+ * gap, which is the ruled intent: mastery dominance, without one rank being a
+ * light switch.
+ *
+ * Tier distance is derived from the ladder's fixed 0.1 mult spacing, so
+ * rusty = -2 steps (0.8x), uncommon = +1 (1.1x), divine = +6 (1.6x).
+ *
+ * @param {string|null} rarity   The proficiency passive's rarity, or null.
+ * @param {object} [rarities]    skillRarities override (defaults to CONFIG).
+ * @param {string} [anchor]      Rarity treated as neutral.
+ * @param {number} [perTier]     Hit bonus per tier (config hitPerTier, 0.10).
+ * @returns {number}
+ */
+export function proficiencyHitMultiplier(rarity, rarities = null, anchor = null, perTier = null) {
+  const C = globalThis.CONFIG?.ASPECTSOFPOWER ?? {};
+  const table = rarities ?? C.skillRarities ?? {};
+  const key = anchor ?? C.weaponProficiency?.anchor ?? 'common';
+  const per = perTier ?? C.weaponProficiency?.hitPerTier ?? 0.10;
+  const anchorMult = table[key]?.mult;
+  const ownMult = rarity ? table[rarity]?.mult : null;
+  if (!anchorMult || !ownMult || !(per > 0)) return 1;
+  const steps = Math.round((ownMult - anchorMult) / 0.1);
+  return Math.max(0.1, 1 + per * steps);
+}
+
+/**
  * Parry mass ratio (design-weapon-proficiencies.md, RULED 2026-07-27:
  * "it's hard to parry a huge sword").
  *

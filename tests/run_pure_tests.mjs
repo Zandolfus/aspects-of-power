@@ -12,7 +12,7 @@ import {
   houseHitFormula, hybridAbilityMod, weaponStatBlend, spellDamageRef,
   spellInvestDamage, strikeInvestDamage, infusionDamage, investSelfDamage,
   effectiveDodgeValue, splitEvenlyWithRemainder, perceiveGateDecision, activityTicks, nextCompletionDelta,
-  proficiencyMultiplier, parryMassMultiplier, lunarPhaseMultiplier, dotTickDamage, procStaminaCost, riderDamageBase,
+  proficiencyMultiplier, proficiencyHitMultiplier, parryMassMultiplier, lunarPhaseMultiplier, dotTickDamage, procStaminaCost, riderDamageBase,
   crushFlatAmount, riderMaxInvest,
 } from '../module/helpers/formulas.mjs';
 import { moonState, moonNodeAngle, nextSyzygy, eclipseAtSyzygy, planetStates,
@@ -482,6 +482,27 @@ eq('rider ceiling never below base', riderMaxInvest(68, 10, 3.0), 68);
 eq('rider ceiling floors a negative pool at base', riderMaxInvest(68, -5, 3.0), 68);
 // George's 3 crush stacks must still fit in his pool at the ceiling's floor.
 eq('George still affords 3 base-invest crush stacks', 3 * 68 <= 225, true);
+
+// -- PROFICIENCY ON TO-HIT (RULED 2026-07-30: multiplicative, 10% per tier -
+// deliberately compressed vs the ~16.7% damage step; the sim showed the full
+// ratio flips the marquee dodge fight in one tier). Ladder spacing is 0.1
+// mult per tier, anchored at common. Reuses the damage tests' RAR table.
+const phm = (r, per) => proficiencyHitMultiplier(r, RAR, 'common', per ?? 0.10);
+eq('hit prof: common is neutral', phm('common'), 1);
+eq('hit prof: uncommon +10%', phm('uncommon'), 1.1);
+eq('hit prof: rare +20%', phm('rare'), 1.2);
+eq('hit prof: legendary +40%', phm('legendary'), 1.4);
+eq('hit prof: divine +60%', phm('divine'), 1.6);
+eq('hit prof: rusty (untrained-tracked) -20%', phm('rusty'), 0.8);
+eq('hit prof: not_proficient -40%', phm('not_proficient'), 0.6);
+eq('hit prof: null rarity is neutral', phm(null), 1);
+eq('hit prof: perTier 0 disables', phm('divine', 0), 1);
+// THE COMPRESSION IS THE POINT: one hit tier must be well inside the 1.188x
+// dice span, where one DAMAGE tier (1.167x) nearly fills it.
+eq('one hit tier is inside the dice band', phm('uncommon') < 1.188, true);
+eq('the damage tier nearly fills the band', proficiencyMultiplier('uncommon', RAR, 'common') > 1.15, true);
+// GOLDEN from the live pull: Phil hit blend 870, uncommon -> 957.
+eq('Phil uncommon hit blend', Math.round(870 * phm('uncommon')), 957);
 
 if (failures) { console.error(`\n${failures} FAILURES`); process.exit(1); }
 console.log('\nAll pure-function tests pass.');

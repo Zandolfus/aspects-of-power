@@ -772,6 +772,14 @@ ASPECTSOFPOWER.weaponProficiency = {
   // ASPECTSOFPOWER.rollTypes, so it could not even be authored. This list was
   // the last live reference. World content migrated in the same change.
   rollTypes: ['str_weapon', 'dex_weapon', 'phys_ranged', 'weapon'],
+  // TO-HIT ladder step (RULED 2026-07-30: "multiply makes the most sense.
+  // reduce it down to a 10% difference between each rank"). DELIBERATELY
+  // compressed vs the ~16.7% damage step: the d20 band is only a 1.188x span,
+  // so the full ratio flips the marquee dodge fight from 99% dodged to a coin
+  // flip in ONE tier (sim: migration/proficiency_tohit_sim.js). At 0.10 the
+  // same fight walks 99% -> 77% -> 34% across tiers instead. Set 0 to disable
+  // the hit half entirely.
+  hitPerTier: 0.10,
 };
 
 /**

@@ -25,7 +25,7 @@
  *   S.canUseSkill(actor, skill);            // {allowed, reason}
  */
 
-import { proficiencyMultiplier } from '../helpers/formulas.mjs';
+import { proficiencyMultiplier, proficiencyHitMultiplier } from '../helpers/formulas.mjs';
 
 /** Equipped, unbroken weapon-slot items. A broken weapon arranges nothing. */
 function equippedWeapons(actor) {
@@ -200,22 +200,57 @@ export function activeProficiencies(actor) {
  * @returns {number}
  */
 export function proficiencyDamageMult(actor, weapon = null) {
+  const rarities = _resolveProfRarities(actor, weapon);
+  if (!rarities) return 1;
+  return Math.max(...rarities.map(r => proficiencyMultiplier(r)));
+}
+
+/**
+ * Proficiency multiplier for TO-HIT — same resolution as the damage mult
+ * (tracked-only, untrained counts as rusty, judged against the weapon being
+ * swung, best of the weapon's types), mapped through the COMPRESSED hit
+ * ladder (RULED 2026-07-30, 10% per tier — see formulas.proficiencyHitMultiplier
+ * for why the two ladders differ).
+ *
+ * @param {Actor} actor
+ * @param {Item} [weapon] Resolve against one weapon; omit to use everything held.
+ * @returns {number}
+ */
+export function proficiencyHitMult(actor, weapon = null) {
+  const rarities = _resolveProfRarities(actor, weapon);
+  if (!rarities) return 1;
+  return Math.max(...rarities.map(r => proficiencyHitMultiplier(r)));
+}
+
+/**
+ * Shared resolution for both proficiency multipliers: WHICH rarity applies.
+ * Returns the per-type rarity keys, or null when the actor is neutral
+ * (untracked, proficiency disabled, or no resolvable weapon types). Split out
+ * 2026-07-30 when the hit multiplier landed — two copies of the tracked/
+ * untrained/type-resolution policy would drift, and this policy is the
+ * load-bearing part (see the scoping note above proficiencyDamageMult).
+ */
+function _resolveProfRarities(actor, weapon) {
   const cfg = globalThis.CONFIG?.ASPECTSOFPOWER?.weaponProficiency ?? {};
-  if (cfg.enabled === false) return 1;
+  if (cfg.enabled === false) return null;
 
   // Untracked actors are neutral, exactly as before. The penalty only exists
   // for someone who has demonstrably been trained in SOMETHING.
   const tracked = (actor?.items ?? []).some(i =>
     i.type === 'skill' && i.system?.tagConfig?.profFor);
-  if (!tracked) return 1;
+  if (!tracked) return null;
 
-  const untrained = proficiencyMultiplier(cfg.untrainedRarity ?? 'rusty');
+  const untrained = cfg.untrainedRarity ?? 'rusty';
+  const anchor = cfg.anchor ?? 'common';
   const types = weapon ? weaponTypesOfItem(weapon) : weaponTypesOf(actor);
-  const found = types.map(t => {
+  if (!types.length) return null;
+  return types.map(t => {
     const p = proficiencyFor(actor, t);
-    return p ? proficiencyMultiplier(p.system?.rarity ?? null) : untrained;
+    // No passive at all -> untrained. A passive with NO rarity set -> the
+    // anchor (neutral, multiplier 1 on both ladders) — matching the pre-split
+    // behaviour where proficiencyMultiplier(null) returned 1.
+    return p ? (p.system?.rarity ?? anchor) : untrained;
   });
-  return found.length ? Math.max(...found) : 1;
 }
 
 /**
