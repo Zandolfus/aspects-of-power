@@ -398,11 +398,12 @@
             <div class='aop-field-grid'>
               <div class='aop-field'>
                 <label class='resource-label' title='Lower bound of cast wait for teleport/leap (very short hops). Set equal to Max to disable distance scaling.'>Min Fraction (&times; round, at 0 ft)</label>
-                <input type='number' name='system.tagConfig.grantedMinActivationFraction' value='{{system.tagConfig.grantedMinActivationFraction}}' min='0' max='2' step='0.01' />
+                {{! step='any': the schema default is 1/9 — a finite step marks the stored value :invalid, and ONE invalid input blocks the whole form's submit path. }}
+                <input type='number' name='system.tagConfig.grantedMinActivationFraction' value='{{system.tagConfig.grantedMinActivationFraction}}' min='0' max='2' step='any' />
               </div>
               <div class='aop-field'>
                 <label class='resource-label' title='Cast wait at the skill&apos;s max teleport/leap distance. Wait lerps from min to this by distancePicked / maxDistance.'>Max Fraction (&times; round, at max range)</label>
-                <input type='number' name='system.tagConfig.grantedActivationFraction' value='{{system.tagConfig.grantedActivationFraction}}' min='0' max='2' step='0.01' />
+                <input type='number' name='system.tagConfig.grantedActivationFraction' value='{{system.tagConfig.grantedActivationFraction}}' min='0' max='2' step='any' />
               </div>
             </div>
           </div>
@@ -1038,7 +1039,7 @@
             <div class='aop-field'>
               <label class='resource-label' title='Fraction of a reference round between ticks. 0.333 = three ticks per round.'>Tick Interval (&times; round)</label>
               <input type='number' name='system.tagConfig.channelTickInterval'
-                     value='{{system.tagConfig.channelTickInterval}}' min='0.05' max='2' step='0.01' />
+                     value='{{system.tagConfig.channelTickInterval}}' min='0.05' max='2' step='any' />
             </div>
             <div class='aop-field'>
               <label class='resource-label' title='Resource charged per tick.'>Tick Cost</label>

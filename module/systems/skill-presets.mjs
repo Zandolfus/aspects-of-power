@@ -44,37 +44,40 @@ export class SkillPresets {
     const keys = Object.keys(presets);
     if (!keys.length) return;
 
-    // Group options the way the config authors them.
+    // Group options the way the config authors them. Hints ride each option
+    // as a data attribute — DialogV2 sanitizes content, so no script tags,
+    // and the wrapper must NOT be a <form> (the parser strips a form nested
+    // inside DialogV2's own form, taking its class with it).
+    const esc = (s) => String(s ?? '').replace(/&/g, '&amp;').replace(/"/g, '&quot;')
+      .replace(/</g, '&lt;').replace(/>/g, '&gt;');
     const groups = {};
     for (const key of keys) {
       const p = presets[key];
       (groups[p.group ?? 'Other'] ??= []).push({ key, ...p });
     }
     const optionsHtml = Object.entries(groups).map(([group, entries]) =>
-      `<optgroup label="${group}">` + entries.map(e =>
-        `<option value="${e.key}">${e.label}</option>`).join('') + '</optgroup>'
+      `<optgroup label="${esc(group)}">` + entries.map(e =>
+        `<option value="${esc(e.key)}" data-hint="${esc(e.hint)}">${esc(e.label)}</option>`).join('') + '</optgroup>'
     ).join('');
-    const hintsJson = JSON.stringify(Object.fromEntries(
-      keys.map(k => [k, presets[k].hint ?? ''])));
 
     const choice = await foundry.applications.api.DialogV2.wait({
       window: { title: `What kind of skill is ${item.name}?` },
       position: { width: 420 },
       content: `
-        <form class="skill-preset-picker">
+        <div class="skill-preset-picker">
           <p class="hint" style="font-size:11px;color:#888;margin:0 0 6px;">
             A preset sets the skill type, tags and family defaults so the sheet
             opens showing only what matters. Everything stays editable.</p>
           <select name="preset" style="width:100%;">${optionsHtml}</select>
           <p class="hint skill-preset-hint" style="font-size:11px;color:#aaa;min-height:2.2em;margin:6px 0 0;"></p>
-          <script type="application/json" class="skill-preset-hints">${hintsJson}</script>
-        </form>`,
+        </div>`,
       render: (_event, dialog) => {
         const root = dialog?.element ?? dialog;
         const sel = root.querySelector('select[name="preset"]');
         const hintEl = root.querySelector('.skill-preset-hint');
-        const hints = JSON.parse(root.querySelector('.skill-preset-hints')?.textContent ?? '{}');
-        const sync = () => { if (hintEl) hintEl.textContent = hints[sel.value] ?? ''; };
+        const sync = () => {
+          if (hintEl) hintEl.textContent = sel?.selectedOptions?.[0]?.dataset?.hint ?? '';
+        };
         sel?.addEventListener('change', sync);
         sync();
       },

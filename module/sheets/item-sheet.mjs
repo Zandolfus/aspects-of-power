@@ -886,6 +886,34 @@ export class AspectsofPowerItemSheet extends foundry.applications.api.Handlebars
       await this.document.update({ 'system.craftAllowedTypes': types });
       return;
     }
+
+    // Alteration row selects: rebuild the whole array from the DOM. Positional
+    // dot-paths (system.alterations.0.id) reach a full-form submit as an
+    // OBJECT with numeric keys, which an ArrayField will not take.
+    if (this.item.type === 'skill' && event.target?.name?.startsWith('system.alterations.')) {
+      const storedAlts = this.item.system.alterations ?? [];
+      const alterations = [...this.element.querySelectorAll('[name^="system.alterations."]')]
+        .map((sel, i) => ({ id: sel.value, params: storedAlts[i]?.params ?? {} }));
+      await this.document.update({ 'system.alterations': alterations });
+      return;
+    }
+
+    // Any remaining named skill field (components, ritualGrade,
+    // requiredEquipment...): update it directly. Falling through to the
+    // full-form submit is NOT reliable here — one :invalid input anywhere in
+    // the form silently blocks the whole submit (found live 2026-07-31: the
+    // 1/9 and 1/3 fraction defaults vs step=0.01 had the components and
+    // ritual grade silently not saving on granted/channel skills), and the
+    // full submit would also serialize alteration rows in the object form
+    // ArrayFields reject. Direct dot-path writes sidestep both.
+    if (this.item.type === 'skill' && event.target?.name?.startsWith('system.')) {
+      const t = event.target;
+      const value = t.type === 'checkbox' ? t.checked
+        : t.type === 'number' ? Number(t.value)
+        : t.value;
+      await this.document.update({ [t.name]: value });
+      return;
+    }
     // --- Consumable fields: direct update for simple fields ---
     if (this.item.type === 'consumable' && event.target?.name?.startsWith('system.')) {
       const name = event.target.name;
