@@ -4642,8 +4642,14 @@ export class AspectsofPowerItem extends Item {
         return;
       }
 
-      // Immobilized blocks physical (non-mana) skills.
-      if (_hasDebuff('immobilized') && rollData.roll.resource !== 'mana') {
+      // Immobilized blocks PHYSICAL skills. `resource !== 'mana'` was a proxy
+      // for that, which broke the moment health became a casting resource
+      // (2026-07-31) — an immobilized blood mage is not moving, she is
+      // bleeding, and should still be able to cast. Ask the real question:
+      // anything carrying the `magic` tag is a cast, whatever it costs.
+      if (_hasDebuff('immobilized')
+          && rollData.roll.resource !== 'mana'
+          && !tags.includes('magic')) {
         ui.notifications.warn(`${this.actor.name} ${game.i18n.localize('ASPECTSOFPOWER.Debuff.cannotAct')} (${game.i18n.localize('ASPECTSOFPOWER.Debuff.immobilized')})`);
         return;
       }
@@ -4864,7 +4870,13 @@ export class AspectsofPowerItem extends Item {
     const spellGrade = this.actor?.system?.attributes?.race?.rank
                     || this.system.roll?.grade
                     || '';
-    const isVariableSpell = rollData.roll.resource === 'mana'
+    // HEALTH IS AN INVEST RESOURCE (RULED 2026-07-31). Paying in blood is a
+    // real school here, not a flavour label — and before this, choosing
+    // `health` silently dropped the skill onto the legacy formula, where its
+    // RARITY was ignored entirely (Mathilda's rare Blood Drain out-damaged by
+    // her common Blood Bolt, because only Drain reached this path). Substrate
+    // for vitality healers, who spend their own life as the casting cost.
+    const isVariableSpell = ['mana', 'health'].includes(rollData.roll.resource)
       && spellTier && spellGrade
       && tags.includes('attack');
 
@@ -4889,8 +4901,16 @@ export class AspectsofPowerItem extends Item {
       const hasAoeAlteration = (this.system.alterations ?? []).some(a => a.id === 'aoe')
         || !!this.system.aoe?.enabled;
       const wisMod      = this.actor.system.abilities?.wisdom?.mod ?? 0;
-      // Live read — slider must cap at the actor's CURRENT mana.
-      const livePool    = Math.round(this.actor.system[rollData.roll.resource]?.value ?? 0);
+      // Live read — slider must cap at the actor's CURRENT pool.
+      // ⚠ When the pool IS health, hold back a floor so no one can invest
+      // themselves to death at the slider. `_commitCastCost` clamps at 0, not
+      // 1, so without this the dialog would happily offer a lethal commit.
+      const _resKey     = rollData.roll.resource;
+      const _healthFloor = (_resKey === 'health')
+        ? Math.max(1, sc.invest?.healthFloor ?? 1)
+        : 0;
+      const livePool    = Math.max(0,
+        Math.round(this.actor.system[_resKey]?.value ?? 0) - _healthFloor);
       const intMod      = this.actor.system.abilities?.intelligence?.mod ?? 0;
       // Multiplier resolution: prefer hand-tuned `diceBonus` (designer-set,
       // non-default value) so existing spells don't drift before migration.

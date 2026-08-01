@@ -204,6 +204,12 @@ ASPECTSOFPOWER.rangedBlend = {
  * here; the per-tier table is the single source of truth.
  */
 ASPECTSOFPOWER.invest = {
+  // HEALTH AS AN INVEST RESOURCE (RULED 2026-07-31). Blood magic and vitality
+  // healers pay in their own life, so `health` reaches the spell invest path
+  // like mana does. This is the HP a caster must be left with — the invest
+  // slider caps here so nobody can commit a lethal amount by accident.
+  // (`_commitCastCost` clamps at 0, so the guard has to live at the slider.)
+  healthFloor: 1,
   toughCapFactor:     0.02,
   staminaBaseDivisor: 20,
   staminaNormalizer:  1085,
