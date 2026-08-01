@@ -1484,6 +1484,41 @@ export class AspectsofPowerItem extends Item {
         }
       }
     }
+
+    // ── MARK CONSUMERS (RULED 2026-07-31) ─────────────────────────────────
+    // The spender's side of the mark economy. `markExpiresOnHit` above belongs
+    // to the MARK and burns on whatever attack happens to benefit next; these
+    // belong to the SKILL, so a kit can hold a persistent mark for accuracy
+    // and still have one skill that cashes it in for burst damage.
+    // Counts ANY mark from this attacker, not just to-hit ones — a pure
+    // damage-bonus mark is still something to spend.
+    let markDmgMult = 1;
+    if (targetActor && this.actor?.uuid) {
+      const _tc = this.system?.tagConfig ?? {};
+      const _mult = _tc.markedDamageMult ?? 1;
+      const _consumes = _tc.consumesMark === true;
+      if (_mult !== 1 || _consumes) {
+        const myMarks = targetActor.effects.filter(e =>
+          !e.disabled
+          && e.system?.markedByActorUuid === this.actor.uuid
+          && (((e.system?.markedAttackMultiplier ?? 0) > 0) || ((e.system?.markedDamageBonus ?? 0) > 0))
+        );
+        if (myMarks.length > 0) {
+          if (_mult !== 1) {
+            markDmgMult = _mult;
+            ChatMessage.create({
+              speaker: ChatMessage.getSpeaker({ actor: this.actor }),
+              ...(whisperGM ? { whisper: whisperGM } : {}),
+              content: `<p><em>${this.name} tears the mark open on ${targetActor.name}: `
+                     + `x${_mult} damage${_consumes ? ' — mark consumed' : ''}.</em></p>`,
+            });
+          }
+          if (_consumes) {
+            await targetActor.deleteEmbeddedDocuments('ActiveEffect', myMarks.map(e => e.id));
+          }
+        }
+      }
+    }
     const isPhysical   = rollData.roll.damageType === 'physical';
     // Armor-answer routing (2026-07-16 ruling): VEIL defends mind/soul attacks
     // ONLY. Physical AND elemental damage face the ARMOR layer (armor+blockDR,
@@ -1752,7 +1787,9 @@ export class AspectsofPowerItem extends Item {
     // attacks pass the default 1.0 → no scaling. A token half in the
     // explosion takes half damage all the way through.
     const fracClamped = Math.max(0, Math.min(1, aoeFraction ?? 1));
-    const rawDmg = Math.max(0, Math.round(dmgRoll.total * fracClamped));
+    // markDmgMult: a mark CONSUMER's payoff (1 when this skill is not one, or
+    // the target carries no mark of this attacker's).
+    const rawDmg = Math.max(0, Math.round(dmgRoll.total * fracClamped * markDmgMult));
     // ⚠ ORDERING (RULED 2026-07-31): the defence multiplier is NO LONGER
     // applied here. Under the margin rule, multiplying before the flat
     // armour/DR subtraction makes a good defence plus any wall reach zero —
@@ -1952,7 +1989,7 @@ export class AspectsofPowerItem extends Item {
              data-affinity-dr="${affinityDR}"
              data-damage-type="${isPhysical ? 'physical' : 'magical'}"
              data-defence-margin="${defenceMargin}"
-             data-lifesteal-pct="${item.system?.tagConfig?.lifestealPct ?? 0}"
+             data-lifesteal="${item.system?.tagConfig?.lifesteal ?? 0}"
              data-mitigation="${_mitLane}" data-mitigation-value="${mitigation}"${damageBreakdownAttr}${fmAttrs}`;
     let redirectLine = '';
     let redirectButton = '';

@@ -300,7 +300,24 @@ export class SkillData extends foundry.abstract.TypeDataModel {
         // buffer). ADDS to the actor-wide passive lifesteal already summed from
         // `flags.aspectsofpower.lifestealPct`, so George's Sanguine Tithe and a
         // per-skill drain stack rather than one overriding the other.
-        lifestealPct: new fields.NumberField({ initial: 0, min: 0, max: 1 }),
+        // (The legacy FLAG keeps its `Pct` suffix; only the authored field was
+        // renamed, and it had exactly one user at the time.)
+        lifesteal: new fields.NumberField({ initial: 0, min: 0, max: 1 }),
+
+        // ── MARK CONSUMERS (RULED 2026-07-31) ────────────────────────────
+        // `markExpiresOnHit` belongs to the MARK — it is set by whoever APPLIED
+        // it and burns on the next benefiting attack, whatever that attack is.
+        // These two live on the SPENDER instead, so one kit can hold a
+        // persistent mark for accuracy AND have a single skill that cashes it
+        // in for burst:
+        //   markedDamageMult — this skill's damage multiplier while the target
+        //     carries any mark from this attacker. 1 = no payoff.
+        //   consumesMark — after benefiting, delete this attacker's marks on
+        //     the target. The mark is spent by THIS skill specifically.
+        // Mathilda: Bolt applies (2 rounds), Drain rides it for accuracy,
+        // Spikes consumes it for damage.
+        markedDamageMult: new fields.NumberField({ initial: 1.0, min: 0 }),
+        consumesMark:     new fields.BooleanField({ initial: false }),
 
         // ── Phase E: buff-carries-reaction config ──
         // When an Active `buff`-tagged skill applies its buff, propagate
