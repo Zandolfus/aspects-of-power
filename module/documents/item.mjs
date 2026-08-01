@@ -5069,7 +5069,10 @@ export class AspectsofPowerItem extends Item {
               safeInvest: 0,                              // hard cap = no soft zone
               maxPool: maxInvest,
               potency: intMod, multiplier,
-              resourceLabel: 'mana', potencyLabel: 'Int', label,
+              // NOT hardcoded 'mana' — health is a casting resource as of
+              // 2026-07-31, and a blood mage being told she is spending mana
+              // while the dialog drains her HP is a lie the player acts on.
+              resourceLabel: _resKey, potencyLabel: 'Int', label,
               channelStat: wisMod,
               channelFactor: sc.celerity?.CHANNEL_FACTOR ?? null,
               hardCap: true,                              // hide safe-ceiling/self-damage rows
