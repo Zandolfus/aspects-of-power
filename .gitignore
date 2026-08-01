@@ -177,3 +177,8 @@ migration/snapshots/
 
 # Local-only world-content scripts (per-world seed/grant scripts, not for repo)
 migration/local/
+
+# Stray uv toolchain binaries - never belong in the system repo
+uv.exe
+uvw.exe
+uvx.exe
