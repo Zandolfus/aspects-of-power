@@ -2598,6 +2598,12 @@ Hooks.on('renderChatMessageHTML', (message, html) => {
             const pct = Number(item.flags?.aspectsofpower?.lifestealPct ?? 0);
             if (pct > 0) totalPct += pct;
           }
+          // PER-SKILL lifesteal (RULED 2026-07-31) — the FIRING skill's own
+          // tagConfig.lifestealPct, carried on the button. ADDS to the
+          // actor-wide passive total above rather than replacing it, so a
+          // standing Sanguine Tithe and a dedicated drain both pay out.
+          const _skillPct = Number(btn.dataset.lifestealPct ?? 0);
+          if (_skillPct > 0) totalPct += _skillPct;
           if (totalPct > 0) {
             const oh = attackerForLifesteal.system.overhealth;
             const gain = Math.round(actualHpLoss * totalPct);

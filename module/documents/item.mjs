@@ -1952,6 +1952,7 @@ export class AspectsofPowerItem extends Item {
              data-affinity-dr="${affinityDR}"
              data-damage-type="${isPhysical ? 'physical' : 'magical'}"
              data-defence-margin="${defenceMargin}"
+             data-lifesteal-pct="${item.system?.tagConfig?.lifestealPct ?? 0}"
              data-mitigation="${_mitLane}" data-mitigation-value="${mitigation}"${damageBreakdownAttr}${fmAttrs}`;
     let redirectLine = '';
     let redirectButton = '';
@@ -4770,6 +4771,15 @@ export class AspectsofPowerItem extends Item {
         && (CONFIG.ASPECTSOFPOWER.weaponProficiency?.rollTypes ?? []).includes(rollData.roll.type)) {
       const _hm = proficiencyHitMult(this.actor, this._proficiencyWeapon());
       if (_hm !== 1) hitFormula = `(${hitFormula})*${_hm}`;
+    }
+
+    // ── PER-SKILL TO-HIT MULTIPLIER (RULED 2026-07-31) ────────────────────
+    // The skill's OWN accuracy, composing with the proficiency ladder above.
+    // Ungated by roll type — a spell may be as clumsy as a weapon. Mathilda's
+    // blood kit rides this at 0.5, restored to parity by her Blood Mark.
+    {
+      const _sm = this.system?.tagConfig?.hitMult ?? 1;
+      if (hitFormula && _sm !== 1) hitFormula = `(${hitFormula})*${_sm}`;
     }
 
     // ── Variable resource invest (per design-magic/melee/ranged-system.md) ─

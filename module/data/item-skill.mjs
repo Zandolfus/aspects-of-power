@@ -285,6 +285,23 @@ export class SkillData extends foundry.abstract.TypeDataModel {
         // `braced` tag, and inert on anything that is not a parry reaction.
         bracedInvestScale: new fields.NumberField({ initial: 1.0, min: 0 }),
 
+        // ── PER-SKILL TO-HIT MULTIPLIER (RULED 2026-07-31) ───────────────
+        // Scales this skill's own accuracy, multiplying the hit formula the
+        // same way the proficiency ladder does (the two compose). 1 = neutral.
+        // Exists for kits whose identity is "this lands badly UNLESS a
+        // condition is met" — Mathilda's blood skills sit at 0.5 and are
+        // brought back to parity by her Blood Mark's +100% markAttackBonus.
+        // Deliberately NOT clamped at 1: a skill may also be MORE accurate.
+        hitMult: new fields.NumberField({ initial: 1.0, min: 0 }),
+
+        // ── PER-SKILL LIFESTEAL (RULED 2026-07-31) ───────────────────────
+        // Fraction of the HP damage this skill actually deals, credited to the
+        // attacker's OVERHEALTH (not health — overhealth is the ceiling-capped
+        // buffer). ADDS to the actor-wide passive lifesteal already summed from
+        // `flags.aspectsofpower.lifestealPct`, so George's Sanguine Tithe and a
+        // per-skill drain stack rather than one overriding the other.
+        lifestealPct: new fields.NumberField({ initial: 0, min: 0, max: 1 }),
+
         // ── Phase E: buff-carries-reaction config ──
         // When an Active `buff`-tagged skill applies its buff, propagate
         // these onto the spawned effect's `system.reaction*` fields so
