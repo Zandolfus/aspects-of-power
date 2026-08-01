@@ -900,6 +900,20 @@
             </div>
           </div>
 
+          {{#if (includes system.tags "braced")}}
+          <div class='aop-subblock'>
+            <span class='aop-subblock-title'>Braced (parry invest)</span>
+            <p class='hint aop-hint'>Stamina buys EFFECTIVE weapon weight for the mass ratio only &mdash; never damage or reach. The slider stops at parity with the attacker's weapon, because out-massing is never a bonus.</p>
+            <div class='aop-field-grid'>
+              <div class='aop-field'>
+                <label class='resource-label' title='How much effective weight a point of stamina buys, against a price set by the incoming hit total. 1.0 = standard rate.'>Brace Efficiency (&times;)</label>
+                <input type='number' name='system.tagConfig.bracedInvestScale'
+                       value='{{system.tagConfig.bracedInvestScale}}' min='0' step='0.05' />
+              </div>
+            </div>
+          </div>
+          {{/if}}
+
           {{#if (eq system.reactionType "guardian")}}
           <div class='aop-subblock'>
             <span class='aop-subblock-title'>Guardian</span>

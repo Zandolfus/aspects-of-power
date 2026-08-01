@@ -14,6 +14,7 @@ import {
   effectiveDodgeValue, splitEvenlyWithRemainder, perceiveGateDecision, activityTicks, nextCompletionDelta,
   proficiencyMultiplier, proficiencyHitMultiplier, parryMassMultiplier, lunarPhaseMultiplier, dotTickDamage, procStaminaCost, riderDamageBase,
   crushFlatAmount, riderMaxInvest, itemWeightLb, KG_TO_LB, carriedWeightLb,
+  bracedParryWeight, bracedMaxUsefulInvest,
 } from '../module/helpers/formulas.mjs';
 import { moonState, moonNodeAngle, nextSyzygy, eclipseAtSyzygy, planetStates,
          meteorShowersOn, cometStates, julianDay, civilDate, worldTimeForDate } from '../module/systems/calendar.mjs';
@@ -314,6 +315,42 @@ eq('parry rule disabled', parryMassMultiplier(60, 220, { parryMassExponent: 0 })
 // THE LIVE CASE THAT MOTIVATED IT: Gabriel's dagger parry rolled 993 against
 // Phil's greatsword hit of 956 and won. Under the rule it no longer does.
 eq('Gabriel dagger no longer parries Phil claymore', Math.round(993 * pmm(60, 200)) >= 956, false);
+
+// -- BRACED PARRY (`braced` tag + invest, RULED 2026-07-31). Stamina buys
+// EFFECTIVE weight for the mass ratio only. Price of +1x weight is a fraction
+// of the INCOMING HIT TOTAL, so it stays proportional across grades.
+const BRC = { bracedCostHitFrac: 0.05, bracedMaxWeightMult: 3.0, parryMassExponent: 0.3, unarmedWeight: 40 };
+const bw = (w, inv, hit, sc = 1) => +bracedParryWeight(w, inv, hit, sc, BRC).toFixed(1);
+// Zero invest is an ordinary free parry - the tag must never be a passive buff.
+eq('braced 0 stamina is unchanged', bw(60, 0, 1070), 60);
+// At a 1070 hit one unit costs 53.5 stamina and buys +1x weight.
+eq('braced one unit doubles', bw(60, 53.5, 1070), 120);
+eq('braced two units triples', bw(60, 107, 1070), 180);
+// Hard ceiling: bracedMaxWeightMult stops a dagger pretending to be a ram.
+eq('braced capped at 3x', bw(60, 100000, 1070), 180);
+// Efficiency scale is per-skill authoring, not a global constant.
+eq('braced scale 2 buys double', bw(60, 53.5, 1070, 2), 180);
+eq('braced scale 0 is inert', bw(60, 53.5, 1070, 0), 60);
+// PRICE SCALES WITH THE BLOW: the same stamina buys less against a bigger hit,
+// which is what keeps the tag honest at high grades.
+eq('braced costs more vs a bigger hit', bw(60, 53.5, 2140) < bw(60, 53.5, 1070), true);
+
+// The slider ceiling is the exact point that reaches PARITY - past it the
+// min(1, ...) cap makes further stamina worthless.
+const bmi = (w, aw, hit, pool, sc = 1) => bracedMaxUsefulInvest(w, aw, hit, pool, sc, BRC);
+// Gabriel: dagger 60 vs greataxe 220 needs x3.67, capped to x3 -> 2 units.
+eq('braced ceiling dagger vs greataxe', bmi(60, 220, 1070, 400), 107);
+// Reaching that ceiling leaves him short of parity, by design.
+eq('braced dagger never reaches parity vs greataxe',
+  +parryMassMultiplier(bracedParryWeight(60, 107, 1070, 1, BRC), 220, BRC).toFixed(2), 0.94);
+// A mid-weight weapon CAN reach parity - the gradient is emergent, not authored.
+eq('braced sword reaches parity vs greataxe',
+  +parryMassMultiplier(bracedParryWeight(100, bmi(100, 220, 1070, 400), 1070, 1, BRC), 220, BRC).toFixed(2), 1);
+// Already out-massing -> no prompt at all.
+eq('braced no prompt when heavier', bmi(220, 100, 1070, 400), 0);
+eq('braced no prompt at parity', bmi(200, 200, 1070, 400), 0);
+// The pool clamps the ceiling - you cannot brace with stamina you do not have.
+eq('braced clamped by pool', bmi(60, 220, 1070, 30), 30);
 
 // -- Lunar phase multiplier (RULED 2026-07-29, amp 0.40). Phase centres are
 // real elongations: new 0deg, first quarter 90, full 180, last quarter 270.

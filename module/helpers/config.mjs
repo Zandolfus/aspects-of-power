@@ -453,6 +453,18 @@ ASPECTSOFPOWER.defenseTuning = {
   // sword at x0.81 — a real thumb on the scale that never decides the exchange
   // on weapon choice alone. Set to 0 to disable. See formulas.parryMassMultiplier.
   parryMassExponent: 0.3,
+  // BRACED PARRY (`braced` tag, RULED 2026-07-31). Stamina buys EFFECTIVE
+  // weapon weight for the mass ratio only. Price of +1x weight is this
+  // fraction of the incoming HIT TOTAL — proportional like the rider cost, so
+  // it holds up across grades instead of going free at high level. At 0.05 a
+  // 1070 hit charges ~54 stamina per +1x: Gabriel (pool 400, dagger 60) pays
+  // ~143 to reach parity with a greataxe, a real bite out of a 400 pool;
+  // Phil's claymore is already at x0.97 and barely needs to brace at all.
+  // ⚠ 0.05 is a FIRST PASS, not a simmed value — see design-braced-parry.
+  bracedCostHitFrac: 0.05,
+  // Hard ceiling on the weight multiplier, so a braced dagger cannot pretend
+  // to be a siege ram. The mass cap min(1, …) usually binds first anyway.
+  bracedMaxWeightMult: 3.0,
   // Shrapnel: instead of the old pool-cost multiplier, shrapnel attacks
   // penalize the dodge roll by this fraction (fragments are hard to dodge).
   shrapnelDodgePenalty: 0.25,
@@ -1375,6 +1387,9 @@ ASPECTSOFPOWER.combatTags = {
   // the tag. Added 2026-07-31.
   summon:      'ASPECTSOFPOWER.Tag.summon',
   channel:     'ASPECTSOFPOWER.Tag.channel',
+  // Braced: a parry reaction that may spend stamina to parry as if the weapon
+  // were heavier (mass ratio only). Inert on anything that is not a parry.
+  braced:      'ASPECTSOFPOWER.Tag.braced',
   // Movement-skill family (Stormstride, Charge, Leap, Teleport, Blink, etc.).
   // Marks any skill that affects or executes movement. Used for queryability
   // ("dispel all movement buffs"), Mobility-aura stacking, and the

@@ -351,6 +351,61 @@ export function parryMassMultiplier(defenderWeight, attackerWeight, cfg = null) 
 }
 
 /**
+ * BRACED PARRY (RULED 2026-07-31, `braced` tag + invest): stamina buys
+ * EFFECTIVE weapon weight for the mass ratio only — you set your feet and take
+ * the blow on the strong of the blade. It never touches damage, reach or
+ * celerity, and `parryMassMultiplier`'s min(1, …) cap still applies, so no
+ * amount of bracing lets a dagger out-mass a greataxe; it can only close the
+ * gap TO parity.
+ *
+ * Price of +1x weight is a fraction of the INCOMING HIT TOTAL, not a flat
+ * number — the same grammar riders use (cost scales with the blow you are
+ * answering), so it stays honest across grades. Bracing against a bigger
+ * attack costs more.
+ *
+ *   effectiveWeight = weight x (1 + scale x invested / (hitFrac x hitTotal))
+ *
+ * @param {number} weight     Defender's held weapon weight.
+ * @param {number} invested   Stamina committed (0 = an ordinary free parry).
+ * @param {number} hitTotal   The incoming attack's hit total.
+ * @param {number} [scale]    Per-skill efficiency, tagConfig.bracedInvestScale.
+ * @param {object} [cfg]      defenseTuning override, for tests.
+ * @returns {number} Effective weight, capped at bracedMaxWeightMult x weight.
+ */
+export function bracedParryWeight(weight, invested, hitTotal, scale = 1, cfg = null) {
+  const t = cfg ?? (globalThis.CONFIG?.ASPECTSOFPOWER?.defenseTuning ?? {});
+  const frac = t.bracedCostHitFrac ?? 0.05;
+  const maxMult = t.bracedMaxWeightMult ?? 3.0;
+  const w = Math.max(0, weight || 0);
+  const unit = Math.max(1, frac * Math.max(0, hitTotal || 0));
+  const mult = 1 + Math.max(0, scale) * Math.max(0, invested || 0) / unit;
+  return w * Math.min(maxMult, mult);
+}
+
+/**
+ * The stamina that fully brings a parry to PARITY with the attacker's weapon —
+ * i.e. the point past which more stamina buys nothing, because the mass ratio
+ * is already capped at 1. Used as the invest slider's ceiling so the dialog
+ * never offers a wasted point of stamina.
+ *
+ * Returns 0 when the defender already out-masses the attacker (no prompt).
+ *
+ * @returns {number} Stamina, clamped to the pool and to bracedMaxWeightMult.
+ */
+export function bracedMaxUsefulInvest(weight, attackerWeight, hitTotal, pool, scale = 1, cfg = null) {
+  const t = cfg ?? (globalThis.CONFIG?.ASPECTSOFPOWER?.defenseTuning ?? {});
+  const frac = t.bracedCostHitFrac ?? 0.05;
+  const maxMult = t.bracedMaxWeightMult ?? 3.0;
+  const w = Math.max(1, weight || 0);
+  const aw = Math.max(0, attackerWeight || 0);
+  if (aw <= w || !(scale > 0)) return 0;
+  const neededMult = Math.min(maxMult, aw / w);
+  const unit = Math.max(1, frac * Math.max(0, hitTotal || 0));
+  const need = Math.ceil(((neededMult - 1) / scale) * unit);
+  return Math.max(0, Math.min(need, Math.floor(Math.max(0, pool || 0))));
+}
+
+/**
  * Lunar phase multiplier (design-calendar-celestial.md, RULED 2026-07-29:
  * lunar rituals are EMPOWERED in their own phase and WEAKENED out of it).
  *

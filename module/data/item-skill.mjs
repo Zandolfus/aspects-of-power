@@ -277,6 +277,14 @@ export class SkillData extends foundry.abstract.TypeDataModel {
         // own armor is NOT re-applied). 0..1.
         guardianRedirectPct: new fields.NumberField({ initial: 0.5, min: 0, max: 1 }),
 
+        // ── BRACED PARRY (`braced` tag, RULED 2026-07-31) ────────────────
+        // Efficiency of the brace: how much EFFECTIVE weapon weight a point of
+        // stamina buys, against a price set by the incoming hit total
+        // (defenseTuning.bracedCostHitFrac). 1.0 = the standard rate; a
+        // masterwork bracing technique can author more. Inert without the
+        // `braced` tag, and inert on anything that is not a parry reaction.
+        bracedInvestScale: new fields.NumberField({ initial: 1.0, min: 0 }),
+
         // ── Phase E: buff-carries-reaction config ──
         // When an Active `buff`-tagged skill applies its buff, propagate
         // these onto the spawned effect's `system.reaction*` fields so

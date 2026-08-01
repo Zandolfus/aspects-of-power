@@ -1,6 +1,6 @@
 import { EquipmentSystem } from '../systems/equipment.mjs';
 import { getPositionalTags } from '../helpers/positioning.mjs';
-import { houseHitFormula, hybridAbilityMod, weaponStatBlend, spellDamageRef, spellInvestDamage, strikeInvestDamage, infusionDamage, investSelfDamage as computeInvestSelfDamage, effectiveDodgeValue, splitEvenlyWithRemainder, parryMassMultiplier, lunarPhaseMultiplier, dotTickDamage, procStaminaCost, crushFlatAmount, riderMaxInvest } from '../helpers/formulas.mjs';
+import { houseHitFormula, hybridAbilityMod, weaponStatBlend, spellDamageRef, spellInvestDamage, strikeInvestDamage, infusionDamage, investSelfDamage as computeInvestSelfDamage, effectiveDodgeValue, splitEvenlyWithRemainder, parryMassMultiplier, bracedParryWeight, bracedMaxUsefulInvest, lunarPhaseMultiplier, dotTickDamage, procStaminaCost, crushFlatAmount, riderMaxInvest } from '../helpers/formulas.mjs';
 import { recordActionFired, declareAction, isInActiveCombat, computeActionWait, referenceRoundLength, computeWindupMultiplier, getScrambleStacks, addScrambleStack, applyDodgeCost, findCombatantForActor, perceiveGate } from '../systems/celerity.mjs';
 import { getThreatRadiusFt, actorIsDashing } from '../systems/engagement-halts.mjs';
 import { selectTargetOnCanvas, skillNeedsTargetPrompt, skillTargetsAtFire, selectMarkerOnCanvas } from '../canvas/target-prompt.mjs';
@@ -680,6 +680,80 @@ export class AspectsofPowerItem extends Item {
   }
 
   /**
+   * BRACED PARRY invest prompt (`braced` tag, RULED 2026-07-31). Stamina buys
+   * EFFECTIVE weapon weight for the mass ratio only. The slider's ceiling is
+   * the exact point that reaches PARITY with the attacker's weapon — past that
+   * `parryMassMultiplier`'s min(1, …) cap makes further stamina worthless, so
+   * the dialog never offers a wasted point.
+   *
+   * Returns the stamina to spend, or null if declined (an ordinary free parry).
+   */
+  async _promptBracedInvest({ skillName, weapon, defWeight, atkWeight, hitTotal, pool, scale }) {
+    const maxInvest = bracedMaxUsefulInvest(defWeight, atkWeight, hitTotal, pool, scale);
+    if (maxInvest <= 0) return null;   // already out-massing — nothing to buy
+    const at = (v) => {
+      const w = bracedParryWeight(defWeight, v, hitTotal, scale);
+      return { w: Math.round(w), m: parryMassMultiplier(w, atkWeight) };
+    };
+    const start = at(0), best = at(maxInvest);
+    const content = `
+      <div class="resource-invest braced-invest">
+        <p style="margin:0 0 6px;">Bracing <strong>${skillName}</strong>${weapon ? ` (${weapon})` : ''}
+          against a heavier weapon.</p>
+        <div class="invest-meta" style="display:grid;grid-template-columns:1fr 1fr;gap:4px;margin-bottom:8px;font-size:12px;">
+          <div>Your weapon: <strong>${defWeight}</strong></div>
+          <div>Theirs: <strong>${atkWeight}</strong></div>
+          <div>Stamina: <strong>${pool}</strong></div>
+          <div>To parity: <strong>${maxInvest}</strong></div>
+        </div>
+        <div class="form-group">
+          <label>Brace: <span class="invest-display">0</span> stamina</label>
+          <input type="range" name="invest" min="0" max="${maxInvest}" value="0" step="1" style="width:100%;" />
+        </div>
+        <div class="invest-readouts" style="display:grid;grid-template-columns:1fr 1fr;gap:4px;margin-top:8px;">
+          <div>Effective weight: <strong class="braced-weight">${start.w}</strong></div>
+          <div>Parry scale: <strong class="braced-mass">x${start.m.toFixed(2)}</strong></div>
+          <div>Stamina after: <strong class="remaining-display">${pool}</strong></div>
+        </div>
+        <p class="hint" style="font-size:11px;margin-top:8px;">Full brace reaches x${best.m.toFixed(2)} — being
+          outmassed is a penalty, out-massing is never a bonus, so the slider stops where it stops helping.
+          Bracing costs nothing but stamina; leave it at 0 for an ordinary parry.</p>
+      </div>`;
+    return foundry.applications.api.DialogV2.wait({
+      window: { title: `${skillName} — Brace` },
+      content,
+      buttons: [
+        {
+          action: 'confirm', label: 'Parry', default: true,
+          callback: (event, button) => {
+            const v = parseInt(button.form.elements.invest?.value, 10);
+            return Math.min(Math.max(0, v || 0), maxInvest);
+          },
+        },
+        { action: 'none', label: 'Parry Unbraced', callback: () => 0 },
+      ],
+      close: () => null,
+      render: (event, dialog) => {
+        const root = dialog?.element ?? dialog;
+        const slider = root?.querySelector('input[name="invest"]');
+        if (!slider) return;
+        const invD = root.querySelector('.invest-display');
+        const wD   = root.querySelector('.braced-weight');
+        const mD   = root.querySelector('.braced-mass');
+        const remD = root.querySelector('.remaining-display');
+        slider.addEventListener('input', () => {
+          const v = parseInt(slider.value, 10) || 0;
+          const r = at(v);
+          invD.textContent = v;
+          wD.textContent = r.w;
+          mD.textContent = 'x' + r.m.toFixed(2);
+          remD.textContent = pool - v;
+        });
+      },
+    });
+  }
+
+  /**
    * @param {object} rollData
    * @param {object} [opts]
    * @param {boolean} [opts.applyRarityMult]  Multiply damage by the skill's
@@ -1213,8 +1287,39 @@ export class AspectsofPowerItem extends Item {
           // attacker's did nothing, so a dagger turned a claymore aside exactly
           // as well as another claymore. Capped at 1: being outmassed is a
           // penalty, out-massing is not a bonus.
-          const massMult = parryMassMultiplier(
-            heldWeaponWeight(targetActor), heldWeaponWeight(this.actor));
+          // BRACED (`braced` tag, RULED 2026-07-31): stamina buys EFFECTIVE
+          // weight for the mass ratio only. Opt-in per skill, so an untagged
+          // parry behaves exactly as before and stays free.
+          const _defW = heldWeaponWeight(targetActor);
+          const _atkW = heldWeaponWeight(this.actor);
+          let effDefW = _defW;
+          let bracedSpent = 0;
+          if ((reactionSkill.system.tags ?? []).includes('braced')) {
+            const _pool = targetActor.system.stamina?.value ?? 0;
+            const _scale = reactionSkill.system?.tagConfig?.bracedInvestScale ?? 1.0;
+            // ⚠ ROUTING LIMIT: unlike _promptDefensePool this prompt is LOCAL,
+            // so it must only be shown to someone entitled to make the
+            // defender's decision. When the defender is another player's
+            // character the brace is skipped (an ordinary free parry) rather
+            // than popping the slider on the attacker's screen. Lifting this
+            // means mirroring the defensePrompt socket round-trip.
+            const _defenderPlayer = game.users.find(u =>
+              u.active && !u.isGM && u.character?.id === targetActor.id);
+            const _mayDecide = _defenderPlayer
+              ? _defenderPlayer.id === game.user.id
+              : (game.user.isGM || targetActor.isOwner);
+            const chosen = _mayDecide ? await this._promptBracedInvest({
+              skillName: reactionSkill.name,
+              weapon: reactionSkill._proficiencyWeapon?.()?.name ?? null,
+              defWeight: _defW, atkWeight: _atkW, hitTotal, pool: _pool, scale: _scale,
+            }) : null;
+            bracedSpent = Math.min(Math.max(0, chosen ?? 0), _pool);
+            if (bracedSpent > 0) {
+              effDefW = bracedParryWeight(_defW, bracedSpent, hitTotal, _scale);
+              await targetActor.update({ 'system.stamina.value': _pool - bracedSpent });
+            }
+          }
+          const massMult = parryMassMultiplier(effDefW, _atkW);
           // PROFICIENCY SCALES THE PARRY too (ruled 2026-07-29). Judged against
           // the implement actually doing the parrying, so Shield Block is rated
           // on the shield rather than on whatever else the defender carries.
@@ -1230,6 +1335,7 @@ export class AspectsofPowerItem extends Item {
             targetActor, reactionSkill._proficiencyWeapon?.() ?? null);
           const parryTotal = Math.round(rawParry * massMult * parryProf);
           const bits = [];
+          if (bracedSpent > 0) bits.push(`braced ${bracedSpent} stam -> weight ${Math.round(effDefW)}`);
           if (massMult < 1) bits.push(`outmassed x${massMult.toFixed(2)}`);
           if (parryProf !== 1) bits.push(`proficiency x${parryProf.toFixed(2)}`);
           const massNote = bits.length
