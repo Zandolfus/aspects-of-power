@@ -14,7 +14,7 @@ import {
   effectiveDodgeValue, splitEvenlyWithRemainder, perceiveGateDecision, activityTicks, nextCompletionDelta,
   proficiencyMultiplier, proficiencyHitMultiplier, parryMassMultiplier, lunarPhaseMultiplier, dotTickDamage, procStaminaCost, riderDamageBase,
   crushFlatAmount, riderMaxInvest, itemWeightLb, KG_TO_LB, carriedWeightLb,
-  bracedParryWeight, bracedMaxUsefulInvest,
+  bracedParryWeight, bracedMaxUsefulInvest, defenceMarginMultiplier,
 } from '../module/helpers/formulas.mjs';
 import { moonState, moonNodeAngle, nextSyzygy, eclipseAtSyzygy, planetStates,
          meteorShowersOn, cometStates, julianDay, civilDate, worldTimeForDate } from '../module/systems/calendar.mjs';
@@ -315,6 +315,27 @@ eq('parry rule disabled', parryMassMultiplier(60, 220, { parryMassExponent: 0 })
 // THE LIVE CASE THAT MOTIVATED IT: Gabriel's dagger parry rolled 993 against
 // Phil's greatsword hit of 956 and won. Under the rule it no longer does.
 eq('Gabriel dagger no longer parries Phil claymore', Math.round(993 * pmm(60, 200)) >= 956, false);
+
+// -- THE MARGIN RULE (RULED 2026-07-31). A failed defence scales with HOW
+// BADLY it lost, replacing avoid / graze-0.5 / full.
+const dmm = (d, h) => +defenceMarginMultiplier(d, h).toFixed(4);
+// Winning still yields zero - full avoidance survives as the top of the curve.
+eq('margin win is total avoidance', dmm(1200, 1070), 0);
+eq('margin exact tie is avoidance', dmm(1070, 1070), 0);
+// Beaten by a hair -> almost nothing lands. THE case the rule exists for:
+// under the old band this was a full hit or a half-damage graze.
+eq('margin near miss barely lands', dmm(1050, 1070), 0.0187);
+// Beaten badly -> nearly everything lands.
+eq('margin badly beaten', dmm(236, 1070), 0.7794);
+// No defence at all is a full hit.
+eq('margin zero defence is full', dmm(0, 1070), 1);
+// Clamped both ends; a nonsense hit total cannot produce negative damage.
+eq('margin clamps at 1', dmm(-500, 1070), 1);
+eq('margin zero hit total', dmm(500, 0), 0);
+// CONTINUITY is the whole point: two pips of a d20 must not be a cliff.
+// Gabriel's live case - dodge 1013 basis, rolls of 8 vs 6 against a 1070 hit.
+eq('margin is continuous across one pip',
+  Math.abs(dmm(Math.round(1013 * 1.08), 1198) - dmm(Math.round(1013 * 1.06), 1198)) < 0.02, true);
 
 // -- BRACED PARRY (`braced` tag + invest, RULED 2026-07-31). Stamina buys
 // EFFECTIVE weight for the mass ratio only. Price of +1x weight is a fraction

@@ -351,6 +351,32 @@ export function parryMassMultiplier(defenderWeight, attackerWeight, cfg = null) 
 }
 
 /**
+ * THE MARGIN RULE (RULED 2026-07-31, design-defense-rework-2026-07).
+ *
+ * A failed defence is not pass/fail — HOW BADLY you lost decides what fraction
+ * gets through. Beaten by a hair, almost nothing lands; beaten badly, nearly
+ * everything does. Winning still yields 0, so full avoidance survives as the
+ * top of the curve.
+ *
+ * Replaces the old avoid / graze-0.5 / full three-step, in which two pips of a
+ * d20 was the difference between 465 damage and death. It is the SAME shape
+ * the mind/soul pool has always used (1 - pool/hit), now applied to every lane.
+ *
+ * ⚠ The caller MUST apply this AFTER flat armour/DR, not before. Dodge margins
+ * are often tiny (9%), and 9% of a blow lands under the armour value, so
+ * multiplying first zeroed 25 of 40 live matchups.
+ *
+ * @param {number} defenceRoll  Dodge/parry roll, or the pool for mental lanes.
+ * @param {number} hitTotal     The incoming attack's hit total.
+ * @returns {number} 0..1 fraction of damage that survives the defence.
+ */
+export function defenceMarginMultiplier(defenceRoll, hitTotal) {
+  const h = Number(hitTotal) || 0;
+  if (h <= 0) return 0;
+  return Math.max(0, Math.min(1, 1 - (Math.max(0, Number(defenceRoll) || 0) / h)));
+}
+
+/**
  * BRACED PARRY (RULED 2026-07-31, `braced` tag + invest): stamina buys
  * EFFECTIVE weapon weight for the mass ratio only — you set your feet and take
  * the blow on the strong of the blade. It never touches damage, reach or

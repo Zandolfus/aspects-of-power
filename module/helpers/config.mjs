@@ -426,10 +426,16 @@ ASPECTSOFPOWER.defenseTuning = {
   // scrambleDecayQuarterRounds).
   scrambleStackPct: 0.15,
   scrambleDecayQuarterRounds: 1,
-  // Graze band: a failed dodge within this fraction of the attacker's hit
-  // total takes HALF damage (restores the partial-mitigation smoothing the
-  // pools used to provide).
+  // ⚠ OBSOLETE as of THE MARGIN RULE (2026-07-31) — a failed defence now
+  // scales continuously with the margin, so there is no graze STEP to size.
+  // Kept only so any content or macro still reading it does not throw.
   grazeBandPct: 0.10,
+  // AI defence policy under the margin rule: defend when the expected share
+  // turned aside clears this. Replaces aiDodgeWinProbMin, which asked for a
+  // 35% chance of TOTAL avoidance — far too conservative once a failed dodge
+  // still reduces damage. The brake on always-defending is the scramble stack
+  // and the tempo cost, not the odds.
+  aiDefendMinReduction: 0.20,
   // Dodge basis divisor: the dodge ROLL uses defense.value ÷ this. The ×1.1
   // in the defense value is pool-era inflation — rolled at full value,
   // parity dodge sits at 91% and mirror fights never resolve (sim

@@ -1,6 +1,6 @@
 import { EquipmentSystem } from '../systems/equipment.mjs';
 import { getPositionalTags } from '../helpers/positioning.mjs';
-import { houseHitFormula, hybridAbilityMod, weaponStatBlend, spellDamageRef, spellInvestDamage, strikeInvestDamage, infusionDamage, investSelfDamage as computeInvestSelfDamage, effectiveDodgeValue, splitEvenlyWithRemainder, parryMassMultiplier, bracedParryWeight, bracedMaxUsefulInvest, lunarPhaseMultiplier, dotTickDamage, procStaminaCost, crushFlatAmount, riderMaxInvest } from '../helpers/formulas.mjs';
+import { houseHitFormula, hybridAbilityMod, weaponStatBlend, spellDamageRef, spellInvestDamage, strikeInvestDamage, infusionDamage, investSelfDamage as computeInvestSelfDamage, effectiveDodgeValue, splitEvenlyWithRemainder, parryMassMultiplier, bracedParryWeight, bracedMaxUsefulInvest, defenceMarginMultiplier, lunarPhaseMultiplier, dotTickDamage, procStaminaCost, crushFlatAmount, riderMaxInvest } from '../helpers/formulas.mjs';
 import { recordActionFired, declareAction, isInActiveCombat, computeActionWait, referenceRoundLength, computeWindupMultiplier, getScrambleStacks, addScrambleStack, applyDodgeCost, findCombatantForActor, perceiveGate } from '../systems/celerity.mjs';
 import { getThreatRadiusFt, actorIsDashing } from '../systems/engagement-halts.mjs';
 import { selectTargetOnCanvas, skillNeedsTargetPrompt, skillTargetsAtFire, selectMarkerOnCanvas } from '../canvas/target-prompt.mjs';
@@ -1207,22 +1207,21 @@ export class AspectsofPowerItem extends Item {
         const costNote = cost > 0 ? ` — next action +${cost} ticks` : '';
         const speaker = ChatMessage.getSpeaker({ actor: targetActor });
 
-        if (droll >= hitTotal) {
+        // THE MARGIN RULE (RULED 2026-07-31): how badly you lost decides what
+        // fraction lands. Replaces avoid / graze-0.5 / full, where two pips of
+        // a d20 was the difference between 465 damage and dying.
+        damageMultiplier = defenceMarginMultiplier(droll, hitTotal);
+        if (damageMultiplier <= 0) {
           isHit = false;
           defenseLine = `<p>${defLabel} dodge: <strong>success</strong> (${droll} vs ${hitTotal})${costNote}</p>`;
           ChatMessage.create({ speaker,
             content: `<p><strong>${targetActor.name}</strong> dodges the ${defLabel.toLowerCase()} attack! (${droll} vs ${hitTotal}) <em>May reposition 5ft.</em></p>`,
           });
-        } else if (droll >= hitTotal * (1 - (dt.grazeBandPct ?? 0.10))) {
-          damageMultiplier = 0.5;
-          defenseLine = `<p>${defLabel} dodge: <strong>graze</strong> (${droll} vs ${hitTotal} — half damage)${costNote}</p>`;
-          ChatMessage.create({ speaker,
-            content: `<p><strong>${targetActor.name}</strong> nearly evades — grazed for half damage. (${droll} vs ${hitTotal})</p>`,
-          });
         } else {
-          defenseLine = `<p>${defLabel} dodge: <strong>failed</strong> (${droll} vs ${hitTotal})${costNote}</p>`;
+          const _redPct = Math.round((1 - damageMultiplier) * 100);
+          defenseLine = `<p>${defLabel} dodge: <strong>partial</strong> (${droll} vs ${hitTotal} — ${_redPct}% reduced)${costNote}</p>`;
           ChatMessage.create({ speaker,
-            content: `<p><strong>${targetActor.name}</strong> fails to dodge. (${droll} vs ${hitTotal})</p>`,
+            content: `<p><strong>${targetActor.name}</strong> gives ground — ${_redPct}% of the blow turned aside. (${droll} vs ${hitTotal})</p>`,
           });
         }
       } else if (defenseResult.perceiveGated) {
@@ -1324,13 +1323,14 @@ export class AspectsofPowerItem extends Item {
           // the implement actually doing the parrying, so Shield Block is rated
           // on the shield rather than on whatever else the defender carries.
           //
-          // Simmed and accepted with eyes open: because parry is a hard
-          // threshold, the full ladder makes it a CLIFF rather than a curve —
-          // a dagger parry against a greatsword sits near 0% up to rare and
-          // near 100% at legendary. It also means a legendary dagger master
-          // parries about as well as a novice with a greatshield, so mastery
-          // can overturn the mass rule at the top of the ladder. That is the
-          // ruled intent: skill should be able to beat physics eventually.
+          // It also means a legendary dagger master parries about as well as a
+          // novice with a greatshield, so mastery can overturn the mass rule at
+          // the top of the ladder. That is the ruled intent: skill should be
+          // able to beat physics eventually.
+          //
+          // (The old "this makes it a CLIFF rather than a curve" caveat here is
+          // RESOLVED as of the margin rule — the ladder now slides the damage
+          // fraction instead of flipping a pass/fail threshold.)
           const parryProf = proficiencyDamageMult(
             targetActor, reactionSkill._proficiencyWeapon?.() ?? null);
           const parryTotal = Math.round(rawParry * massMult * parryProf);
@@ -1340,7 +1340,16 @@ export class AspectsofPowerItem extends Item {
           if (parryProf !== 1) bits.push(`proficiency x${parryProf.toFixed(2)}`);
           const massNote = bits.length
             ? ` <em>(${bits.join(', ')} of ${rawParry})</em>` : '';
-          if (parryTotal >= hitTotal) {
+          // THE MARGIN RULE reaches parry too (RULED 2026-07-31). Left binary
+          // it would be STRICTLY DOMINATED: measured against the proportional
+          // dodge it lost 11 of 12 live matchups, and at an identical basis a
+          // binary defence takes 11x the damage of a proportional one, because
+          // falling short buys nothing at all. Takes the BETTER of the parry
+          // and whatever the dodge/pool branch already achieved, so declaring
+          // a parry can never leave you worse off than not declaring one.
+          const parryMult = defenceMarginMultiplier(parryTotal, hitTotal);
+          if (parryMult < damageMultiplier) damageMultiplier = parryMult;
+          if (damageMultiplier <= 0) {
             isHit = false;
             reactionLine = `<p><em>${targetActor.name} parries with <strong>${reactionSkill.name}</strong>! `
                          + `(${parryTotal} vs ${hitTotal})${massNote}</em></p>`;
@@ -1744,13 +1753,24 @@ export class AspectsofPowerItem extends Item {
     // explosion takes half damage all the way through.
     const fracClamped = Math.max(0, Math.min(1, aoeFraction ?? 1));
     const rawDmg = Math.max(0, Math.round(dmgRoll.total * fracClamped));
-    const primaryContrib   = primaryResult.isHit
-      ? Math.max(0, Math.round(rawDmg * halfFactor * primaryResult.damageMultiplier))
+    // ⚠ ORDERING (RULED 2026-07-31): the defence multiplier is NO LONGER
+    // applied here. Under the margin rule, multiplying before the flat
+    // armour/DR subtraction makes a good defence plus any wall reach zero —
+    // measured at 25 of 40 live matchups immune. What flows into the wall is
+    // now the share of the blow that LANDED (which halves of a dual-defence
+    // attack connected); the margin scales what SURVIVES the wall, below.
+    const primaryContrib   = primaryResult.isHit   ? rawDmg * halfFactor : 0;
+    const secondaryContrib = (secondaryResult?.isHit) ? rawDmg * halfFactor : 0;
+    const afterDefense     = Math.max(0, Math.round(primaryContrib + secondaryContrib));
+    // Weighted margin across the halves that actually landed. With a single
+    // defence this is just its own multiplier; with two it averages them, so
+    // equal multipliers reproduce the old total exactly.
+    const _landed = (primaryResult.isHit ? halfFactor : 0)
+                  + (secondaryResult?.isHit ? halfFactor : 0);
+    const defenceMargin = _landed > 0
+      ? (((primaryResult.isHit ? primaryResult.damageMultiplier * halfFactor : 0)
+        + (secondaryResult?.isHit ? secondaryResult.damageMultiplier * halfFactor : 0)) / _landed)
       : 0;
-    const secondaryContrib = (secondaryResult?.isHit)
-      ? Math.max(0, Math.round(rawDmg * halfFactor * secondaryResult.damageMultiplier))
-      : 0;
-    const afterDefense    = primaryContrib + secondaryContrib;
 
     // Per-affinity damage breakdown — two contributors get bucketed here
     // so the apply-damage handler can subtract the TARGET's per-affinity
@@ -1837,7 +1857,13 @@ export class AspectsofPowerItem extends Item {
 
     // Armor/veil reduces whatever got through the barrier.
     const preToughnessDmg = Math.max(0, afterBarrier - mitigation);
-    const finalDamage     = isHit ? Math.max(0, preToughnessDmg - effectiveToughness) : 0;
+    // ⚠ THE MARGIN LANDS HERE, LAST (RULED 2026-07-31) — after barrier, after
+    // armour/veil, after DR. Applying it any earlier lets a decent defence
+    // plus any wall reach zero. Consequence accepted: barrier and armour are
+    // charged against the FULL blow, so giving ground does not preserve your
+    // barrier — the shell takes the impact regardless of your footwork.
+    const postDR      = Math.max(0, preToughnessDmg - effectiveToughness);
+    const finalDamage = isHit ? Math.max(0, Math.round(postDR * defenceMargin)) : 0;
     const displayDamage   = finalDamage;
 
     // ── self_damage_taken passive auto-fire (Phase C) ──
@@ -1925,6 +1951,7 @@ export class AspectsofPowerItem extends Item {
              data-toughness="${baseDR}"
              data-affinity-dr="${affinityDR}"
              data-damage-type="${isPhysical ? 'physical' : 'magical'}"
+             data-defence-margin="${defenceMargin}"
              data-mitigation="${_mitLane}" data-mitigation-value="${mitigation}"${damageBreakdownAttr}${fmAttrs}`;
     let redirectLine = '';
     let redirectButton = '';
@@ -2379,9 +2406,19 @@ export class AspectsofPowerItem extends Item {
       if (isPhysicalLane && hasDefend) {
         const aiStacks = getScrambleStacks(targetActor);
         const aiDv = effectiveDodgeValue(targetActor, defKey, aiStacks, dt);
+        // Under THE MARGIN RULE defending is never wasted — any dodge basis
+        // turns aside a proportional share — so the old "35% chance of TOTAL
+        // avoidance" gate is far too conservative and would have AI actors eat
+        // blows they could have halved. Decide on the EXPECTED REDUCTION
+        // instead; the brake on always-defending is the scramble stack and the
+        // tempo cost, not the odds. `aiDodgeWinProbMin` is retained only for
+        // the whispered readout.
         const p = _dodgeWinProb(aiDv, hitTotal);
-        defend = p >= (dt.aiDodgeWinProbMin ?? 0.35);
-        note = defend ? `dodges (p≈${Math.round(p * 100)}%)` : `takes the hit (dodge p≈${Math.round(p * 100)}%)`;
+        const expReduction = 1 - defenceMarginMultiplier(aiDv, hitTotal);
+        defend = expReduction >= (dt.aiDefendMinReduction ?? 0.20);
+        note = defend
+          ? `defends (turns aside ≈${Math.round(expReduction * 100)}%, full-avoid p≈${Math.round(p * 100)}%)`
+          : `takes the hit (would only turn aside ≈${Math.round(expReduction * 100)}%)`;
       } else if (!isPhysicalLane && pool > 0) {
         defend = true;
         note = 'spends pool';

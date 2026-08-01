@@ -2465,6 +2465,23 @@ Hooks.on('renderChatMessageHTML', (message, html) => {
         }
       }
 
+      // 3c. THE MARGIN RULE (RULED 2026-07-31) — how badly the defender lost
+      // the opposed roll scales what SURVIVES the wall. It lands HERE, last of
+      // the mitigation steps and before overhealth/HP, because applying it any
+      // earlier lets a decent defence plus any flat wall reach zero (measured:
+      // 25 of 40 live matchups immune). Absent attribute = 1, so every other
+      // damage source (zones, DoTs, channels, the redirect buttons whose value
+      // is already margin-applied) is untouched.
+      const _margin = (btn.dataset.defenceMargin !== undefined && btn.dataset.defenceMargin !== '')
+        ? Math.max(0, Math.min(1, parseFloat(btn.dataset.defenceMargin)))
+        : 1;
+      if (remaining > 0 && _margin < 1) {
+        const kept = Math.round(remaining * _margin);
+        const turned = remaining - kept;
+        remaining = kept;
+        if (turned > 0) parts.push(`Defence: −${turned} (${Math.round((1 - _margin) * 100)}% turned aside)`);
+      }
+
       // 3. Overhealth absorbs next.
       const overhealth = target.system.overhealth;
       if (remaining > 0 && overhealth?.value > 0) {
