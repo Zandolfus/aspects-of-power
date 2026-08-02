@@ -51,6 +51,15 @@
     // Band thresholds for the report, from the house target matrix
     // (mirror 6-8 rounds, cross-lane favoured 3-4, never below 2).
     lethal: 3, grindy: 8,
+    // EXPERIMENT — magic/melee unification. Weapons use weight TWICE: windup
+    // (damage) and wait (tempo), which is what makes them DPR-neutral across
+    // weights. Spells use spellTierWeights for wait ONLY, so tier costs time
+    // without paying damage. Setting this true feeds the tier weight in as a
+    // windup, exactly as a weapon's weight is. `spellInvestDamage` and
+    // `strikeInvestDamage` are already the same function at windup 1, so this
+    // is "stop passing the neutral value" rather than a new formula.
+    // Compared side by side in the output; NOT shipped.
+    spellWindupModes: [false, true],
   };
 
   /* ------------- helpers ------------- */
@@ -62,7 +71,7 @@
   const hitAt = (f, d20) => { try { const v = Function('d20', 'return ' + f)(d20); return Number.isFinite(v) ? v : null; } catch { return null; } };
 
   /* ------------- attacker profiles ------------- */
-  function profileSkill(actor, sk) {
+  function profileSkill(actor, sk, spellWindupOn) {
     const rd = sk.getRollData?.();
     if (!rd?.roll) return null;
     const tags = sk.system.tags ?? [];
@@ -86,16 +95,25 @@
     const res   = rd.roll.resource;
     const eff   = sk._resolveRarityMods().effectiveMult;
 
-    let branch = 'legacy', dmg = null, wait = null, cost = null;
+    let branch = 'legacy', dmg = null, wait = null, cost = null, windup = 1;
 
     if (['mana', 'health'].includes(res) && tier && grade
         && sc.spellTierFactors[tier] && sc.spellGradeFactors[grade]) {
       branch = 'spell';
       const gf = sc.spellGradeFactors[grade];
       const baseCost = Math.round(sc.spellTierFactors[tier] * gf);
-      dmg  = F.spellInvestDamage(actor.system.abilities.intelligence.mod, eff, baseCost, F.spellDamageRef(gf));
+      // windup 1 makes strikeInvestDamage identical to spellInvestDamage, so
+      // the OFF mode reproduces shipped behaviour exactly rather than merely
+      // closely — same function, neutral argument.
+      const spellWindup = spellWindupOn
+        ? Math.min(dt.windupMax ?? 3.0, Math.max(dt.windupMin ?? 0.5,
+            (sc.spellTierWeights?.[tier] ?? sc.celerity.BASELINE_WEIGHT) / 100))
+        : 1;
+      dmg  = F.strikeInvestDamage(actor.system.abilities.intelligence.mod, eff,
+                                  spellWindup, baseCost, F.spellDamageRef(gf));
       wait = CEL.computeActionWait(actor, sk, null, baseCost);
       cost = baseCost;
+      windup = spellWindup;
     } else if (res === 'stamina' && ['str_weapon', 'dex_weapon', 'phys_ranged'].includes(rd.roll.type)) {
       const wpn = sk._resolveWeaponForSkill();
       const wt  = sk.constructor.resolveWeaponWeight(wpn);
@@ -107,7 +125,8 @@
           { str: A.strength.mod, dex: A.dexterity.mod, per: A.perception.mod }, isRanged);
         const baseStam = Math.max(1, Math.round(
           (wt / sc.invest.staminaBaseDivisor) * (blend / sc.invest.staminaNormalizer)));
-        dmg  = F.strikeInvestDamage(blend, eff, CEL.computeWindupMultiplier(sk, wpn), baseStam, baseStam);
+        windup = CEL.computeWindupMultiplier(sk, wpn);
+        dmg  = F.strikeInvestDamage(blend, eff, windup, baseStam, baseStam);
         wait = CEL.computeActionWait(actor, sk, wpn);
         cost = baseStam;
       }
@@ -123,7 +142,7 @@
 
     const wpnTags = sk._resolveWeaponForSkill?.()?.system?.tags ?? [];
     return {
-      actor: actor.name, name: sk.name, branch, dmg, cost, wait,
+      actor: actor.name, name: sk.name, branch, dmg, cost, wait, windup,
       hitBasis, lane: sk.system.roll?.targetDefense || '',
       pierce: tags.includes('pierce')
            || (AA.pierceWeaponTypes ?? []).some(t => wpnTags.includes(t)),
@@ -199,54 +218,62 @@
   if (actors.length < 2) return 'Need at least two of CFG.actors present in the world.';
 
   const defenders = actors.map(profileDefender);
-  const skills = [];
-  for (const a of actors) {
-    for (const sk of a.items) {
-      if (sk.type !== 'skill') continue;
-      const p = profileSkill(a, sk);
-      if (p) skills.push(p);
-    }
-  }
-
   const roundLen = CEL.referenceRoundLength(actors[0].system.attributes?.race?.level ?? 1);
-  const grid = {}, choices = {}, ttks = [];
-  let immune = 0, pairs = 0;
 
-  for (const def of defenders) {
-    grid[CFG.label(def.name)] = {};
-    for (const atk of actors) {
-      if (atk.name === def.name) continue;
-      pairs++;
-      let best = { dpr: 0, skill: null };
-      for (const sk of skills.filter(s => s.actor === atk.name)) {
-        const { mean } = meanPerSwing(sk, def);
-        const dpr = mean * (roundLen / sk.wait);
-        if (dpr > best.dpr) best = { dpr, skill: sk.name, perSwing: mean };
-      }
-      const key = CFG.label(atk.name);
-      if (best.dpr <= 0.01) { immune++; grid[CFG.label(def.name)][key] = 'IMMUNE'; }
-      else {
-        const ttk = def.hp / best.dpr;
-        ttks.push(ttk);
-        grid[CFG.label(def.name)][key] = Math.round(ttk * 10) / 10;
-        choices[`${key} -> ${CFG.label(def.name)}`] =
-          `${best.skill} (${Math.round(best.perSwing)}/swing, ${Math.round(best.dpr)} dpr)`;
+  function runOnce(spellWindupOn) {
+    const skills = [];
+    for (const a of actors) {
+      for (const sk of a.items) {
+        if (sk.type !== 'skill') continue;
+        const p = profileSkill(a, sk, spellWindupOn);
+        if (p) skills.push(p);
       }
     }
+    const grid = {}, choices = {}, ttks = [];
+    let immune = 0, pairs = 0;
+
+    for (const def of defenders) {
+      grid[CFG.label(def.name)] = {};
+      for (const atk of actors) {
+        if (atk.name === def.name) continue;
+        pairs++;
+        let best = { dpr: 0, skill: null };
+        for (const sk of skills.filter(s => s.actor === atk.name)) {
+          const { mean } = meanPerSwing(sk, def);
+          const dpr = mean * (roundLen / sk.wait);
+          if (dpr > best.dpr) best = { dpr, skill: sk.name, perSwing: mean };
+        }
+        const key = CFG.label(atk.name);
+        if (best.dpr <= 0.01) { immune++; grid[CFG.label(def.name)][key] = 'IMMUNE'; }
+        else {
+          const ttk = def.hp / best.dpr;
+          ttks.push(ttk);
+          grid[CFG.label(def.name)][key] = Math.round(ttk * 10) / 10;
+          choices[`${key} -> ${CFG.label(def.name)}`] =
+            `${best.skill} (${Math.round(best.perSwing)}/swing, ${Math.round(best.dpr)} dpr)`;
+        }
+      }
+    }
+    ttks.sort((a, b) => a - b);
+    return {
+      spellWindup: spellWindupOn,
+      summary: {
+        pairs, immune,
+        immunePct: Math.round(immune / pairs * 100),
+        medianRounds: ttks.length ? Math.round(ttks[Math.floor(ttks.length / 2)] * 10) / 10 : null,
+        belowFloor: ttks.filter(t => t < 2).length,
+        lethal: ttks.filter(t => t <= CFG.lethal).length,
+        grindy: ttks.filter(t => t > CFG.grindy).length,
+      },
+      grid, choices,
+      spellSkills: skills.filter(s => s.branch === 'spell').map(s =>
+        `${CFG.label(s.actor)}/${s.name}: ${Math.round(s.dmg)} dmg, wu ${Math.round(s.windup * 100) / 100}, ${Math.round(s.dmg * roundLen / s.wait)} dpr`),
+    };
   }
 
-  ttks.sort((a, b) => a - b);
-  const summary = {
-    roundLengthTicks: roundLen,
-    pairs, immune,
-    immunePct: Math.round(immune / pairs * 100),
-    medianRounds: ttks.length ? Math.round(ttks[Math.floor(ttks.length / 2)] * 10) / 10 : null,
-    belowFloor: ttks.filter(t => t < 2).length,
-    lethal: ttks.filter(t => t <= CFG.lethal).length,
-    grindy: ttks.filter(t => t > CFG.grindy).length,
-  };
-
-  window.__archetypeSim = { summary, grid, choices, skills, defenders, cfg: CFG };
-  console.table(grid);
-  return JSON.stringify({ summary, grid }, null, 1);
+  const runs = CFG.spellWindupModes.map(runOnce);
+  window.__archetypeSim = { runs, defenders, roundLen, cfg: CFG };
+  for (const r of runs) { console.log(`spellWindup=${r.spellWindup}`); console.table(r.grid); }
+  return JSON.stringify({ roundLengthTicks: roundLen, runs: runs.map(r => ({
+    spellWindup: r.spellWindup, summary: r.summary, grid: r.grid, spellSkills: r.spellSkills })) }, null, 1);
 })()
