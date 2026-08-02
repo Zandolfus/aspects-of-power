@@ -51,6 +51,7 @@ import { AIProfiles, registerAIHooks, aiSetFactionFocus } from './systems/ai.mjs
 import { registerSummonHud } from './canvas/summon-hud.mjs';
 import { registerMovementHud } from './canvas/movement-hud.mjs';
 import { CelerityCombatTracker, installAopTurnMarkerPatch } from './apps/celerity-combat-tracker.mjs';
+import { resolveDamage, durabilityDamage, applyMarkBonus } from './systems/damage.mjs';
 
 /* -------------------------------------------- */
 /*  Debuff Helpers                              */
@@ -2314,6 +2315,7 @@ Hooks.on('renderChatMessageHTML', (message, html) => {
       // keep their own bonus. Effects with `markedExpiresOnHit: true` are
       // deleted after the bonus fires (Feint-style one-shot).
       const attackerActorUuid = btn.dataset.attackerActorUuid || '';
+      let markBonus = 0;
       if (attackerActorUuid) {
         const myMarks = target.effects.filter(e =>
           !e.disabled
@@ -2322,8 +2324,9 @@ Hooks.on('renderChatMessageHTML', (message, html) => {
         );
         const totalBonus = myMarks.reduce((s, e) => s + (Number(e.system?.markedDamageBonus) || 0), 0);
         if (totalBonus > 0) {
+          markBonus = totalBonus;
           const before = incomingDmg;
-          incomingDmg = Math.round(incomingDmg * (1 + totalBonus));
+          incomingDmg = applyMarkBonus(incomingDmg, totalBonus);
           parts.push(`Marked: +${Math.round(totalBonus * 100)}% (${before} → ${incomingDmg})`);
           // Delete expires-on-hit marks AFTER applying the bonus.
           const oneShots = myMarks.filter(e => e.system?.markedExpiresOnHit === true);
@@ -2383,17 +2386,46 @@ Hooks.on('renderChatMessageHTML', (message, html) => {
       }
       if (cleansedReports.length) parts.push(cleansedReports.join('; '));
 
-      let remaining = incomingDmg;
-
       // 1. Barrier absorbs first (if present). No toughness/DR on this portion.
       const barrier = target.system.barrier;
       const barrierEffect = target.effects.find(e =>
         !e.disabled && e.system?.effectType === 'barrier'
       );
-      if (barrier?.value > 0 && barrierEffect) {
-        const absorbed = Math.min(barrier.value, remaining);
-        const newBarrierVal = barrier.value - absorbed;
-        remaining -= absorbed;
+      const barrierPool = (barrier?.value > 0 && barrierEffect) ? barrier.value : 0;
+
+      // THE DEFENCE MARGIN (RULED 2026-07-31) — how badly the defender lost the
+      // opposed roll scales what survives the wall. Absent attribute = 1, so
+      // zones, DoTs, channels and the already-margined redirect buttons are
+      // untouched. See systems/damage.mjs for why it lands after the wall.
+      const _margin = (btn.dataset.defenceMargin !== undefined && btn.dataset.defenceMargin !== '')
+        ? Math.max(0, Math.min(1, parseFloat(btn.dataset.defenceMargin)))
+        : 1;
+
+      // ── THE PIPELINE ──────────────────────────────────────────────────────
+      // One shared implementation (systems/damage.mjs) so a balance sim and the
+      // table cannot disagree — the whole reason this was extracted out of the
+      // chat hook. Mark and per-affinity resist are pre-applied above because
+      // both need the effect documents to describe themselves, so they pass 0.
+      const dmgRes = resolveDamage({
+        incoming: incomingDmg,
+        markBonus: 0,
+        affinityResist: 0,
+        barrier: barrierPool,
+        mitigation,
+        mitigationLabel: mitigLane === 'armor' ? 'Armor' : 'Veil',
+        drValue,
+        affinityDR,
+        augDR: target.system.damageReduction?.[isPhysical ? 'physical' : 'magical'] ?? 0,
+        augLabel: isPhysical ? 'Phys' : 'Mag',
+        margin: _margin,
+        overhealth: target.system.overhealth?.value ?? 0,
+        health: target.system.health?.value ?? 0,
+      });
+      const remaining = dmgRes.hpLoss;
+
+      if (barrierPool > 0) {
+        const absorbed = dmgRes.barrierAbsorbed;
+        const newBarrierVal = dmgRes.barrierRemaining;
         barrierAbsorbed = true;
 
         if (newBarrierVal === 0) {
@@ -2437,65 +2469,16 @@ Hooks.on('renderChatMessageHTML', (message, html) => {
         }
       }
 
-      // 2. Armor/Veil reduces whatever got through the barrier.
-      if (remaining > 0 && mitigation > 0) {
-        const mitigated = Math.min(mitigation, remaining);
-        remaining = Math.max(0, remaining - mitigation);
-        parts.push(`${mitigLane === 'armor' ? 'Armor' : 'Veil'}: −${mitigated}`);
-      }
-
-      // 3. DR (with affinity reduction) reduces whatever got through armor.
-      if (remaining > 0) {
-        const effectiveDR = Math.max(0, drValue - affinityDR);
-        const drReduced = Math.min(effectiveDR, remaining);
-        remaining = Math.max(0, remaining - effectiveDR);
-        if (drReduced > 0) parts.push(`DR: −${drReduced}`);
-      }
-
-      // 3b. Augment-sourced flat damage reduction (Inscribe Physical/Magical
-      // Resist). Subtracts a flat amount based on damage type. Designed to
-      // be modest — per user note "no % reductions, way too powerful."
-      if (remaining > 0) {
-        const drKey = isPhysical ? 'physical' : 'magical';
-        const augDR = target.system.damageReduction?.[drKey] ?? 0;
-        if (augDR > 0) {
-          const augReduced = Math.min(augDR, remaining);
-          remaining = Math.max(0, remaining - augDR);
-          parts.push(`${isPhysical ? 'Phys' : 'Mag'} Resist: −${augReduced}`);
-        }
-      }
-
-      // 3c. THE MARGIN RULE (RULED 2026-07-31) — how badly the defender lost
-      // the opposed roll scales what SURVIVES the wall. It lands HERE, last of
-      // the mitigation steps and before overhealth/HP, because applying it any
-      // earlier lets a decent defence plus any flat wall reach zero (measured:
-      // 25 of 40 live matchups immune). Absent attribute = 1, so every other
-      // damage source (zones, DoTs, channels, the redirect buttons whose value
-      // is already margin-applied) is untouched.
-      const _margin = (btn.dataset.defenceMargin !== undefined && btn.dataset.defenceMargin !== '')
-        ? Math.max(0, Math.min(1, parseFloat(btn.dataset.defenceMargin)))
-        : 1;
-      if (remaining > 0 && _margin < 1) {
-        const kept = Math.round(remaining * _margin);
-        const turned = remaining - kept;
-        remaining = kept;
-        if (turned > 0) parts.push(`Defence: −${turned} (${Math.round((1 - _margin) * 100)}% turned aside)`);
-      }
-
-      // 3. Overhealth absorbs next.
-      const overhealth = target.system.overhealth;
-      if (remaining > 0 && overhealth?.value > 0) {
-        const ohAbsorbed = Math.min(overhealth.value, remaining);
-        remaining -= ohAbsorbed;
-        updateData['system.overhealth.value'] = overhealth.value - ohAbsorbed;
-        parts.push(`Overhealth: −${ohAbsorbed}`);
-      }
-
-      // 4. Remaining hits HP.
+      // 2-4. Armour/veil → DR → augment resist → margin → overhealth → HP were
+      // all resolved above by resolveDamage. What remains here is turning its
+      // numbers into document writes and display, in pipeline order.
       const health = target.system.health;
-      const newHealth = Math.max(0, health.value - remaining);
+      const newHealth = dmgRes.newHealth;
+      if (dmgRes.overhealthAbsorbed > 0) {
+        updateData['system.overhealth.value'] = dmgRes.overhealthRemaining;
+      }
       updateData['system.health.value'] = newHealth;
-      if (remaining > 0) parts.push(`Health: −${remaining}`);
+      parts.push(...dmgRes.parts);
 
       await target.update(updateData);
 
@@ -2513,9 +2496,6 @@ Hooks.on('renderChatMessageHTML', (message, html) => {
 
       // Degrade durability only on damage that passed through barriers.
       if (!barrierAbsorbed || remaining > 0) {
-        const effectiveDR = Math.max(0, drValue - affinityDR);
-        const postBarrierDmg = barrierAbsorbed ? Math.max(0, incomingDmg - (barrier?.value ?? 0)) : incomingDmg;
-        const totalDurabilityDmg = Math.max(0, postBarrierDmg - mitigation - effectiveDR);
 
         // AXE WEAR (design-weapon-proficiencies.md, RULED 2026-07-28) — armour
         // is worn by what it STOPPED, not by what leaked past it.
@@ -2540,22 +2520,18 @@ Hooks.on('renderChatMessageHTML', (message, html) => {
         // not the model, drove the multi-axe problem: at 20% five axes strip a
         // heavy kit in 5 rounds; at 10% they need 10 and a solo axe never does.
         const _aaCfg = CONFIG.ASPECTSOFPOWER.armorAnswer ?? {};
-        const wearRate = _aaCfg.axeWearRate ?? 0;
-        let axeWear = 0;
-        if (wearRate > 0 && damageType === 'physical' && attackerActorUuid) {
+        let wearRate = 0;
+        if ((_aaCfg.axeWearRate ?? 0) > 0 && damageType === 'physical' && attackerActorUuid) {
           try {
             const atkActor = await fromUuid(attackerActorUuid);
             const { weaponTypesOf } = await import('./systems/weapon-styles.mjs');
             const types = atkActor ? weaponTypesOf(atkActor) : [];
             const axeTypes = _aaCfg.axeWeaponTypes ?? ['axe', 'greataxe'];
-            if (types.some(t => axeTypes.includes(t))) {
-              const stopped = Math.min(postBarrierDmg, mitigation + effectiveDR);
-              axeWear = Math.max(0, Math.round(stopped * wearRate));
-            }
+            if (types.some(t => axeTypes.includes(t))) wearRate = _aaCfg.axeWearRate;
           } catch { /* attacker gone — no wear rather than a thrown handler */ }
         }
 
-        const durDmg = totalDurabilityDmg + axeWear;
+        const durDmg = durabilityDamage(dmgRes, { mitigation, wearRate }).total;
         if (durDmg > 0) await EquipmentSystem.degradeDurability(target, durDmg, damageType);
       }
 

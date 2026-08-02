@@ -18,6 +18,7 @@ import {
 } from '../module/helpers/formulas.mjs';
 import { moonState, moonNodeAngle, nextSyzygy, eclipseAtSyzygy, planetStates,
          meteorShowersOn, cometStates, julianDay, civilDate, worldTimeForDate } from '../module/systems/calendar.mjs';
+import { resolveDamage, durabilityDamage, applyMarkBonus } from '../module/systems/damage.mjs';
 
 const CFG = {
   meleeBlend: { strFloor: 0.30, slope: 0.70, weightOffset: 40, weightSpan: 180 },
@@ -656,6 +657,70 @@ eq('carried: two equipped storages both work', carriedWeightLb(nested, [RING, BA
 eq('carried: storedIn pointing at nothing still weighs',
    carriedWeightLb([{ id: 'a', weight: 50, quantity: 1, storedIn: 'ghost' }], [RING]), 50);
 eq('carried: empty inventory', carriedWeightLb([], [RING]), 0);
+
+/* ---------------------------------------------------------------- */
+/*  systems/damage.mjs - the resolution pipeline                     */
+/* ---------------------------------------------------------------- */
+// GOLDEN: the five live margin-rule verifications of 2026-07-31, hand-checked
+// against the chat cards at the time (design-defense-rework-2026-07). These are
+// the numbers the table actually produced, so any drift in the chain breaks
+// them - which is the whole point of extracting it out of the chat hook.
+
+// Test 1 - THE ORDERING PROOF. Gabriel -> Khalid: raw 886, armour 604, DR 87,
+// margin 1 - 825/1202. Post-wall the margin scales 195 down to 61 and Khalid
+// drops 731 -> 670. PRE-wall the same swing was 886 x 0.3136 = 278 - 604 = ZERO,
+// i.e. Khalid would have been immune. That reversal is why the order is fixed.
+const t1 = resolveDamage({
+  incoming: 886, mitigation: 604, drValue: 87,
+  margin: 0.3136439267886856, health: 731,
+});
+eq('damage: post-wall margin lands 61 (live card)', t1.hpLoss, 61);
+eq('damage: post-wall margin leaves 670 hp (live card)', t1.newHealth, 670);
+eq('damage: armour reduction reported', t1.mitigated, 604);
+eq('damage: DR reduction reported', t1.drReduced, 87);
+
+// Test 3 - defence DECLINED (margin absent = 1). Raw 601 fully stopped by 604
+// armour: the old pre-margin behaviour, reproduced exactly.
+const t3 = resolveDamage({ incoming: 601, mitigation: 604, drValue: 0, health: 500 });
+eq('damage: no margin, wall eats it', t3.hpLoss, 0);
+eq('damage: absent margin turns nothing aside', t3.marginTurned, 0);
+
+// Test 2 - full avoidance clamps the margin to 0, so nothing lands even though
+// the blow would otherwise have cleared the wall.
+const t2 = resolveDamage({ incoming: 2000, mitigation: 100, margin: 0, health: 900 });
+eq('damage: margin 0 is a clean miss', t2.hpLoss, 0);
+eq('damage: margin 0 still leaves hp untouched', t2.newHealth, 900);
+
+// Barrier eats first and takes NO toughness/DR on its portion.
+// A barrier smaller than the blow is spent entirely and the remainder goes on
+// to face armour and DR normally.
+const tb = resolveDamage({ incoming: 500, barrier: 200, mitigation: 100, drValue: 50, health: 400 });
+eq('damage: barrier absorbs first', tb.barrierAbsorbed, 200);
+eq('damage: barrier remainder faces the wall', tb.hpLoss, 150);
+eq('damage: spent barrier is flagged broken', tb.barrierBroke, true);
+// A barrier bigger than the blow survives with the difference intact.
+const tbs = resolveDamage({ incoming: 500, barrier: 800, mitigation: 100, health: 400 });
+eq('damage: oversized barrier survives', tbs.barrierBroke, false);
+eq('damage: oversized barrier keeps the remainder', tbs.barrierRemaining, 300);
+eq('damage: nothing reaches hp through a big barrier', tbs.hpLoss, 0);
+
+// Overhealth sits AFTER the margin, so it soaks only what actually landed.
+const to = resolveDamage({ incoming: 1000, mitigation: 200, margin: 0.5, overhealth: 300, health: 600 });
+eq('damage: margin applies before overhealth', to.overhealthAbsorbed, 300);
+eq('damage: overhealth then hp', to.hpLoss, 100);
+
+// Mark amplifies the RAW blow, before any mitigation.
+eq('damage: mark scales the raw blow', applyMarkBonus(500, 0.2), 600);
+eq('damage: no mark is identity', applyMarkBonus(500, 0), 500);
+const tm = resolveDamage({ incoming: 500, markBonus: 0.2, mitigation: 100, health: 900 });
+eq('damage: marked damage clears more wall', tm.hpLoss, 500);
+
+// Axe wear is anchored to what the armour STOPPED, never to the target's kit.
+const tw = resolveDamage({ incoming: 1000, mitigation: 400, drValue: 100, health: 900 });
+eq('damage: durability leak is what got through', durabilityDamage(tw, { mitigation: 400 }).leaked, 500);
+eq('damage: axe wear is 10% of what was stopped',
+   durabilityDamage(tw, { mitigation: 400, wearRate: 0.1 }).wear, 50);
+eq('damage: no wear rate, no wear', durabilityDamage(tw, { mitigation: 400 }).wear, 0);
 
 if (failures) { console.error(`\n${failures} FAILURES`); process.exit(1); }
 console.log('\nAll pure-function tests pass.');
