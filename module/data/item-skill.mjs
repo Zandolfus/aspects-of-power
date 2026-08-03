@@ -363,6 +363,14 @@ export class SkillData extends foundry.abstract.TypeDataModel {
         harvestPerLevel:    new fields.NumberField({ initial: 0, min: 0 }),
         harvestDotAffinity: new fields.StringField({ initial: '' }),
 
+        // ── MEDITATION AURA (Mana Attraction, user ruled 2026-08-03) ─────
+        // A skill that raises the meditation return of everyone within
+        // `auraRadius` feet of its owner, resolved when the `meditate`
+        // activity runs rather than ticked — meditation is an hour of world
+        // time, not a combat loop, so there is nothing to tick against.
+        // The owner benefits from their own field.
+        meditationAuraBonus: new fields.NumberField({ initial: 0, min: 0 }),
+
         // ── Phase E: buff-carries-reaction config ──
         // When an Active `buff`-tagged skill applies its buff, propagate
         // these onto the spawned effect's `system.reaction*` fields so

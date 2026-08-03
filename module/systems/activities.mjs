@@ -120,6 +120,52 @@ export async function advanceWorldTime(seconds) {
 }
 
 /**
+ * Meditation aura bonus reaching `actor` right now (Mana Attraction).
+ *
+ * RULED 2026-08-03: a REAL RADIUS on the canvas. Resolved at activity time
+ * rather than ticked — meditation is an hour of world time, not a combat loop,
+ * so there is no tick to hang an aura off. Whoever is standing in the field
+ * when the party sits down gets the benefit.
+ *
+ * ⚠ Takes the STRONGEST field, not the sum. "Mana attraction" is a gradient;
+ * standing in two of them does not double the pull, and summing would make
+ * stacking aura-carriers the obvious play. Change here if that is ever wanted.
+ *
+ * ⚠ Requires a placed token. Downtime often happens with nobody on the canvas,
+ * in which case this returns 0 and the meditator gets only their own rate —
+ * reported on the card so the absence is visible rather than silent.
+ *
+ * @returns {{bonus: number, sources: string[]}}
+ */
+export function meditationAuraBonusFor(actor) {
+  const none = { bonus: 0, sources: [] };
+  const self = actor?.getActiveTokens?.()?.[0];
+  if (!self?.center || !canvas?.grid) return none;
+  const pxPerFt = canvas.grid.size / canvas.grid.distance;
+
+  let best = 0;
+  let from = '';
+  for (const tokenDoc of (self.scene ?? canvas.scene)?.tokens ?? []) {
+    const other = tokenDoc.object;
+    const src = tokenDoc.actor;
+    if (!other?.center || !src?.items) continue;
+    for (const sk of src.items) {
+      if (sk.type !== 'skill') continue;
+      const c = sk.system?.tagConfig ?? {};
+      const bonus = Number(c.meditationAuraBonus) || 0;
+      const radiusFt = Number(c.auraRadius) || 0;
+      if (bonus <= 0 || radiusFt <= 0) continue;
+      // The owner stands in their own field.
+      const dx = self.center.x - other.center.x;
+      const dy = self.center.y - other.center.y;
+      if (Math.hypot(dx, dy) > radiusFt * pxPerFt) continue;
+      if (bonus > best) { best = bonus; from = `${sk.name} (${src.name})`; }
+    }
+  }
+  return best > 0 ? { bonus: best, sources: [from] } : none;
+}
+
+/**
  * Perform an activity: price it, post the card, spend the world time.
  *
  * @param {Actor}  actor
@@ -153,15 +199,18 @@ export async function performActivity(actor, key, opts = {}) {
   let restored = null;
   if (restoreCfg?.resource) {
     const pool = actor.system[restoreCfg.resource];
-    const frac = restoreCfg.fractionPath
+    const own = restoreCfg.fractionPath
       ? Number(foundry.utils.getProperty(actor.system, restoreCfg.fractionPath)) || 0
       : Number(restoreCfg.fraction) || 0;
+    const aura = meditationAuraBonusFor(actor);
+    const frac = own + aura.bonus;
     const max = Math.round(pool?.max ?? 0);
     const cur = Math.round(pool?.value ?? 0);
     if (max > 0 && frac > 0) {
       const gain = Math.min(Math.round(max * frac), max - cur);
       if (gain > 0) await actor.update({ [`system.${restoreCfg.resource}.value`]: cur + gain });
-      restored = { resource: restoreCfg.resource, gain: Math.max(0, gain), frac, from: cur, max };
+      restored = { resource: restoreCfg.resource, gain: Math.max(0, gain), frac, from: cur, max,
+                   own, aura };
     }
   }
 
@@ -174,6 +223,9 @@ export async function performActivity(actor, key, opts = {}) {
           ? `<p>Recovers <strong>${restored.gain}</strong> ${restored.resource}`
             + ` (${Math.round(restored.frac * 100)}% of ${restored.max})`
             + ` — ${restored.from + restored.gain} / ${restored.max}.</p>`
+            + (restored.aura?.bonus > 0
+                ? `<p><em>+${Math.round(restored.aura.bonus * 100)}% from `
+                  + `${restored.aura.sources.join(', ')}.</em></p>` : '')
           : '')
       + (opts.note ? `<p>${opts.note}</p>` : ''),
   });
