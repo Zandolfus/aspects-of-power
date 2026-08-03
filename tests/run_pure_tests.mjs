@@ -16,7 +16,9 @@ import {
   proficiencyMultiplier, proficiencyHitMultiplier, parryMassMultiplier, lunarPhaseMultiplier, dotTickDamage, procStaminaCost, riderDamageBase,
   crushFlatAmount, riderMaxInvest, itemWeightLb, KG_TO_LB, carriedWeightLb,
   bracedParryWeight, bracedMaxUsefulInvest, defenceMarginMultiplier,
-  buffCapacity, buffCost, buffAbilityCost, resolveBuffLoad, auraRadiusFor,
+  buffCapacity, buffCost, buffLoadByAbility, buffDefenceCost, buffModCost,
+  abilityMod, abilityModTotal, gradeMultiplierFor, solveBuffScale,
+  resolveBuffLoad, auraRadiusFor,
 } from '../module/helpers/formulas.mjs';
 import { moonState, moonNodeAngle, nextSyzygy, eclipseAtSyzygy, planetStates,
          meteorShowersOn, cometStates, julianDay, civilDate, worldTimeForDate } from '../module/systems/calendar.mjs';
@@ -953,31 +955,85 @@ eq('aura: the divisor is a knob',
 // GOLDEN: ability values and buff amounts read off the live world 2026-08-03.
 // Gabriel sums 3204 across his nine; Faye 1631. Buff amounts are the measured
 // roll totals x each entry's authored multiplier.
-const mkAbil = (sum) => ({ a: { value: sum } });   // capacity only reads values
-eq('buffCapacity Gabriel (3204)', buffCapacity(mkAbil(3204)), 641);
-eq('buffCapacity Faye (1631)', buffCapacity(mkAbil(1631)), 326);
-eq('buffCapacity: no abilities is no capacity', buffCapacity(null), 0);
-// ⚠⚠ THE CAP MUST NOT MOVE WHEN YOU BUFF THE BODY. Buffs are written into
-// ability values, so a capacity read off the raw sum grows with every buff it
-// admits — live-measured, a 326-point buff took Faye's sum 1631 -> 1957 and her
-// capacity 326 -> 391. Subtracting the ability points on loan pins it.
-eq('buffCapacity ignores the buffs already loaded',
-   buffCapacity(mkAbil(1957), 326), 326);
-eq('buffCapacity is stable under repeated buffing',
-   buffCapacity(mkAbil(1631 + 500), 500), buffCapacity(mkAbil(1631), 0));
-// ⚠ Only the ABILITY half comes back out. A buff's armour points never entered
-// the ability sum, so subtracting them would shrink the cap for free.
-eq('buffAbilityCost splits abilities from defence',
-   buffAbilityCost([{ key: 'system.abilities.strength.value', value: 200 },
-                    { key: 'system.defense.armor.value',      value: 582 }]), 200);
-// Blessings, titles and effect-applied gear are permanent identity and DO
-// raise what you can carry — this is what sizing off breakdown.calculated got
-// wrong, reading Faye at 302 against a true 326.
-eq('buffCapacity counts everything that is not a buff',
-   buffCapacity(mkAbil(1631), 0), 326);
-// The fraction is a knob, not a constant.
+// The stat curve, extracted from actor.prepareDerivedData so the buff cap can
+// price a hypothetical value. GOLDEN: Faye's live wisdom 285 -> mod 380 at
+// grade E (gradeMult 1), read from the world 2026-08-03.
+const CURVECFG = { statCurve: { NORM: 1085, P: 0.8, MULT_BASE: 1.25,
+                                gradeIndex: { G: 0, F: 0, E: 0, D: 1, S: 5 } } };
+eq('abilityMod: the curve at NORM is NORM', abilityMod(1085, 1, CURVECFG), 1085);
+eq('abilityMod: zero is zero', abilityMod(0, 1, CURVECFG), 0);
+// ⚠ CONCAVE — this is why buff cost must be marginal and the scale solved.
+// The same +100 buys less mod the higher the stat already is.
+const _lowGain  = abilityMod(300, 1, CURVECFG) - abilityMod(200, 1, CURVECFG);
+const _highGain = abilityMod(1100, 1, CURVECFG) - abilityMod(1000, 1, CURVECFG);
+eq('abilityMod: +100 is worth more on a low stat', _lowGain > _highGain, true);
+// ⚠ THE SCALING ARGUMENT: grade multiplies mod, so the same value-delta is
+// worth 3x more at grade S than at grade E. A value-space cap could not see it.
+eq('gradeMultiplierFor E', gradeMultiplierFor('E', CURVECFG), 1);
+eq('gradeMultiplierFor S', Math.round(gradeMultiplierFor('S', CURVECFG) * 100), 305);
+eq('abilityMod: grade S is worth 1.25^5 of grade E',
+   abilityMod(500, gradeMultiplierFor('S', CURVECFG), CURVECFG),
+   Math.round(abilityMod(500, 1, CURVECFG) * gradeMultiplierFor('S', CURVECFG)));
+
+// Capacity is a flat fraction of the UNBUFFED mod total.
+eq('buffCapacity is 20% of the unbuffed mod total', buffCapacity(3940), 788);
+eq('buffCapacity: nothing is nothing', buffCapacity(0), 0);
 eq('buffCapacity honours config fraction',
-   buffCapacity(mkAbil(1000), 0, { buffCap: { fraction: 0.5 } }), 500);
+   buffCapacity(1000, { buffCap: { fraction: 0.5 } }), 500);
+
+// ⚠ THE CURVE IS APPLIED PER ABILITY, THEN SUMMED. Summing values first and
+// curving once is a different number, because x^0.8 is not additive.
+const _nine = Object.fromEntries('abcdefghi'.split('').map(k => [k, { value: 400 }]));
+eq('abilityModTotal curves each stat separately',
+   abilityModTotal(_nine, {}, 1, CURVECFG), 9 * abilityMod(400, 1, CURVECFG));
+eq('abilityModTotal is not the curve of the sum',
+   abilityModTotal(_nine, {}, 1, CURVECFG) !== abilityMod(3600, 1, CURVECFG), true);
+// Negative deltas reconstruct the unbuffed body.
+eq('abilityModTotal: a negative delta removes a buff',
+   abilityModTotal({ a: { value: 500 } }, { a: -100 }, 1, CURVECFG),
+   abilityMod(400, 1, CURVECFG));
+
+// Splitting a change list by where the points land.
+const MIXED = [
+  { key: 'system.abilities.strength.value', value: 200 },
+  { key: 'system.abilities.wisdom.value',   value: 50 },
+  { key: 'system.defense.armor.value',      value: 582 },
+];
+eq('buffLoadByAbility keys by ability',
+   buffLoadByAbility(MIXED), { strength: 200, wisdom: 50 });
+eq('buffDefenceCost takes the defence half', buffDefenceCost(MIXED), 582);
+// ⚠ Defence points are ALREADY mod-scale (defences are derived from mods), so
+// they pass through uncurved. That is the unit match value space never had.
+eq('buffModCost passes defence through uncurved',
+   buffModCost({ a: { value: 400 } },
+               [{ key: 'system.defense.armor.value', value: 582 }], 1, CURVECFG), 582);
+
+// ⚠ COST IS MARGINAL AND TARGET-DEPENDENT. The same buff is cheaper on someone
+// who already has the stat high — the honest price of measuring real power.
+const _onLow  = buffModCost({ strength: { value: 200 } },
+  [{ key: 'system.abilities.strength.value', value: 100 }], 1, CURVECFG);
+const _onHigh = buffModCost({ strength: { value: 1000 } },
+  [{ key: 'system.abilities.strength.value', value: 100 }], 1, CURVECFG);
+eq('buffModCost: the same buff costs less on a high stat', _onHigh < _onLow, true);
+
+// ⚠ SOLVED, NOT DIVIDED. room/cost overshoots because cost is concave in the
+// change values — the scaled buff must actually fit.
+const _tgt = { strength: { value: 300 } };
+const _big = [{ key: 'system.abilities.strength.value', value: 800 }];
+const _full = buffModCost(_tgt, _big, 1, CURVECFG);
+const _room = Math.round(_full / 2);
+const _s = solveBuffScale(_tgt, _big, 1, _room, CURVECFG);
+const _fits = buffModCost(_tgt,
+  _big.map(c => ({ ...c, value: Math.round(c.value * _s) })), 1, CURVECFG);
+eq('solveBuffScale: the scaled buff fits the room', _fits <= _room, true);
+eq('solveBuffScale: and is not needlessly small', _fits >= _room - 2, true);
+eq('solveBuffScale: naive room/cost would have overshot',
+   buffModCost(_tgt, _big.map(c => ({ ...c, value: Math.round(c.value * (_room / _full)) })),
+               1, CURVECFG) > _room, true);
+eq('solveBuffScale: a buff that fits is not scaled',
+   solveBuffScale(_tgt, _big, 1, _full * 2, CURVECFG), 1);
+eq('solveBuffScale: no room means nothing lands',
+   solveBuffScale(_tgt, _big, 1, 0, CURVECFG), 0);
 
 // Willy's Dreams of Light Lunar (Ally): int +243, wil +229, wis +215.
 const DREAMS = [

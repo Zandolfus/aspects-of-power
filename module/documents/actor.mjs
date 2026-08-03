@@ -2,7 +2,8 @@
 // here: systems/weapon-styles.mjs pulls only from helpers/formulas.mjs, so it
 // cannot create the actor->item cycle the code standards forbid.
 import { proficiencyDamageMult } from '../systems/weapon-styles.mjs';
-import { carriedWeightLb, buffCapacity, buffCost, buffAbilityCost } from '../helpers/formulas.mjs';
+import { carriedWeightLb, buffCapacity, abilityMod, abilityModTotal,
+         buffLoadByAbility, buffDefenceCost } from '../helpers/formulas.mjs';
 
 /**
  * Change keys that `prepareDerivedData` consumes BY HAND — every ability, plus
@@ -203,9 +204,10 @@ export class AspectsofPowerActor extends Actor {
     const sc = CONFIG.ASPECTSOFPOWER.statCurve;
     const _raceRank = systemData.attributes?.race?.rank ?? 'E';
     const _gradeMult = Math.pow(sc.MULT_BASE, sc.gradeIndex[_raceRank] ?? 0);
-    const calcMod = (value) => {
-      return Math.round(Math.pow(value / sc.NORM, sc.P) * sc.NORM * _gradeMult);
-    };
+    // Delegates to helpers/formulas.mjs so the buff cap — which has to price a
+    // hypothetical value without re-deriving the actor — cannot drift from the
+    // curve the actor actually uses.
+    const calcMod = (value) => abilityMod(value, _gradeMult);
 
     // --- Stat breakdown: classify effect contributions by source ---
     // Titles are additive to base; blessings MULTIPLY (base + titles).
@@ -333,20 +335,28 @@ export class AspectsofPowerActor extends Actor {
     // are indistinguishable from a buff by shape alone; charging for them would
     // put every geared PC permanently overcap before any healer acted.
     if (systemData.buffs) {
-      let buffUsed = 0;
-      // Tracked separately because capacity is sized off ability values, so
-      // only the ability half of a live buff is "on loan" from that sum. A
-      // buff's armour points never entered it and must not be taken back out.
-      let buffAbilityLoan = 0;
+      // Per-ability points currently on loan from buffs, NEGATED, so subtracting
+      // them from the live values reconstructs the unbuffed body. Per-ability
+      // rather than a single total because the curve is applied per stat —
+      // where the points sit changes what they are worth.
+      const loan = {};
+      let defenceLoad = 0;
       for (const e of this.allApplicableEffects()) {
         if (e.disabled) continue;
         if (e.system?.effectType !== 'buff') continue;
-        buffUsed += buffCost(e.changes);
-        buffAbilityLoan += buffAbilityCost(e.changes);
+        for (const [k, v] of Object.entries(buffLoadByAbility(e.changes))) {
+          loan[k] = (loan[k] ?? 0) - v;
+        }
+        defenceLoad += buffDefenceCost(e.changes);
       }
-      systemData.buffs.capacity = buffCapacity(systemData.abilities, buffAbilityLoan);
-      systemData.buffs.used = buffUsed;
-      systemData.buffs.remaining = Math.max(0, systemData.buffs.capacity - buffUsed);
+      const currentTotal  = abilityModTotal(systemData.abilities, {}, _gradeMult);
+      const unbuffedTotal = abilityModTotal(systemData.abilities, loan, _gradeMult);
+      systemData.buffs.capacity = buffCapacity(unbuffedTotal);
+      // Used is the mod actually on loan, not the raw points written — the
+      // same currency the capacity is denominated in.
+      systemData.buffs.used = Math.max(0, currentTotal - unbuffedTotal) + defenceLoad;
+      systemData.buffs.remaining =
+        Math.max(0, systemData.buffs.capacity - systemData.buffs.used);
     }
 
     // ── Size Scaling (str/vit mods) ──

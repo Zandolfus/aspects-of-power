@@ -9,7 +9,9 @@
  * here must stay serializable-payload-in, no instance state.
  */
 import { EquipmentSystem } from './equipment.mjs';
-import { buffCapacity, buffCost, buffAbilityCost, resolveBuffLoad } from '../helpers/formulas.mjs';
+import { buffCapacity, buffModCost, buffLoadByAbility, buffDefenceCost,
+         abilityModTotal, gradeMultiplierFor, solveBuffScale,
+         resolveBuffLoad } from '../helpers/formulas.mjs';
 
 export async function executeGmAction(payload) {
     const msgWhisper = payload.whisperGM ? { whisper: payload.whisperGM } : {};
@@ -253,28 +255,62 @@ export async function executeGmAction(payload) {
         // Non-stackable re-casts overwrite `existing`, so its cost leaves the
         // budget — otherwise re-applying the same buff would measure itself as
         // competition and truncate to nothing on the second cast.
+        // ⚠ MOD SPACE. Capacity, usage and cost are all denominated in mod
+        // points, because that is the only unit the rest of the game reads.
         const replacing = (existing && !payload.stackable) ? existing : null;
-        let buffUsed = 0;
-        // Ability-only half, tracked separately: capacity is sized off ability
-        // values, so a live buff's ability points must come back out of that
-        // sum or the cap grows to admit the very buff it is measuring.
-        // ⚠ The REPLACED effect is excluded from buffUsed but NOT from the
-        // loan - its points are still in the ability values being read right
-        // now, so leaving them in would inflate the capacity it is checked
-        // against.
-        let buffAbilityLoan = 0;
+        const _abil = target.system?.abilities ?? {};
+        const _gm = gradeMultiplierFor(target.system?.attributes?.race?.rank ?? 'E');
+
+        // Per-ability points on loan from live buffs, NEGATED so subtracting
+        // them reconstructs the unbuffed body.
+        // ⚠ The REPLACED effect stays in the loan even though it leaves
+        // `buffUsed` - its points are sitting in the ability values being read
+        // right now, so dropping it here would inflate the capacity it is
+        // being checked against.
+        const loan = {};
+        let usedDefence = 0;
         for (const e of target.effects) {
           if (e.disabled) continue;
           if (e.system?.effectType !== 'buff') continue;
-          buffAbilityLoan += buffAbilityCost(e.changes);
+          for (const [k, v] of Object.entries(buffLoadByAbility(e.changes))) {
+            loan[k] = (loan[k] ?? 0) - v;
+          }
           if (replacing && e.id === replacing.id) continue;
-          buffUsed += buffCost(e.changes);
+          usedDefence += buffDefenceCost(e.changes);
         }
-        const buffCap = buffCapacity(target.system?.abilities, buffAbilityLoan);
-        const incomingCost = buffCost(payload.changes);
+        const currentTotal  = abilityModTotal(_abil, {}, _gm);
+        const unbuffedTotal = abilityModTotal(_abil, loan, _gm);
+        const buffCap = buffCapacity(unbuffedTotal);
+
+        // What the OTHER live buffs cost, in mod: everything on loan, minus the
+        // part belonging to the effect we are about to replace.
+        let replacedAbilityMod = 0;
+        if (replacing) {
+          const back = {};
+          for (const [k, v] of Object.entries(buffLoadByAbility(replacing.changes))) {
+            back[k] = (back[k] ?? 0) - v;
+          }
+          replacedAbilityMod = currentTotal - abilityModTotal(_abil, back, _gm);
+        }
+        const buffUsed = Math.max(0,
+          (currentTotal - unbuffedTotal) - replacedAbilityMod) + usedDefence;
+
+        // Cost is marginal ON THIS TARGET AS THEY STAND — but a re-cast must be
+        // priced against the body WITHOUT its own previous application, or the
+        // curve would charge it as if it were stacking on itself.
+        const _costAbil = replacing
+          ? Object.fromEntries(Object.entries(_abil).map(([k, a]) => {
+              const back = buffLoadByAbility(replacing.changes)[k] ?? 0;
+              return [k, { value: (Number(a?.value) || 0) - back }];
+            }))
+          : _abil;
+        const incomingCost = buffModCost(_costAbil, payload.changes, _gm);
         const acceptOvercap = target.system?.buffs?.acceptOvercap ?? false;
+        const room = Math.max(0, buffCap - buffUsed);
         const load = resolveBuffLoad({
           capacity: buffCap, used: buffUsed, cost: incomingCost, acceptOvercap,
+          // Solved, not divided: mod cost is concave in the change values.
+          scale: solveBuffScale(_costAbil, payload.changes, _gm, room),
         });
 
         // Truncation rescales every entry by the same factor so a multi-stat

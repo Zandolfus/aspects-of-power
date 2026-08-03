@@ -871,48 +871,156 @@ export function auraRadiusFor(authoredRadius, perMod, cfg = null) {
  * `mod ~ value^0.8`, a buff worth +20% of your values is only about +15.7% of
  * your power, so the cap is slightly tighter in practice than it reads.
  *
- * ⚠⚠ MEASURED FROM THE UNBUFFED BODY. Buffs are written INTO ability values,
- * so sizing the cap off the raw sum makes it self-referential: live-measured
- * 2026-08-03, a 326-point buff raised Faye's ability sum from 1631 to 1957 and
- * her capacity from 326 to 391, meaning buffing someone increased how much they
- * could be buffed. It converges rather than running away (to `frac/(1-frac)` =
- * 25% of base instead of 20%), but a cap that moves when you push on it is not
- * a cap.
+ * ⚠⚠ MOD SPACE, NOT VALUE SPACE (user ruled 2026-08-03: "otherwise this won't
+ * scale"). Buffs are WRITTEN as raw stat values, but nothing in combat reads a
+ * raw value — HP, mana, damage and every defence are computed from mods. A
+ * budget denominated in values is denominated in a unit with no gameplay
+ * meaning, and because `mod` carries a `1.25^gradeIndex` term, the same
+ * value-delta buys wildly different power at grade G than at grade S. A
+ * value-space cap would silently change what it is worth as the game extends
+ * past grade E.
  *
- * The fix subtracts EXACTLY the ability points currently on loan from buffs,
- * `buffedAbilityPoints`, and nothing else. The tempting shortcut — sizing off
- * `breakdown.calculated + equipmentCapped` — over-corrects: it also drops
- * blessings, titles and any gear applied as a loose ActiveEffect, which are
- * permanent identity and should raise what you can carry. Measured on Faye,
- * that read 302 against a true 326.
+ * It also fixes a unit mismatch rather than creating one: defence stats are
+ * DERIVED from mods, so a defence point and a mod point are the same scale,
+ * where a defence point and a raw ability point are not.
  *
- * @param {object} abilities            actor.system.abilities (all nine)
- * @param {number} [buffedAbilityPoints] Ability-key points from live buffs.
- * @param {object} [cfg]                CONFIG override (tests)
- * @returns {number} Capacity in stat points.
+ * ⚠⚠ AND MEASURED FROM THE UNBUFFED BODY. Buffs are written into ability
+ * values, so sizing the cap off current values makes it self-referential:
+ * live-measured, a 326-point buff raised Faye's ability sum from 1631 to 1957
+ * and her capacity from 326 to 391. It converges rather than running away (to
+ * `frac/(1-frac)`), but a cap that moves when you push on it is not a cap.
+ *
+ * ⚠ The consequence to accept: because the curve is concave, the SAME buff
+ * costs less on a target who already has that stat high. Cost is a property of
+ * the pairing, not of the buff alone — a healer cannot know the price without
+ * knowing the target. That is the honest price of measuring real power.
+ *
+ * @param {number} unbuffedModTotal  Sum of the nine mods with buffs removed.
+ * @param {object} [cfg]             CONFIG override (tests)
+ * @returns {number} Capacity in mod points.
  */
-export function buffCapacity(abilities, buffedAbilityPoints = 0, cfg = null) {
+export function buffCapacity(unbuffedModTotal, cfg = null) {
   const sc = cfg ?? (globalThis.CONFIG?.ASPECTSOFPOWER ?? {});
   const f = Number(sc.buffCap?.fraction);
   const frac = Number.isFinite(f) && f > 0 ? f : 0.20;
-  let sum = 0;
-  for (const a of Object.values(abilities ?? {})) sum += Number(a?.value) || 0;
-  const onLoan = Math.max(0, Number(buffedAbilityPoints) || 0);
-  return Math.round(Math.max(0, sum - onLoan) * frac);
+  return Math.round(Math.max(0, Number(unbuffedModTotal) || 0) * frac);
 }
 
 /**
- * The ability-key half of a buff's cost.
+ * The stat-curve modifier for one ability value (design-stat-curves.md):
+ *   mod = round((value/NORM)^P x NORM x gradeMult)
  *
- * Capacity is sized off ability values only, so only the ability portion of a
- * live buff has to be subtracted back out — a buff's +582 armour never entered
- * that sum and must not be removed from it.
- *
- * @param {Array<{key: string, value: number}>} changes
- * @returns {number} Ability-key points, positives only.
+ * Extracted from the `calcMod` closure in actor.prepareDerivedData so the buff
+ * cap can price a hypothetical value without re-deriving an actor. The actor
+ * uses this same function, so the two cannot drift.
  */
-export function buffAbilityCost(changes) {
-  return buffCost(changes, { buffCap: { countedKeyPrefixes: ['system.abilities.'] } });
+export function abilityMod(value, gradeMult = 1, cfg = null) {
+  const sc = (cfg ?? (globalThis.CONFIG?.ASPECTSOFPOWER ?? {})).statCurve ?? {};
+  const NORM = Number(sc.NORM) || 1085;
+  const P = Number.isFinite(Number(sc.P)) ? Number(sc.P) : 0.8;
+  const v = Math.max(0, Number(value) || 0);
+  return Math.round(Math.pow(v / NORM, P) * NORM * (Number(gradeMult) || 1));
+}
+
+/** Grade multiplier for a race rank: MULT_BASE ^ gradeIndex[rank]. */
+export function gradeMultiplierFor(rank, cfg = null) {
+  const sc = (cfg ?? (globalThis.CONFIG?.ASPECTSOFPOWER ?? {})).statCurve ?? {};
+  const base = Number(sc.MULT_BASE) || 1.25;
+  const idx = Number(sc.gradeIndex?.[rank]) || 0;
+  return Math.pow(base, idx);
+}
+
+/**
+ * Sum of the nine ability mods, with optional per-ability value deltas applied
+ * before the curve. Deltas may be negative — that is how the unbuffed basis is
+ * computed, by subtracting the points currently on loan from buffs.
+ *
+ * ⚠ The curve is applied PER ABILITY, then summed. Summing values first and
+ * curving once would be a different (and wrong) number, because `x^0.8` is not
+ * additive.
+ *
+ * @param {object} abilities   actor.system.abilities
+ * @param {object} [deltaByKey] e.g. { strength: 200, wisdom: -115 }
+ * @param {number} [gradeMult]
+ * @param {object} [cfg]
+ */
+export function abilityModTotal(abilities, deltaByKey = {}, gradeMult = 1, cfg = null) {
+  let sum = 0;
+  for (const [k, a] of Object.entries(abilities ?? {})) {
+    const v = (Number(a?.value) || 0) + (Number(deltaByKey?.[k]) || 0);
+    sum += abilityMod(v, gradeMult, cfg);
+  }
+  return sum;
+}
+
+/**
+ * Split a change list into per-ability value points, keyed by ability name.
+ * Positives only — a buff that lowers a stat does not earn budget back.
+ *
+ * @returns {object} e.g. { intelligence: 243, willpower: 229 }
+ */
+export function buffLoadByAbility(changes) {
+  const out = {};
+  for (const c of changes ?? []) {
+    const key = String(c?.key ?? '');
+    if (!key.startsWith('system.abilities.') || !key.endsWith('.value')) continue;
+    const name = key.slice('system.abilities.'.length, -'.value'.length);
+    const v = Math.max(0, Number(c?.value) || 0);
+    if (v > 0) out[name] = (out[name] ?? 0) + v;
+  }
+  return out;
+}
+
+/** Flat defence-stat points in a change list (already mod-scale). */
+export function buffDefenceCost(changes) {
+  return buffCost(changes, { buffCap: { countedKeyPrefixes: ['system.defense.'] } });
+}
+
+/**
+ * What an incoming buff costs, in mod points, ON THIS TARGET AS THEY STAND.
+ *
+ * Marginal by construction: the ability half is the mod the target GAINS on top
+ * of what they already have, so piling buff after buff onto one stat gets
+ * steadily more expensive as the curve flattens. That falls out of the maths
+ * rather than needing a rule.
+ *
+ * @param {object} abilities  Target's CURRENT abilities (buffs included).
+ * @param {Array}  changes    The incoming buff's changes.
+ * @param {number} gradeMult
+ * @param {object} [cfg]
+ * @returns {number} Cost in mod points.
+ */
+export function buffModCost(abilities, changes, gradeMult = 1, cfg = null) {
+  const deltas = buffLoadByAbility(changes);
+  const before = abilityModTotal(abilities, {}, gradeMult, cfg);
+  const after  = abilityModTotal(abilities, deltas, gradeMult, cfg);
+  return Math.max(0, after - before) + buffDefenceCost(changes);
+}
+
+/**
+ * Largest scale in [0,1] whose scaled buff still fits `room` mod points.
+ *
+ * ⚠ SOLVED, NOT DIVIDED. `room / cost` is the right answer only when cost is
+ * linear in the change values, and it is not — the ability half runs through a
+ * concave curve, so halving the values removes LESS than half the mod. Dividing
+ * would consistently overshoot the cap. Twenty bisection steps land within
+ * ~1e-6, which is far finer than the whole-point rounding downstream.
+ */
+export function solveBuffScale(abilities, changes, gradeMult, room, cfg = null) {
+  const full = buffModCost(abilities, changes, gradeMult, cfg);
+  if (full <= 0) return 1;
+  if (room >= full) return 1;
+  if (room <= 0) return 0;
+  const scaled = (s) => buffModCost(
+    abilities,
+    (changes ?? []).map(c => ({ ...c, value: Math.round((Number(c.value) || 0) * s) })),
+    gradeMult, cfg);
+  let lo = 0, hi = 1;
+  for (let i = 0; i < 20; i++) {
+    const mid = (lo + hi) / 2;
+    if (scaled(mid) <= room) lo = mid; else hi = mid;
+  }
+  return lo;
 }
 
 /**
@@ -974,7 +1082,8 @@ export function buffCost(changes, cfg = null) {
  *            strainDamage: number, truncated: boolean}}
  */
 export function resolveBuffLoad({ capacity = 0, used = 0, cost = 0,
-                                  acceptOvercap = false } = {}, cfg = null) {
+                                  acceptOvercap = false, scale = null } = {},
+                                cfg = null) {
   const sc = cfg ?? (globalThis.CONFIG?.ASPECTSOFPOWER ?? {});
   const rate = Number(sc.buffCap?.overcapDamageRate);
   const dmgRate = Number.isFinite(rate) && rate >= 0 ? rate : 0.20;
@@ -995,9 +1104,15 @@ export function resolveBuffLoad({ capacity = 0, used = 0, cost = 0,
     return { scale: 1, applied: want, excess,
              strainDamage: Math.round(excess * dmgRate), truncated: false };
   }
-  // Truncate. `room / want` scales every change proportionally, so a
-  // multi-stat buff keeps its shape instead of dropping whichever entry
-  // happened to be last in the array.
-  return { scale: room / want, applied: room, excess: 0,
-           strainDamage: 0, truncated: true };
+  // Truncate. The caller passes a SOLVED scale (solveBuffScale) because cost is
+  // concave in the change values — `room / want` would overshoot. Falling back
+  // to that ratio only when no scale is supplied keeps the pure function usable
+  // on its own for the linear (defence-only) case.
+  // ⚠ `scale == null` explicitly, NOT Number.isFinite(Number(scale)) —
+  // `Number(null)` is 0, which is finite, so the fallback would never fire and
+  // every un-scaled truncation would silently apply nothing.
+  const s = (scale == null || !Number.isFinite(Number(scale)))
+    ? room / want
+    : Math.max(0, Math.min(1, Number(scale)));
+  return { scale: s, applied: room, excess: 0, strainDamage: 0, truncated: true };
 }
