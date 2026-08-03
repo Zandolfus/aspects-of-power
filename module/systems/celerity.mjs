@@ -17,7 +17,8 @@
  */
 
 import { AspectsofPowerItem } from '../documents/item.mjs';
-import { weaponStatBlend, perceiveGateDecision } from '../helpers/formulas.mjs';
+import { weaponStatBlend, perceiveGateDecision, spellCastWeight } from '../helpers/formulas.mjs';
+import { heldImplementWeight } from './weapon-styles.mjs';
 import { tickDotsFor } from './dot.mjs';
 
 const HYBRID_60_40_WIS_DEX = (a) => 0.6 * (a.wisdom?.mod ?? 0) + 0.4 * (a.dexterity?.mod ?? 0);
@@ -72,14 +73,23 @@ const _MAGIC_TYPES = new Set(['magic', 'magic_melee', 'magic_projectile']);
  *   Weapon skills   → resolveWeaponWeight on the equipped/required weapon,
  *                     else BASELINE_WEIGHT (e.g. unarmed without a tag)
  *
- * Implements (staves, wands) equipped while casting must NOT contribute their
- * own weight to spell wait — spell weight is intrinsic to the spell tier.
+ * Implements (staves, wands) do NOT contribute their own weight to spell wait
+ * under the default model — spell weight is intrinsic to the spell tier. That
+ * changes only when `config.spellWeight.model` is 'implement', where the focus
+ * IS the weapon and the spell adds to it; see spellCastWeight.
  */
 function _resolveCelerityWeight(skill, weapon = null) {
   const sc = CONFIG.ASPECTSOFPOWER.celerity;
   const type = skill?.system?.roll?.type ?? '';
   if (_MAGIC_TYPES.has(type)) {
     const tier = skill?.system?.roll?.tier ?? '';
+    // MAGIC/MELEE UNIFICATION: under the 'implement' model the focus is the
+    // weapon and the spell adds to it, so the cast carries implement + tier.
+    // The DAMAGE side (spellWindupMultiplier) reads the same weight — that
+    // pairing is what keeps DPR weight-invariant, exactly as it is for a swing.
+    // Returns 0 when the model is off, so shipped behaviour is untouched.
+    const castW = spellCastWeight(tier, heldImplementWeight(skill?.actor));
+    if (castW > 0) return castW;
     return CONFIG.ASPECTSOFPOWER.spellTierWeights?.[tier] ?? sc.BASELINE_WEIGHT;
   }
   const w = weapon ?? skill._resolveWeaponForSkill?.() ?? null;

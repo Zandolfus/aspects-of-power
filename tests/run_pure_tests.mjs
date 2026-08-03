@@ -11,6 +11,7 @@
 import {
   houseHitFormula, hybridAbilityMod, weaponStatBlend, spellDamageRef,
   spellInvestDamage, strikeInvestDamage, infusionDamage, investSelfDamage,
+  spellCastWeight, spellWindupMultiplier,
   effectiveDodgeValue, splitEvenlyWithRemainder, perceiveGateDecision, activityTicks, nextCompletionDelta,
   proficiencyMultiplier, proficiencyHitMultiplier, parryMassMultiplier, lunarPhaseMultiplier, dotTickDamage, procStaminaCost, riderDamageBase,
   crushFlatAmount, riderMaxInvest, itemWeightLb, KG_TO_LB, carriedWeightLb,
@@ -721,6 +722,43 @@ eq('damage: durability leak is what got through', durabilityDamage(tw, { mitigat
 eq('damage: axe wear is 10% of what was stopped',
    durabilityDamage(tw, { mitigation: 400, wearRate: 0.1 }).wear, 50);
 eq('damage: no wear rate, no wear', durabilityDamage(tw, { mitigation: 400 }).wear, 0);
+
+/* ---------------------------------------------------------------- */
+/*  Magic/melee unification - spell cast weight + windup             */
+/* ---------------------------------------------------------------- */
+// THE LOAD-BEARING PROPERTY: windup 1 makes strikeInvestDamage identical to
+// spellInvestDamage. If that ever stops being true, switching the model off
+// silently changes every spell in the game.
+const SW_INT = 651, SW_MULT = 0.7, SW_INVEST = 40, SW_REF = 20;
+eq('spellweight: windup 1 makes strike == spell (the off-switch)',
+   strikeInvestDamage(SW_INT, SW_MULT, 1, SW_INVEST, SW_REF),
+   spellInvestDamage(SW_INT, SW_MULT, SW_INVEST, SW_REF));
+
+const SWCFG = (model, extra = {}) => ({
+  spellWeight: { model, tierGatedImplements: false, windupMaxSpell: null, ...extra },
+  spellTierWeights: { basic: 130, high: 150, greater: 200, major: 400, grand: 700 },
+  defenseTuning: { windupMin: 0.5, windupMax: 3.0 },
+});
+eq('spellweight: model off returns 0 weight', spellCastWeight('greater', 140, SWCFG('none')), 0);
+eq('spellweight: model off returns windup 1', spellWindupMultiplier('greater', 140, SWCFG('none')), 1);
+eq('spellweight: tier model ignores the implement', spellCastWeight('greater', 140, SWCFG('tier')), 200);
+eq('spellweight: implement model adds the focus', spellCastWeight('greater', 140, SWCFG('implement')), 340);
+eq('spellweight: bare-handed implement model is tier only', spellCastWeight('greater', 0, SWCFG('implement')), 200);
+eq('spellweight: unknown tier yields no weight', spellCastWeight('', 140, SWCFG('implement')), 0);
+// wand(40)+basic(130) = 170 -> 1.7; staff(140)+high(150) = 290 -> 2.9
+eq('spellweight: wand basic windup', spellWindupMultiplier('basic', 40, SWCFG('implement')), 1.7);
+eq('spellweight: staff high windup', spellWindupMultiplier('high', 140, SWCFG('implement')), 2.9);
+// THE CLAMP. staff(140)+greater(200) = 340 wants 3.4 but the shipped ceiling is
+// 3.0 - wait keeps scaling while damage stops, so heavy casting LOSES dpr.
+eq('spellweight: shipped clamp caps staff+greater at 3.0',
+   spellWindupMultiplier('greater', 140, SWCFG('implement')), 3.0);
+eq('spellweight: windupMaxSpell unlocks it',
+   spellWindupMultiplier('greater', 140, SWCFG('implement', { windupMaxSpell: 99 })), 3.4);
+eq('spellweight: staff+grand unlocked is 8.4',
+   spellWindupMultiplier('grand', 140, SWCFG('implement', { windupMaxSpell: 99 })), 8.4);
+// Floor still applies to anything absurdly light.
+eq('spellweight: windupMin floors the result',
+   spellWindupMultiplier('basic', 0, { ...SWCFG('implement'), spellTierWeights: { basic: 10 } }), 0.5);
 
 if (failures) { console.error(`\n${failures} FAILURES`); process.exit(1); }
 console.log('\nAll pure-function tests pass.');

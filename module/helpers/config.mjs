@@ -155,6 +155,52 @@ ASPECTSOFPOWER.spellGradeFactors = {
 };
 
 /**
+ * MAGIC/MELEE UNIFICATION (2026-08-02) — OFF by default, flip to test.
+ *
+ * A weapon uses its weight TWICE: as WINDUP (damage) and as WAIT (tempo).
+ * That pairing is what makes DPR weight-invariant — windup is weight/100 and
+ * wait is proportional to weight, so damage-per-round cancels out and weight
+ * becomes a pure per-hit-size-versus-tempo dial.
+ *
+ * Spells only ever used `spellTierWeights` for WAIT. Tier therefore cost time
+ * without paying damage, and casting a bigger spell was strictly worse:
+ * measured on Willy, DPR ran 1021 (basic) → 873 (greater) → 357 (grand).
+ *
+ * `spellInvestDamage` and `strikeInvestDamage` are already the same function
+ * with windup pinned to 1, so switching this on is "stop passing the neutral
+ * value", not a new formula.
+ *
+ *   model 'none'      shipped behaviour — windup 1
+ *         'tier'      windup from spellTierWeights
+ *         'implement' the IMPLEMENT is the weapon and the spell adds to it, so
+ *                     a wand-basic (40+130) is quick and light while a
+ *                     staff-greater (140+200) is a siege engine. Costs nothing
+ *                     in DPR — it only moves the per-hit/tempo dial.
+ *
+ * ⚠ `windupMax` (defenseTuning, 3.0) starts taxing combined weight above 300:
+ * wait keeps scaling but damage stops, so heavy-implement/high-tier builds LOSE
+ * DPR. Weapons never reach it (greataxe 220 is the heaviest thing in the game),
+ * so it has always been a distant ceiling; under 'implement' it becomes an
+ * active penalty. `windupMaxSpell` overrides it for spells only.
+ *
+ * ⚠ Turning this on is a 30-100% caster damage increase. Simmed via
+ * migration/archetype_sim.js: healthy on uniformly-built archetypes (immunity
+ * 45%→35%, median 3.9→4.5 rounds), but it AMPLIFIES content that is already
+ * out of band — on the live roster it roughly halves time-to-kill, because
+ * divine-rarity skills and the unscaled legacy branch are already outliers.
+ */
+ASPECTSOFPOWER.spellWeight = {
+  model: 'none',
+  // Wands already own BASIC via WAND_BASIC_WAIT_MULT. This re-gates the STAFF's
+  // +baseMana of free damage scaling from "cast takes ≥ half a round" to
+  // "tier above basic", so each implement owns a band of the tier ladder
+  // instead of both keying off cast time.
+  tierGatedImplements: false,
+  // null = fall back to defenseTuning.windupMax.
+  windupMaxSpell: null,
+};
+
+/**
  * Spell-tier celerity weights per design-magic-system.md.
  * Drives `wait = weight × multiplier × SCALE / actor_speed` for magic skills.
  * Mirror of weaponWeights but keyed by spell tier rather than weapon-type tag.

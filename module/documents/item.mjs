@@ -1,13 +1,13 @@
 import { EquipmentSystem } from '../systems/equipment.mjs';
 import { getPositionalTags } from '../helpers/positioning.mjs';
-import { houseHitFormula, hybridAbilityMod, weaponStatBlend, spellDamageRef, spellInvestDamage, strikeInvestDamage, infusionDamage, investSelfDamage as computeInvestSelfDamage, effectiveDodgeValue, splitEvenlyWithRemainder, parryMassMultiplier, bracedParryWeight, bracedMaxUsefulInvest, defenceMarginMultiplier, lunarPhaseMultiplier, dotTickDamage, procStaminaCost, crushFlatAmount, riderMaxInvest } from '../helpers/formulas.mjs';
+import { houseHitFormula, hybridAbilityMod, weaponStatBlend, spellDamageRef, spellInvestDamage, spellWindupMultiplier, spellCastWeight, strikeInvestDamage, infusionDamage, investSelfDamage as computeInvestSelfDamage, effectiveDodgeValue, splitEvenlyWithRemainder, parryMassMultiplier, bracedParryWeight, bracedMaxUsefulInvest, defenceMarginMultiplier, lunarPhaseMultiplier, dotTickDamage, procStaminaCost, crushFlatAmount, riderMaxInvest } from '../helpers/formulas.mjs';
 import { recordActionFired, declareAction, isInActiveCombat, computeActionWait, referenceRoundLength, computeWindupMultiplier, getScrambleStacks, addScrambleStack, applyDodgeCost, findCombatantForActor, perceiveGate } from '../systems/celerity.mjs';
 import { getThreatRadiusFt, actorIsDashing } from '../systems/engagement-halts.mjs';
 import { selectTargetOnCanvas, skillNeedsTargetPrompt, skillTargetsAtFire, selectMarkerOnCanvas } from '../canvas/target-prompt.mjs';
 import { regionTokenOverlap, segmentIntersect } from '../helpers/geometry.mjs';
 import { CraftingSkillsMixin } from '../systems/crafting-skills.mjs';
 import { executeGmAction as executeGmActionImpl } from '../systems/gm-actions.mjs';
-import { proficiencyDamageMult, proficiencyHitMult, heldWeaponWeight } from '../systems/weapon-styles.mjs';
+import { proficiencyDamageMult, proficiencyHitMult, heldWeaponWeight, heldImplementWeight } from '../systems/weapon-styles.mjs';
 
 /**
  * Check if an actor is an assigned player character (not just owned).
@@ -5128,10 +5128,20 @@ export class AspectsofPowerItem extends Item {
       const apThresholdTicks = Math.ceil(roundLen * 0.5);
       // Staff bonus is mutually exclusive with Orb discharge — a discharged
       // cast is already free + fast, no need to stack +baseMana on top.
+      // TIER-GATED IMPLEMENTS (config.spellWeight.tierGatedImplements, OFF by
+      // default): give each implement a band of the tier ladder instead of both
+      // keying off cast time. Wands already own BASIC via WAND_BASIC_WAIT_MULT;
+      // this hands the staff everything ABOVE basic. The wait-threshold gate is
+      // otherwise unchanged — and note the two disagree in an interesting way:
+      // the threshold rewards slow casts, so speeding a caster up can switch
+      // the staff OFF mid-build, which the tier gate never does.
+      const _tierGated = CONFIG.ASPECTSOFPOWER.spellWeight?.tierGatedImplements === true;
+      const _staffQualifies = _tierGated
+        ? spellTier !== 'basic'
+        : (roundLen > 0 && castWaitWithInvest >= apThresholdTicks);
       const hasStaff = !orbDischarging
         && this.actor?.getEquippedImplements?.().has('staff')
-        && roundLen > 0
-        && castWaitWithInvest >= apThresholdTicks;
+        && _staffQualifies;
       const effectiveInvested = hasStaff ? invested + baseMana : invested;
       // Damage uses sized base for AOE (so over-invest above sized base
       // boosts damage), original base for non-AOE.
@@ -5160,7 +5170,14 @@ export class AspectsofPowerItem extends Item {
         // grade power-jump comes purely from the int stat curve). Still ^0.2
         // concave → dumping the pool is inefficient, no alpha strike.
         const spellDmgRef = spellDamageRef(gradeFactor);
-        dmgFormula = String(spellInvestDamage(intMod, multiplier, effectiveInvested, spellDmgRef));
+        // MAGIC/MELEE UNIFICATION (config.spellWeight, OFF by default). A weapon
+        // spends its weight twice — windup for damage, wait for tempo — which is
+        // what makes DPR weight-invariant. Spells only spent it on wait, so tier
+        // cost time and bought no damage. `spellInvestDamage` IS
+        // `strikeInvestDamage` with windup pinned to 1, so when the model is off
+        // this is byte-identical to the old call.
+        const _spellWindup = spellWindupMultiplier(spellTier, heldImplementWeight(this.actor));
+        dmgFormula = String(strikeInvestDamage(intMod, multiplier, _spellWindup, effectiveInvested, spellDmgRef));
       }
 
       // Hand off to the AOE block below: store the pre-placed template +

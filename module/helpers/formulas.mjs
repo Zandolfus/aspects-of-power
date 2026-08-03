@@ -71,6 +71,57 @@ export function weaponStatBlend(weight, mods, isRanged, cfg = null) {
 }
 
 /**
+ * The weight a CAST carries, under the magic/melee unification.
+ *
+ * A weapon's weight does double duty — windup (damage) and wait (tempo) — and
+ * that pairing is what makes DPR weight-invariant. Spells only ever used their
+ * tier weight for wait, so tier bought time and no damage. This returns the
+ * weight a spell should carry so both sides can read the same number.
+ *
+ * `model` comes from CONFIG.ASPECTSOFPOWER.spellWeight.model:
+ *   'none'      → 0 (caller uses windup 1; shipped behaviour)
+ *   'tier'      → the tier weight alone
+ *   'implement' → implement weight + tier weight
+ *
+ * @param {string} tier            'basic' | 'high' | 'greater' | 'major' | 'grand'
+ * @param {number} implementWeight Heaviest equipped implement's weight, 0 if none.
+ * @param {object} [cfg]           CONFIG.ASPECTSOFPOWER override (tests).
+ * @returns {number}               Cast weight; 0 means "no spell weight model".
+ */
+export function spellCastWeight(tier, implementWeight = 0, cfg = null) {
+  const sc = cfg ?? (globalThis.CONFIG?.ASPECTSOFPOWER ?? {});
+  const model = sc.spellWeight?.model ?? 'none';
+  if (model === 'none') return 0;
+  const tierW = sc.spellTierWeights?.[tier];
+  if (!tierW) return 0;
+  return model === 'implement'
+    ? tierW + Math.max(0, Number(implementWeight) || 0)
+    : tierW;
+}
+
+/**
+ * Windup multiplier for a spell — the damage half of the same weight the wait
+ * uses. Mirrors computeWindupMultiplier's shape (weight/100, clamped) so a
+ * spell and a swing are scaled by the same grammar.
+ *
+ * Returns 1 when the model is off, which makes `strikeInvestDamage` identical
+ * to `spellInvestDamage` — the two differ only by this factor.
+ *
+ * @param {string} tier
+ * @param {number} implementWeight
+ * @param {object} [cfg]
+ * @returns {number}
+ */
+export function spellWindupMultiplier(tier, implementWeight = 0, cfg = null) {
+  const sc = cfg ?? (globalThis.CONFIG?.ASPECTSOFPOWER ?? {});
+  const w = spellCastWeight(tier, implementWeight, sc);
+  if (w <= 0) return 1;
+  const dt = sc.defenseTuning ?? {};
+  const max = sc.spellWeight?.windupMaxSpell ?? dt.windupMax ?? 3.0;
+  return Math.min(max, Math.max(dt.windupMin ?? 0.5, w / 100));
+}
+
+/**
  * Grade-relative fixed spell-damage reference — the 65f8a42 tier-ladder fix
  * constant (basic-tier baseMana at this grade). Normalizing invest by the
  * spell's OWN baseMana cancelled tier out of damage; every invest-scaled

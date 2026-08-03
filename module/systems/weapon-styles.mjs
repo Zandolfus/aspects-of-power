@@ -275,6 +275,28 @@ export function heldWeaponWeight(actor) {
 }
 
 /**
+ * Weight of the heaviest equipped IMPLEMENT (wand/staff/orb/tome/...), 0 if the
+ * caster is holding none.
+ *
+ * Distinct from `heldWeaponWeight` on purpose: under the magic/melee
+ * unification a cast's weight is implement + tier, and a caster with a sword
+ * on their belt is not casting through the sword. Reads the same implement set
+ * `getEquippedImplements` uses, so what makes a wand an implement for the
+ * discount also makes it one for the weight.
+ *
+ * @param {Actor} actor
+ * @returns {number}
+ */
+export function heldImplementWeight(actor) {
+  const table = globalThis.CONFIG?.ASPECTSOFPOWER?.weaponWeights ?? {};
+  let best = 0;
+  for (const t of (actor?.getEquippedImplements?.() ?? [])) {
+    best = Math.max(best, table[t] ?? 0);
+  }
+  return best;
+}
+
+/**
  * May this skill be used with what the actor currently has, and knows?
  * Gates on `requiresStyle` (the arrangement), `requiresWeaponTag` (the type
  * in hand), and `styleSkill` (the governing Passive the actor must OWN).
