@@ -55,6 +55,16 @@
   const dt  = sc.defenseTuning;
   const AA  = sc.armorAnswer ?? {};
 
+  // ⚠ REFUSE TO GUESS. A scenario may set `curve`, which is threaded to
+  // strikeInvestDamage as a cfg override. On an older build that parameter does
+  // not exist, the extra argument is ignored, and every row silently comes back
+  // at the shipped 0.2 — a plausible number that is not the number asked for.
+  // That failure mode has cost this project a full session before.
+  if (typeof F.investCurve !== 'function') {
+    return 'ABORT: this build has no F.investCurve — pull b0a6cef before simming the invest curve, '
+         + 'or the curve scenarios would silently report shipped-0.2 numbers.';
+  }
+
   /* ---------------- CONFIG ---------------- */
   const CFG = {
     // Roster resolution, in order:
@@ -117,6 +127,21 @@
     //   tierGated    wands own BASIC (their wait discount), staves own
     //                everything ABOVE basic (their free +baseMana scaling),
     //                instead of the current wait-threshold gate.
+    // ── INVEST POLICY ────────────────────────────────────────────────────
+    // ⚠ THE SIM HAS ALWAYS INVESTED AT BASE, where (invested/base)^curve is
+    // exactly 1 — so the invest curve was INVISIBLE to it. Any question about
+    // the curve needs a policy that actually spends something.
+    //   'base'  minimum commitment (what this file always did)
+    //   'cap'   the legal ceiling: spells baseMana + Wis x
+    //           spellMaxInvestAboveBase[tier] (a HARD cap, no self-damage
+    //           past it); weapons baseStamina + Tough x toughCapFactor (the
+    //           SOFT zone — beyond it a real player pays HP, which this does
+    //           not model, so 'cap' understates what a desperate player can do)
+    //   'pool'  everything they have, ignoring caps entirely
+    // ⚠ Invest also drives CHANNEL WAIT (invested x CHANNEL_FACTOR / Wis), so
+    // spending more makes the cast slower. That coupling is the whole reason
+    // 'pool' is not simply better — measure, do not assume.
+    investPolicy: window.__simInvestPolicy ?? 'base',
     scenarios: window.__simScenarios ?? [
       { name: 'A shipped',              spellWeight: 'none', windupMax: 3.0, tierGated: false },
       { name: 'B tier weight',          spellWeight: 'tier', windupMax: 3.0, tierGated: false },
@@ -190,12 +215,23 @@
         : 1;
       // Staff owns the tiers ABOVE basic: its +baseMana of free damage scaling.
       const staffOn = SC.tierGated && imps.includes('staff') && tier !== 'basic';
-      const effInvest = staffOn ? baseCost * 2 : baseCost;
+      // Invest per policy. The cap is HARD for spells — Wis is the absolute
+      // ceiling and there is no self-damage past it.
+      const aboveF = sc.spellMaxInvestAboveBase?.[tier]
+        ?? sc.spellMaxInvestAboveBase?.[''] ?? 0.1;
+      const manaPool = Math.round(actor.system.mana?.max ?? 0);
+      const wisCap = Math.round(baseCost + (actor.system.abilities.wisdom?.mod ?? 0) * aboveF);
+      const chosen = CFG.investPolicy === 'pool' ? Math.max(baseCost, manaPool)
+        : CFG.investPolicy === 'cap' ? Math.max(baseCost, Math.min(manaPool, wisCap))
+        : baseCost;
+      const effInvest = staffOn ? chosen * 2 : chosen;
       dmg = F.strikeInvestDamage(actor.system.abilities.intelligence.mod, eff,
-                                 spellWindup, effInvest, F.spellDamageRef(gf));
-      // Wait scales with the SAME weight the damage used — that pairing is what
-      // makes DPR weight-invariant. Shipped celerity only knows the tier weight.
-      wait = CEL.computeActionWait(actor, sk, null, baseCost);
+                                 spellWindup, effInvest, F.spellDamageRef(gf), SC.curveCfg);
+      // ⚠ Wait takes the ACTUAL invest, not the base — channel wait is
+      // invested x CHANNEL_FACTOR / Wis, so a bigger commitment is a slower
+      // cast. Passing baseCost here would have handed 'pool' its damage for
+      // free and made dumping unconditionally correct.
+      wait = CEL.computeActionWait(actor, sk, null, chosen);
       if (SC.spellWeight === 'impl' && tierW > 0) wait = Math.max(1, Math.round(wait * (castW / tierW)));
       // Wand owns BASIC: its wait discount. computeActionWait already applies it
       // when a wand is equipped, so only add it when the gate says otherwise.
@@ -217,9 +253,17 @@
         const baseStam = Math.max(1, Math.round(
           (wt / sc.invest.staminaBaseDivisor) * (blend / sc.invest.staminaNormalizer)));
         windup = CEL.computeWindupMultiplier(sk, wpn);
-        dmg  = F.strikeInvestDamage(blend, eff, windup, baseStam, baseStam);
+        // Weapon cap is the SOFT zone only (Tough x toughCapFactor). Past it a
+        // real player may keep going and pay HP, which this does not model —
+        // so 'cap' understates a desperate swing.
+        const stamPool = Math.round(actor.system.stamina?.max ?? 0);
+        const safeInv = Math.max(0, Math.round((A.toughness?.mod ?? 0) * sc.invest.toughCapFactor));
+        const chosenS = CFG.investPolicy === 'pool' ? Math.max(baseStam, stamPool)
+          : CFG.investPolicy === 'cap' ? Math.max(baseStam, Math.min(stamPool, baseStam + safeInv))
+          : baseStam;
+        dmg  = F.strikeInvestDamage(blend, eff, windup, chosenS, baseStam, SC.curveCfg);
         wait = CEL.computeActionWait(actor, sk, wpn);
-        cost = baseStam;
+        cost = chosenS;
       }
     }
     // Anything matching neither invest gate falls to roll()'s legacy fallback,
@@ -353,6 +397,9 @@
   const roundLen = CEL.referenceRoundLength(refRL);
 
   function runOnce(SC) {
+    // A scenario's `curve` becomes a cfg override for the invest exponent.
+    // Absent = whatever the world is configured with.
+    SC.curveCfg = SC.curve ? { invest: { curveExponent: SC.curve } } : null;
     const skills = [];
     for (const a of actors) {
       const allow = CFG.onlySkills?.[a.name] ?? CFG.onlySkills?.[CFG.label(a.name)] ?? null;
