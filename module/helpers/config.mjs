@@ -188,16 +188,36 @@ ASPECTSOFPOWER.spellGradeFactors = {
  * 45%→35%, median 3.9→4.5 rounds), but it AMPLIFIES content that is already
  * out of band — on the live roster it roughly halves time-to-kill, because
  * divine-rarity skills and the unscaled legacy branch are already outliers.
+ *
+ * ENABLED 2026-08-03 as 'implement'. The live-roster alarm above was measured
+ * with a CONTINUOUS-DPR sim; under the discrete timing shipped in 6273433 it
+ * is far milder — median 3.4 → 2.1 rounds and 15 → 18 sub-2-round matchups,
+ * not the near-halving. Casters become slow artillery: every one of Willy's
+ * spells now takes longer than a round, and he loses five of six duels.
  */
 ASPECTSOFPOWER.spellWeight = {
-  model: 'none',
+  model: 'implement',
   // Wands already own BASIC via WAND_BASIC_WAIT_MULT. This re-gates the STAFF's
   // +baseMana of free damage scaling from "cast takes ≥ half a round" to
   // "tier above basic", so each implement owns a band of the tier ladder
   // instead of both keying off cast time.
-  tierGatedImplements: false,
-  // null = fall back to defenseTuning.windupMax.
-  windupMaxSpell: null,
+  //
+  // ON: measured +15% on above-basic spells, correctly inert on basic tier,
+  // and it changed NO duel outcome — median, immunity, floor and overcommits
+  // are identical either way. Chosen for the identity, not the numbers: the
+  // wait-threshold gate it replaces can switch the staff OFF mid-build when a
+  // caster gets faster, which a tier gate never does.
+  tierGatedImplements: true,
+  // null = fall back to defenseTuning.windupMax (3.0).
+  //
+  // ⚠ THE CLAMP MUST NEVER BIND, or the unification inverts. Windup pays for
+  // damage while wait pays for tempo; clamping one and not the other makes a
+  // HEAVIER implement strictly worse. At 3.0, staff+greater (w340) gets windup
+  // 3.0 for 1.7x wait — DPR 1.76 — while wand+greater (w240) gets 2.4 for 1.2x
+  // — DPR 2.00. The wand wins, which is precisely backwards. Parity needs
+  // max ≥ heaviestWeight/100 (3.4 today). Set well above that so future
+  // content cannot silently re-invert it.
+  windupMaxSpell: 99,
 };
 
 /**
