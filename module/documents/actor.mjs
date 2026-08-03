@@ -1326,16 +1326,25 @@ export class AspectsofPowerActor extends Actor {
       if (amount <= 0) continue;
       const radiusPx = (sys.auraRadius ?? 0) * pxPerFt;
       const targeting = sys.auraTargeting ?? 'enemies';
+      // A SUPPORTIVE aura includes the person carrying it (user ruled
+      // 2026-08-03) — a chanter standing in their own regen hymn should be
+      // sustained by it, not be a battery for everyone else. A DAMAGE aura
+      // still skips self for the obvious reason.
+      const effectType = sys.auraEffectType ?? 'damage';
+      const includeSelf = effectType === 'heal' || effectType === 'stam';
 
       for (const otherDoc of scene.tokens) {
-        if (otherDoc.id === token.document.id) continue;
+        const isSelf = otherDoc.id === token.document.id;
+        if (isSelf && !includeSelf) continue;
         const other = otherDoc.object;
         if (!other) continue;
         const dx = other.center.x - myCenter.x;
         const dy = other.center.y - myCenter.y;
         if (Math.hypot(dx, dy) > radiusPx) continue;
 
-        if (!_passesAuraTargetingFilter(myDisp, otherDoc.disposition, targeting)) continue;
+        // Self is always a valid recipient of one's own supportive aura, even
+        // when the targeting mode is written for other people.
+        if (!isSelf && !_passesAuraTargetingFilter(myDisp, otherDoc.disposition, targeting)) continue;
         const targetActor = otherDoc.actor;
         if (!targetActor) continue;
 
