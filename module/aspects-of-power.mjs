@@ -2772,9 +2772,14 @@ Hooks.on('updateActor', async (actor, changes, _options, userId) => {
     }
 
     // ── HARVEST ON DOT DEATH (Burnt Offering) ────────────────────────────
-    // Something died while suffering a DoT. Anyone whose DoT it was, and who
-    // owns a skill configured to harvest, is paid out. Runs BEFORE the
-    // on_death fan-out so a death bloom cannot delete the evidence first.
+    // ⚠ THE TRIGGER IS "DIED WHILE BURNING", NOT "KILLED BY THE BURN"
+    // (user ruled 2026-08-03). What lands the killing blow is irrelevant — a
+    // greataxe to the head still pays out, so long as the victim was carrying
+    // this actor's DoT when they dropped. That is why this reads the effect
+    // LIST at time of death and never inspects the damage source.
+    //
+    // Runs BEFORE the on_death fan-out so a death bloom cannot delete the
+    // evidence first.
     //
     // ⚠ Gated on isActingGM: this mutates a THIRD party's resources from a
     // hook, and this table runs two GM logins — bare isGM would pay twice.
