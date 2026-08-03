@@ -1155,6 +1155,29 @@ ASPECTSOFPOWER.activities = {
   // Clock-bound: the world takes its own time regardless of who waits.
   cureGlue:    { label: 'Cure glue',            cost: 0, class: 'clock', clockSeconds: 3600 },
   travelMile:  { label: 'Travel a mile (cart)', cost: 0, class: 'clock', clockSeconds: 1200 },
+  // MEDITATION (user ruled 2026-08-03): an hour of quiet restores a FRACTION
+  // of max mana. Clock-bound on purpose — meditating faster because you are
+  // dexterous makes no sense, and the whole point is that it costs an hour of
+  // world time you could have spent travelling or crafting.
+  // The fraction is read from the ACTOR (`system.meditation.fraction`), not
+  // fixed here, so a passive can raise it — see meditation.baseFraction.
+  meditate:    { label: 'Meditate', cost: 0, class: 'clock', clockSeconds: 3600,
+                 restore: { resource: 'mana', fractionPath: 'meditation.fraction' } },
+};
+
+/**
+ * MEDITATION — mana recovery outside combat.
+ *
+ * An hour of meditation restores `baseFraction` of max mana. This is the only
+ * self-service mana refill in the game, which is what makes mana a genuinely
+ * finite per-fight resource: you cannot top up mid-fight, only between them.
+ *
+ * ⚠ `baseFraction` MUST equal the `system.meditation.fraction` schema initial
+ * on actor-character.mjs. The schema default is what an actor actually carries;
+ * this is the documented baseline and the value migrations reset to.
+ */
+ASPECTSOFPOWER.meditation = {
+  baseFraction: 0.10,
 };
 
 /**

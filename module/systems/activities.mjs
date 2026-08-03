@@ -145,16 +145,41 @@ export async function performActivity(actor, key, opts = {}) {
       + (result.qualityMult !== 1 ? ` x${result.qualityMult} quality` : '')
       + (result.taskClass === 'hybrid' ? ', or the clock, whichever is longer.' : '.');
 
+  // ── Resource restoration (meditation and friends) ────────────────────────
+  // An activity may declare `restore: { resource, fraction | fractionPath }`.
+  // `fractionPath` reads from the ACTOR so a passive can raise it via an
+  // active effect — John meditates at 15% where everyone else gets 10%.
+  const restoreCfg = (CONFIG.ASPECTSOFPOWER.activities ?? {})[key]?.restore;
+  let restored = null;
+  if (restoreCfg?.resource) {
+    const pool = actor.system[restoreCfg.resource];
+    const frac = restoreCfg.fractionPath
+      ? Number(foundry.utils.getProperty(actor.system, restoreCfg.fractionPath)) || 0
+      : Number(restoreCfg.fraction) || 0;
+    const max = Math.round(pool?.max ?? 0);
+    const cur = Math.round(pool?.value ?? 0);
+    if (max > 0 && frac > 0) {
+      const gain = Math.min(Math.round(max * frac), max - cur);
+      if (gain > 0) await actor.update({ [`system.${restoreCfg.resource}.value`]: cur + gain });
+      restored = { resource: restoreCfg.resource, gain: Math.max(0, gain), frac, from: cur, max };
+    }
+  }
+
   await ChatMessage.create({
     speaker: ChatMessage.getSpeaker({ actor }),
     content: `<p><strong>${actor.name}</strong>: ${result.label}${qualityNote}</p>`
       + `<p>Time taken: <strong>${result.display}</strong></p>`
       + `<p><em>${basis}</em></p>`
+      + (restored
+          ? `<p>Recovers <strong>${restored.gain}</strong> ${restored.resource}`
+            + ` (${Math.round(restored.frac * 100)}% of ${restored.max})`
+            + ` — ${restored.from + restored.gain} / ${restored.max}.</p>`
+          : '')
       + (opts.note ? `<p>${opts.note}</p>` : ''),
   });
 
   if (opts.advanceTime !== false) await advanceWorldTime(result.seconds);
-  return result;
+  return { ...result, restored };
 }
 
 /**

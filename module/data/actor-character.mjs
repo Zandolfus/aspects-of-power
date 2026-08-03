@@ -35,6 +35,16 @@ export class CharacterData extends foundry.abstract.TypeDataModel {
         source:     new fields.StringField({ initial: '' }),
       }),
 
+      // Meditation: the fraction of MAX MANA recovered by an hour of the
+      // `meditate` activity. A schema field rather than a config constant
+      // because it is an ACTIVE-EFFECT TARGET — John's passive adds to it, and
+      // any future trait can too. The initial MUST match
+      // `config.meditation.baseFraction`; a stale default here would silently
+      // diverge from the number the activity registry advertises.
+      meditation: new fields.SchemaField({
+        fraction: new fields.NumberField({ initial: 0.10, min: 0 }),
+      }),
+
       biography: new fields.HTMLField({ initial: '' }),
 
       // Wounded token image — swaps token art when HP drops below threshold.
