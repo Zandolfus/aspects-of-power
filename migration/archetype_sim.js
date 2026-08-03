@@ -29,6 +29,21 @@
  * ⚠ HIT FORMULAS CONTAIN THE HOUSE `d20` AND NOTHING ELSE. Evaluate them by
  * PASSING d20, never by substituting dice means — that was one of the four bugs.
  * Damage formulas DO contain real dice and must have their means substituted.
+ *
+ * ⚠ TIME IS DISCRETE. `declareAction` schedules a fire for `clockTick + wait`,
+ * so nothing lands at tick 0 and the Nth swing lands at N × wait. This sim used
+ * to divide HP by a continuous DPR, which was the fifth wrong answer of that
+ * same session: it credits a slow attacker with damage they are never alive to
+ * deal. See `killTicks` below. Every summary still carries the continuous
+ * figure alongside the discrete one — a correction you cannot see is a
+ * correction you cannot check.
+ *
+ * ⚠ THE PICKER IS GREEDY AND HAS NO SURVIVAL INSTINCT. Each attacker chooses
+ * the skill with the lowest time-to-kill against each defender, with no regard
+ * for whether they live that long. A caster will happily commit to a 5190-tick
+ * nuke in a fight that ends at 2094. That is not corrected — it is REPORTED, as
+ * `overcommits` and a "their best answer never lands" note on the duel. Read it
+ * as "this build's best answer is unusable here", not as the sim's own pick.
  */
 (async () => {
   const SID = game.system.id;
@@ -256,7 +271,7 @@
     const defBasis = (laneVal / (dt.dodgeBasisDiv ?? 1.1))
                    * Math.max(0, 1 - (dt.scrambleStackPct ?? 0.15) * CFG.scrambleStacks);
 
-    let total = 0, n = 0, zero = 0;
+    let total = 0, n = 0, zero = 0, oneShot = 0;
     for (let a = 1; a <= 20; a++) {
       const hitTotal = atk.hitBasis * (1 + a / 100);
       const defSides = canDefend ? 20 : 1;
@@ -273,10 +288,33 @@
           overhealth: def.overhealth,
           health: def.hp,
         });
-        total += res.hpLoss; n++; if (res.hpLoss <= 0) zero++;
+        total += res.hpLoss; n++;
+        if (res.hpLoss <= 0) zero++;
+        if (res.hpLoss >= def.hp) oneShot++;
       }
     }
-    return { mean: total / n, whiffPct: zero / n };
+    return { mean: total / n, whiffPct: zero / n, oneShotPct: oneShot / n };
+  }
+
+  /**
+   * DISCRETE kill time, in ticks.
+   *
+   * An action is declared and FIRES `wait` ticks later (celerity.js
+   * `declareAction`: `scheduledTick = clockTick + wait`), so the Nth swing lands
+   * at N × wait and nothing at all lands before the first wait elapses.
+   * `HP ÷ DPR` instead spreads damage continuously, which hands a slow attacker
+   * damage they are never alive to deal — the Dreams of Light case, where a
+   * 5191-tick cast needing two casts to kill "won in 1.2 rounds" on paper while
+   * dying at tick 2865 without ever acting.
+   *
+   * ⚠ Swings are counted off the MEAN per swing, so the chance of killing a
+   * swing early or late is not modelled. That approximation is worst exactly
+   * where it matters most — a 1-2 swing kill — so `oneShotPct` is carried
+   * through to the report rather than being averaged away.
+   */
+  function killTicks(wait, hp, mean) {
+    if (!(mean > 0)) return Infinity;
+    return Math.ceil(hp / mean) * wait;
   }
 
   /* ------------- run ------------- */
@@ -305,7 +343,12 @@
         if (p) skills.push(p);
       }
     }
-    const grid = {}, choices = {}, ttks = [];
+    const grid = {}, choices = {}, ttks = [], contTtks = [];
+    const killTick = {};                 // 'ATTACKER>DEFENDER' -> tick of the killing blow
+    // 'ATTACKER>DEFENDER' -> { chosen, fastest }. Two different questions:
+    // `fastest` answers "did they ever get to act", `chosen` answers "did the
+    // skill they committed to ever land".
+    const waitOf = {};
     let immune = 0, pairs = 0;
 
     for (const def of defenders) {
@@ -313,37 +356,110 @@
       for (const atk of actors) {
         if (atk.name === def.name) continue;
         pairs++;
-        let best = { dpr: 0, skill: null };
+        // Chosen on TIME TO KILL, not DPR. The two disagree exactly where this
+        // sim used to be wrong: a big slow swing can out-DPR a quick one and
+        // still land its killing blow later, because the last partial swing of
+        // a continuous model does not exist — you either get the whole swing
+        // off or you get nothing.
+        let best = { ticks: Infinity, dpr: 0, skill: null };
+        let bestDpr = 0;                 // the OLD model's pick, kept for the delta
+        let fastest = Infinity;          // cadence they swing at even when it does nothing
         for (const sk of skills.filter(s => s.actor === atk.name)) {
-          const { mean } = meanPerSwing(sk, def);
+          fastest = Math.min(fastest, sk.wait);
+          const { mean, oneShotPct } = meanPerSwing(sk, def);
+          if (!(mean > 0.01)) continue;
+          const ticks = killTicks(sk.wait, def.hp, mean);
           const dpr = mean * (roundLen / sk.wait);
-          if (dpr > best.dpr) best = { dpr, skill: sk.name, perSwing: mean };
+          if (dpr > bestDpr) bestDpr = dpr;
+          if (ticks < best.ticks || (ticks === best.ticks && dpr > best.dpr)) {
+            best = { ticks, dpr, skill: sk.name, perSwing: mean, wait: sk.wait,
+                     swings: Math.ceil(def.hp / mean), oneShotPct };
+          }
         }
         const key = CFG.label(atk.name);
-        if (best.dpr <= 0.01) { immune++; grid[CFG.label(def.name)][key] = 'IMMUNE'; }
+        // Cadence is recorded even for an IMMUNE attacker: they still swing,
+        // they just never finish. Conflating "could not kill" with "never
+        // acted" would have reported 7 shutouts out of 9 duels on the shipped
+        // baseline, which is an artefact of the missing entry, not a finding.
+        waitOf[`${key}>${CFG.label(def.name)}`] = { chosen: best.skill ? best.wait : fastest, fastest };
+        if (!best.skill) { immune++; grid[CFG.label(def.name)][key] = 'IMMUNE'; }
         else {
-          const ttk = def.hp / best.dpr;
-          ttks.push(ttk);
-          grid[CFG.label(def.name)][key] = Math.round(ttk * 10) / 10;
+          const rounds = best.ticks / roundLen;
+          ttks.push(rounds);
+          contTtks.push(def.hp / bestDpr);
+          killTick[`${key}>${CFG.label(def.name)}`] = best.ticks;
+          grid[CFG.label(def.name)][key] = Math.round(rounds * 10) / 10;
           choices[`${key} -> ${CFG.label(def.name)}`] =
-            `${best.skill} (${Math.round(best.perSwing)}/swing, ${Math.round(best.dpr)} dpr)`;
+            `${best.skill} (${Math.round(best.perSwing)}/swing × ${best.swings} @ ${best.wait}t`
+            + ` = tick ${best.ticks}, ${Math.round(best.dpr)} dpr`
+            + (best.oneShotPct > 0 ? `, ${Math.round(best.oneShotPct * 100)}% one-shot` : '')
+            + (Math.round(rounds * 10) !== Math.round(def.hp / bestDpr * 10)
+                ? `; continuous said ${Math.round(def.hp / bestDpr * 10) / 10}` : '') + ')';
         }
       }
     }
+
+    // ── DUELS ────────────────────────────────────────────────────────────────
+    // The grid is one-directional: "how long would A need". A duel asks who
+    // actually lands their killing blow first, which is the whole point of
+    // discrete timing. A shutout — the loser landing ZERO swings — is invisible
+    // to a continuous model and is what a slow artillery build risks.
+    const duels = {};
+    let shutouts = 0, decided = 0, overcommits = 0;
+    for (let i = 0; i < defenders.length; i++) {
+      for (let j = i + 1; j < defenders.length; j++) {
+        const A = CFG.label(defenders[i].name), B = CFG.label(defenders[j].name);
+        const tAB = killTick[`${A}>${B}`] ?? Infinity;
+        const tBA = killTick[`${B}>${A}`] ?? Infinity;
+        if (!Number.isFinite(tAB) && !Number.isFinite(tBA)) { duels[`${A} vs ${B}`] = 'stalemate'; continue; }
+        decided++;
+        const aWins = tAB <= tBA;
+        const [w, l, tw, tl] = aWins ? [A, B, tAB, tBA] : [B, A, tBA, tAB];
+        // A SHUTOUT is measured on the loser's FASTEST attack — "did they ever
+        // get to act at all". Measuring it on the skill the picker CHOSE would
+        // let a greedy min-time-to-kill choice manufacture shutouts: it happily
+        // commits to a 4878-tick nuke in a fight that ends at 4172 and then
+        // reports zero swings, when a 2541-tick bolt was available.
+        const lw = waitOf[`${l}>${w}`] ?? {};
+        const landed = lw.fastest > 0 && Number.isFinite(lw.fastest) ? Math.floor(tw / lw.fastest) : 0;
+        if (landed === 0) shutouts++;
+        // Separately worth seeing: they had time to act, but not with the skill
+        // that was their best answer to this defender.
+        const overcommitted = landed > 0 && Number.isFinite(lw.chosen) && lw.chosen > tw;
+        if (overcommitted) overcommits++;
+        duels[`${A} vs ${B}`] = `${w} at tick ${tw} (${Math.round(tw / roundLen * 10) / 10}r)`
+          + `; ${l} landed ${landed} swing${landed === 1 ? '' : 's'}`
+          + (Number.isFinite(tl) ? `, needed ${tl}` : ', could not kill')
+          + (landed === 0 ? ' — SHUTOUT' : '')
+          + (overcommitted ? ` — their best answer (${lw.chosen}t) never lands` : '');
+      }
+    }
+
     ttks.sort((a, b) => a - b);
+    contTtks.sort((a, b) => a - b);
+    const med = (arr) => arr.length ? Math.round(arr[Math.floor(arr.length / 2)] * 10) / 10 : null;
     return {
       mode: SC.name,
       summary: {
         pairs, immune,
         immunePct: Math.round(immune / pairs * 100),
-        medianRounds: ttks.length ? Math.round(ttks[Math.floor(ttks.length / 2)] * 10) / 10 : null,
+        medianRounds: med(ttks),
+        // What the old continuous model would have reported, side by side.
+        // Keep this: the fix is only trustworthy if the delta is visible.
+        medianRoundsContinuous: med(contTtks),
         belowFloor: ttks.filter(t => t < 2).length,
+        belowFloorContinuous: contTtks.filter(t => t < 2).length,
         lethal: ttks.filter(t => t <= CFG.lethal).length,
         grindy: ttks.filter(t => t > CFG.grindy).length,
+        duelsDecided: decided, shutouts, overcommits,
       },
-      grid, choices,
+      grid, choices, duels,
+      // `wait` is on this line deliberately: a spell slower than roundLen is
+      // the shape continuous DPR reports most confidently and most wrongly.
       spellSkills: skills.filter(s => s.branch === 'spell').map(s =>
-        `${CFG.label(s.actor)}/${s.name}: w${s.castWeight} wu${Math.round(s.windup*100)/100} ${Math.round(s.dmg)}dmg ${Math.round(s.dmg*roundLen/s.wait)}dpr`),
+        `${CFG.label(s.actor)}/${s.name}: w${s.castWeight} wu${Math.round(s.windup*100)/100} ${Math.round(s.dmg)}dmg`
+        + ` ${s.wait}t (${Math.round(s.wait / roundLen * 100) / 100}r) ${Math.round(s.dmg*roundLen/s.wait)}dpr`
+        + (s.wait > roundLen ? ' SLOWER-THAN-A-ROUND' : '')),
     };
   }
 
@@ -356,7 +472,8 @@
     }
   }
   window.__archetypeSim = { runs, defenders, roundLen, cfg: CFG, loadoutRestore };
-  for (const r of runs) { console.log(`mode=${r.mode}`); console.table(r.grid); }
+  for (const r of runs) { console.log(`mode=${r.mode}`); console.table(r.grid); console.table(r.duels); }
   return JSON.stringify({ roundLengthTicks: roundLen, loadoutsSwitchedAndRestored: loadoutRestore,
-    runs: runs.map(r => ({ mode: r.mode, summary: r.summary, grid: r.grid, spellSkills: r.spellSkills })) }, null, 1);
+    runs: runs.map(r => ({ mode: r.mode, summary: r.summary, grid: r.grid,
+      duels: r.duels, spellSkills: r.spellSkills })) }, null, 1);
 })()
