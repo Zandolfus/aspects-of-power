@@ -42,7 +42,28 @@
 
   /* ---------------- CONFIG ---------------- */
   const CFG = {
-    actors: ['[SIM] Tank', '[SIM] Heavy Weapon', '[SIM] Light Weapon', '[SIM] Ranger', '[SIM] Caster'],
+    // Roster resolution, in order:
+    //   1. window.__simActors  — an explicit array of names
+    //   2. any actors prefixed '[SIM] ' — the purpose-built testbed, if present
+    //   3. every player-owned character — works in any world with no setup
+    // Deliberately NOT a hardcoded list of this world's actor names: the
+    // harness is a durable tool, so it must not depend on one world's content
+    // (migration commit policy — "would another world's GM ever run this?").
+    // In both cases an actor must OWN AT LEAST ONE ATTACK SKILL to be included:
+    // a combat sim populated with crafters and pets reports nothing but mutual
+    // immunity. (The [SIM] testbed deliberately contains four crafters, which
+    // is exactly how this was found.)
+    actors: window.__simActors ?? (() => {
+      const canFight = (a) => a.items.some(i => i.type === 'skill'
+        && (i.system.tags ?? []).includes('attack'));
+      const sim = game.actors.filter(a => a.name.startsWith('[SIM] ') && canFight(a));
+      if (sim.length >= 2) return sim.map(a => a.name);
+      return game.actors.filter(a => a.type === 'character'
+        && Object.entries(a.ownership ?? {}).some(([k, v]) =>
+             k !== 'default' && v === 3 && game.users.get(k) && !game.users.get(k).isGM)
+        && (a.system.health?.max ?? 0) > 0
+        && canFight(a)).map(a => a.name);
+    })(),
     label: (n) => n.replace('[SIM] ', ''),
     // Crush is a debuff that ramps; model it at its steady-state stack count.
     crushStacks: AA.armorCrushMaxStacks ?? 3,
@@ -51,15 +72,33 @@
     // Band thresholds for the report, from the house target matrix
     // (mirror 6-8 rounds, cross-lane favoured 3-4, never below 2).
     lethal: 3, grindy: 8,
-    // EXPERIMENT — magic/melee unification. Weapons use weight TWICE: windup
-    // (damage) and wait (tempo), which is what makes them DPR-neutral across
-    // weights. Spells use spellTierWeights for wait ONLY, so tier costs time
-    // without paying damage. Setting this true feeds the tier weight in as a
-    // windup, exactly as a weapon's weight is. `spellInvestDamage` and
-    // `strikeInvestDamage` are already the same function at windup 1, so this
-    // is "stop passing the neutral value" rather than a new formula.
-    // Compared side by side in the output; NOT shipped.
-    spellWindupModes: [false, true],
+    // A combat sim must use combat loadouts — `effectBonus` filters equipment
+    // by activeLoadout, so a caster parked on `profession` reads with zero
+    // armour and inflated crafting stats. Switched here and restored in a
+    // finally. This is the one place the sim MUTATES anything.
+    forceCombatLoadout: true,
+    // ── SCENARIOS (magic/melee unification) ──────────────────────────────
+    // Weapons use weight TWICE: windup (damage) and wait (tempo), which is what
+    // makes them DPR-neutral across weapon weights. Spells use spellTierWeights
+    // for wait ONLY, so tier costs time without paying damage.
+    //   spellWeight  'none'   windup 1 — shipped behaviour
+    //                'tier'   windup from the tier weight
+    //                'impl'   IMPLEMENT + tier: the focus is the weapon and the
+    //                         spell adds to it. DPR is invariant to weight, so
+    //                         this trades per-hit size against tempo.
+    //   windupMax    3.0 is the shipped clamp; it starts taxing combined weight
+    //                above 300 (staff+greater), where wait keeps scaling but
+    //                damage stops.
+    //   tierGated    wands own BASIC (their wait discount), staves own
+    //                everything ABOVE basic (their free +baseMana scaling),
+    //                instead of the current wait-threshold gate.
+    scenarios: window.__simScenarios ?? [
+      { name: 'A shipped',              spellWeight: 'none', windupMax: 3.0, tierGated: false },
+      { name: 'B tier weight',          spellWeight: 'tier', windupMax: 3.0, tierGated: false },
+      { name: 'C impl+tier, clamped',   spellWeight: 'impl', windupMax: 3.0, tierGated: false },
+      { name: 'D impl+tier, unlocked',  spellWeight: 'impl', windupMax: 99,  tierGated: false },
+      { name: 'E D + tier-gated impls', spellWeight: 'impl', windupMax: 99,  tierGated: true  },
+    ],
   };
 
   /* ------------- helpers ------------- */
@@ -71,7 +110,17 @@
   const hitAt = (f, d20) => { try { const v = Function('d20', 'return ' + f)(d20); return Number.isFinite(v) ? v : null; } catch { return null; } };
 
   /* ------------- attacker profiles ------------- */
-  function profileSkill(actor, sk, spellWindupOn) {
+  /** Heaviest equipped implement, as a weight. 0 when casting bare-handed. */
+  function implementWeight(actor) {
+    let best = 0;
+    for (const t of (actor.getEquippedImplements?.() ?? [])) {
+      const w = sc.weaponWeights?.[t] ?? 0;
+      if (w > best) best = w;
+    }
+    return best;
+  }
+
+  function profileSkill(actor, sk, SC) {
     const rd = sk.getRollData?.();
     if (!rd?.roll) return null;
     const tags = sk.system.tags ?? [];
@@ -95,7 +144,7 @@
     const res   = rd.roll.resource;
     const eff   = sk._resolveRarityMods().effectiveMult;
 
-    let branch = 'legacy', dmg = null, wait = null, cost = null, windup = 1;
+    let branch = 'legacy', dmg = null, wait = null, cost = null, windup = 1, castWeight = 0;
 
     if (['mana', 'health'].includes(res) && tier && grade
         && sc.spellTierFactors[tier] && sc.spellGradeFactors[grade]) {
@@ -103,17 +152,34 @@
       const gf = sc.spellGradeFactors[grade];
       const baseCost = Math.round(sc.spellTierFactors[tier] * gf);
       // windup 1 makes strikeInvestDamage identical to spellInvestDamage, so
-      // the OFF mode reproduces shipped behaviour exactly rather than merely
-      // closely — same function, neutral argument.
-      const spellWindup = spellWindupOn
-        ? Math.min(dt.windupMax ?? 3.0, Math.max(dt.windupMin ?? 0.5,
-            (sc.spellTierWeights?.[tier] ?? sc.celerity.BASELINE_WEIGHT) / 100))
+      // 'none' reproduces shipped behaviour exactly rather than merely closely
+      // — same function, neutral argument.
+      const tierW = sc.spellTierWeights?.[tier] ?? sc.celerity.BASELINE_WEIGHT;
+      const imps  = [...(actor.getEquippedImplements?.() ?? [])];
+      const implW = imps.reduce((m, t) => Math.max(m, sc.weaponWeights?.[t] ?? 0), 0);
+      const castW = SC.spellWeight === 'impl' ? implW + tierW
+                  : SC.spellWeight === 'tier' ? tierW
+                  : 0;
+      const spellWindup = castW > 0
+        ? Math.min(SC.windupMax, Math.max(dt.windupMin ?? 0.5, castW / 100))
         : 1;
-      dmg  = F.strikeInvestDamage(actor.system.abilities.intelligence.mod, eff,
-                                  spellWindup, baseCost, F.spellDamageRef(gf));
+      // Staff owns the tiers ABOVE basic: its +baseMana of free damage scaling.
+      const staffOn = SC.tierGated && imps.includes('staff') && tier !== 'basic';
+      const effInvest = staffOn ? baseCost * 2 : baseCost;
+      dmg = F.strikeInvestDamage(actor.system.abilities.intelligence.mod, eff,
+                                 spellWindup, effInvest, F.spellDamageRef(gf));
+      // Wait scales with the SAME weight the damage used — that pairing is what
+      // makes DPR weight-invariant. Shipped celerity only knows the tier weight.
       wait = CEL.computeActionWait(actor, sk, null, baseCost);
+      if (SC.spellWeight === 'impl' && tierW > 0) wait = Math.max(1, Math.round(wait * (castW / tierW)));
+      // Wand owns BASIC: its wait discount. computeActionWait already applies it
+      // when a wand is equipped, so only add it when the gate says otherwise.
+      if (SC.tierGated && imps.includes('wand') && tier !== 'basic') {
+        wait = Math.max(1, Math.round(wait / (sc.celerity.WAND_BASIC_WAIT_MULT ?? 0.77)));
+      }
       cost = baseCost;
       windup = spellWindup;
+      castWeight = castW;
     } else if (res === 'stamina' && ['str_weapon', 'dex_weapon', 'phys_ranged'].includes(rd.roll.type)) {
       const wpn = sk._resolveWeaponForSkill();
       const wt  = sk.constructor.resolveWeaponWeight(wpn);
@@ -142,7 +208,7 @@
 
     const wpnTags = sk._resolveWeaponForSkill?.()?.system?.tags ?? [];
     return {
-      actor: actor.name, name: sk.name, branch, dmg, cost, wait, windup,
+      actor: actor.name, name: sk.name, branch, dmg, cost, wait, windup, castWeight,
       hitBasis, lane: sk.system.roll?.targetDefense || '',
       pierce: tags.includes('pierce')
            || (AA.pierceWeaponTypes ?? []).some(t => wpnTags.includes(t)),
@@ -217,15 +283,25 @@
   const actors = CFG.actors.map(n => game.actors.getName(n)).filter(Boolean);
   if (actors.length < 2) return 'Need at least two of CFG.actors present in the world.';
 
+  // A combat sim must read combat loadouts. Switched here, restored in the
+  // finally at the bottom - the only mutation this file performs.
+  const loadoutRestore = {};
+  if (CFG.forceCombatLoadout) {
+    for (const a of actors) {
+      const cur = a.system.activeLoadout || 'combat';
+      if (cur !== 'combat') { loadoutRestore[a.name] = cur; await a.update({ 'system.activeLoadout': 'combat' }); }
+    }
+  }
+
   const defenders = actors.map(profileDefender);
   const roundLen = CEL.referenceRoundLength(actors[0].system.attributes?.race?.level ?? 1);
 
-  function runOnce(spellWindupOn) {
+  function runOnce(SC) {
     const skills = [];
     for (const a of actors) {
       for (const sk of a.items) {
         if (sk.type !== 'skill') continue;
-        const p = profileSkill(a, sk, spellWindupOn);
+        const p = profileSkill(a, sk, SC);
         if (p) skills.push(p);
       }
     }
@@ -256,7 +332,7 @@
     }
     ttks.sort((a, b) => a - b);
     return {
-      spellWindup: spellWindupOn,
+      mode: SC.name,
       summary: {
         pairs, immune,
         immunePct: Math.round(immune / pairs * 100),
@@ -267,13 +343,20 @@
       },
       grid, choices,
       spellSkills: skills.filter(s => s.branch === 'spell').map(s =>
-        `${CFG.label(s.actor)}/${s.name}: ${Math.round(s.dmg)} dmg, wu ${Math.round(s.windup * 100) / 100}, ${Math.round(s.dmg * roundLen / s.wait)} dpr`),
+        `${CFG.label(s.actor)}/${s.name}: w${s.castWeight} wu${Math.round(s.windup*100)/100} ${Math.round(s.dmg)}dmg ${Math.round(s.dmg*roundLen/s.wait)}dpr`),
     };
   }
 
-  const runs = CFG.spellWindupModes.map(runOnce);
-  window.__archetypeSim = { runs, defenders, roundLen, cfg: CFG };
-  for (const r of runs) { console.log(`spellWindup=${r.spellWindup}`); console.table(r.grid); }
-  return JSON.stringify({ roundLengthTicks: roundLen, runs: runs.map(r => ({
-    spellWindup: r.spellWindup, summary: r.summary, grid: r.grid, spellSkills: r.spellSkills })) }, null, 1);
+  let runs;
+  try {
+    runs = CFG.scenarios.map(runOnce);
+  } finally {
+    for (const [n, v] of Object.entries(loadoutRestore)) {
+      await game.actors.getName(n).update({ 'system.activeLoadout': v });
+    }
+  }
+  window.__archetypeSim = { runs, defenders, roundLen, cfg: CFG, loadoutRestore };
+  for (const r of runs) { console.log(`mode=${r.mode}`); console.table(r.grid); }
+  return JSON.stringify({ roundLengthTicks: roundLen, loadoutsSwitchedAndRestored: loadoutRestore,
+    runs: runs.map(r => ({ mode: r.mode, summary: r.summary, grid: r.grid, spellSkills: r.spellSkills })) }, null, 1);
 })()
