@@ -5,6 +5,58 @@ import { proficiencyDamageMult } from '../systems/weapon-styles.mjs';
 import { carriedWeightLb } from '../helpers/formulas.mjs';
 
 /**
+ * Change keys that `prepareDerivedData` consumes BY HAND — every ability, plus
+ * each key with an explicit `effectBonus(...)` call site below.
+ *
+ * ⚠ THIS SET IS THE CONTRACT. Anything listed here is applied by the manual
+ * contribution breakdown; anything NOT listed falls through to generic
+ * application in `applyActiveEffects`. Adding an `effectBonus()` call without
+ * adding its key here DOUBLE-APPLIES that change. Removing one without
+ * deleting the call site drops it entirely.
+ *
+ * Abilities are excluded wholesale because their composition cannot be
+ * expressed as per-key application at all: equipment is capped at 30% of a
+ * stat's own calculated value AND 20% of the SUM across all nine, and titles,
+ * blessings and passives compose in a fixed order. A flat per-key merge has no
+ * way to see the other eight stats.
+ */
+const MANUALLY_APPLIED_KEYS = new Set([
+  'system.defense.dr.value',
+  'system.defense.armor.value',
+  'system.defense.veil.value',
+  'system.defense.melee.value',
+  'system.defense.ranged.value',
+  'system.defense.mind.value',
+  'system.defense.soul.value',
+  'system.meditation.fraction',
+]);
+
+/** True when the manual breakdown owns this change key. */
+function _isManuallyApplied(key) {
+  return typeof key === 'string'
+    && (key.startsWith('system.abilities.') || MANUALLY_APPLIED_KEYS.has(key));
+}
+
+/**
+ * Does an item belong to the ACTIVE loadout? Module scope because both
+ * `applyActiveEffects` and the `effectBonus` closure need it, and the two must
+ * agree — a profession-set item buffing a combat stat in one path but not the
+ * other would be worse than either behaviour alone.
+ * No source item = always apply (legacy effects with no itemSource).
+ */
+function _itemMatchesLoadoutFor(actor, item) {
+  if (!item) return true;
+  const slotConfig = CONFIG.ASPECTSOFPOWER.equipmentSlots ?? {};
+  const activeLoadout = actor.system?.activeLoadout || 'combat';
+  const allSlots = [item.system.slot, ...(item.system.additionalSlots ?? [])].filter(Boolean);
+  return allSlots.some((slotKey) => {
+    const slotSet = slotConfig[slotKey]?.set ?? 'combat';
+    // 'both' (e.g. jewelry) is always active regardless of loadout.
+    return slotSet === 'both' || slotSet === activeLoadout;
+  });
+}
+
+/**
  * Disposition-targeting filter for auras. Returns true if `otherDisp` is a
  * valid target given the source's `myDisp` and the aura's `targeting` mode.
  * Exported for use by the movement-hook entry trigger (canvas/aura-entry-trigger).
@@ -38,12 +90,45 @@ export class AspectsofPowerActor extends Actor {
       Object.keys(phases).map(p => [p, []])
     );
 
-    // Skip core's default mergeObject-based application — we process all
-    // effect changes manually in prepareDerivedData using our own contribution
-    // breakdown (equipment caps, blessing multipliers, titles, etc.).
-    // Core's default would crash on our leaf-value change keys (e.g.
-    // system.abilities.strength.value) because v14 deserializes values as
-    // primitives and mergeObject expects objects.
+    // ── Why this is overridden at all ────────────────────────────────────
+    // ABILITIES cannot be applied per-key. Equipment is capped at 30% of a
+    // stat's own calculated value AND 20% of the SUM across all nine, and
+    // titles/blessings/passives compose in a fixed order. A flat per-key merge
+    // cannot see the other eight stats, so `prepareDerivedData` builds the
+    // whole contribution breakdown by hand. That is the real reason, and it
+    // covers ~2,050 of the ~2,055 change entries in a live world.
+    //
+    // ⚠ The comment that used to sit here ALSO claimed core's application
+    // would crash on our leaf-value keys. Tested against v14.365 on 2026-08-03:
+    // it does not. It runs cleanly and resolves them correctly. That claim was
+    // what turned a targeted need into a blanket override.
+    //
+    // ── Why anything is applied here now ─────────────────────────────────
+    // A blanket skip means every non-ability field must be hand-wired through
+    // `effectBonus`, and forgetting fails SILENTLY — the effect reports as
+    // enabled, applicable and un-suppressed while doing nothing. That bit
+    // twice: `system.meditation.fraction`, and Gabriel's Geppetto's Eye
+    // (`system.reactions.max`), which someone worked around by hardcoding the
+    // value into his source data.
+    //
+    // So: keys the manual breakdown owns are skipped, everything else is
+    // applied through core's own per-change logic. New fields now work by
+    // default instead of failing quietly.
+    for (const effect of this.allApplicableEffects()) {
+      if (effect.disabled) continue;
+      // Equipment effects are loadout-scoped, exactly as `effectBonus` treats
+      // them — a profession-set item must not buff a combat stat.
+      if (effect.system?.effectType === 'equipment'
+          && !_itemMatchesLoadoutFor(this, this.items.get(effect.system?.itemSource))) continue;
+      for (const change of effect.changes) {
+        if (!change?.key || _isManuallyApplied(change.key)) continue;
+        try {
+          effect.apply(this, change);
+        } catch (err) {
+          console.error(`[AoP] effect "${effect.name}" change "${change.key}" failed to apply:`, err);
+        }
+      }
+    }
   }
 
   /** @override */
@@ -102,23 +187,15 @@ export class AspectsofPowerActor extends Actor {
         other: 0,
       };
     }
-    // Active loadout determines which equipment effects apply.
-    // 'combat' loadout: only items in combat slots contribute.
-    // 'profession' loadout: only items in profession slots contribute.
-    const activeLoadout = systemData.activeLoadout || 'combat';
-    const slotConfig = CONFIG.ASPECTSOFPOWER.equipmentSlots ?? {};
+    // Active loadout determines which equipment effects apply: 'combat' uses
+    // combat slots, 'profession' uses profession slots, jewelry ('both') is
+    // always on. Resolved inside _itemMatchesLoadoutFor.
 
     // Helper: does an item belong to the active loadout?
     // Checks primary slot AND any additional slots — if any matches the loadout, it applies.
-    const _itemMatchesLoadout = (item) => {
-      if (!item) return true; // no source item: always apply (legacy effects)
-      const allSlots = [item.system.slot, ...(item.system.additionalSlots ?? [])].filter(Boolean);
-      return allSlots.some(slotKey => {
-        const slotSet = slotConfig[slotKey]?.set ?? 'combat';
-        // 'both' (e.g. jewelry) is always active regardless of loadout.
-        return slotSet === 'both' || slotSet === activeLoadout;
-      });
-    };
+    // Delegates to the module-scope implementation so this path and
+    // applyActiveEffects can never disagree about what is equipped.
+    const _itemMatchesLoadout = (item) => _itemMatchesLoadoutFor(this, item);
 
     for (const e of this.allApplicableEffects()) {
       if (e.disabled) continue;
