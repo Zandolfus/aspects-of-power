@@ -114,6 +114,15 @@ export class AspectsofPowerActor extends Actor {
     // So: keys the manual breakdown owns are skipped, everything else is
     // applied through core's own per-change logic. New fields now work by
     // default instead of failing quietly.
+    // ⚠ APPLY ONLY THIS PHASE'S CHANGES. This method is invoked ONCE PER PHASE
+    // ('initial', then 'final'), so a loop that ignores the argument applies
+    // every change TWICE. Caught by diffing derived values across all 219
+    // actors: Gabriel's reactions.max came out at 4 instead of 3, and that one
+    // number was the only tell — nothing else in the world stacks additively
+    // on a non-ability key yet, so the bug was one content change away from
+    // being invisible.
+    const activePhase = typeof phase === 'string' ? phase : 'initial';
+
     for (const effect of this.allApplicableEffects()) {
       if (effect.disabled) continue;
       // Equipment effects are loadout-scoped, exactly as `effectBonus` treats
@@ -122,6 +131,7 @@ export class AspectsofPowerActor extends Actor {
           && !_itemMatchesLoadoutFor(this, this.items.get(effect.system?.itemSource))) continue;
       for (const change of effect.changes) {
         if (!change?.key || _isManuallyApplied(change.key)) continue;
+        if ((change.phase ?? 'initial') !== activePhase) continue;
         try {
           effect.apply(this, change);
         } catch (err) {
