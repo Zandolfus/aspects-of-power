@@ -93,6 +93,102 @@ export function selectTargetOnCanvas(opts = {}) {
 }
 
 /**
+ * Prompt the player to click SEVERAL tokens on canvas. Resolves with an array
+ * of TokenDocuments, or null if Escape was pressed.
+ *
+ * Sibling of selectTargetOnCanvas, which cannot be reused for this: it clears
+ * every prior target and resolves on the FIRST pick, so a multi-target skill
+ * routed through it would silently collapse to one target no matter what the
+ * player clicked.
+ *
+ * Clicking a token toggles it, so a misclick is undone by clicking again.
+ * Enter confirms; reaching `max` confirms automatically, since at that point
+ * there is nothing left to decide.
+ *
+ * @param {object} [opts]
+ * @param {number} [opts.max]      Most tokens selectable. Default 1.
+ * @param {number} [opts.min]      Fewest before Enter will confirm. Default 1.
+ * @param {string} [opts.message]  Override the notification text.
+ * @param {Function} [opts.validate] (tokenDoc) → boolean.
+ * @returns {Promise<TokenDocument[]|null>}
+ */
+export function selectTargetsOnCanvas(opts = {}) {
+  const max = Math.max(1, opts.max ?? 1);
+  const min = Math.max(1, Math.min(opts.min ?? 1, max));
+  return new Promise((resolve) => {
+    const validate = opts.validate ?? (() => true);
+    const prevControl = ui.controls?.control?.name ?? 'tokens';
+    const prevTool    = ui.controls?.tool?.name    ?? 'select';
+    ui.controls?.activate?.({ control: 'tokens', tool: 'target' });
+
+    for (const t of game.user.targets) {
+      try { t.setTarget(false, { releaseOthers: false, groupSelection: false }); } catch { /* noop */ }
+    }
+
+    const picked = new Map();   // id → TokenDocument, insertion-ordered
+    const base = opts.message ?? `Click up to ${max} targets, Enter to confirm (Esc to cancel)`;
+    let notif = ui.notifications.info(base, { permanent: true });
+    const reshow = () => {
+      try { ui.notifications.remove(notif); } catch { /* noop */ }
+      const names = [...picked.values()].map(d => d.name).join(', ');
+      notif = ui.notifications.info(
+        `${base}${picked.size ? ` — ${picked.size}/${max}: ${names}` : ''}`, { permanent: true });
+    };
+
+    let resolved = false;
+    const finish = (result) => {
+      if (resolved) return;
+      resolved = true;
+      cleanup();
+      resolve(result);
+    };
+
+    const onTarget = (user, token, targeted) => {
+      if (user?.id !== game.user.id) return;
+      const doc = token?.document ?? token;
+      if (!targeted) { picked.delete(doc.id); reshow(); return; }
+      if (!validate(doc)) {
+        ui.notifications.warn(`${doc.name} is not a valid target.`);
+        try { token.setTarget(false, { releaseOthers: false, groupSelection: false }); } catch { /* noop */ }
+        return;
+      }
+      if (picked.size >= max && !picked.has(doc.id)) {
+        ui.notifications.warn(`At most ${max} targets — deselect one first.`);
+        try { token.setTarget(false, { releaseOthers: false, groupSelection: false }); } catch { /* noop */ }
+        return;
+      }
+      picked.set(doc.id, doc);
+      reshow();
+      // Nothing left to choose once the cap is reached.
+      if (picked.size >= max) finish([...picked.values()]);
+    };
+
+    const onKey = (event) => {
+      if (event.key === 'Enter' && picked.size >= min) {
+        event.stopPropagation(); event.preventDefault();
+        finish([...picked.values()]);
+      } else if (event.key === 'Escape') {
+        event.stopPropagation(); event.preventDefault();
+        for (const t of game.user.targets) {
+          try { t.setTarget(false, { releaseOthers: false, groupSelection: false }); } catch { /* noop */ }
+        }
+        finish(null);
+      }
+    };
+
+    const cleanup = () => {
+      Hooks.off('targetToken', onTarget);
+      document.removeEventListener('keydown', onKey, true);
+      try { ui.notifications.remove(notif); } catch { /* noop */ }
+      try { ui.controls?.activate?.({ control: prevControl, tool: prevTool }); } catch { /* noop */ }
+    };
+
+    Hooks.on('targetToken', onTarget);
+    document.addEventListener('keydown', onKey, true);
+  });
+}
+
+/**
  * Prompt the player to click one of their mines on canvas. Resolves
  * with the picked RegionDocument or null if cancelled.
  *

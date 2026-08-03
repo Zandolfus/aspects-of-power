@@ -3,7 +3,7 @@ import { getPositionalTags } from '../helpers/positioning.mjs';
 import { houseHitFormula, hybridAbilityMod, weaponStatBlend, spellDamageRef, spellInvestDamage, spellWindupMultiplier, spellCastWeight, strikeInvestDamage, infusionDamage, investSelfDamage as computeInvestSelfDamage, effectiveDodgeValue, splitEvenlyWithRemainder, parryMassMultiplier, bracedParryWeight, bracedMaxUsefulInvest, defenceMarginMultiplier, lunarPhaseMultiplier, dotTickDamage, procStaminaCost, crushFlatAmount, riderMaxInvest } from '../helpers/formulas.mjs';
 import { recordActionFired, declareAction, isInActiveCombat, computeActionWait, referenceRoundLength, computeWindupMultiplier, getScrambleStacks, addScrambleStack, applyDodgeCost, findCombatantForActor, perceiveGate } from '../systems/celerity.mjs';
 import { getThreatRadiusFt, actorIsDashing } from '../systems/engagement-halts.mjs';
-import { selectTargetOnCanvas, skillNeedsTargetPrompt, skillTargetsAtFire, selectMarkerOnCanvas } from '../canvas/target-prompt.mjs';
+import { selectTargetOnCanvas, selectTargetsOnCanvas, skillNeedsTargetPrompt, skillTargetsAtFire, selectMarkerOnCanvas } from '../canvas/target-prompt.mjs';
 import { regionTokenOverlap, segmentIntersect } from '../helpers/geometry.mjs';
 import { CraftingSkillsMixin } from '../systems/crafting-skills.mjs';
 import { executeGmAction as executeGmActionImpl } from '../systems/gm-actions.mjs';
@@ -4837,12 +4837,35 @@ export class AspectsofPowerItem extends Item {
     const targetsAtFire = skillTargetsAtFire(this);
     if (!options.executeDeferred && options.preInvestAmount == null
         && skillNeedsTargetPrompt(this) && !targetsAtFire) {
-      const picked = await selectTargetOnCanvas({
-        message: `Click target for ${this.name} (Esc to cancel)`,
-      });
-      if (!picked) {
-        ui.notifications.info(`${this.name} cancelled.`);
-        return;
+      // ⚠ A stack SPREAD skill needs the multi-target prompt. The single-target
+      // one clears every prior target and resolves on the first click, so
+      // routing a spread through it would silently collapse it to one target
+      // no matter what the player picked — the spread would be unreachable in
+      // normal play.
+      // Target ceiling comes from the rule itself: every target needs at least
+      // one field, so F >= T, and F + T <= budget gives T <= budget/2.
+      const _spCfg = this.system.tagConfig ?? {};
+      const _spBudget = (_spCfg.stackPool && (_spCfg.stackCost ?? 0) > 0)
+        ? (_spCfg.stackSpreadBudget ?? 0) : 0;
+      if (_spBudget > 0) {
+        const held = getStackCount(this.actor, _spCfg.stackPool);
+        const maxT = Math.max(1, Math.min(Math.floor(_spBudget / 2), held));
+        const picked = await selectTargetsOnCanvas({
+          max: maxT,
+          message: `Click up to ${maxT} target${maxT === 1 ? '' : 's'} for ${this.name}, Enter to confirm (Esc to cancel)`,
+        });
+        if (!picked?.length) {
+          ui.notifications.info(`${this.name} cancelled.`);
+          return;
+        }
+      } else {
+        const picked = await selectTargetOnCanvas({
+          message: `Click target for ${this.name} (Esc to cancel)`,
+        });
+        if (!picked) {
+          ui.notifications.info(`${this.name} cancelled.`);
+          return;
+        }
       }
     }
 
