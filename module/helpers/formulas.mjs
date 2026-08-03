@@ -812,3 +812,123 @@ export function riderMaxInvest(baseCost, pool, mult = null) {
   const m = mult ?? C.maxInvestMult ?? 3.0;
   return Math.max(baseCost, Math.min(Math.max(0, pool), Math.floor(baseCost * m)));
 }
+
+/* ------------------------------------------------------------------ */
+/*  Buff capacity (design-healer-system.md, healer pillar phase 6)      */
+/* ------------------------------------------------------------------ */
+
+/**
+ * How much external augmentation a body can carry: a fraction of the sum of
+ * its nine ability VALUES.
+ *
+ * ⚠ VALUE SPACE, NOT MOD SPACE — the design memo says "sum of all 9 calculated
+ * mods", but every buff in the game is written as `system.<stat>.value` with an
+ * additive change, so cost is only commensurable with capacity in value space.
+ * Measuring in mod space would also make the same buff cost a different amount
+ * on every recipient (mod is concave in value), so a healer could not know what
+ * a spell costs before casting it. Cost is a property of the BUFF; that only
+ * holds here.
+ *
+ * The concavity then works in the game's favour for free: because
+ * `mod ~ value^0.8`, a buff worth +20% of your values is only about +15.7% of
+ * your power, so the cap is slightly tighter in practice than it reads.
+ *
+ * @param {object} abilities  actor.system.abilities (all nine)
+ * @param {object} [cfg]      CONFIG override (tests)
+ * @returns {number} Capacity in stat points.
+ */
+export function buffCapacity(abilities, cfg = null) {
+  const sc = cfg ?? (globalThis.CONFIG?.ASPECTSOFPOWER ?? {});
+  const f = Number(sc.buffCap?.fraction);
+  const frac = Number.isFinite(f) && f > 0 ? f : 0.20;
+  let sum = 0;
+  for (const a of Object.values(abilities ?? {})) sum += Number(a?.value) || 0;
+  return Math.round(sum * frac);
+}
+
+/**
+ * What a buff costs against that capacity: the sum of every stat point it adds.
+ *
+ * Counts ability AND defence bonuses in ONE pool. A point of armour and a point
+ * of strength are not the same kind of thing, but they are the same kind of
+ * GIFT — this budget asks "how much borrowed power are you carrying", and the
+ * alternative (abilities only) exempts six of the twelve live buffs including
+ * the single most extreme one in the world (Splinter Guard, +582 armour onto a
+ * base of 25).
+ *
+ * ⚠ Only POSITIVE contributions count. A buff that also lowers a stat does not
+ * earn budget back, or a "+800 str / -800 dex" change would be free.
+ *
+ * @param {Array<{key: string, value: number}>} changes  ActiveEffect changes.
+ * @param {object} [cfg]  CONFIG override (tests)
+ * @returns {number} Cost in stat points.
+ */
+export function buffCost(changes, cfg = null) {
+  const sc = cfg ?? (globalThis.CONFIG?.ASPECTSOFPOWER ?? {});
+  const prefixes = sc.buffCap?.countedKeyPrefixes
+    ?? ['system.abilities.', 'system.defense.'];
+  let sum = 0;
+  for (const c of changes ?? []) {
+    const key = String(c?.key ?? '');
+    // `.value` only: `system.defense.melee.pool` is a dice pool, not a stat.
+    if (!key.endsWith('.value')) continue;
+    if (!prefixes.some(p => key.startsWith(p))) continue;
+    sum += Math.max(0, Number(c?.value) || 0);
+  }
+  return Math.round(sum);
+}
+
+/**
+ * Decide what actually lands when a buff meets the recipient's capacity.
+ *
+ * Two outcomes, chosen by the RECIPIENT (not the caster):
+ *  - `acceptOvercap` OFF (default): the buff TRUNCATES to whatever room is
+ *    left. `scale` is the factor to multiply every change value by.
+ *  - `acceptOvercap` ON: the buff lands in full and the overflow is paid for
+ *    in flat HP, on apply, once.
+ *
+ * ⚠ `excess` is the part of THIS buff that did not fit (`cost − room`), not
+ * `usage_after_apply − capacity` as the memo's formula reads. They agree on the
+ * first buff (room = capacity when nothing is loaded), but the memo's version
+ * re-charges previously-paid overflow on every subsequent application, so
+ * stacking three small buffs past the cap would cost far more than one big one
+ * of the same total. Per-application is what the memo's own trigger rule
+ * ("one-time per buff application") describes.
+ *
+ * @param {object}  args
+ * @param {number}  args.capacity       buffCapacity(recipient).
+ * @param {number}  args.used           Cost of buffs already loaded.
+ * @param {number}  args.cost           buffCost(incoming).
+ * @param {boolean} args.acceptOvercap  Recipient's toggle.
+ * @param {object} [cfg]  CONFIG override (tests)
+ * @returns {{scale: number, applied: number, excess: number,
+ *            strainDamage: number, truncated: boolean}}
+ */
+export function resolveBuffLoad({ capacity = 0, used = 0, cost = 0,
+                                  acceptOvercap = false } = {}, cfg = null) {
+  const sc = cfg ?? (globalThis.CONFIG?.ASPECTSOFPOWER ?? {});
+  const rate = Number(sc.buffCap?.overcapDamageRate);
+  const dmgRate = Number.isFinite(rate) && rate >= 0 ? rate : 0.20;
+
+  const cap  = Math.max(0, Number(capacity) || 0);
+  const load = Math.max(0, Number(used) || 0);
+  const want = Math.max(0, Number(cost) || 0);
+  const none = { scale: 1, applied: 0, excess: 0, strainDamage: 0, truncated: false };
+  if (want <= 0) return none;
+
+  const room = Math.max(0, cap - load);
+  if (want <= room) {
+    return { scale: 1, applied: want, excess: 0, strainDamage: 0, truncated: false };
+  }
+
+  const excess = want - room;
+  if (acceptOvercap) {
+    return { scale: 1, applied: want, excess,
+             strainDamage: Math.round(excess * dmgRate), truncated: false };
+  }
+  // Truncate. `room / want` scales every change proportionally, so a
+  // multi-stat buff keeps its shape instead of dropping whichever entry
+  // happened to be last in the array.
+  return { scale: room / want, applied: room, excess: 0,
+           strainDamage: 0, truncated: true };
+}

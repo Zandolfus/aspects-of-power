@@ -37,6 +37,7 @@
   --aop-stamina: #f9a825;
   --aop-overhealth: #2e7d32;
   --aop-barrier: #5c6bc0;
+  --aop-buffs: #b58b2a;
   --aop-health-bright: #ef5350;
   --aop-mana-bright: #42a5f5;
   --aop-stamina-bright: #ffca28;
@@ -418,6 +419,22 @@
 .aspects-of-power .bar-fill-stamina  { background: var(--aop-stamina); }
 .aspects-of-power .bar-fill-overhealth { background: var(--aop-overhealth); }
 .aspects-of-power .bar-fill-barrier  { background: var(--aop-barrier); }
+.aspects-of-power .bar-fill-buffs    { background: var(--aop-buffs); }
+/* Buff capacity: the toggle sits inline with the numbers, dim until enabled,
+   because accepting overcap means volunteering to bleed for a buff. */
+.aspects-of-power .overcap-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  cursor: pointer;
+  opacity: 0.45;
+}
+.aspects-of-power .overcap-toggle:hover { opacity: 0.9; }
+.aspects-of-power .overcap-toggle:has(input:checked) {
+  opacity: 1;
+  color: var(--aop-health);
+}
+.aspects-of-power .overcap-toggle input { margin: 0; }
 .aspects-of-power .bar-values {
   display: flex;
   align-items: center;

@@ -54,6 +54,18 @@ export class CharacterData extends foundry.abstract.TypeDataModel {
         fraction: new fields.NumberField({ initial: 0.10, min: 0 }),
       }),
 
+      // BUFF CAPACITY (design-healer-system.md phase 6). Capacity and current
+      // usage are both DERIVED — see prepareDerivedData — so only the choice
+      // is stored, per the house stored-fallback rule.
+      //
+      // ⚠ The toggle belongs to the RECIPIENT, not the caster. A healer cannot
+      // decide on your behalf that you can afford to bleed for their buff.
+      // Default OFF: overcap buffs truncate to the room left and nobody takes
+      // damage they did not opt into.
+      buffs: new fields.SchemaField({
+        acceptOvercap: new fields.BooleanField({ initial: false }),
+      }),
+
       biography: new fields.HTMLField({ initial: '' }),
 
       // Wounded token image — swaps token art when HP drops below threshold.

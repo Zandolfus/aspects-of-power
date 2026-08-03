@@ -85,6 +85,14 @@ export class NpcData extends foundry.abstract.TypeDataModel {
         affinities: new fields.ArrayField(new fields.StringField(), { initial: [] }),
         source:     new fields.StringField({ initial: '' }),
       }),
+
+      // BUFF CAPACITY (design-healer-system.md phase 6). Mirrors the character
+      // model — NPCs follow the same rule set, and half the buff content in the
+      // world is theirs (Splinter Guard, Bark Brace, Rally Cry, Barkskin), so a
+      // character-only field would cap the recipients that matter least.
+      buffs: new fields.SchemaField({
+        acceptOvercap: new fields.BooleanField({ initial: false }),
+      }),
     };
   }
 }

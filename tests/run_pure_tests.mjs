@@ -16,6 +16,7 @@ import {
   proficiencyMultiplier, proficiencyHitMultiplier, parryMassMultiplier, lunarPhaseMultiplier, dotTickDamage, procStaminaCost, riderDamageBase,
   crushFlatAmount, riderMaxInvest, itemWeightLb, KG_TO_LB, carriedWeightLb,
   bracedParryWeight, bracedMaxUsefulInvest, defenceMarginMultiplier,
+  buffCapacity, buffCost, resolveBuffLoad,
 } from '../module/helpers/formulas.mjs';
 import { moonState, moonNodeAngle, nextSyzygy, eclipseAtSyzygy, planetStates,
          meteorShowersOn, cometStates, julianDay, civilDate, worldTimeForDate } from '../module/systems/calendar.mjs';
@@ -915,6 +916,77 @@ eq('convert: five small casts cost the same as one big one',
 eq('convert: nothing spent is nothing gained', convertResources(0, 5, 201, 'stamina', CONVCFG).gained, 0);
 eq('convert: too little to buy one unit yields nothing',
    convertResources(4, 5, 201, 'stamina', CONVCFG).gained, 0);
+
+// ── Buff capacity (healer pillar phase 6) ─────────────────────────────────
+// GOLDEN: ability values and buff amounts read off the live world 2026-08-03.
+// Gabriel sums 3204 across his nine; Faye 1631. Buff amounts are the measured
+// roll totals x each entry's authored multiplier.
+const mkAbil = (sum) => ({ a: { value: sum } });   // capacity only reads values
+eq('buffCapacity Gabriel (3204)', buffCapacity(mkAbil(3204)), 641);
+eq('buffCapacity Faye (1631)', buffCapacity(mkAbil(1631)), 326);
+eq('buffCapacity: no abilities is no capacity', buffCapacity(null), 0);
+// The fraction is a knob, not a constant.
+eq('buffCapacity honours config fraction',
+   buffCapacity(mkAbil(1000), { buffCap: { fraction: 0.5 } }), 500);
+
+// Willy's Dreams of Light Lunar (Ally): int +243, wil +229, wis +215.
+const DREAMS = [
+  { key: 'system.abilities.intelligence.value', value: 243 },
+  { key: 'system.abilities.willpower.value',    value: 229 },
+  { key: 'system.abilities.wisdom.value',       value: 215 },
+];
+eq('buffCost Dreams of Light', buffCost(DREAMS), 687);
+// Defence bonuses share the pool — this is the whole reason Splinter Guard
+// (+582 armour onto a base of 25) is reachable by the cap at all.
+eq('buffCost counts defence',
+   buffCost([{ key: 'system.defense.armor.value', value: 582 }]), 582);
+// A dice POOL is not a stat, and a non-stat key is not a buff.
+eq('buffCost ignores pools and foreign keys',
+   buffCost([{ key: 'system.defense.melee.pool', value: 500 },
+             { key: 'system.meditation.fraction', value: 0.15 }]), 0);
+// ⚠ Negatives do not refund, or "+800 str / -800 dex" would be free.
+eq('buffCost: negatives do not earn budget back',
+   buffCost([{ key: 'system.abilities.strength.value',  value: 800 },
+             { key: 'system.abilities.dexterity.value', value: -800 }]), 800);
+
+// Bloodrage (+99 str) is 17% of a cap — tuned content is untouched.
+eq('resolveBuffLoad: a small buff fits whole',
+   resolveBuffLoad({ capacity: 593, used: 0, cost: 99 }).scale, 1);
+eq('resolveBuffLoad: fitting costs nothing',
+   resolveBuffLoad({ capacity: 593, used: 0, cost: 99 }).strainDamage, 0);
+
+// Dreams of Light (687) on Faye (cap 326), toggle OFF → truncates to fit.
+const _faye = resolveBuffLoad({ capacity: 326, used: 0, cost: 687 });
+eq('resolveBuffLoad: overcap truncates', _faye.truncated, true);
+eq('resolveBuffLoad: truncated to the room left', _faye.applied, 326);
+eq('resolveBuffLoad: truncation takes no damage', _faye.strainDamage, 0);
+eq('resolveBuffLoad: scale is room/cost', Math.round(_faye.scale * 1000), 475);
+
+// Same buff, toggle ON → lands whole and Faye pays 361 x 0.20 in HP.
+const _fayeOn = resolveBuffLoad({ capacity: 326, used: 0, cost: 687, acceptOvercap: true });
+eq('resolveBuffLoad: accepted overcap applies in full', _fayeOn.applied, 687);
+eq('resolveBuffLoad: accepted overcap is not truncated', _fayeOn.truncated, false);
+eq('resolveBuffLoad: excess is the part that did not fit', _fayeOn.excess, 361);
+eq('resolveBuffLoad: overcap costs 20% of excess in HP', _fayeOn.strainDamage, 72);
+
+// THE ARCHETYPE SPLIT: identical buff, identical overflow, different bodies.
+// Faye 203 HP loses 35% of her life; Phil 1388 HP loses 5%.
+eq('overcap costs Faye a third of her life', Math.round(72 / 203 * 100), 35);
+eq('overcap barely scratches Phil', Math.round(72 / 1388 * 100), 5);
+
+// ⚠ PER-APPLICATION, not cumulative: already-paid overflow is not re-charged.
+// Loaded 300 of 326, adding 100 → only the 74 that miss the cap are charged.
+const _second = resolveBuffLoad({ capacity: 326, used: 300, cost: 100, acceptOvercap: true });
+eq('resolveBuffLoad: only this buff’s overflow is charged', _second.excess, 74);
+eq('resolveBuffLoad: second buff strain', _second.strainDamage, 15);
+// Three buffs of 100 past a full cap cost exactly what one buff of 300 does.
+const _thrice = [1, 2, 3].reduce((s) => s
+  + resolveBuffLoad({ capacity: 326, used: 326, cost: 100, acceptOvercap: true }).strainDamage, 0);
+eq('resolveBuffLoad: splitting a buff cannot dodge the price', _thrice,
+   resolveBuffLoad({ capacity: 326, used: 326, cost: 300, acceptOvercap: true }).strainDamage);
+// A buff that costs nothing is never taxed.
+eq('resolveBuffLoad: a free buff is free',
+   resolveBuffLoad({ capacity: 326, used: 900, cost: 0 }).strainDamage, 0);
 
 if (failures) { console.error(`\n${failures} FAILURES`); process.exit(1); }
 console.log('\nAll pure-function tests pass.');

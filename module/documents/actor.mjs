@@ -2,7 +2,7 @@
 // here: systems/weapon-styles.mjs pulls only from helpers/formulas.mjs, so it
 // cannot create the actor->item cycle the code standards forbid.
 import { proficiencyDamageMult } from '../systems/weapon-styles.mjs';
-import { carriedWeightLb } from '../helpers/formulas.mjs';
+import { carriedWeightLb, buffCapacity, buffCost } from '../helpers/formulas.mjs';
 
 /**
  * Change keys that `prepareDerivedData` consumes BY HAND — every ability, plus
@@ -321,6 +321,28 @@ export class AspectsofPowerActor extends Actor {
       totalEquipRaw: abilityKeys.reduce((sum, k) => sum + systemData.abilities[k].breakdown.equipmentBonusRaw, 0),
       totalEquipCapped: totalEquip,
     };
+
+    // ── Buff capacity (design-healer-system.md phase 6) ──
+    // Derived, never stored: capacity moves with the abilities and usage moves
+    // with the live effect list, so neither can go stale the way a cached
+    // number would. Safe here — ability `value` is final as of the loop above
+    // (the size pass below only touches `mod`).
+    //
+    // ⚠ Usage counts ONLY effects stamped `effectType: 'buff'` by gmApplyBuff.
+    // Titles, blessings and gear all write the same additive stat changes and
+    // are indistinguishable from a buff by shape alone; charging for them would
+    // put every geared PC permanently overcap before any healer acted.
+    if (systemData.buffs) {
+      let buffUsed = 0;
+      for (const e of this.allApplicableEffects()) {
+        if (e.disabled) continue;
+        if (e.system?.effectType !== 'buff') continue;
+        buffUsed += buffCost(e.changes);
+      }
+      systemData.buffs.capacity = buffCapacity(systemData.abilities);
+      systemData.buffs.used = buffUsed;
+      systemData.buffs.remaining = Math.max(0, systemData.buffs.capacity - buffUsed);
+    }
 
     // ── Size Scaling (str/vit mods) ──
     // Detect size tag from collectedTags; default to medium (1.0x).

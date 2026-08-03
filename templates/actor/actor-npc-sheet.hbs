@@ -95,6 +95,22 @@
         </div>
         {{/if}}
 
+        {{!-- Buff capacity — shown once anything is loaded. The toggle is the
+              recipient's even when the recipient is a monster: a GM buffing
+              their own tank should be able to spend its HP for the overflow. --}}
+        {{#if (gt system.buffs.capacity 0)}}
+        <div class="resource flex-group-center resource-buffs">
+          <label class="resource-label">Buffs</label>
+          <div class="resource-content flexrow flex-center flex-between">
+            <span>{{system.buffs.used}} / {{system.buffs.capacity}}</span>
+            <label class="overcap-toggle" title="Accept overcap buffs — they apply in full and the overflow costs HP on apply.">
+              <input type="checkbox" name="system.buffs.acceptOvercap" {{checked system.buffs.acceptOvercap}} />
+              <i class="fas fa-heart-crack"></i>
+            </label>
+          </div>
+        </div>
+        {{/if}}
+
       </div>
       <div class="resources grid grid-7col">
         <div class="resource flex-group-center">

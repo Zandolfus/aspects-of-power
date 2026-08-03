@@ -9,6 +9,7 @@
  * here must stay serializable-payload-in, no instance state.
  */
 import { EquipmentSystem } from './equipment.mjs';
+import { buffCapacity, buffCost, resolveBuffLoad } from '../helpers/formulas.mjs';
 
 export async function executeGmAction(payload) {
     const msgWhisper = payload.whisperGM ? { whisper: payload.whisperGM } : {};
@@ -238,6 +239,85 @@ export async function executeGmAction(payload) {
           e => e.origin === payload.originUuid && e.name === payload.effectName
         );
 
+        // ── BUFF CAPACITY (design-healer-system.md phase 6) ──────────────
+        // The one chokepoint every buff reaches, whatever spawned it: skill,
+        // crafted consumable, chained skill, aura. Enforcing here means a new
+        // buff source cannot forget to be capped.
+        //
+        // ⚠ Usage is recomputed from the effect list rather than read from the
+        // derived `system.buffs.used`. A buff applied moments ago may not have
+        // re-prepared yet, and a stale read here would let a second buff in
+        // free (playbook-live-data-reliability).
+        //
+        // ⚠ A REPLACED effect must not count against its own replacement.
+        // Non-stackable re-casts overwrite `existing`, so its cost leaves the
+        // budget — otherwise re-applying the same buff would measure itself as
+        // competition and truncate to nothing on the second cast.
+        const replacing = (existing && !payload.stackable) ? existing : null;
+        let buffUsed = 0;
+        for (const e of target.effects) {
+          if (e.disabled) continue;
+          if (e.system?.effectType !== 'buff') continue;
+          if (replacing && e.id === replacing.id) continue;
+          buffUsed += buffCost(e.changes);
+        }
+        const buffCap = buffCapacity(target.system?.abilities);
+        const incomingCost = buffCost(payload.changes);
+        const acceptOvercap = target.system?.buffs?.acceptOvercap ?? false;
+        const load = resolveBuffLoad({
+          capacity: buffCap, used: buffUsed, cost: incomingCost, acceptOvercap,
+        });
+
+        // Truncation rescales every entry by the same factor so a multi-stat
+        // buff keeps its shape. Rounded per entry, floored at 0.
+        if (load.truncated && load.scale < 1) {
+          payload.changes = (payload.changes ?? []).map(c => ({
+            ...c,
+            value: Math.max(0, Math.round((Number(c.value) || 0) * load.scale)),
+          }));
+        }
+
+        // Overcap price: flat HP, on apply, once. Paid only by a recipient who
+        // turned the toggle on, so nobody bleeds for a buff they did not want.
+        if (load.strainDamage > 0) {
+          const hp = target.system?.health;
+          if (hp) {
+            await target.update({
+              'system.health.value': Math.max(0, hp.value - load.strainDamage),
+            });
+          }
+        }
+
+        // Report it. A silently halved buff is the failure mode this whole
+        // pillar keeps producing — say what the cap did, every time it acted.
+        if (load.truncated) {
+          const pct = Math.round(load.scale * 100);
+          ChatMessage.create({ speaker: payload.speaker, ...msgWhisper,
+            content: `<p><strong>${target.name}</strong> is near their buff capacity `
+                   + `(${buffUsed}/${buffCap}) — buff truncated to ${pct}% `
+                   + `(${load.applied} of ${incomingCost} points fit).</p>`,
+          });
+        } else if (load.strainDamage > 0) {
+          ChatMessage.create({ speaker: payload.speaker, ...msgWhisper,
+            content: `<p><strong>${target.name}</strong> accepts an overcap buff `
+                   + `(${buffUsed + incomingCost}/${buffCap}) — ${load.excess} points `
+                   + `over, taking <strong>${load.strainDamage}</strong> strain damage.</p>`,
+          });
+        }
+
+        // Nothing fit at all: stop before writing an all-zero effect.
+        if (load.truncated && load.applied <= 0 && !hasSysOverrides) break;
+
+        // The marker the capacity scan keys on. Written on EVERY path — an
+        // unstamped buff is invisible to future capacity checks and leaks the
+        // budget permanently.
+        //
+        // ⚠ Kept out of `sysOverrides` on purpose: `hasSysOverrides` gates the
+        // "weaker re-cast still overwrites" rule below, and stamping into that
+        // object would flip it true for every plain stat buff, letting a weak
+        // refresh overwrite a strong active one.
+        const buffSystem = { ...sysOverrides, effectType: 'buff' };
+
         if (existing && !existing.disabled) {
           if (payload.stackable) {
             // Stackable: merge new values into the existing effect's changes.
@@ -259,7 +339,7 @@ export async function executeGmAction(payload) {
               'duration.startRound': startRound,
               'duration.startTurn': startTurn,
             };
-            if (hasSysOverrides) updateData.system = sysOverrides;
+            updateData.system = buffSystem;
             await existing.update(updateData);
             const mergedTotal = merged.reduce((sum, c) => sum + Number(c.value), 0);
             ChatMessage.create({ speaker: payload.speaker, ...msgWhisper,
@@ -276,7 +356,7 @@ export async function executeGmAction(payload) {
                 'duration.startRound': startRound,
                 'duration.startTurn': startTurn,
               };
-              if (hasSysOverrides) updateData.system = sysOverrides;
+              updateData.system = buffSystem;
               await existing.update(updateData);
               ChatMessage.create({ speaker: payload.speaker, ...msgWhisper,
                 content: `<p>Buff on <strong>${target.name}</strong> ${newTotal > currentTotal ? `upgraded (total +${newTotal}, was +${currentTotal})` : 'refreshed'}.</p>`,
@@ -297,7 +377,7 @@ export async function executeGmAction(payload) {
               'duration.startRound': startRound,
               'duration.startTurn': startTurn,
             };
-            if (hasSysOverrides) updateData.system = sysOverrides;
+            updateData.system = buffSystem;
             await existing.update(updateData);
           } else {
             const createData = {
@@ -309,7 +389,7 @@ export async function executeGmAction(payload) {
               disabled: false,
               changes: payload.changes,
             };
-            if (hasSysOverrides) createData.system = sysOverrides;
+            createData.system = buffSystem;
             await target.createEmbeddedDocuments('ActiveEffect', [createData]);
           }
           const statSummary = payload.changes.map(c => {

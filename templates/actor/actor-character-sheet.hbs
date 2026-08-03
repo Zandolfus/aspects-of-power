@@ -90,6 +90,26 @@
             {{/if}}
           </div>
         </div>
+
+        {{!-- Buff capacity — how much borrowed power this body can carry.
+              The toggle is the RECIPIENT's: on, overcap buffs land whole and
+              cost HP; off, they truncate to whatever room is left. --}}
+        <div class="resource-bar-row resource-buffs {{#unless (gt system.buffs.used 0)}}bar-empty{{/unless}}"
+             data-tooltip="Buff capacity: {{system.buffs.used}} / {{system.buffs.capacity}} stat points of borrowed power. Buffs past this truncate, unless you accept overcap and pay the overflow in HP.">
+          <label class="bar-label">BUF</label>
+          <div class="bar-track">
+            <div class="bar-fill bar-fill-buffs" style="width: {{#if (gt system.buffs.capacity 0)}}{{math system.buffs.used '/' system.buffs.capacity '*' 100}}{{else}}0{{/if}}%"></div>
+          </div>
+          <div class="bar-values">
+            <span>{{system.buffs.used}}</span>
+            <span class="bar-separator">/</span>
+            <span class="bar-max">{{system.buffs.capacity}}</span>
+            <label class="overcap-toggle" title="Accept overcap buffs — they apply in full and the overflow costs HP on apply.">
+              <input type="checkbox" name="system.buffs.acceptOvercap" {{checked system.buffs.acceptOvercap}} />
+              <i class="fas fa-heart-crack"></i>
+            </label>
+          </div>
+        </div>
       </div>
 
       {{!-- ── Defenses + Identity side by side ── --}}

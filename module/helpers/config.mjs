@@ -1244,6 +1244,42 @@ ASPECTSOFPOWER.strain = {
 };
 
 /**
+ * BUFF CAPACITY (design-healer-system.md, healer pillar phase 6).
+ *
+ * One global budget for borrowed power: you can carry buffs worth `fraction`
+ * of the sum of your own nine ability values. Past that, either the buff
+ * truncates or you pay for the overflow in HP — the RECIPIENT chooses, via
+ * `system.buffs.acceptOvercap`.
+ *
+ * ⚠ THE ARCHETYPE SPLIT COMES FROM THE HP POOL, NOT THE CAP. Measured on the
+ * live roster, capacities are remarkably flat — Gabriel 641, Phil 601, John
+ * 594, Willy 577 against Faye 326, Lincoln 359 — while HP spans 203 (Faye) to
+ * 1388 (Phil). So the same overflow costs Faye a third of her life and Phil
+ * a twentieth. That is the whole mechanic: tanks are buff anchors because they
+ * can EAT the overcap, not because they are allowed more of it.
+ *
+ * ⚠ COUNTS ONLY EFFECTS EXPLICITLY STAMPED `effectType: 'buff'`. Inferring
+ * "is this a buff" from the data is impossible — of the 87 live non-equipment
+ * effects that change a stat, the untagged majority are titles, blessings,
+ * untagged gear and debuffs. Counting those would leave every PC permanently
+ * overcap from their own title before a healer casts anything.
+ *
+ * Sized against measured content 2026-08-03: Bloodrage (+99 str) costs 17% of
+ * a cap and is untouched; Dreams of Light (+687 across three stats) is over the
+ * cap of every PC in the game; Barkskin and Bark Brace each eat a full cap
+ * alone. It binds on the outliers and leaves the tuned content alone.
+ */
+ASPECTSOFPOWER.buffCap = {
+  // Capacity = fraction x sum of the nine ability values.
+  fraction: 0.20,
+  // Overcap price, in flat HP per stat point of overflow, on apply.
+  overcapDamageRate: 0.20,
+  // Which change keys cost budget. Abilities AND defence in ONE pool — see
+  // buffCost() in helpers/formulas.mjs for why they share a budget.
+  countedKeyPrefixes: ['system.abilities.', 'system.defense.'],
+};
+
+/**
  * RESOURCE CONVERSION (design-healer-system.md) — healer-only.
  *
  * Rates are SOURCE units per 1 DESTINATION unit, except where the memo marks a
