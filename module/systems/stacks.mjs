@@ -85,6 +85,19 @@ export function getStackCount(actor, pool) {
 }
 
 /**
+ * Damage already paid for, per stack. 0 when the pool banked no payload.
+ *
+ * THE POINT OF THIS: it lets the spender be genuinely free to fire — no mana,
+ * no invest — while still hitting for what the producer's cast bought. The
+ * alternative (the spender rolling its own damage) cannot express "firing is
+ * free except for time", because a zero-invest spell computes zero damage:
+ * `(invested/20) ** 0.2` is 0 at 0.
+ */
+export function getStackPayload(actor, pool) {
+  return Math.max(0, Number(findStackEffect(actor, pool)?.system?.stackPayload) || 0);
+}
+
+/**
  * Add stacks to a pool, creating the carrying effect if absent.
  *
  * ⚠ Returns the new count computed from the PRE-update value rather than
@@ -95,7 +108,7 @@ export function getStackCount(actor, pool) {
  * @returns {Promise<number>} Stacks held after the add.
  */
 export async function addStacks(actor, pool, amount, opts = {}) {
-  const { cap = 0, sourceSkill = '', label = '', img = null, durationRounds = 0 } = opts;
+  const { cap = 0, sourceSkill = '', label = '', img = null, durationRounds = 0, payload = 0 } = opts;
   const add = Math.max(0, Math.floor(Number(amount) || 0));
   if (!actor || !pool || add <= 0) return getStackCount(actor, pool);
 
@@ -105,8 +118,16 @@ export async function addStacks(actor, pool, amount, opts = {}) {
   const after    = Math.min(ceiling, before + add);
   if (after === before) return before;
 
+  const pay = Math.max(0, Number(payload) || 0);
   if (existing) {
-    await existing.update({ 'system.stackCount': after });
+    // Re-conjuring into a partly-spent pool re-prices the WHOLE pool at the
+    // new cast's payload. Averaging the old and new rates would be more
+    // "accurate" and much harder to reason about at the table; a top-up
+    // simply refreshes what the fields are worth.
+    await existing.update({
+      'system.stackCount': after,
+      ...(pay > 0 ? { 'system.stackPayload': pay } : {}),
+    });
   } else {
     await actor.createEmbeddedDocuments('ActiveEffect', [{
       name: label || `${STACK_EFFECT_PREFIX}: ${pool}`,
@@ -114,7 +135,10 @@ export async function addStacks(actor, pool, amount, opts = {}) {
       origin: actor.uuid,
       // 0 = until spent. Producers that want a shelf life pass durationRounds.
       ...(durationRounds > 0 ? { duration: { rounds: durationRounds } } : {}),
-      system: { stackPool: pool, stackCount: after, stackSourceSkill: sourceSkill },
+      system: {
+        stackPool: pool, stackCount: after, stackSourceSkill: sourceSkill,
+        ...(pay > 0 ? { stackPayload: pay } : {}),
+      },
     }]);
   }
   return after;

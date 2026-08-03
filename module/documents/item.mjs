@@ -8,7 +8,7 @@ import { regionTokenOverlap, segmentIntersect } from '../helpers/geometry.mjs';
 import { CraftingSkillsMixin } from '../systems/crafting-skills.mjs';
 import { executeGmAction as executeGmActionImpl } from '../systems/gm-actions.mjs';
 import { proficiencyDamageMult, proficiencyHitMult, heldWeaponWeight, heldImplementWeight } from '../systems/weapon-styles.mjs';
-import { stackDamageMultiplier, spendableRange, getStackCount, addStacks, spendStacks } from '../systems/stacks.mjs';
+import { stackDamageMultiplier, spendableRange, getStackCount, getStackPayload, addStacks, spendStacks } from '../systems/stacks.mjs';
 
 /**
  * Check if an actor is an assigned player character (not just owned).
@@ -157,22 +157,30 @@ export class AspectsofPowerItem extends Item {
    * Producer side: bank this skill's stacks onto the CASTER after a successful
    * cast. No-op for every skill that does not declare `stackProduces`.
    */
-  async _produceStacks(speaker, rollMode) {
+  async _produceStacks(speaker, rollMode, castDamage = 0) {
     const cfg = this.system.tagConfig ?? {};
     if (!cfg.stackPool || !(cfg.stackProduces > 0) || !this.actor) return;
     const before = getStackCount(this.actor, cfg.stackPool);
+    // Bank what this cast was worth, split across the fields it made. The
+    // producer pays the mana and the windup; the spender is free to fire and
+    // simply cashes this in. A producer that rolls no damage banks 0, and its
+    // spenders fall back to scaling their own formula.
+    const payload = cfg.stackProduces > 0 && castDamage > 0
+      ? castDamage / cfg.stackProduces : 0;
     const after = await addStacks(this.actor, cfg.stackPool, cfg.stackProduces, {
       cap: cfg.stackCap ?? 0,
       sourceSkill: this.name,
       label: `${this.name} (${cfg.stackPool})`,
       img: this.img,
+      payload,
     });
     const gained = after - before;
     ChatMessage.create({
       speaker, rollMode,
       content: `<p><em>${this.actor.name} conjures <strong>${gained}</strong> `
              + `${gained === 1 ? 'stack' : 'stacks'} — ${after} held`
-             + `${cfg.stackCap > 0 ? ` / ${cfg.stackCap}` : ''}.`
+             + `${cfg.stackCap > 0 ? ` / ${cfg.stackCap}` : ''}`
+             + `${payload > 0 ? `, worth ${Math.round(payload)} each` : ''}.`
              + `${gained < cfg.stackProduces ? ' Pool is full.' : ''}</em></p>`,
     });
   }
@@ -5661,13 +5669,27 @@ export class AspectsofPowerItem extends Item {
         want = await this._promptStackSpend(_stkCfg.stackPool, min, max, _stkCfg.stackScaling ?? 1);
         if (want == null) return;   // cancelled — nothing spent, no cost paid
       }
+      // Read the banked payload BEFORE spending — spendStacks deletes the
+      // effect when the pool empties, taking the payload with it.
+      const payload = getStackPayload(this.actor, _stkCfg.stackPool);
       stackSpent = await spendStacks(this.actor, _stkCfg.stackPool, want);
       if (stackSpent <= 0) {
         ChatMessage.create({ speaker, rollMode, flavor: label,
           content: `${_stkCfg.stackPool} stacks were spent before this resolved.` });
         return;
       }
-      stackMult = stackDamageMultiplier(stackSpent, _stkCfg.stackScaling ?? 1);
+      if (payload > 0) {
+        // BANKED-PAYLOAD MODE. The producer already paid for this damage, so
+        // the spender REPLACES its own formula rather than scaling it. This is
+        // what lets the hurl be free to fire: a zero-invest spell computes zero
+        // damage, since `(invested/20) ** 0.2` is 0 at 0.
+        // Overriding the formula (not a post-hoc multiplier) keeps the posted
+        // roll, the chat card and the applied damage all the same number.
+        dmgFormula = String(Math.max(1, Math.round(payload * stackSpent)));
+        stackMult = 1;
+      } else {
+        stackMult = stackDamageMultiplier(stackSpent, _stkCfg.stackScaling ?? 1);
+      }
       const _left = getStackCount(this.actor, _stkCfg.stackPool);
       ChatMessage.create({
         speaker, rollMode,
@@ -6076,7 +6098,7 @@ export class AspectsofPowerItem extends Item {
       }
 
       await this._applySustainEffect(speaker);
-      await this._produceStacks(speaker, rollMode);
+      await this._produceStacks(speaker, rollMode, dmgRoll?.total ?? 0);
       return dmgRoll;
     }
 
@@ -6087,7 +6109,7 @@ export class AspectsofPowerItem extends Item {
     // ── STACKS: bank the pool (producer side) ───────────────────────────
     // After the cost is committed, so a cast that could not be paid for
     // conjures nothing.
-    await this._produceStacks(speaker, rollMode);
+    await this._produceStacks(speaker, rollMode, dmgRoll?.total ?? 0);
 
     // ── Legacy behavior for tagless skills ──────────────────────────────
     if (tags.length === 0) {

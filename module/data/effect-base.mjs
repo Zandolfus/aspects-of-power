@@ -155,9 +155,15 @@ export class AopEffectData extends foundry.data.ActiveEffectTypeDataModel {
       //   stackCount       how many remain. The effect is DELETED at 0 rather
       //                    than left sitting empty on the sheet.
       //   stackSourceSkill provenance, for display and debugging.
+      //   stackPayload     damage ALREADY PAID FOR, per stack. The producer's
+      //                    cast damage divided by how many stacks it made, so
+      //                    the spender can be free-to-fire and still hit for
+      //                    what the conjure bought. 0 = the spender rolls its
+      //                    own damage and merely scales it by the spend.
       stackPool:        new fields.StringField({ initial: '' }),
       stackCount:       new fields.NumberField({ initial: 0, min: 0, integer: true }),
       stackSourceSkill: new fields.StringField({ initial: '' }),
+      stackPayload:     new fields.NumberField({ initial: 0, min: 0 }),
 
       // ── Weapon buff (Flameblade etc. — design-spellstriker.md) ──
       // A buff effect with weaponBuffDamage > 0 adds that FLAT amount (typed
