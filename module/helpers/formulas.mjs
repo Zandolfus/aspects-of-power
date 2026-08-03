@@ -140,24 +140,42 @@ export function spellDamageRef(gradeFactor, cfg = null) {
  * SHARED by the invest-dialog preview and the real cast path — they must
  * never drift (8de305b).
  */
-export function spellInvestDamage(intMod, multiplier, invested, ref) {
-  return Math.round(intMod * multiplier * Math.pow(Math.max(invested, 1) / Math.max(ref, 1), 0.2));
+export function spellInvestDamage(intMod, multiplier, invested, ref, cfg = null) {
+  return Math.round(intMod * multiplier
+    * Math.pow(Math.max(invested, 1) / Math.max(ref, 1), investCurve(cfg)));
+}
+
+/**
+ * The invest curve exponent (config `invest.curveExponent`, default 0.2).
+ *
+ * ONE exponent governs every commit-more-for-more in the game — spell damage,
+ * weapon strikes, spellstrike infusion, and healing once unified. Read from
+ * config rather than inlined so the whole economy can be simmed as a unit;
+ * the fallback MUST match the config value (a stale fallback silently changes
+ * behaviour when the key is renamed — CHANNEL_FACTOR was 1000 vs config 3000).
+ */
+export function investCurve(cfg = null) {
+  const sc = cfg ?? (globalThis.CONFIG?.ASPECTSOFPOWER ?? {});
+  const v = Number(sc.invest?.curveExponent);
+  return Number.isFinite(v) && v > 0 ? v : 0.2;
 }
 
 /**
  * Invest-scaled weapon strike damage: blend × mult × windup × (stam/base)^0.2.
  * Preview passes windup 1 (the dialog shows pre-windup numbers today).
  */
-export function strikeInvestDamage(statBlend, multiplier, windup, invested, baseStamina) {
-  return Math.round(statBlend * multiplier * windup * Math.pow(Math.max(invested, 1) / Math.max(baseStamina, 1), 0.2));
+export function strikeInvestDamage(statBlend, multiplier, windup, invested, baseStamina, cfg = null) {
+  return Math.round(statBlend * multiplier * windup
+    * Math.pow(Math.max(invested, 1) / Math.max(baseStamina, 1), investCurve(cfg)));
 }
 
 /**
  * Spellstrike fusion infusion: int × coef × (mana/ref)^0.2 (dac55a5 —
  * wis-capped upstream; ref = spellDamageRef, NOT the skill's own baseMana).
  */
-export function infusionDamage(intMod, coef, manaInvested, ref) {
-  return Math.round(intMod * coef * Math.pow(Math.max(manaInvested, 1) / Math.max(ref, 1), 0.2));
+export function infusionDamage(intMod, coef, manaInvested, ref, cfg = null) {
+  return Math.round(intMod * coef
+    * Math.pow(Math.max(manaInvested, 1) / Math.max(ref, 1), investCurve(cfg)));
 }
 
 /**

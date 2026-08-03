@@ -11,7 +11,7 @@
 import {
   houseHitFormula, hybridAbilityMod, weaponStatBlend, spellDamageRef,
   spellInvestDamage, strikeInvestDamage, infusionDamage, investSelfDamage,
-  spellCastWeight, spellWindupMultiplier,
+  spellCastWeight, spellWindupMultiplier, investCurve,
   effectiveDodgeValue, splitEvenlyWithRemainder, perceiveGateDecision, activityTicks, nextCompletionDelta,
   proficiencyMultiplier, proficiencyHitMultiplier, parryMassMultiplier, lunarPhaseMultiplier, dotTickDamage, procStaminaCost, riderDamageBase,
   crushFlatAmount, riderMaxInvest, itemWeightLb, KG_TO_LB, carriedWeightLb,
@@ -815,6 +815,26 @@ eq('spread: six targets at 1 each collapses to the 3-target cap',
    spread([1, 1, 1, 1, 1, 1], 6, 6).length, 3);
 eq('spread: four targets cannot coexist at budget 6',
    spread([1, 1, 1, 1], 6, 5).length, 3);
+
+/* ── THE INVEST CURVE (config invest.curveExponent) ────────────────────── */
+// One exponent behind every commit-more-for-more in the game. Shipped at 0.2;
+// these pin BOTH that the default is unchanged and that the knob works, so a
+// whole-economy sim can be run without forking the formula.
+const C05 = { invest: { curveExponent: 0.5 } };
+const C02 = { invest: { curveExponent: 0.2 } };
+eq('curve: default is 0.2', investCurve({}), 0.2);
+eq('curve: config drives it', investCurve(C05), 0.5);
+eq('curve: a broken value falls back rather than zeroing damage', investCurve({ invest: { curveExponent: 0 } }), 0.2);
+// Explicit 0.2 must equal the shipped default exactly — this is the off-switch.
+eq('curve: explicit 0.2 == shipped default (strike)',
+   strikeInvestDamage(500, 1, 2, 160, 20, C02), strikeInvestDamage(500, 1, 2, 160, 20));
+eq('curve: explicit 0.2 == shipped default (spell)',
+   spellInvestDamage(500, 1, 160, 20, C02), spellInvestDamage(500, 1, 160, 20));
+// 8x the commitment: 1.52x at 0.2, 2.83x at sqrt.
+eq('curve: 0.2 gives 8x invest -> 1.52x', strikeInvestDamage(1000, 1, 1, 160, 20, C02), 1516);
+eq('curve: sqrt gives 8x invest -> 2.83x', strikeInvestDamage(1000, 1, 1, 160, 20, C05), 2828);
+eq('curve: one unit of invest is unchanged by the curve',
+   strikeInvestDamage(1000, 1, 1, 20, 20, C05), strikeInvestDamage(1000, 1, 1, 20, 20, C02));
 
 if (failures) { console.error(`\n${failures} FAILURES`); process.exit(1); }
 console.log('\nAll pure-function tests pass.');

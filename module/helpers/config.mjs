@@ -279,6 +279,20 @@ ASPECTSOFPOWER.invest = {
   toughCapFactor:     0.02,
   staminaBaseDivisor: 20,
   staminaNormalizer:  1085,
+  // THE INVEST CURVE — one exponent behind every "commit more resource for a
+  // bigger result" in the game: spell damage, weapon strikes, spellstrike
+  // infusion, and (once unified) healing.
+  //
+  // 0.2 is deliberately flat: committing 4x the resource buys 1.32x the
+  // result, so dumping a pool is inefficient and there is no alpha strike.
+  // The cost of that flatness is that the invest DIAL barely exists —
+  // measured on healing, doubling the commitment buys +15%, which no player
+  // would ever choose.
+  //
+  // ⚠ Raising this is a whole-game change, not a tuning nudge. At 0.5 (sqrt)
+  // the same 4x commitment buys 2x. Sim before touching it — the caps
+  // (wis/tough) do more to prevent alpha strikes than the exponent does.
+  curveExponent: 0.2,
 };
 
 /**
