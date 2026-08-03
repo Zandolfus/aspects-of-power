@@ -4980,9 +4980,17 @@ export class AspectsofPowerItem extends Item {
       && (_stkSpender.stackCost ?? 0) > 0
       && getStackPayload(this.actor, _stkSpender.stackPool) > 0;
 
+    // A stack PRODUCER is priced exactly like an attack spell — same invest
+    // dialog, same tier/grade/windup damage formula — it just banks the result
+    // instead of throwing it at someone. Without this it would need the
+    // `attack` tag to reach the invest branch, and would then try to attack a
+    // target it does not have; falling back to the legacy formula instead
+    // would bank a payload with no windup and no rarity.
+    const _isStackProducer = !!_stkSpender.stackPool && (_stkSpender.stackProduces ?? 0) > 0;
+
     const isVariableSpell = ['mana', 'health'].includes(rollData.roll.resource)
       && spellTier && spellGrade
-      && tags.includes('attack')
+      && (tags.includes('attack') || _isStackProducer)
       && !_isPayloadSpender;
 
     const isVariableWeapon = rollData.roll.resource === 'stamina'
