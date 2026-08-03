@@ -37,6 +37,12 @@
   const AA  = sc.armorAnswer ?? {};
   const dt  = sc.defenseTuning ?? {};
 
+  // ⚠ REFUSE TO GUESS: without the cfg-aware strikeInvestDamage every curve
+  // scenario silently returns shipped-0.2 numbers.
+  if (typeof F.investCurve !== 'function') {
+    return 'ABORT: this build has no F.investCurve - pull b0a6cef first.';
+  }
+
   const CFG = {
     // Curves to compare. 0.2 = the shipped economy; 0.5 = the memo's sqrt.
     curves: window.__healCurves ?? [0.2, 0.5],
@@ -79,10 +85,18 @@
     }
   }
 
-  /** Unified heal: blend x rarity x windup x (invested/ref)^curve. */
+  /**
+   * Unified heal — literally the damage function, with a healing blend.
+   *
+   * THIS IS WHAT "UNIFY HEALERS" MEANS: healing stops being a hand-authored
+   * dice string and goes through `strikeInvestDamage` like every strike and
+   * spell, so tier (via windup), rarity and invest all apply. Calling the
+   * shipped function rather than mirroring it is the whole point — a mirror
+   * is how the last five wrong answers happened.
+   */
   const healAmount = (blend, mult, windup, invested, ref, curve) =>
-    Math.round(blend * mult * windup
-      * Math.pow(Math.max(invested, 1) / Math.max(ref, 1), curve));
+    F.strikeInvestDamage(blend, mult, windup, invested, ref,
+      { invest: { curveExponent: curve } });
 
   /* ---------- who heals, who hits ---------- */
   const healers = game.actors.filter(a => a.items.some(i => i.type === 'skill'
