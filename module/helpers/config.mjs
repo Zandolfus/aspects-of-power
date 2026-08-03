@@ -1244,6 +1244,23 @@ ASPECTSOFPOWER.strain = {
 };
 
 /**
+ * AURAS (design-healer-system.md — the chanter's range envelope).
+ *
+ * Radius = authored radius x (1 + Per.mod / perceptionDivisor). See
+ * `auraRadiusFor` in helpers/formulas.mjs for why this is multiplicative on
+ * the authored base rather than the memo's flat `Per_mod x range_factor`.
+ *
+ * ⚠ 1000 IS THE KNOB THAT KEEPS AURAS A POSITIONING DECISION. Measured against
+ * real party spacing 2026-08-03 (median ally pair 9-35 ft on combat maps), it
+ * puts a 20 ft aura at 20 ft for a novice and 41 ft for the highest-perception
+ * character in the world — always covering the huddle, never the battlefield.
+ * Dropping it toward 100 makes auras map-wide for the current main cast.
+ */
+ASPECTSOFPOWER.auras = {
+  perceptionDivisor: 1000,
+};
+
+/**
  * BUFF CAPACITY (design-healer-system.md, healer pillar phase 6).
  *
  * One global budget for borrowed power: you can carry buffs worth `fraction`

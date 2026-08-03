@@ -1,6 +1,6 @@
 import { EquipmentSystem } from '../systems/equipment.mjs';
 import { getPositionalTags } from '../helpers/positioning.mjs';
-import { houseHitFormula, hybridAbilityMod, weaponStatBlend, healStatBlend, spellDamageRef, spellInvestDamage, spellWindupMultiplier, spellCastWeight, strikeInvestDamage, infusionDamage, investSelfDamage as computeInvestSelfDamage, effectiveDodgeValue, splitEvenlyWithRemainder, parryMassMultiplier, bracedParryWeight, bracedMaxUsefulInvest, defenceMarginMultiplier, lunarPhaseMultiplier, dotTickDamage, procStaminaCost, crushFlatAmount, riderMaxInvest } from '../helpers/formulas.mjs';
+import { houseHitFormula, hybridAbilityMod, weaponStatBlend, healStatBlend, spellDamageRef, spellInvestDamage, spellWindupMultiplier, spellCastWeight, strikeInvestDamage, infusionDamage, investSelfDamage as computeInvestSelfDamage, effectiveDodgeValue, splitEvenlyWithRemainder, parryMassMultiplier, bracedParryWeight, bracedMaxUsefulInvest, defenceMarginMultiplier, lunarPhaseMultiplier, dotTickDamage, procStaminaCost, crushFlatAmount, riderMaxInvest, auraRadiusFor } from '../helpers/formulas.mjs';
 import { recordActionFired, declareAction, isInActiveCombat, computeActionWait, referenceRoundLength, computeWindupMultiplier, getScrambleStacks, addScrambleStack, applyDodgeCost, findCombatantForActor, perceiveGate } from '../systems/celerity.mjs';
 import { getThreatRadiusFt, actorIsDashing } from '../systems/engagement-halts.mjs';
 import { selectTargetOnCanvas, selectTargetsOnCanvas, skillNeedsTargetPrompt, skillTargetsAtFire, selectMarkerOnCanvas } from '../canvas/target-prompt.mjs';
@@ -3409,7 +3409,12 @@ export class AspectsofPowerItem extends Item {
     //   'heal'   → gmApplyRestoration (health by default, configurable)
     //   'stam'   → gmApplyRestoration with stamina
     // Also fires on entry via the movement-hook trigger.
-    const auraRadius = tc.auraRadius ?? 0;
+    // Radius is the AUTHORED number stretched by the caster's perception, and
+    // like auraAmount it is frozen onto the effect at apply time — the field is
+    // as wide as the caster who made it, and stays that wide if they are later
+    // buffed or blinded. See auraRadiusFor for why this is multiplicative.
+    const auraRadius = auraRadiusFor(tc.auraRadius,
+      this.actor?.system?.abilities?.perception?.mod ?? 0);
     if (auraRadius > 0) {
       const auraScale = tc.auraScale ?? 0.3;
       const amount = Math.max(0, Math.round(rollTotal * auraScale));

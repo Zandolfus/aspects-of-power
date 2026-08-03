@@ -16,7 +16,7 @@ import {
   proficiencyMultiplier, proficiencyHitMultiplier, parryMassMultiplier, lunarPhaseMultiplier, dotTickDamage, procStaminaCost, riderDamageBase,
   crushFlatAmount, riderMaxInvest, itemWeightLb, KG_TO_LB, carriedWeightLb,
   bracedParryWeight, bracedMaxUsefulInvest, defenceMarginMultiplier,
-  buffCapacity, buffCost, resolveBuffLoad,
+  buffCapacity, buffCost, resolveBuffLoad, auraRadiusFor,
 } from '../module/helpers/formulas.mjs';
 import { moonState, moonNodeAngle, nextSyzygy, eclipseAtSyzygy, planetStates,
          meteorShowersOn, cometStates, julianDay, civilDate, worldTimeForDate } from '../module/systems/calendar.mjs';
@@ -916,6 +916,38 @@ eq('convert: five small casts cost the same as one big one',
 eq('convert: nothing spent is nothing gained', convertResources(0, 5, 201, 'stamina', CONVCFG).gained, 0);
 eq('convert: too little to buy one unit yields nothing',
    convertResources(4, 5, 201, 'stamina', CONVCFG).gained, 0);
+
+// ── Aura radius (the chanter's range envelope) ────────────────────────────
+// GOLDEN: the two live auras and the real perception spread, read 2026-08-03.
+// Mana Attraction is authored 20 ft on John (per.mod 463); Storm Stride 10 ft
+// on Gabriel (per.mod 497). Roster perception runs 15 (Kevin) to 1029 (Frieda).
+eq('aura: Mana Attraction on John', auraRadiusFor(20, 463), 29);
+eq('aura: Storm Stride on Gabriel', auraRadiusFor(10, 497), 15);
+eq('aura: a novice gets the authored radius', auraRadiusFor(20, 15), 20);
+eq('aura: the highest perception in the world', auraRadiusFor(20, 1029), 41);
+// ⚠ THE AUTHORED RADIUS IS A FLOOR — this is what a pure `per x factor` form
+// gets wrong, handing low-perception characters a useless one-foot aura.
+eq('aura: zero perception still gets the authored radius', auraRadiusFor(20, 0), 20);
+// ⚠ SKILL IDENTITY SURVIVES AT EVERY LEVEL. Storm Stride's deliberately tight
+// field stays exactly half Mana Attraction's, which the additive form
+// (base + per/10) collapses to 60 vs 66 ft at these same perceptions.
+eq('aura: the 2:1 design ratio holds at low perception',
+   auraRadiusFor(20, 100) / auraRadiusFor(10, 100), 2);
+// At the top end it is 2:1 up to WHOLE-FOOT ROUNDING (40.58 -> 41, 20.29 -> 20),
+// which reads as 2.05. The ratio is exact before rounding; the additive form
+// drifts to 1.1:1 for real, not by a rounding step.
+eq('aura: and at the highest perception in the world',
+   Math.abs(auraRadiusFor(20, 1029) / auraRadiusFor(10, 1029) - 2) < 0.1, true);
+// Measured party clustering: median ally spacing is 9-35 ft on the combat maps
+// and 50-95 ft on the sprawling ones. A 20 ft aura must cover the huddle at
+// every level without ever covering a spread formation.
+eq('aura: covers the tight huddle even for a novice', auraRadiusFor(20, 15) >= 15, true);
+eq('aura: never reaches a spread formation, even at 1029',
+   auraRadiusFor(20, 1029) < 88, true);
+// No aura stays no aura — the radius is also the on/off switch.
+eq('aura: no authored radius is no aura', auraRadiusFor(0, 1029), 0);
+eq('aura: the divisor is a knob',
+   auraRadiusFor(20, 1000, { auras: { perceptionDivisor: 100 } }), 220);
 
 // ── Buff capacity (healer pillar phase 6) ─────────────────────────────────
 // GOLDEN: ability values and buff amounts read off the live world 2026-08-03.

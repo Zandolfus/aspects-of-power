@@ -17,7 +17,7 @@
  *   A.activityDialog(actor);                            // pick one
  */
 
-import { activityTicks } from '../helpers/formulas.mjs';
+import { activityTicks, auraRadiusFor } from '../helpers/formulas.mjs';
 import { ticksToMs, formatTicksAsTime } from './celerity.mjs';
 
 /**
@@ -165,7 +165,10 @@ export function meditationAuraBonusFor(actor) {
       if (sk.type !== 'skill') continue;
       const c = sk.system?.tagConfig ?? {};
       const bonus = Number(c.meditationAuraBonus) || 0;
-      const radiusFt = Number(c.auraRadius) || 0;
+      // Perception stretches the authored radius — the SOURCE's perception,
+      // not the meditator's. Whose field it is decides how far it reaches.
+      const radiusFt = auraRadiusFor(c.auraRadius,
+        src.system?.abilities?.perception?.mod ?? 0);
       if (bonus <= 0 || radiusFt <= 0) continue;
       const them = centreOf(tokenDoc);
       const dist = Math.hypot(me.x - them.x, me.y - them.y);

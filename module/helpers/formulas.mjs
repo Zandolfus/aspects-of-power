@@ -813,6 +813,44 @@ export function riderMaxInvest(baseCost, pool, mult = null) {
   return Math.max(baseCost, Math.min(Math.max(0, pool), Math.floor(baseCost * m)));
 }
 
+/**
+ * Aura radius in feet: the skill's authored radius STRETCHED by perception.
+ *
+ * ⚠ MULTIPLICATIVE ON THE AUTHORED BASE, not the memo's `Per_mod x factor`.
+ * A pure product has no base term, so it would pass perception's full 68x
+ * roster spread (per.mod 15 to 1029) straight through and hand low-level
+ * characters a one-foot aura. Every other range in this game has a floor —
+ * `castingRange` is `40 + per.mod/10` for exactly this reason.
+ *
+ * ⚠ AND NOT ADDITIVE EITHER, which is the tempting move because it mirrors
+ * castingRange. Measured against real party clustering (median ally spacing
+ * 9-35 ft on the combat maps, 50-95 ft on the sprawling ones), an additive
+ * `base + per.mod/10` reaches 69 ft at the CURRENT main cast's perception
+ * (John 463, Willy 494, Gabriel 497, Phil 514) — a 138 ft bubble that covers a
+ * whole 200x150 map, so the aura stops being a positioning decision at the
+ * level the party is already at. Worse, the flat term swamps the authored
+ * number: Storm Stride's deliberately tight 10 ft and Mana Attraction's 20 ft
+ * converge to 60 and 66, collapsing a 2:1 identity to 1.1:1.
+ *
+ * Multiplicative keeps that ratio at 2:1 at every perception, makes the
+ * authored radius a FLOOR rather than a rounding error, and spans a modest ~2x
+ * across the whole roster (20 ft to 41 ft on a 20 ft aura).
+ *
+ * @param {number} authoredRadius  tagConfig.auraRadius, in feet. 0 = no aura.
+ * @param {number} perMod          Caster's perception mod.
+ * @param {object} [cfg]           CONFIG override (tests)
+ * @returns {number} Radius in feet, rounded. 0 stays 0.
+ */
+export function auraRadiusFor(authoredRadius, perMod, cfg = null) {
+  const sc = cfg ?? (globalThis.CONFIG?.ASPECTSOFPOWER ?? {});
+  const base = Math.max(0, Number(authoredRadius) || 0);
+  if (base <= 0) return 0;
+  const d = Number(sc.auras?.perceptionDivisor);
+  const div = Number.isFinite(d) && d > 0 ? d : 1000;
+  const per = Math.max(0, Number(perMod) || 0);
+  return Math.round(base * (1 + per / div));
+}
+
 /* ------------------------------------------------------------------ */
 /*  Buff capacity (design-healer-system.md, healer pillar phase 6)      */
 /* ------------------------------------------------------------------ */
