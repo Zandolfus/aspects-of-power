@@ -9,7 +9,7 @@
  * here must stay serializable-payload-in, no instance state.
  */
 import { EquipmentSystem } from './equipment.mjs';
-import { buffCapacity, buffCost, resolveBuffLoad } from '../helpers/formulas.mjs';
+import { buffCapacity, buffCost, buffAbilityCost, resolveBuffLoad } from '../helpers/formulas.mjs';
 
 export async function executeGmAction(payload) {
     const msgWhisper = payload.whisperGM ? { whisper: payload.whisperGM } : {};
@@ -255,13 +255,22 @@ export async function executeGmAction(payload) {
         // competition and truncate to nothing on the second cast.
         const replacing = (existing && !payload.stackable) ? existing : null;
         let buffUsed = 0;
+        // Ability-only half, tracked separately: capacity is sized off ability
+        // values, so a live buff's ability points must come back out of that
+        // sum or the cap grows to admit the very buff it is measuring.
+        // ⚠ The REPLACED effect is excluded from buffUsed but NOT from the
+        // loan - its points are still in the ability values being read right
+        // now, so leaving them in would inflate the capacity it is checked
+        // against.
+        let buffAbilityLoan = 0;
         for (const e of target.effects) {
           if (e.disabled) continue;
           if (e.system?.effectType !== 'buff') continue;
+          buffAbilityLoan += buffAbilityCost(e.changes);
           if (replacing && e.id === replacing.id) continue;
           buffUsed += buffCost(e.changes);
         }
-        const buffCap = buffCapacity(target.system?.abilities);
+        const buffCap = buffCapacity(target.system?.abilities, buffAbilityLoan);
         const incomingCost = buffCost(payload.changes);
         const acceptOvercap = target.system?.buffs?.acceptOvercap ?? false;
         const load = resolveBuffLoad({

@@ -2,7 +2,7 @@
 // here: systems/weapon-styles.mjs pulls only from helpers/formulas.mjs, so it
 // cannot create the actor->item cycle the code standards forbid.
 import { proficiencyDamageMult } from '../systems/weapon-styles.mjs';
-import { carriedWeightLb, buffCapacity, buffCost } from '../helpers/formulas.mjs';
+import { carriedWeightLb, buffCapacity, buffCost, buffAbilityCost } from '../helpers/formulas.mjs';
 
 /**
  * Change keys that `prepareDerivedData` consumes BY HAND — every ability, plus
@@ -334,12 +334,17 @@ export class AspectsofPowerActor extends Actor {
     // put every geared PC permanently overcap before any healer acted.
     if (systemData.buffs) {
       let buffUsed = 0;
+      // Tracked separately because capacity is sized off ability values, so
+      // only the ability half of a live buff is "on loan" from that sum. A
+      // buff's armour points never entered it and must not be taken back out.
+      let buffAbilityLoan = 0;
       for (const e of this.allApplicableEffects()) {
         if (e.disabled) continue;
         if (e.system?.effectType !== 'buff') continue;
         buffUsed += buffCost(e.changes);
+        buffAbilityLoan += buffAbilityCost(e.changes);
       }
-      systemData.buffs.capacity = buffCapacity(systemData.abilities);
+      systemData.buffs.capacity = buffCapacity(systemData.abilities, buffAbilityLoan);
       systemData.buffs.used = buffUsed;
       systemData.buffs.remaining = Math.max(0, systemData.buffs.capacity - buffUsed);
     }

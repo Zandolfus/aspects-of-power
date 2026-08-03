@@ -16,7 +16,7 @@ import {
   proficiencyMultiplier, proficiencyHitMultiplier, parryMassMultiplier, lunarPhaseMultiplier, dotTickDamage, procStaminaCost, riderDamageBase,
   crushFlatAmount, riderMaxInvest, itemWeightLb, KG_TO_LB, carriedWeightLb,
   bracedParryWeight, bracedMaxUsefulInvest, defenceMarginMultiplier,
-  buffCapacity, buffCost, resolveBuffLoad, auraRadiusFor,
+  buffCapacity, buffCost, buffAbilityCost, resolveBuffLoad, auraRadiusFor,
 } from '../module/helpers/formulas.mjs';
 import { moonState, moonNodeAngle, nextSyzygy, eclipseAtSyzygy, planetStates,
          meteorShowersOn, cometStates, julianDay, civilDate, worldTimeForDate } from '../module/systems/calendar.mjs';
@@ -958,18 +958,26 @@ eq('buffCapacity Gabriel (3204)', buffCapacity(mkAbil(3204)), 641);
 eq('buffCapacity Faye (1631)', buffCapacity(mkAbil(1631)), 326);
 eq('buffCapacity: no abilities is no capacity', buffCapacity(null), 0);
 // ⚠⚠ THE CAP MUST NOT MOVE WHEN YOU BUFF THE BODY. Buffs are written into
-// ability values, so a capacity read off `.value` grows with every buff it
-// admits — live-measured, a 326-point buff took Faye from 326 to 391. When a
-// breakdown is present the cap is sized off calculated + gear only.
-const _buffed = {
-  a: { value: 1957, breakdown: { calculated: 1400, equipmentCapped: 231 } },
-};
-eq('buffCapacity ignores the buffs already loaded', buffCapacity(_buffed), 326);
-eq('buffCapacity: gear counts toward capacity',
-   buffCapacity({ a: { value: 0, breakdown: { calculated: 1000, equipmentCapped: 500 } } }), 300);
+// ability values, so a capacity read off the raw sum grows with every buff it
+// admits — live-measured, a 326-point buff took Faye's sum 1631 -> 1957 and her
+// capacity 326 -> 391. Subtracting the ability points on loan pins it.
+eq('buffCapacity ignores the buffs already loaded',
+   buffCapacity(mkAbil(1957), 326), 326);
+eq('buffCapacity is stable under repeated buffing',
+   buffCapacity(mkAbil(1631 + 500), 500), buffCapacity(mkAbil(1631), 0));
+// ⚠ Only the ABILITY half comes back out. A buff's armour points never entered
+// the ability sum, so subtracting them would shrink the cap for free.
+eq('buffAbilityCost splits abilities from defence',
+   buffAbilityCost([{ key: 'system.abilities.strength.value', value: 200 },
+                    { key: 'system.defense.armor.value',      value: 582 }]), 200);
+// Blessings, titles and effect-applied gear are permanent identity and DO
+// raise what you can carry — this is what sizing off breakdown.calculated got
+// wrong, reading Faye at 302 against a true 326.
+eq('buffCapacity counts everything that is not a buff',
+   buffCapacity(mkAbil(1631), 0), 326);
 // The fraction is a knob, not a constant.
 eq('buffCapacity honours config fraction',
-   buffCapacity(mkAbil(1000), { buffCap: { fraction: 0.5 } }), 500);
+   buffCapacity(mkAbil(1000), 0, { buffCap: { fraction: 0.5 } }), 500);
 
 // Willy's Dreams of Light Lunar (Ally): int +243, wil +229, wis +215.
 const DREAMS = [
