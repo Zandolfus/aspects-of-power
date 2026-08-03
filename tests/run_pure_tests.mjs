@@ -22,6 +22,13 @@ import { moonState, moonNodeAngle, nextSyzygy, eclipseAtSyzygy, planetStates,
 import { resolveDamage, durabilityDamage, applyMarkBonus } from '../module/systems/damage.mjs';
 import { stackDamageMultiplier, spendableRange, clampSpread, maxSingleTargetFields } from '../module/systems/stacks.mjs';
 
+// ⚠ GOLDEN DAMAGE VALUES BELOW WERE MEASURED AT INVEST CURVE 0.2, from live
+// chat cards. They are pinned to that curve EXPLICITLY (CURVE_02) so they stay
+// true statements about the formula after the shipped config moves. Without the
+// pin they would keep passing via the 0.2 fallback while no longer describing
+// the live game - a green suite asserting history.
+const CURVE_02 = { invest: { curveExponent: 0.2 } };
+
 const CFG = {
   meleeBlend: { strFloor: 0.30, slope: 0.70, weightOffset: 40, weightSpan: 180 },
   rangedBlend: { perFloor: 0.05, slope: 0.55, weightOffset: 50, weightSpan: 200 },
@@ -61,17 +68,17 @@ eq('hybrid 70/30', hybridAbilityMod(abilities, { abilities: 'intelligence', stat
 eq('spellDamageRef E', spellDamageRef(10, CFG), 20);
 
 // Infusion â€” live-verified dac55a5 re-fire: Aiden int759 coef0.7 32 mana ref20 â†’ 584.
-eq('infusion Aiden 32', infusionDamage(759, 0.7, 32, 20), 584);
+eq('infusion Aiden 32', infusionDamage(759, 0.7, 32, 20, CURVE_02), 584);
 // Pre-fix reproduction: coef 1, 120 mana vs own-base 20 â†’ 1086 (the original live fire).
-eq('infusion legacy repro', infusionDamage(759, 1.0, 120, 20), 1086);
+eq('infusion legacy repro', infusionDamage(759, 1.0, 120, 20, CURVE_02), 1086);
 
 // Strike invest â€” live-verified Cross Wind strike: blend321 Ã—0.9 mult Ã—1.0 windup, 9 stam / 1 base â†’ 448.
-eq('strike Aiden CW', strikeInvestDamage(321, 0.9, 1.0, 9, 1), 448);
+eq('strike Aiden CW', strikeInvestDamage(321, 0.9, 1.0, 9, 1, CURVE_02), 448);
 
 // Spell invest â€” live-verified spell-tier fix ladder (int759, mult 0.5 inferiorâ€¦ use exact ladder):
 // From 65f8a42 verify: basic 584 at safe invest. basic: tierBase 20, wisCap 20+238Ã—0.05â‰ˆ32 â†’ int759Ã—multÃ—(32/20)^0.2.
 // With mult chosen so result 584: 584 = 759Ã—mÃ—1.0985 â†’ mâ‰ˆ0.7005 â†’ uncommon 0.7. Check:
-eq('spell basic uncommon', spellInvestDamage(759, 0.7, 32, 20), 584);
+eq('spell basic uncommon', spellInvestDamage(759, 0.7, 32, 20, CURVE_02), 584);
 
 // Self-damage: linear past safe ceiling. Aiden CW test fire: blend321, 9 invested, base 1, safe 4 â†’ excess 4 â†’ 321Ã—(4/4)=321 (live: 321 self-damage).
 eq('selfDamage Aiden CW', investSelfDamage(321, 9, 1, 4), 321);

@@ -292,7 +292,22 @@ ASPECTSOFPOWER.invest = {
   // ⚠ Raising this is a whole-game change, not a tuning nudge. At 0.5 (sqrt)
   // the same 4x commitment buys 2x. Sim before touching it — the caps
   // (wis/tough) do more to prevent alpha strikes than the exponent does.
-  curveExponent: 0.2,
+  //
+  // RULED 0.5 (sqrt) on 2026-08-03, simmed first. At 0.2 the invest dial was
+  // decorative: doubling a commitment bought +15%, so nobody would ever spend
+  // above base and the slider may as well not exist. At 0.5 it buys +41%, paid
+  // for in sustain — a real decision every round.
+  //
+  // Measured game-wide on the [SIM] testbed, invest at the legal cap: median
+  // 4.2 → 3.1 rounds, immunity 35% → 25%, sub-2-round matchups UNCHANGED at 3,
+  // no shutouts. It widens expression without moving the floor.
+  //
+  // ⚠ THE CAPS ARE WHAT MAKE THIS SAFE, not the exponent. Uncapped, sqrt gives
+  // 0.7-round medians and 15 of 20 matchups under the floor — but so does 0.2,
+  // at 2.0 rounds. See design-invest-curve-and-caps.md before loosening any
+  // invest cap, and note that the channel-time brake does NOT bite on spells
+  // that are already slow.
+  curveExponent: 0.5,
 };
 
 /**
