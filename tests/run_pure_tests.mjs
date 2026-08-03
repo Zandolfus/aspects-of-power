@@ -877,6 +877,19 @@ eq('unified heal == strikeInvestDamage with a healing blend',
      { invest: { curveExponent: 0.5 } }),
    Math.round(584 * 1.5 * Math.SQRT2));
 
+// THE HEALING COEFFICIENT rides the RARITY multiplier, not the blend. RULED
+// 2026-08-03: a basic heal should be about a THIRD of an average same-level
+// health bar. Calibrated live against average PC health 670 -> target 223.
+// Common rarity 0.6, staff basic windup 2.7, typical healer blend 524:
+eq('heal coefficient: common basic with a staff is ~1/3 of a 670 bar',
+   strikeInvestDamage(524, 0.6 * 0.25, 2.7, 20, 20, { invest: { curveExponent: 0.5 } }), 212);
+// The ladder: high ~1.5x basic, greater ~2.5x. Greater is nearly a full bar,
+// which is what an 80-mana long cast should buy.
+eq('heal coefficient: greater is ~2.5x basic',
+   Math.round(strikeInvestDamage(524, 0.6 * 0.25, 3.4, 80, 20, { invest: { curveExponent: 0.5 } })
+            / strikeInvestDamage(524, 0.6 * 0.25, 2.7, 20, 20, { invest: { curveExponent: 0.5 } }) * 10) / 10,
+   2.5);
+
 if (failures) { console.error(`\n${failures} FAILURES`); process.exit(1); }
 console.log('\nAll pure-function tests pass.');
 

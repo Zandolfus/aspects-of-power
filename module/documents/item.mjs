@@ -5386,7 +5386,13 @@ export class AspectsofPowerItem extends Item {
         const _potency = _isHeal
           ? healStatBlend(this.actor.system.abilities, rollData.roll.resource)
           : intMod;
-        dmgFormula = String(strikeInvestDamage(_potency, multiplier, _spellWindup, effectiveInvested, spellDmgRef));
+        // The healing coefficient rides the RARITY multiplier rather than the
+        // blend: the blend answers "who heals well", the coefficient answers
+        // "how much is a heal worth". Keeping them separate means retuning heal
+        // size never disturbs which stats a healer wants.
+        const _healCoef = _isHeal ? (sc.healing?.coefficient ?? 1) : 1;
+        dmgFormula = String(strikeInvestDamage(_potency, multiplier * _healCoef,
+          _spellWindup, effectiveInvested, spellDmgRef));
       }
 
       // Hand off to the AOE block below: store the pre-placed template +

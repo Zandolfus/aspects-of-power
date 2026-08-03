@@ -744,6 +744,22 @@ ASPECTSOFPOWER.healing = {
     health:  { primary: 'vitality', pw: 0.6, secondary: 'wisdom',       sw: 0.4 },
     stamina: { primary: 'wisdom',   pw: 0.6, secondary: 'strength',     sw: 0.4 },
   },
+  // POTENCY COEFFICIENT — the single dial for "how big is a heal".
+  //
+  // RULED 2026-08-03: a BASIC heal should restore about a THIRD of an average
+  // same-level health bar. Without this, healing inherited the damage economy's
+  // raw scale and a basic heal was a full bar or more — every heal an undo
+  // button rather than attrition management.
+  //
+  // Calibrated live: average PC health 670 → target 223. A common-rarity basic
+  // heal, staff in hand (windup 2.7), typical healer blend 524:
+  //   524 x 0.6 x 2.7 x 0.25 = 212
+  // Measured across the four real healers, basic lands 197-355 (median 249,
+  // 29-53% of a bar); high ~1.5x that, greater ~2.5x.
+  //
+  // ⚠ Retune this, not the blends — the blends define WHO heals well, this
+  // defines how much healing is worth. They are separate questions.
+  coefficient: 0.25,
   // Vitality mode: the caster may never drop below this fraction of max HP.
   // Their own health IS the cap — there is no separate ceiling stat.
   selfFloorFrac: 0.25,
