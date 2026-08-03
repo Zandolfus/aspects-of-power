@@ -4969,9 +4969,21 @@ export class AspectsofPowerItem extends Item {
     // RARITY was ignored entirely (Mathilda's rare Blood Drain out-damaged by
     // her common Blood Bolt, because only Drain reached this path). Substrate
     // for vitality healers, who spend their own life as the casting cost.
+    // ⚠ A stack spender in BANKED-PAYLOAD mode is not variable-invest at all:
+    // its damage was priced by the producer, so investing mana into it would
+    // buy nothing. Without this it would open an invest dialog, charge the
+    // caster, and change no number — and "firing is free except for time" is
+    // an explicit ruling. Its tier still drives cast SPEED; only the damage
+    // and the cost come from the pool.
+    const _stkSpender = this.system.tagConfig ?? {};
+    const _isPayloadSpender = !!_stkSpender.stackPool
+      && (_stkSpender.stackCost ?? 0) > 0
+      && getStackPayload(this.actor, _stkSpender.stackPool) > 0;
+
     const isVariableSpell = ['mana', 'health'].includes(rollData.roll.resource)
       && spellTier && spellGrade
-      && tags.includes('attack');
+      && tags.includes('attack')
+      && !_isPayloadSpender;
 
     const isVariableWeapon = rollData.roll.resource === 'stamina'
       && tags.includes('attack')
