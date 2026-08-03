@@ -73,6 +73,64 @@ export function spendableRange(available, cost, maxSpend = 0) {
   return { min, max: Math.max(min, capped) };
 }
 
+/**
+ * Clamp a per-target field assignment to what the pool and the spread budget
+ * actually allow. PURE — golden-tested.
+ *
+ * THE SPREAD RULE (Dreams of Light, user 2026-08-03): one action throws F
+ * fields across T targets subject to **F + T <= budget**. At budget 6 that is
+ * 5-at-one, 4-at-two, 3-at-three, 2-at-four, 1-at-five — every row one action.
+ * Spreading buys reach and pays in throughput, which is what makes it a real
+ * choice rather than a strictly-worse option.
+ *
+ * Over-budget assignments are trimmed one field at a time from the LARGEST
+ * remaining pile, so the loss is shared rather than falling entirely on
+ * whoever the player listed last. A pile trimmed to zero stops being a target,
+ * which frees budget of its own — that is why this iterates instead of solving
+ * in closed form.
+ *
+ * @param {Array<{id: string, fields: number}>} wanted
+ * @param {number} budget  F + T ceiling. 0/absent = single-target only.
+ * @param {number} pool    Stacks actually held.
+ * @returns {Array<{id: string, fields: number}>} Legal assignment, zeros dropped.
+ */
+export function clampSpread(wanted, budget, pool) {
+  let list = (wanted ?? [])
+    .map(w => ({ id: w.id, fields: Math.max(0, Math.floor(Number(w.fields) || 0)) }))
+    .filter(w => w.fields > 0);
+  if (!list.length) return [];
+
+  const held = Math.max(0, Math.floor(Number(pool) || 0));
+  const cap  = budget > 0 ? Math.floor(budget) : Infinity;
+
+  const total = () => list.reduce((s, w) => s + w.fields, 0);
+  // Never spend more than is held, regardless of budget.
+  while (total() > held && list.length) {
+    const big = list.reduce((a, b) => (b.fields > a.fields ? b : a));
+    big.fields -= 1;
+    list = list.filter(w => w.fields > 0);
+  }
+  // Then honour F + T <= budget.
+  while (list.length && total() + list.length > cap) {
+    const big = list.reduce((a, b) => (b.fields > a.fields ? b : a));
+    big.fields -= 1;
+    list = list.filter(w => w.fields > 0);
+  }
+  return list;
+}
+
+/**
+ * Most fields spendable on ONE target given the budget (T = 1). PURE.
+ * At budget 6 this is 5 — the skill description's "max use of 5 fields per
+ * action on single target" falls out of the same rule rather than being a
+ * separate constant.
+ */
+export function maxSingleTargetFields(budget, pool) {
+  const held = Math.max(0, Math.floor(Number(pool) || 0));
+  if (!(budget > 0)) return held;
+  return Math.max(0, Math.min(held, Math.floor(budget) - 1));
+}
+
 /** The live stack effect for a pool, or null. */
 export function findStackEffect(actor, pool) {
   if (!actor || !pool) return null;

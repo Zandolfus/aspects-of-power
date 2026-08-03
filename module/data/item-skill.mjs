@@ -340,6 +340,13 @@ export class SkillData extends foundry.abstract.TypeDataModel {
         stackMaxSpend: new fields.NumberField({ initial: 0, min: 0, integer: true }),
         stackCap:      new fields.NumberField({ initial: 0, min: 0, integer: true }),
         stackScaling:  new fields.NumberField({ initial: 1.0, min: 0 }),
+        // MULTI-TARGET SPREAD. One activation throws F fields across T targets
+        // subject to F + T <= stackSpreadBudget. At 6: 5-at-one, 4-at-two,
+        // 3-at-three, 2-at-four, 1-at-five — all for the same single action.
+        // Spreading buys reach and pays in throughput.
+        // 0 (default) = single-target only, so every existing skill is
+        // unaffected and the old one-target-per-throw behaviour is preserved.
+        stackSpreadBudget: new fields.NumberField({ initial: 0, min: 0, integer: true }),
 
         // ── Phase E: buff-carries-reaction config ──
         // When an Active `buff`-tagged skill applies its buff, propagate

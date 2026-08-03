@@ -8,7 +8,7 @@ import { regionTokenOverlap, segmentIntersect } from '../helpers/geometry.mjs';
 import { CraftingSkillsMixin } from '../systems/crafting-skills.mjs';
 import { executeGmAction as executeGmActionImpl } from '../systems/gm-actions.mjs';
 import { proficiencyDamageMult, proficiencyHitMult, heldWeaponWeight, heldImplementWeight } from '../systems/weapon-styles.mjs';
-import { stackDamageMultiplier, spendableRange, getStackCount, getStackPayload, addStacks, spendStacks } from '../systems/stacks.mjs';
+import { stackDamageMultiplier, spendableRange, clampSpread, getStackCount, getStackPayload, addStacks, spendStacks } from '../systems/stacks.mjs';
 
 /**
  * Check if an actor is an assigned player character (not just owned).
@@ -145,6 +145,58 @@ export class AspectsofPowerItem extends Item {
           callback: (event, button) => {
             const val = parseInt(button.form.elements.stackSpend?.value, 10);
             return Math.min(Math.max(min, val || min), max);
+          },
+        },
+        { action: 'cancel', label: 'Cancel', callback: () => null },
+      ],
+      close: () => null,
+    });
+  }
+
+  /**
+   * Prompt for how many fields to throw at EACH targeted token.
+   *
+   * One number per target, because the player assigns freely — 3-and-1 across
+   * two targets is a different tactical choice from 2-and-2 (finish one, chip
+   * the other) and the rule has no reason to forbid it.
+   *
+   * Over-budget entries are trimmed by `clampSpread` rather than rejected, so a
+   * mis-typed number costs a field instead of the whole action.
+   *
+   * @returns {Promise<Array<{id,name,fields}>|null>} Assignment, or null if cancelled.
+   */
+  async _promptStackSpread(pool, held, budget, targets, payload) {
+    const rows = targets.map(t => `<div class="form-group">
+        <label>${t.name}</label>
+        <input type="number" name="tgt_${t.id}" value="0" min="0" max="${held}" step="1" />
+      </div>`).join('');
+    // Only feasible rows: every target needs at least one field, so F >= T,
+    // and F + T <= budget then caps targets at floor(budget / 2). At budget 6
+    // that is 5-at-one, 4-at-two, 3-at-three — and no fourth target, ever.
+    const ladder = [];
+    for (let tt = 1; tt <= Math.floor(budget / 2); tt++) {
+      ladder.push(`${budget - tt} at ${tt}`);
+    }
+    return foundry.applications.api.DialogV2.wait({
+      window: { title: `${this.name} — Throw Fields` },
+      content: `<p><strong>${held}</strong> held${payload > 0 ? `, ${Math.round(payload)} damage each` : ''}.</p>
+        ${rows}
+        <p class="hint">Fields + targets must not exceed ${budget} — ${ladder.join(', ')}.
+        Over-budget assignments are trimmed from the largest pile.</p>`,
+      buttons: [
+        {
+          action: 'confirm',
+          label: 'Throw',
+          default: true,
+          callback: (event, button) => {
+            const wanted = targets.map(t => ({
+              id: t.id,
+              fields: parseInt(button.form.elements[`tgt_${t.id}`]?.value, 10) || 0,
+            }));
+            const legal = clampSpread(wanted, budget, held);
+            return legal.length
+              ? legal.map(l => ({ ...l, name: targets.find(t => t.id === l.id)?.name ?? '?' }))
+              : null;
           },
         },
         { action: 'cancel', label: 'Cancel', callback: () => null },
@@ -5674,6 +5726,8 @@ export class AspectsofPowerItem extends Item {
     // minutes of real table time.
     let stackMult = 1;
     let stackSpent = 0;
+    let stackSpread = null;   // [{id, name, fields}] when split across targets
+    let stackPayloadEach = 0;
     const _stkCfg = this.system.tagConfig ?? {};
     if (_stkCfg.stackPool && (_stkCfg.stackCost ?? 0) > 0) {
       const held = getStackCount(this.actor, _stkCfg.stackPool);
@@ -5683,9 +5737,27 @@ export class AspectsofPowerItem extends Item {
           content: `Not enough ${_stkCfg.stackPool} stacks (need ${min}, have ${held}).` });
         return;
       }
-      // Only ask when there is a real choice to make.
+      // SPREAD MODE: one activation may split fields across several targets,
+      // subject to fields + targets <= stackSpreadBudget. Single-target is just
+      // the T=1 row of the same rule, so both go through this prompt when a
+      // budget is configured.
+      const _budget = _stkCfg.stackSpreadBudget ?? 0;
+      const _payloadPreview = getStackPayload(this.actor, _stkCfg.stackPool);
       let want = min;
-      if (max > min) {
+      if (_budget > 0) {
+        const tgts = [...game.user.targets];
+        if (!tgts.length) {
+          ui.notifications.warn(`${this.name}: pick at least one target.`);
+          return;
+        }
+        const assigned = await this._promptStackSpread(
+          _stkCfg.stackPool, held, _budget,
+          tgts.map(t => ({ id: t.id, name: t.actor?.name ?? t.name })), _payloadPreview);
+        if (!assigned?.length) return;   // cancelled or nothing assigned
+        stackSpread = assigned;
+        want = assigned.reduce((s, a) => s + a.fields, 0);
+      } else if (max > min) {
+        // Only ask when there is a real choice to make.
         want = await this._promptStackSpend(_stkCfg.stackPool, min, max, _stkCfg.stackScaling ?? 1);
         if (want == null) return;   // cancelled — nothing spent, no cost paid
       }
@@ -5705,7 +5777,11 @@ export class AspectsofPowerItem extends Item {
         // damage, since `(invested/20) ** 0.2` is 0 at 0.
         // Overriding the formula (not a post-hoc multiplier) keeps the posted
         // roll, the chat card and the applied damage all the same number.
-        dmgFormula = String(Math.max(1, Math.round(payload * stackSpent)));
+        stackPayloadEach = payload;
+        // On a spread, this formula is only the FIRST target's share; the
+        // dispatch loop re-rolls per target from stackPayloadEach.
+        const _first = stackSpread?.length ? stackSpread[0].fields : stackSpent;
+        dmgFormula = String(Math.max(1, Math.round(payload * _first)));
         stackMult = 1;
       } else {
         stackMult = stackDamageMultiplier(stackSpent, _stkCfg.stackScaling ?? 1);
@@ -5715,6 +5791,9 @@ export class AspectsofPowerItem extends Item {
         speaker, rollMode,
         content: `<p><em>${this.actor.name} spends <strong>${stackSpent}</strong> `
                + `${stackSpent === 1 ? 'stack' : 'stacks'} on ${this.name}`
+               + `${stackSpread?.length > 1
+                    ? ` — ${stackSpread.map(a => `${a.fields} at ${a.name}`).join(', ')}`
+                    : ''}`
                + `${stackMult !== 1 ? ` — x${Math.round(stackMult * 100) / 100} effect` : ''}`
                + ` (${_left} remaining).</em></p>`,
       });
@@ -6176,8 +6255,25 @@ export class AspectsofPowerItem extends Item {
     for (const tag of orderedTags) {
       switch (tag) {
         case 'attack': {
+          // SPREAD: resolve each target separately with its own share of the
+          // fields. The to-hit roll is SHARED across targets, matching how the
+          // AOE dispatch already treats a multi-target attack — one action, one
+          // swing of intent, many landing points.
+          if (stackSpread?.length > 1) {
+            for (const asg of stackSpread) {
+              const tok = canvas.tokens.get(asg.id);
+              if (!tok) continue;
+              const share = Math.max(1, Math.round(stackPayloadEach * asg.fields));
+              const shareRoll = await new Roll(String(share)).evaluate();
+              const result = await this._handleAttackTag(item, rollData, hitRoll, shareRoll,
+                speaker, rollMode, `${label} — ${asg.fields} at ${asg.name}`, tok, 1, { stackMult: 1 });
+              if (result) hitResults.set(asg.id, result);
+            }
+            break;
+          }
+          const soleTarget = stackSpread?.length === 1 ? canvas.tokens.get(stackSpread[0].id) : null;
           const result = await this._handleAttackTag(item, rollData, hitRoll, dmgRoll, speaker, rollMode, label,
-            null, 1, { stackMult });
+            soleTarget, 1, { stackMult });
           if (result) hitResults.set(null, result);
           break;
         }

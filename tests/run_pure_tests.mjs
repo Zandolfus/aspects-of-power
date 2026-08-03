@@ -20,7 +20,7 @@ import {
 import { moonState, moonNodeAngle, nextSyzygy, eclipseAtSyzygy, planetStates,
          meteorShowersOn, cometStates, julianDay, civilDate, worldTimeForDate } from '../module/systems/calendar.mjs';
 import { resolveDamage, durabilityDamage, applyMarkBonus } from '../module/systems/damage.mjs';
-import { stackDamageMultiplier, spendableRange } from '../module/systems/stacks.mjs';
+import { stackDamageMultiplier, spendableRange, clampSpread, maxSingleTargetFields } from '../module/systems/stacks.mjs';
 
 const CFG = {
   meleeBlend: { strFloor: 0.30, slope: 0.70, weightOffset: 40, weightSpan: 180 },
@@ -784,6 +784,37 @@ eq('stacks: no maxSpend means spend everything', spendableRange(5, 1, 0).max, 5)
 eq('stacks: maxSpend caps the activation', spendableRange(5, 1, 3).max, 3);
 eq('stacks: maxSpend below cost still allows the cost', spendableRange(5, 2, 1).max, 2);
 eq('stacks: exactly enough is spendable', spendableRange(3, 3, 0).max, 3);
+
+/* ── STACK SPREAD: fields + targets <= budget (user 2026-08-03) ─────────── */
+// The whole ladder Willy described, at budget 6. Every row is ONE action.
+const spread = (pairs, budget = 6, pool = 5) =>
+  clampSpread(pairs.map((f, i) => ({ id: `t${i}`, fields: f })), budget, pool)
+    .map(a => a.fields);
+eq('spread: 5 at one target', JSON.stringify(spread([5])), '[5]');
+eq('spread: 4 across two', JSON.stringify(spread([2, 2])), '[2,2]');
+eq('spread: 3 across three', JSON.stringify(spread([1, 1, 1])), '[1,1,1]');
+eq('spread: uneven 3-and-1 across two is legal', JSON.stringify(spread([3, 1])), '[3,1]');
+// "max use of 5 fields per action on single target" falls out of the rule
+// rather than being a separate constant.
+eq('spread: single-target max is budget-1', maxSingleTargetFields(6, 99), 5);
+eq('spread: single-target max is capped by the pool', maxSingleTargetFields(6, 3), 3);
+eq('spread: no budget means the pool is the only limit', maxSingleTargetFields(0, 4), 4);
+// Over-budget trims from the LARGEST pile, so the loss is shared.
+eq('spread: 5-and-1 is 7 over a 6 budget, trims to 3-and-1',
+   JSON.stringify(spread([5, 1])), '[3,1]');
+eq('spread: 4 across three is 7, trims to 1 each', JSON.stringify(spread([2, 1, 1])), '[1,1,1]');
+eq('spread: 3-3 across two trims to 4 total', JSON.stringify(spread([3, 3])), '[2,2]');
+// The pool is a harder limit than the budget.
+eq('spread: cannot spend more than held', JSON.stringify(spread([5], 6, 2)), '[2]');
+eq('spread: empty assignment stays empty', JSON.stringify(spread([0, 0])), '[]');
+// ⚠ THE LADDER CAPS AT THREE TARGETS, and nobody had to decide that — every
+// target needs at least one field, so F >= T, and F + T <= 6 then forces
+// T <= 3. A fourth target would need F >= 4 with only 2 fields of budget left.
+// That is exactly the three cases described: 5-at-one, 4-at-two, 3-at-three.
+eq('spread: six targets at 1 each collapses to the 3-target cap',
+   spread([1, 1, 1, 1, 1, 1], 6, 6).length, 3);
+eq('spread: four targets cannot coexist at budget 6',
+   spread([1, 1, 1, 1], 6, 5).length, 3);
 
 if (failures) { console.error(`\n${failures} FAILURES`); process.exit(1); }
 console.log('\nAll pure-function tests pass.');
