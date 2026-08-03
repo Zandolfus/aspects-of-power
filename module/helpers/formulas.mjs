@@ -871,6 +871,21 @@ export function auraRadiusFor(authoredRadius, perMod, cfg = null) {
  * `mod ~ value^0.8`, a buff worth +20% of your values is only about +15.7% of
  * your power, so the cap is slightly tighter in practice than it reads.
  *
+ * ⚠⚠ MEASURED FROM THE UNBUFFED BODY, via `breakdown.calculated +
+ * equipmentCapped` rather than the final `.value`. Buffs are written INTO
+ * ability values, so sizing the cap off `.value` makes it self-referential:
+ * live-measured 2026-08-03, a 326-point buff raised Faye's ability sum from
+ * 1631 to 1957 and her capacity from 326 to 391, meaning buffing someone
+ * increased how much they could be buffed. It converges rather than running
+ * away (to `frac/(1-frac)` = 25% of base instead of 20%), but a cap that moves
+ * when you push on it is not a cap.
+ *
+ * `calculated` already carries titles, blessings and passives — permanent
+ * identity — and `equipmentCapped` carries gear, which is chosen and already
+ * capped at 30%/20% elsewhere. What it excludes is exactly the loose
+ * ActiveEffect layer that buffs live in. Falls back to `.value` when there is
+ * no breakdown (pure tests, pre-derivation).
+ *
  * @param {object} abilities  actor.system.abilities (all nine)
  * @param {object} [cfg]      CONFIG override (tests)
  * @returns {number} Capacity in stat points.
@@ -880,7 +895,12 @@ export function buffCapacity(abilities, cfg = null) {
   const f = Number(sc.buffCap?.fraction);
   const frac = Number.isFinite(f) && f > 0 ? f : 0.20;
   let sum = 0;
-  for (const a of Object.values(abilities ?? {})) sum += Number(a?.value) || 0;
+  for (const a of Object.values(abilities ?? {})) {
+    const b = a?.breakdown;
+    sum += b
+      ? (Number(b.calculated) || 0) + (Number(b.equipmentCapped) || 0)
+      : (Number(a?.value) || 0);
+  }
   return Math.round(sum * frac);
 }
 

@@ -957,6 +957,16 @@ const mkAbil = (sum) => ({ a: { value: sum } });   // capacity only reads values
 eq('buffCapacity Gabriel (3204)', buffCapacity(mkAbil(3204)), 641);
 eq('buffCapacity Faye (1631)', buffCapacity(mkAbil(1631)), 326);
 eq('buffCapacity: no abilities is no capacity', buffCapacity(null), 0);
+// ⚠⚠ THE CAP MUST NOT MOVE WHEN YOU BUFF THE BODY. Buffs are written into
+// ability values, so a capacity read off `.value` grows with every buff it
+// admits — live-measured, a 326-point buff took Faye from 326 to 391. When a
+// breakdown is present the cap is sized off calculated + gear only.
+const _buffed = {
+  a: { value: 1957, breakdown: { calculated: 1400, equipmentCapped: 231 } },
+};
+eq('buffCapacity ignores the buffs already loaded', buffCapacity(_buffed), 326);
+eq('buffCapacity: gear counts toward capacity',
+   buffCapacity({ a: { value: 0, breakdown: { calculated: 1000, equipmentCapped: 500 } } }), 300);
 // The fraction is a knob, not a constant.
 eq('buffCapacity honours config fraction',
    buffCapacity(mkAbil(1000), { buffCap: { fraction: 0.5 } }), 500);
