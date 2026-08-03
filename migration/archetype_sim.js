@@ -332,7 +332,15 @@
   }
 
   const defenders = actors.map(profileDefender);
-  const roundLen = CEL.referenceRoundLength(actors[0].system.attributes?.race?.level ?? 1);
+  // ⚠ The reference round is the unit EVERY reported figure is divided by, so
+  // it must not depend on which actor happens to sort first. It spans 20x
+  // across a mixed-level roster (RL0 = 83333 ticks, RL24 = 10563, RL64 = 4066),
+  // and taking actors[0] silently rescales the whole report — on the full PC
+  // roster that is Aaron at RL0, which would have made every kill look like a
+  // rounding error. Use the roster MEDIAN and report it.
+  const _rls = actors.map(a => a.system.attributes?.race?.level ?? 1).sort((a, b) => a - b);
+  const refRL = _rls[Math.floor(_rls.length / 2)];
+  const roundLen = CEL.referenceRoundLength(refRL);
 
   function runOnce(SC) {
     const skills = [];
@@ -471,9 +479,11 @@
       await game.actors.getName(n).update({ 'system.activeLoadout': v });
     }
   }
-  window.__archetypeSim = { runs, defenders, roundLen, cfg: CFG, loadoutRestore };
+  window.__archetypeSim = { runs, defenders, roundLen, refRL, raceLevels: _rls, cfg: CFG, loadoutRestore };
   for (const r of runs) { console.log(`mode=${r.mode}`); console.table(r.grid); console.table(r.duels); }
-  return JSON.stringify({ roundLengthTicks: roundLen, loadoutsSwitchedAndRestored: loadoutRestore,
+  return JSON.stringify({ roundLengthTicks: roundLen, referenceRaceLevel: refRL,
+    raceLevelSpread: `${_rls[0]}..${_rls[_rls.length - 1]}`,
+    loadoutsSwitchedAndRestored: loadoutRestore,
     runs: runs.map(r => ({ mode: r.mode, summary: r.summary, grid: r.grid,
       duels: r.duels, spellSkills: r.spellSkills })) }, null, 1);
 })()
