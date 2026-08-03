@@ -8,6 +8,7 @@ import { regionTokenOverlap, segmentIntersect } from '../helpers/geometry.mjs';
 import { CraftingSkillsMixin } from '../systems/crafting-skills.mjs';
 import { executeGmAction as executeGmActionImpl } from '../systems/gm-actions.mjs';
 import { proficiencyDamageMult, proficiencyHitMult, heldWeaponWeight, heldImplementWeight } from '../systems/weapon-styles.mjs';
+import { stackDamageMultiplier, spendableRange, getStackCount, addStacks, spendStacks } from '../systems/stacks.mjs';
 
 /**
  * Check if an actor is an assigned player character (not just owned).
@@ -109,6 +110,70 @@ export class AspectsofPowerItem extends Item {
         { action: 'cancel', label: 'Cancel', callback: () => null },
       ],
       close: () => null,
+    });
+  }
+
+  /**
+   * Prompt for how many stacks to commit to this activation.
+   *
+   * Shows the resulting multiplier live so the player is choosing a payoff, not
+   * a number. Via DialogV2.wait so one stub drives it headlessly, per the
+   * standard every dialog in this system follows.
+   *
+   * @returns {Promise<number|null>} Stacks to spend, or null if cancelled.
+   */
+  async _promptStackSpend(pool, min, max, scaling = 1) {
+    const rows = [];
+    for (let n = min; n <= max; n++) {
+      const m = stackDamageMultiplier(n, scaling);
+      rows.push(`<option value="${n}"${n === max ? ' selected' : ''}>`
+        + `${n} — x${Math.round(m * 100) / 100} effect</option>`);
+    }
+    return foundry.applications.api.DialogV2.wait({
+      window: { title: `${this.name} — Spend Stacks` },
+      content: `<div class="form-group">
+          <label>Stacks to spend (${min}-${max} held):</label>
+          <select name="stackSpend" autofocus>${rows.join('')}</select>
+        </div>
+        <p class="hint">Pool: ${pool}. Spreading across targets and dumping into
+        one are both valid — they trade breadth for burst, not efficiency.</p>`,
+      buttons: [
+        {
+          action: 'confirm',
+          label: 'Spend',
+          default: true,
+          callback: (event, button) => {
+            const val = parseInt(button.form.elements.stackSpend?.value, 10);
+            return Math.min(Math.max(min, val || min), max);
+          },
+        },
+        { action: 'cancel', label: 'Cancel', callback: () => null },
+      ],
+      close: () => null,
+    });
+  }
+
+  /**
+   * Producer side: bank this skill's stacks onto the CASTER after a successful
+   * cast. No-op for every skill that does not declare `stackProduces`.
+   */
+  async _produceStacks(speaker, rollMode) {
+    const cfg = this.system.tagConfig ?? {};
+    if (!cfg.stackPool || !(cfg.stackProduces > 0) || !this.actor) return;
+    const before = getStackCount(this.actor, cfg.stackPool);
+    const after = await addStacks(this.actor, cfg.stackPool, cfg.stackProduces, {
+      cap: cfg.stackCap ?? 0,
+      sourceSkill: this.name,
+      label: `${this.name} (${cfg.stackPool})`,
+      img: this.img,
+    });
+    const gained = after - before;
+    ChatMessage.create({
+      speaker, rollMode,
+      content: `<p><em>${this.actor.name} conjures <strong>${gained}</strong> `
+             + `${gained === 1 ? 'stack' : 'stacks'} — ${after} held`
+             + `${cfg.stackCap > 0 ? ` / ${cfg.stackCap}` : ''}.`
+             + `${gained < cfg.stackProduces ? ' Pool is full.' : ''}</em></p>`,
     });
   }
 
@@ -1443,7 +1508,10 @@ export class AspectsofPowerItem extends Item {
     // that re-resolves + double-applies when clicked, per 2026-07-15 test) nor
     // re-fire retaliations/guardian reactions. Damage still passes through the
     // target's passive mitigation (armor/veil/toughness) downstream.
-    const { skipDefense = false } = opts;
+    // stackMult: a stack SPENDER's payoff, resolved once per activation in
+    // roll() and threaded in — NOT recomputed here, because this method runs
+    // once PER TARGET on an AOE and the pool must only be charged once.
+    const { skipDefense = false, stackMult = 1 } = opts;
     const whisperGM = !_isPlayerCharacter(this.actor) ? ChatMessage.getWhisperRecipients('GM') : undefined;
     let targetToken    = targetTokenOverride ?? game.user.targets.first() ?? null;
     let targetActor    = targetToken?.actor ?? null;
@@ -1789,7 +1857,9 @@ export class AspectsofPowerItem extends Item {
     const fracClamped = Math.max(0, Math.min(1, aoeFraction ?? 1));
     // markDmgMult: a mark CONSUMER's payoff (1 when this skill is not one, or
     // the target carries no mark of this attacker's).
-    const rawDmg = Math.max(0, Math.round(dmgRoll.total * fracClamped * markDmgMult));
+    // stackMult: a stack SPENDER's payoff — `spent ** stackScaling`, 1 when
+    // this skill spends no stacks.
+    const rawDmg = Math.max(0, Math.round(dmgRoll.total * fracClamped * markDmgMult * stackMult));
     // ⚠ ORDERING (RULED 2026-07-31): the defence multiplier is NO LONGER
     // applied here. Under the margin rule, multiplying before the flat
     // armour/DR subtraction makes a good defence plus any wall reach zero —
@@ -4660,6 +4730,21 @@ export class AspectsofPowerItem extends Item {
         return;
       }
 
+      // Stacks: a spender with an empty pool cannot fire at all. Checked HERE,
+      // beside the other cannot-act gates, so the player is never walked
+      // through target selection and an invest dialog for a cast that was
+      // never going to resolve. The actual spend happens on the fire path.
+      const _stkGate = this.system.tagConfig ?? {};
+      if (_stkGate.stackPool && (_stkGate.stackCost ?? 0) > 0) {
+        const _held = getStackCount(this.actor, _stkGate.stackPool);
+        if (_held < _stkGate.stackCost) {
+          ui.notifications.warn(
+            `${this.name}: needs ${_stkGate.stackCost} ${_stkGate.stackPool} `
+            + `${_stkGate.stackCost === 1 ? 'stack' : 'stacks'}, ${this.actor.name} has ${_held}.`);
+          return;
+        }
+      }
+
       // Blind blocks skills that require sight.
       if (_hasDebuff('blind') && this.system.requiresSight) {
         // Blind doesn't fully block — it reduces to-hit. Mark for later.
@@ -5553,6 +5638,46 @@ export class AspectsofPowerItem extends Item {
       return declared;
     }
 
+    // ── STACKS: spend the pool (systems/stacks.mjs) ─────────────────────
+    // Fire path only — the declare branch returned above, so a queued cast
+    // banks nothing and spends nothing until it actually resolves.
+    // Re-checked live rather than trusting the declare-time gate: the pool can
+    // empty between declare and fire, which under celerity is seconds to
+    // minutes of real table time.
+    let stackMult = 1;
+    let stackSpent = 0;
+    const _stkCfg = this.system.tagConfig ?? {};
+    if (_stkCfg.stackPool && (_stkCfg.stackCost ?? 0) > 0) {
+      const held = getStackCount(this.actor, _stkCfg.stackPool);
+      const { min, max } = spendableRange(held, _stkCfg.stackCost, _stkCfg.stackMaxSpend);
+      if (max < min) {
+        ChatMessage.create({ speaker, rollMode, flavor: label,
+          content: `Not enough ${_stkCfg.stackPool} stacks (need ${min}, have ${held}).` });
+        return;
+      }
+      // Only ask when there is a real choice to make.
+      let want = min;
+      if (max > min) {
+        want = await this._promptStackSpend(_stkCfg.stackPool, min, max, _stkCfg.stackScaling ?? 1);
+        if (want == null) return;   // cancelled — nothing spent, no cost paid
+      }
+      stackSpent = await spendStacks(this.actor, _stkCfg.stackPool, want);
+      if (stackSpent <= 0) {
+        ChatMessage.create({ speaker, rollMode, flavor: label,
+          content: `${_stkCfg.stackPool} stacks were spent before this resolved.` });
+        return;
+      }
+      stackMult = stackDamageMultiplier(stackSpent, _stkCfg.stackScaling ?? 1);
+      const _left = getStackCount(this.actor, _stkCfg.stackPool);
+      ChatMessage.create({
+        speaker, rollMode,
+        content: `<p><em>${this.actor.name} spends <strong>${stackSpent}</strong> `
+               + `${stackSpent === 1 ? 'stack' : 'stacks'} on ${this.name}`
+               + `${stackMult !== 1 ? ` — x${Math.round(stackMult * 100) / 100} effect` : ''}`
+               + ` (${_left} remaining).</em></p>`,
+      });
+    }
+
     // Not enough resource → warn and abort.
     // Read live so a state change between formula-build and now (e.g. mana
     // drained while the variable-invest dialog was open) is caught.
@@ -5951,12 +6076,18 @@ export class AspectsofPowerItem extends Item {
       }
 
       await this._applySustainEffect(speaker);
+      await this._produceStacks(speaker, rollMode);
       return dmgRoll;
     }
 
     // ── Deduct resource cost (non-AOE) ──────────────────────────────────
     // Barrier skills defer cost until after the target accepts.
     await _commitCastCost();
+
+    // ── STACKS: bank the pool (producer side) ───────────────────────────
+    // After the cost is committed, so a cast that could not be paid for
+    // conjures nothing.
+    await this._produceStacks(speaker, rollMode);
 
     // ── Legacy behavior for tagless skills ──────────────────────────────
     if (tags.length === 0) {
@@ -6003,7 +6134,8 @@ export class AspectsofPowerItem extends Item {
     for (const tag of orderedTags) {
       switch (tag) {
         case 'attack': {
-          const result = await this._handleAttackTag(item, rollData, hitRoll, dmgRoll, speaker, rollMode, label);
+          const result = await this._handleAttackTag(item, rollData, hitRoll, dmgRoll, speaker, rollMode, label,
+            null, 1, { stackMult });
           if (result) hitResults.set(null, result);
           break;
         }

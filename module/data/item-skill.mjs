@@ -319,6 +319,28 @@ export class SkillData extends foundry.abstract.TypeDataModel {
         markedDamageMult: new fields.NumberField({ initial: 1.0, min: 0 }),
         consumesMark:     new fields.BooleanField({ initial: false }),
 
+        // ── STACKS (design-stacks-subsystem.md, RULED 2026-08-02) ─────────
+        // A self-held charge pool on the CASTER. One skill produces into a
+        // named pool; others spend from it. Both sides carry `stackPool`;
+        // that string is the only thing binding them.
+        //   stackProduces  a cast creates this many              (producer)
+        //   stackCost      minimum spent per activation          (spender)
+        //   stackMaxSpend  ceiling on one activation, 0 = all it has
+        //   stackCap       pool maximum the producer will fill to
+        //   stackScaling   EXPONENT on the spend, not a per-stack factor:
+        //                  multiplier = spent ** stackScaling. 1.0 = linear
+        //                  (RULED — spreading is a choice, not an efficiency
+        //                  question, so dump and spread must not compete on
+        //                  damage). Spending one stack is 1x at every value.
+        // A skill with stackProduces > 0 AND stackCost > 0 is legal: it both
+        // banks and spends.
+        stackPool:     new fields.StringField({ initial: '' }),
+        stackProduces: new fields.NumberField({ initial: 0, min: 0, integer: true }),
+        stackCost:     new fields.NumberField({ initial: 0, min: 0, integer: true }),
+        stackMaxSpend: new fields.NumberField({ initial: 0, min: 0, integer: true }),
+        stackCap:      new fields.NumberField({ initial: 0, min: 0, integer: true }),
+        stackScaling:  new fields.NumberField({ initial: 1.0, min: 0 }),
+
         // ── Phase E: buff-carries-reaction config ──
         // When an Active `buff`-tagged skill applies its buff, propagate
         // these onto the spawned effect's `system.reaction*` fields so

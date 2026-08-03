@@ -146,6 +146,19 @@ export class AopEffectData extends foundry.data.ActiveEffectTypeDataModel {
       markedAttackMultiplier:  new fields.NumberField({ initial: 0, min: 0 }),
       markedExpiresOnHit:      new fields.BooleanField({ initial: false }),
 
+      // ── Stacks subsystem (systems/stacks.mjs) ──
+      // A self-held charge pool: "conjure N now, spend 1..N later". Unlike a
+      // mark, this effect lives on the PRODUCER, not the target — which is
+      // exactly why marks could not be reused for it.
+      //   stackPool        pool id, e.g. 'dreams-of-light'. Producers and
+      //                    spenders find each other by this string.
+      //   stackCount       how many remain. The effect is DELETED at 0 rather
+      //                    than left sitting empty on the sheet.
+      //   stackSourceSkill provenance, for display and debugging.
+      stackPool:        new fields.StringField({ initial: '' }),
+      stackCount:       new fields.NumberField({ initial: 0, min: 0, integer: true }),
+      stackSourceSkill: new fields.StringField({ initial: '' }),
+
       // ── Weapon buff (Flameblade etc. — design-spellstriker.md) ──
       // A buff effect with weaponBuffDamage > 0 adds that FLAT amount (typed
       // by weaponBuffAffinities) to the wearer's weapon strikes while active.

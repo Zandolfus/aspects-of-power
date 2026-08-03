@@ -20,6 +20,7 @@ import {
 import { moonState, moonNodeAngle, nextSyzygy, eclipseAtSyzygy, planetStates,
          meteorShowersOn, cometStates, julianDay, civilDate, worldTimeForDate } from '../module/systems/calendar.mjs';
 import { resolveDamage, durabilityDamage, applyMarkBonus } from '../module/systems/damage.mjs';
+import { stackDamageMultiplier, spendableRange } from '../module/systems/stacks.mjs';
 
 const CFG = {
   meleeBlend: { strFloor: 0.30, slope: 0.70, weightOffset: 40, weightSpan: 180 },
@@ -759,6 +760,30 @@ eq('spellweight: staff+grand unlocked is 8.4',
 // Floor still applies to anything absurdly light.
 eq('spellweight: windupMin floors the result',
    spellWindupMultiplier('basic', 0, { ...SWCFG('implement'), spellTierWeights: { basic: 10 } }), 0.5);
+
+/* ── STACKS (systems/stacks.mjs) ───────────────────────────────────────── */
+// Linear is the RULED default: spreading five fields across five targets and
+// dumping all five into one must deal the SAME total, so the choice is breadth
+// vs burst rather than an efficiency trap.
+eq('stacks: linear scaling, one stack', stackDamageMultiplier(1, 1), 1);
+eq('stacks: linear scaling, five stacks', stackDamageMultiplier(5, 1), 5);
+// Dreams of Light: payload is the conjure's damage split five ways, so a full
+// dump must reconstitute the whole cast. 2493 live / 5 = 498.6 per field.
+eq('stacks: a full dump reconstitutes the cast', Math.round(498.6 * stackDamageMultiplier(5, 1)), 2493);
+// ⚠ Spending ONE stack is 1x at EVERY scaling. `spent * scaling` would have
+// silently halved a single-stack spend at 0.5 — the reason the form is an
+// exponent, not a factor.
+eq('stacks: one stack is 1x under concavity too', stackDamageMultiplier(1, 0.5), 1);
+eq('stacks: concave scaling, four stacks', stackDamageMultiplier(4, 0.5), 2);
+eq('stacks: zero spend is zero effect', stackDamageMultiplier(0, 1), 0);
+eq('stacks: negative spend cannot pay out', stackDamageMultiplier(-3, 1), 0);
+// Range gating.
+eq('stacks: empty pool cannot fire', spendableRange(0, 1, 0).max, 0);
+eq('stacks: pool below cost cannot fire', spendableRange(2, 3, 0).max, 0);
+eq('stacks: no maxSpend means spend everything', spendableRange(5, 1, 0).max, 5);
+eq('stacks: maxSpend caps the activation', spendableRange(5, 1, 3).max, 3);
+eq('stacks: maxSpend below cost still allows the cost', spendableRange(5, 2, 1).max, 2);
+eq('stacks: exactly enough is spendable', spendableRange(3, 3, 0).max, 3);
 
 if (failures) { console.error(`\n${failures} FAILURES`); process.exit(1); }
 console.log('\nAll pure-function tests pass.');

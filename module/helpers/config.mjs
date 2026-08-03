@@ -1465,6 +1465,10 @@ ASPECTSOFPOWER.combatTags = {
   // the tag. Added 2026-07-31.
   summon:      'ASPECTSOFPOWER.Tag.summon',
   channel:     'ASPECTSOFPOWER.Tag.channel',
+  // Stacks: a self-held charge pool on the CASTER (systems/stacks.mjs).
+  // Produce N with one skill, spend 1..N with another. Marks are the same
+  // shape but live on the TARGET, which is why this is its own subsystem.
+  stacks:      'ASPECTSOFPOWER.Tag.stacks',
   // Braced: a parry reaction that may spend stamina to parry as if the weapon
   // were heavier (mass ratio only). Inert on anything that is not a parry.
   braced:      'ASPECTSOFPOWER.Tag.braced',
