@@ -80,6 +80,16 @@
         && canFight(a)).map(a => a.name);
     })(),
     label: (n) => n.replace('[SIM] ', ''),
+    // ⚠ RESTRICT AN ACTOR TO THEIR REAL ROTATION.
+    //   window.__simSkills = { Gabriel: ['Strike', 'Infused Strike (Electric)'] }
+    // Mis-configured content routinely out-damages a character's actual kit,
+    // because the LEGACY branch applies neither windup nor rarity. Gabriel's
+    // top three picks were all legacy (Hamstring is dex_weapon but costs MANA,
+    // so it misses the stamina-gated weapon branch), which made him read as the
+    // deadliest character in the game off skills his player never uses.
+    // See `legacyPicks` in the summary — that is the tell.
+    onlySkills: window.__simSkills ?? null,
+    excludeSkills: window.__simExcludeSkills ?? [],
     // Crush is a debuff that ramps; model it at its steady-state stack count.
     crushStacks: AA.armorCrushMaxStacks ?? 3,
     // Scramble degrades a defender's dodge as they keep dodging. 0 = fresh.
@@ -345,14 +355,18 @@
   function runOnce(SC) {
     const skills = [];
     for (const a of actors) {
+      const allow = CFG.onlySkills?.[a.name] ?? CFG.onlySkills?.[CFG.label(a.name)] ?? null;
       for (const sk of a.items) {
         if (sk.type !== 'skill') continue;
+        if (allow && !allow.includes(sk.name)) continue;
+        if (CFG.excludeSkills.includes(sk.name)) continue;
         const p = profileSkill(a, sk, SC);
         if (p) skills.push(p);
       }
     }
     const grid = {}, choices = {}, ttks = [], contTtks = [];
     const killTick = {};                 // 'ATTACKER>DEFENDER' -> tick of the killing blow
+    const legacyPicks = [];              // pairs whose best answer is a legacy-branch skill
     // 'ATTACKER>DEFENDER' -> { chosen, fastest }. Two different questions:
     // `fastest` answers "did they ever get to act", `chosen` answers "did the
     // skill they committed to ever land".
@@ -381,7 +395,7 @@
           if (dpr > bestDpr) bestDpr = dpr;
           if (ticks < best.ticks || (ticks === best.ticks && dpr > best.dpr)) {
             best = { ticks, dpr, skill: sk.name, perSwing: mean, wait: sk.wait,
-                     swings: Math.ceil(def.hp / mean), oneShotPct };
+                     swings: Math.ceil(def.hp / mean), oneShotPct, branch: sk.branch };
           }
         }
         const key = CFG.label(atk.name);
@@ -397,8 +411,13 @@
           contTtks.push(def.hp / bestDpr);
           killTick[`${key}>${CFG.label(def.name)}`] = best.ticks;
           grid[CFG.label(def.name)][key] = Math.round(rounds * 10) / 10;
+          // ⚠ A LEGACY pick is a red flag, not a result. That branch applies
+          // neither windup nor rarity, so a mis-configured skill routinely
+          // beats the character's real kit. Counted in the summary.
+          if (best.branch === 'legacy') legacyPicks.push(`${key} -> ${CFG.label(def.name)}: ${best.skill}`);
           choices[`${key} -> ${CFG.label(def.name)}`] =
-            `${best.skill} (${Math.round(best.perSwing)}/swing × ${best.swings} @ ${best.wait}t`
+            `${best.skill}${best.branch === 'legacy' ? ' [LEGACY!]' : ''}`
+            + ` (${Math.round(best.perSwing)}/swing × ${best.swings} @ ${best.wait}t`
             + ` = tick ${best.ticks}, ${Math.round(best.dpr)} dpr`
             + (best.oneShotPct > 0 ? `, ${Math.round(best.oneShotPct * 100)}% one-shot` : '')
             + (Math.round(rounds * 10) !== Math.round(def.hp / bestDpr * 10)
@@ -460,8 +479,11 @@
         lethal: ttks.filter(t => t <= CFG.lethal).length,
         grindy: ttks.filter(t => t > CFG.grindy).length,
         duelsDecided: decided, shutouts, overcommits,
+        // How many matchups are decided by a skill the real damage path never
+        // scales. High = you are measuring mis-configured content, not balance.
+        legacyPickCount: legacyPicks.length,
       },
-      grid, choices, duels,
+      grid, choices, duels, legacyPicks,
       // `wait` is on this line deliberately: a spell slower than roundLen is
       // the shape continuous DPR reports most confidently and most wrongly.
       spellSkills: skills.filter(s => s.branch === 'spell').map(s =>
