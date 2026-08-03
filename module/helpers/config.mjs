@@ -1207,6 +1207,44 @@ ASPECTSOFPOWER.strain = {
   maxFrac: 0.5,
   // Fraction of true max HP recovered per hour of world time.
   recoveryPerHour: 0.05,
+  // Toughness divisor for conversion strain:
+  //   strain = destinationGained / (Tough.mod x conversionDivisor)
+  //
+  // ANCHORED TO MEDITATION. Gaining 10% of max mana (one hour of meditating)
+  // should cost ~5% strain (one hour of strain recovery), making conversion
+  // time-NEUTRAL rather than free: you skip the hour, you owe the hour.
+  // Solved across the live roster, 7 puts Harvey (mana 678, tough 201) at
+  // 68 / (201 x 7) = 0.048 — break-even.
+  //
+  // ⚠ Toughness DIVIDES the strain rather than granting a free allowance. A
+  // per-cast allowance is trivially split into many small casts, and cast time
+  // does not plug that: channel wait is LINEAR in amount, so ten small
+  // conversions cost the same time as one large one. Dividing means every
+  // conversion costs something and toughness makes you better at it.
+  conversionDivisor: 7,
+};
+
+/**
+ * RESOURCE CONVERSION (design-healer-system.md) — healer-only.
+ *
+ * Rates are SOURCE units per 1 DESTINATION unit, except where the memo marks a
+ * conversion as efficient (vitality), where 1 source buys several destination.
+ *
+ * ⚠ VALUE FOLLOWS RENEWABILITY, measured 2026-08-03:
+ *   stamina  regenerates 5% of max PER ROUND in combat, and out of combat is
+ *            effectively unlimited → cheapest by far
+ *   mana     NO regen in combat; 10% per HOUR of meditation → expensive
+ *   vitality NO regen at all, and running out is death → most expensive, but
+ *            the most COMPRESSIBLE: spending it buys the most, which is the
+ *            blood-magic bargain. Bounded by the 25%-HP self-floor.
+ */
+ASPECTSOFPOWER.conversions = {
+  stamina_mana:    { from: 'stamina', to: 'mana',    rate: 5,    label: 'Channel Vitality to Spirit' },
+  stamina_health:  { from: 'stamina', to: 'health',  rate: 10,   label: 'Reinforce Flesh' },
+  mana_stamina:    { from: 'mana',    to: 'stamina', rate: 0.5,  label: 'Mystic Second Wind' },
+  mana_health:     { from: 'mana',    to: 'health',  rate: 5,    label: 'Mend Self' },
+  health_mana:     { from: 'health',  to: 'mana',    rate: 0.2,  label: 'Blood Magic' },
+  health_stamina:  { from: 'health',  to: 'stamina', rate: 0.1,  label: 'Tap Life Force' },
 };
 
 /**

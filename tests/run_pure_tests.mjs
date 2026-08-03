@@ -11,7 +11,7 @@
 import {
   houseHitFormula, hybridAbilityMod, weaponStatBlend, spellDamageRef,
   spellInvestDamage, strikeInvestDamage, infusionDamage, investSelfDamage,
-  spellCastWeight, spellWindupMultiplier, investCurve, healStatBlend,
+  spellCastWeight, spellWindupMultiplier, investCurve, healStatBlend, convertResources,
   effectiveDodgeValue, splitEvenlyWithRemainder, perceiveGateDecision, activityTicks, nextCompletionDelta,
   proficiencyMultiplier, proficiencyHitMultiplier, parryMassMultiplier, lunarPhaseMultiplier, dotTickDamage, procStaminaCost, riderDamageBase,
   crushFlatAmount, riderMaxInvest, itemWeightLb, KG_TO_LB, carriedWeightLb,
@@ -889,6 +889,32 @@ eq('heal coefficient: greater is ~2.5x basic',
    Math.round(strikeInvestDamage(524, 0.6 * 0.25, 3.4, 80, 20, { invest: { curveExponent: 0.5 } })
             / strikeInvestDamage(524, 0.6 * 0.25, 2.7, 20, 20, { invest: { curveExponent: 0.5 } }) * 10) / 10,
    2.5);
+
+/* ── RESOURCE CONVERSION (design-healer-system.md) ─────────────────────── */
+const CONVCFG = { strain: { conversionDivisor: 7 } };
+// rate = SOURCE per 1 DESTINATION. Stamina is the cheap resource: 5 buys 1.
+eq('convert: 5 stamina buys 1 mana', convertResources(100, 5, 201, 'stamina', CONVCFG).gained, 20);
+// Vitality is COMPRESSIBLE — 1 health buys 5 mana (rate 0.2).
+eq('convert: 1 health buys 5 mana', convertResources(100, 0.2, 201, 'health', CONVCFG).gained, 500);
+// ⚠ Health-sourced conversions charge NO strain — the health IS the price.
+eq('convert: blood magic charges no strain', convertResources(100, 0.2, 201, 'health', CONVCFG).strain, 0);
+// ANCHOR: Harvey (tough 201, mana 678) gaining 10% of his mana should cost
+// ~5% strain — one hour of meditation traded for one hour of recovery.
+const _harvey = convertResources(339, 5, 201, 'stamina', CONVCFG);
+eq('convert: anchor — 10% mana costs ~5% strain', _harvey.gained, 67);
+eq('convert: anchor strain rounds to 5%', Math.round(_harvey.strain * 100), 5);
+// Toughness makes you better at it, rather than buying a free window.
+eq('convert: double toughness halves the strain',
+   Math.round(convertResources(339, 5, 402, 'stamina', CONVCFG).strain * 1000),
+   Math.round(_harvey.strain * 500));
+// Splitting a conversion cannot dodge the cost — this is why toughness
+// divides rather than granting a per-cast allowance.
+const _split = [1,2,3,4,5].reduce((s) => s + convertResources(100, 5, 201, 'stamina', CONVCFG).strain, 0);
+eq('convert: five small casts cost the same as one big one',
+   Math.round(_split * 10000), Math.round(convertResources(500, 5, 201, 'stamina', CONVCFG).strain * 10000));
+eq('convert: nothing spent is nothing gained', convertResources(0, 5, 201, 'stamina', CONVCFG).gained, 0);
+eq('convert: too little to buy one unit yields nothing',
+   convertResources(4, 5, 201, 'stamina', CONVCFG).gained, 0);
 
 if (failures) { console.error(`\n${failures} FAILURES`); process.exit(1); }
 console.log('\nAll pure-function tests pass.');

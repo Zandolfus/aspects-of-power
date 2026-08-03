@@ -146,6 +146,39 @@ export function spellInvestDamage(intMod, multiplier, invested, ref, cfg = null)
 }
 
 /**
+ * Resource conversion: how much destination `sourceSpent` buys, and what it
+ * costs in STRAIN. PURE — golden-tested.
+ *
+ * `rate` is SOURCE units per 1 DESTINATION unit, so rate 5 means five stamina
+ * buys one mana, and rate 0.2 means one health buys five mana.
+ *
+ * Strain is charged on the DESTINATION gained, not the source spent, because
+ * what you are paying for is the mana — and divided by toughness, because
+ * toughness is how much self-inflicted strain a body absorbs. Dividing rather
+ * than granting a free allowance matters: an allowance is trivially split
+ * across many small casts, and cast time does not stop that (channel wait is
+ * linear in amount, so ten small conversions cost the same time as one big
+ * one).
+ *
+ * ⚠ Vitality-SOURCED conversions charge no strain — the health is the price
+ * already, and charging max HP on top would tax the same act twice.
+ *
+ * @returns {{gained: number, strain: number}}
+ */
+export function convertResources(sourceSpent, rate, toughMod, fromResource = '', cfg = null) {
+  const sc = cfg ?? (globalThis.CONFIG?.ASPECTSOFPOWER ?? {});
+  const spend = Math.max(0, Math.floor(Number(sourceSpent) || 0));
+  const r = Number(rate) || 1;
+  if (spend <= 0 || r <= 0) return { gained: 0, strain: 0 };
+  const gained = Math.floor(spend / r);
+  if (gained <= 0) return { gained: 0, strain: 0 };
+  if (fromResource === 'health') return { gained, strain: 0 };
+  const divisor = sc.strain?.conversionDivisor ?? 7;
+  const tough = Math.max(1, Number(toughMod) || 0);
+  return { gained, strain: gained / (tough * divisor) };
+}
+
+/**
  * Healing potency blend for a mode (design-healer-system.md).
  *
  * THE CASTING RESOURCE IS THE MODE — mana is a cleric, health is blood magic,
