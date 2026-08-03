@@ -139,26 +139,41 @@ export async function advanceWorldTime(seconds) {
  */
 export function meditationAuraBonusFor(actor) {
   const none = { bonus: 0, sources: [] };
-  const self = actor?.getActiveTokens?.()?.[0];
-  if (!self?.center || !canvas?.grid) return none;
-  const pxPerFt = canvas.grid.size / canvas.grid.distance;
+  const selfTok = actor?.getActiveTokens?.()?.[0];
+  const selfDoc = selfTok?.document;
+  if (!selfDoc || !canvas?.grid) return none;
+  const gridSize = canvas.grid.size;
+  const pxPerFt = gridSize / canvas.grid.distance;
+
+  // ⚠ CENTRE FROM THE DOCUMENT, NOT THE PLACEABLE. `token.object.center` lags
+  // during move animation, so a token read right after being repositioned
+  // reports where it USED to be — which made a token 60 ft away test as
+  // in-range. The document's x/y are authoritative the moment the update
+  // resolves, and this also works for tokens that are not rendered at all.
+  const centreOf = (doc) => ({
+    x: doc.x + (doc.width * gridSize) / 2,
+    y: doc.y + (doc.height * gridSize) / 2,
+  });
+  const me = centreOf(selfDoc);
 
   let best = 0;
   let from = '';
-  for (const tokenDoc of (self.scene ?? canvas.scene)?.tokens ?? []) {
-    const other = tokenDoc.object;
+  for (const tokenDoc of (selfDoc.parent ?? canvas.scene)?.tokens ?? []) {
     const src = tokenDoc.actor;
-    if (!other?.center || !src?.items) continue;
+    if (!src?.items) continue;
     for (const sk of src.items) {
       if (sk.type !== 'skill') continue;
       const c = sk.system?.tagConfig ?? {};
       const bonus = Number(c.meditationAuraBonus) || 0;
       const radiusFt = Number(c.auraRadius) || 0;
       if (bonus <= 0 || radiusFt <= 0) continue;
-      // The owner stands in their own field.
-      const dx = self.center.x - other.center.x;
-      const dy = self.center.y - other.center.y;
-      if (Math.hypot(dx, dy) > radiusFt * pxPerFt) continue;
+      const them = centreOf(tokenDoc);
+      const dist = Math.hypot(me.x - them.x, me.y - them.y);
+      // ⚠ Guard NaN explicitly. `NaN > radiusPx` is FALSE, so a malformed
+      // position would PASS the range check rather than fail it — the aura
+      // would silently apply at any distance.
+      if (!Number.isFinite(dist) || dist > radiusFt * pxPerFt) continue;
+      // The owner stands in their own field (distance 0).
       if (bonus > best) { best = bonus; from = `${sk.name} (${src.name})`; }
     }
   }
