@@ -146,6 +146,30 @@ export function spellInvestDamage(intMod, multiplier, invested, ref, cfg = null)
 }
 
 /**
+ * Healing potency blend for a mode (design-healer-system.md).
+ *
+ * THE CASTING RESOURCE IS THE MODE — mana is a cleric, health is blood magic,
+ * stamina is a chanter's aura. All three are wisdom-led and differ in their
+ * second stat, so a healer has one primary and three expressions of it.
+ *
+ * This is the term that replaces INT in the invest formula, which is what
+ * makes healing share the damage economy rather than sit beside it.
+ *
+ * @param {object} abilities  actor.system.abilities
+ * @param {string} resource   'mana' | 'health' | 'stamina'
+ * @param {object} [cfg]      CONFIG override (tests)
+ * @returns {number} Blended mod, 0 when the mode is unknown.
+ */
+export function healStatBlend(abilities, resource, cfg = null) {
+  const sc = cfg ?? (globalThis.CONFIG?.ASPECTSOFPOWER ?? {});
+  const b = sc.healing?.blends?.[resource];
+  if (!b) return 0;
+  const p = Number(abilities?.[b.primary]?.mod) || 0;
+  const s = Number(abilities?.[b.secondary]?.mod) || 0;
+  return Math.round(p * (b.pw ?? 0) + s * (b.sw ?? 0));
+}
+
+/**
  * The invest curve exponent (config `invest.curveExponent`, default 0.2).
  *
  * ONE exponent governs every commit-more-for-more in the game — spell damage,

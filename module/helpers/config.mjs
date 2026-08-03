@@ -720,6 +720,39 @@ ASPECTSOFPOWER.castingSpeedWeights = {
 };
 
 /**
+ * HEALING — the potency blend per mode (design-healer-system.md).
+ *
+ * THE CASTING RESOURCE IS THE MODE. No extra tag is needed, because each mode
+ * already spends a different pool, and a skill that costs health simply IS
+ * blood magic. All three are wisdom-led; wisdom already drives casting speed,
+ * so a healer has one clear primary and the modes differ in their second stat.
+ *
+ *   mana    cleric   — 0.6 Wis + 0.4 Int
+ *   health  vitality — 0.6 Vit + 0.4 Wis  (blood magic; own life is the cost)
+ *   stamina aura     — 0.6 Wis + 0.4 Str  (chanter; sustained party support)
+ *
+ * This blend replaces INT as the potency term in the invest formula, so
+ * healing goes through `strikeInvestDamage` exactly like every strike and
+ * spell — tier (via windup), rarity and invest all apply. Before this, all 30
+ * restoration skills in the world sat on the legacy branch: tier inert, rarity
+ * ignored AND inverted (the two strongest heals in the game were `inferior`),
+ * and heal size set by a hand-authored dice string.
+ */
+ASPECTSOFPOWER.healing = {
+  blends: {
+    mana:    { primary: 'wisdom',   pw: 0.6, secondary: 'intelligence', sw: 0.4 },
+    health:  { primary: 'vitality', pw: 0.6, secondary: 'wisdom',       sw: 0.4 },
+    stamina: { primary: 'wisdom',   pw: 0.6, secondary: 'strength',     sw: 0.4 },
+  },
+  // Vitality mode: the caster may never drop below this fraction of max HP.
+  // Their own health IS the cap — there is no separate ceiling stat.
+  selfFloorFrac: 0.25,
+  // Aura mode invest ceiling above base, as a fraction of Tough.mod (the
+  // physical-resource parallel to the caster's Wis cap).
+  staminaCapFactor: 0.15,
+};
+
+/**
  * Per-tier Wis-derived hard cap on spell invest above base mana:
  *   max_invest = baseMana + Wis_mod × spellMaxInvestAboveBase[tier]
  * Then clamped by the actor's mana pool. NO self-damage past this cap —

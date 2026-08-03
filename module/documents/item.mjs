@@ -1,6 +1,6 @@
 import { EquipmentSystem } from '../systems/equipment.mjs';
 import { getPositionalTags } from '../helpers/positioning.mjs';
-import { houseHitFormula, hybridAbilityMod, weaponStatBlend, spellDamageRef, spellInvestDamage, spellWindupMultiplier, spellCastWeight, strikeInvestDamage, infusionDamage, investSelfDamage as computeInvestSelfDamage, effectiveDodgeValue, splitEvenlyWithRemainder, parryMassMultiplier, bracedParryWeight, bracedMaxUsefulInvest, defenceMarginMultiplier, lunarPhaseMultiplier, dotTickDamage, procStaminaCost, crushFlatAmount, riderMaxInvest } from '../helpers/formulas.mjs';
+import { houseHitFormula, hybridAbilityMod, weaponStatBlend, healStatBlend, spellDamageRef, spellInvestDamage, spellWindupMultiplier, spellCastWeight, strikeInvestDamage, infusionDamage, investSelfDamage as computeInvestSelfDamage, effectiveDodgeValue, splitEvenlyWithRemainder, parryMassMultiplier, bracedParryWeight, bracedMaxUsefulInvest, defenceMarginMultiplier, lunarPhaseMultiplier, dotTickDamage, procStaminaCost, crushFlatAmount, riderMaxInvest } from '../helpers/formulas.mjs';
 import { recordActionFired, declareAction, isInActiveCombat, computeActionWait, referenceRoundLength, computeWindupMultiplier, getScrambleStacks, addScrambleStack, applyDodgeCost, findCombatantForActor, perceiveGate } from '../systems/celerity.mjs';
 import { getThreatRadiusFt, actorIsDashing } from '../systems/engagement-halts.mjs';
 import { selectTargetOnCanvas, selectTargetsOnCanvas, skillNeedsTargetPrompt, skillTargetsAtFire, selectMarkerOnCanvas } from '../canvas/target-prompt.mjs';
@@ -5063,9 +5063,21 @@ export class AspectsofPowerItem extends Item {
     // would bank a payload with no windup and no rarity.
     const _isStackProducer = !!_stkSpender.stackPool && (_stkSpender.stackProduces ?? 0) > 0;
 
+    // HEALER UNIFICATION (design-healer-system.md). A restoration skill is
+    // priced exactly like an attack spell — same invest dialog, same Wis cap,
+    // same tier/windup/rarity — it just restores instead of harming. Without
+    // this it fell to the legacy branch, where tier was inert, invest bought
+    // nothing, and rarity was not merely ignored but INVERTED: the multiplier
+    // the legacy path skips is the skill's own, so the two strongest heals in
+    // the world were both `inferior`.
+    // Gated on tier like every other spell, so a heal with no tier stays on
+    // the legacy branch until its content is authored.
+    const _isHeal = tags.includes('restoration')
+      && (this.system.tagConfig?.restorationResource ?? 'health') !== 'barrier';
+
     const isVariableSpell = ['mana', 'health'].includes(rollData.roll.resource)
       && spellTier && spellGrade
-      && (tags.includes('attack') || _isStackProducer)
+      && (tags.includes('attack') || _isStackProducer || _isHeal)
       && !_isPayloadSpender;
 
     const isVariableWeapon = rollData.roll.resource === 'stamina'
@@ -5365,7 +5377,16 @@ export class AspectsofPowerItem extends Item {
         // `strikeInvestDamage` with windup pinned to 1, so when the model is off
         // this is byte-identical to the old call.
         const _spellWindup = spellWindupMultiplier(spellTier, heldImplementWeight(this.actor));
-        dmgFormula = String(strikeInvestDamage(intMod, multiplier, _spellWindup, effectiveInvested, spellDmgRef));
+        // HEALER UNIFICATION: a restoration skill swaps INT for its mode's
+        // healing blend and is otherwise identical — same reference, same
+        // windup, same rarity, same invest curve. The mode comes from the
+        // casting RESOURCE, because a spell that costs health simply IS blood
+        // magic. Everything downstream reads dmgRoll.total, so the heal is the
+        // roll: card, preview and applied amount cannot drift apart.
+        const _potency = _isHeal
+          ? healStatBlend(this.actor.system.abilities, rollData.roll.resource)
+          : intMod;
+        dmgFormula = String(strikeInvestDamage(_potency, multiplier, _spellWindup, effectiveInvested, spellDmgRef));
       }
 
       // Hand off to the AOE block below: store the pre-placed template +

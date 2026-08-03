@@ -11,7 +11,7 @@
 import {
   houseHitFormula, hybridAbilityMod, weaponStatBlend, spellDamageRef,
   spellInvestDamage, strikeInvestDamage, infusionDamage, investSelfDamage,
-  spellCastWeight, spellWindupMultiplier, investCurve,
+  spellCastWeight, spellWindupMultiplier, investCurve, healStatBlend,
   effectiveDodgeValue, splitEvenlyWithRemainder, perceiveGateDecision, activityTicks, nextCompletionDelta,
   proficiencyMultiplier, proficiencyHitMultiplier, parryMassMultiplier, lunarPhaseMultiplier, dotTickDamage, procStaminaCost, riderDamageBase,
   crushFlatAmount, riderMaxInvest, itemWeightLb, KG_TO_LB, carriedWeightLb,
@@ -842,6 +842,40 @@ eq('curve: 0.2 gives 8x invest -> 1.52x', strikeInvestDamage(1000, 1, 1, 160, 20
 eq('curve: sqrt gives 8x invest -> 2.83x', strikeInvestDamage(1000, 1, 1, 160, 20, C05), 2828);
 eq('curve: one unit of invest is unchanged by the curve',
    strikeInvestDamage(1000, 1, 1, 20, 20, C05), strikeInvestDamage(1000, 1, 1, 20, 20, C02));
+
+/* ── HEALING BLEND (design-healer-system.md) ───────────────────────────── */
+// THE CASTING RESOURCE IS THE MODE. Golden stats are Harvey McKay's, live:
+// vit 444, wis 811, int 243, str 161.
+const HEALCFG = {
+  healing: { blends: {
+    mana:    { primary: 'wisdom',   pw: 0.6, secondary: 'intelligence', sw: 0.4 },
+    health:  { primary: 'vitality', pw: 0.6, secondary: 'wisdom',       sw: 0.4 },
+    stamina: { primary: 'wisdom',   pw: 0.6, secondary: 'strength',     sw: 0.4 },
+  } },
+};
+const HARVEY = {
+  vitality: { mod: 444 }, wisdom: { mod: 811 },
+  intelligence: { mod: 243 }, strength: { mod: 161 },
+};
+eq('heal blend: cleric  = .6wis+.4int', healStatBlend(HARVEY, 'mana', HEALCFG), 584);
+eq('heal blend: vitality= .6vit+.4wis', healStatBlend(HARVEY, 'health', HEALCFG), 591);
+eq('heal blend: aura    = .6wis+.4str', healStatBlend(HARVEY, 'stamina', HEALCFG), 551);
+// An unknown mode heals for NOTHING rather than silently falling back to a
+// blend that flatters the caster — a wrong mode should be obvious at the table.
+eq('heal blend: unknown mode is zero', healStatBlend(HARVEY, 'barrier', HEALCFG), 0);
+eq('heal blend: missing abilities are zero', healStatBlend({}, 'mana', HEALCFG), 0);
+// All three are wisdom-led, so a dedicated healer is strong in every mode and
+// the modes differ in their SECOND stat, not their identity.
+eq('heal blend: every mode is wisdom-led for a wis specialist',
+   healStatBlend(HARVEY, 'mana', HEALCFG) > 500
+   && healStatBlend(HARVEY, 'health', HEALCFG) > 500
+   && healStatBlend(HARVEY, 'stamina', HEALCFG) > 500, true);
+// The unified heal IS the damage function with the blend swapped in.
+// Harvey, high tier (windup 1.5), rarity 1, invest 40 vs ref 20, sqrt curve.
+eq('unified heal == strikeInvestDamage with a healing blend',
+   strikeInvestDamage(healStatBlend(HARVEY, 'mana', HEALCFG), 1, 1.5, 40, 20,
+     { invest: { curveExponent: 0.5 } }),
+   Math.round(584 * 1.5 * Math.SQRT2));
 
 if (failures) { console.error(`\n${failures} FAILURES`); process.exit(1); }
 console.log('\nAll pure-function tests pass.');
