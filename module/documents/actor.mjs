@@ -333,6 +333,16 @@ export class AspectsofPowerActor extends Actor {
     systemData.defense.armor.value = effectBonus('system.defense.armor.value');
     systemData.defense.veil.value  = effectBonus('system.defense.veil.value');
 
+    // Meditation fraction: base from config, plus anything a passive grants.
+    // ⚠ This line is REQUIRED for the effect to do anything. `applyActiveEffects`
+    // is a deliberate no-op in this system — core's merge-based application is
+    // skipped entirely and every change is summed by hand here. An AE targeting
+    // a field nobody reads through `effectBonus` applies to NOTHING, silently,
+    // while looking perfectly well-formed on the sheet.
+    systemData.meditation.fraction = Math.max(0,
+      (CONFIG.ASPECTSOFPOWER.meditation?.baseFraction ?? 0.10)
+      + effectBonus('system.meditation.fraction'));
+
     // Block DR — the held weapon contributes passive flat mitigation
     // (active defense, design-active-defense.md): the str archetype's
     // constant-on layer. blockDR = coef × (celerityWeight/100) × (1 + str/1085).
