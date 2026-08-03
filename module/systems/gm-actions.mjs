@@ -298,10 +298,13 @@ export async function executeGmAction(payload) {
         // Cost is marginal ON THIS TARGET AS THEY STAND — but a re-cast must be
         // priced against the body WITHOUT its own previous application, or the
         // curve would charge it as if it were stacking on itself.
+        // ⚠ Carry `mod` across, not just `value` — abilityModTotal anchors on
+        // the live mod to preserve post-curve adjustments (size scaling), and
+        // a value-only clone would quietly drop them.
         const _costAbil = replacing
           ? Object.fromEntries(Object.entries(_abil).map(([k, a]) => {
               const back = buffLoadByAbility(replacing.changes)[k] ?? 0;
-              return [k, { value: (Number(a?.value) || 0) - back }];
+              return [k, { value: (Number(a?.value) || 0) - back, mod: a?.mod }];
             }))
           : _abil;
         const incomingCost = buffModCost(_costAbil, payload.changes, _gm);

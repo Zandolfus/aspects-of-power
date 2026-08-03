@@ -324,6 +324,21 @@ export class AspectsofPowerActor extends Actor {
       totalEquipCapped: totalEquip,
     };
 
+    // ── Size Scaling (str/vit mods) ──
+    // Detect size tag from collectedTags; default to medium (1.0x).
+    const sizeScaling = CONFIG.ASPECTSOFPOWER.sizeScaling ?? {};
+    let actorSizeTag = 'medium';
+    for (const sizeKey of Object.keys(sizeScaling)) {
+      if (systemData.collectedTags?.has(sizeKey)) { actorSizeTag = sizeKey; break; }
+    }
+    const sizeMultipliers = sizeScaling[actorSizeTag] ?? { str: 1.0, hp: 1.0, meleeRangedDef: 1.0 };
+    systemData.sizeTag = actorSizeTag;
+
+    if (sizeMultipliers.str !== 1.0) {
+      systemData.abilities.strength.mod = Math.round(systemData.abilities.strength.mod * sizeMultipliers.str);
+      systemData.abilities.strength.breakdown.finalMod = systemData.abilities.strength.mod;
+    }
+
     // ── Buff capacity (design-healer-system.md phase 6) ──
     // Derived, never stored: capacity moves with the abilities and usage moves
     // with the live effect list, so neither can go stale the way a cached
@@ -359,21 +374,9 @@ export class AspectsofPowerActor extends Actor {
         Math.max(0, systemData.buffs.capacity - systemData.buffs.used);
     }
 
-    // ── Size Scaling (str/vit mods) ──
-    // Detect size tag from collectedTags; default to medium (1.0x).
-    const sizeScaling = CONFIG.ASPECTSOFPOWER.sizeScaling ?? {};
-    let actorSizeTag = 'medium';
-    for (const sizeKey of Object.keys(sizeScaling)) {
-      if (systemData.collectedTags?.has(sizeKey)) { actorSizeTag = sizeKey; break; }
-    }
-    const sizeMultipliers = sizeScaling[actorSizeTag] ?? { str: 1.0, hp: 1.0, meleeRangedDef: 1.0 };
-    systemData.sizeTag = actorSizeTag;
-
-    if (sizeMultipliers.str !== 1.0) {
-      systemData.abilities.strength.mod = Math.round(systemData.abilities.strength.mod * sizeMultipliers.str);
-      systemData.abilities.strength.breakdown.finalMod = systemData.abilities.strength.mod;
-    }
-
+    // ⚠ AFTER the size pass on purpose: size scaling multiplies a large
+    // creature's strength mod, and capacity is denominated in mods. Running
+    // this earlier read Phil (large) at 731 against a true 755.
     // --- Resource maxima ---
     // hpScale (defenseTuning, default 1.5): global TTK-floor raise shipped
     // with active defense — windup-amplified bursts must not one-shot

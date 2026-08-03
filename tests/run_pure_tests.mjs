@@ -992,6 +992,19 @@ eq('abilityModTotal is not the curve of the sum',
 eq('abilityModTotal: a negative delta removes a buff',
    abilityModTotal({ a: { value: 500 } }, { a: -100 }, 1, CURVECFG),
    abilityMod(400, 1, CURVECFG));
+// ⚠ POST-CURVE ADJUSTMENTS SURVIVE. Size scaling multiplies a large creature's
+// strength mod after the curve; recomputing from value alone loses it, which
+// read Phil (large) at 731 capacity against a true 755.
+eq('abilityModTotal anchors on the live mod',
+   abilityModTotal({ strength: { value: 530, mod: 734 } }, {}, 1, CURVECFG), 734);
+// And carries the same factor onto the hypothetical when a delta is applied.
+const _sized = abilityModTotal({ strength: { value: 530, mod: 734 } },
+                               { strength: 100 }, 1, CURVECFG);
+const _plain = abilityModTotal({ strength: { value: 530 } },
+                               { strength: 100 }, 1, CURVECFG);
+eq('abilityModTotal keeps the size factor under a delta', _sized > _plain, true);
+eq('abilityModTotal: size factor is preserved exactly', _sized,
+   Math.round(abilityMod(630, 1, CURVECFG) * (734 / abilityMod(530, 1, CURVECFG))));
 
 // Splitting a change list by where the points land.
 const MIXED = [

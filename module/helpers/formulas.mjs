@@ -947,8 +947,21 @@ export function gradeMultiplierFor(rank, cfg = null) {
 export function abilityModTotal(abilities, deltaByKey = {}, gradeMult = 1, cfg = null) {
   let sum = 0;
   for (const [k, a] of Object.entries(abilities ?? {})) {
-    const v = (Number(a?.value) || 0) + (Number(deltaByKey?.[k]) || 0);
-    sum += abilityMod(v, gradeMult, cfg);
+    const base = Number(a?.value) || 0;
+    const d = Number(deltaByKey?.[k]) || 0;
+    const actual = Number(a?.mod);
+    const hasActual = Number.isFinite(actual);
+    // ⚠ ANCHOR ON THE LIVE `.mod` WHENEVER THERE IS NO DELTA. Some mods are
+    // adjusted AFTER the curve — size scaling multiplies a large creature's
+    // strength — so recomputing from the value alone silently disagrees with
+    // the actor. Measured on Phil (large): capacity read 731 against a true
+    // 755 because his size-boosted strength was rebuilt without the boost.
+    if (!d && hasActual) { sum += actual; continue; }
+    // With a delta, re-curve and carry the SAME post-curve factor across, so
+    // whatever adjusted the live mod still applies to the hypothetical one.
+    const curved = abilityMod(base, gradeMult, cfg);
+    const ratio = (hasActual && curved > 0) ? actual / curved : 1;
+    sum += Math.round(abilityMod(base + d, gradeMult, cfg) * ratio);
   }
   return sum;
 }
