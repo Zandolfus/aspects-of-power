@@ -348,6 +348,21 @@ export class SkillData extends foundry.abstract.TypeDataModel {
         // unaffected and the old one-target-per-throw behaviour is preserved.
         stackSpreadBudget: new fields.NumberField({ initial: 0, min: 0, integer: true }),
 
+        // ── HARVEST ON DOT DEATH (Burnt Offering, user ruled 2026-08-03) ──
+        // A PASSIVE that pays out when something dies while suffering a DoT
+        // THIS actor applied. Burnt Offering: "when an enemy dies while
+        // burning from one of your burn effects, gain mana equal to their
+        // level / 10".
+        //   harvestResource   what is restored ('' = inert)
+        //   harvestPerLevel   restored = round(victim race level x this)
+        //   harvestDotAffinity  the DoT must carry this affinity ('fire' for
+        //     burn). EMPTY means any DoT of this actor's counts — burn has no
+        //     dedicated effect flag, it is a fire-affinity DoT, so affinity is
+        //     the honest way to ask "was it MY burn".
+        harvestResource:    new fields.StringField({ initial: '' }),
+        harvestPerLevel:    new fields.NumberField({ initial: 0, min: 0 }),
+        harvestDotAffinity: new fields.StringField({ initial: '' }),
+
         // ── Phase E: buff-carries-reaction config ──
         // When an Active `buff`-tagged skill applies its buff, propagate
         // these onto the spawned effect's `system.reaction*` fields so

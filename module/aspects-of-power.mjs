@@ -2771,6 +2771,51 @@ Hooks.on('updateActor', async (actor, changes, _options, userId) => {
       });
     }
 
+    // ── HARVEST ON DOT DEATH (Burnt Offering) ────────────────────────────
+    // Something died while suffering a DoT. Anyone whose DoT it was, and who
+    // owns a skill configured to harvest, is paid out. Runs BEFORE the
+    // on_death fan-out so a death bloom cannot delete the evidence first.
+    //
+    // ⚠ Gated on isActingGM: this mutates a THIRD party's resources from a
+    // hook, and this table runs two GM logins — bare isGM would pay twice.
+    if (isActingGM()) {
+      const seen = new Set();
+      for (const eff of actor.effects) {
+        if (eff.disabled || !eff.system?.dot) continue;
+        const applierUuid = eff.system.applierActorUuid;
+        if (!applierUuid || seen.has(applierUuid)) continue;
+        const applier = await fromUuid(applierUuid).catch(() => null);
+        const applierActor = applier?.actor ?? applier;
+        if (!applierActor?.items) continue;
+        const affinities = eff.system.affinities ?? [];
+        const harvester = applierActor.items.find((i) => {
+          if (i.type !== 'skill') return false;
+          const c = i.system?.tagConfig ?? {};
+          if (!c.harvestResource || !(c.harvestPerLevel > 0)) return false;
+          // Empty affinity = any DoT of mine counts.
+          return !c.harvestDotAffinity || affinities.includes(c.harvestDotAffinity);
+        });
+        if (!harvester) continue;
+        seen.add(applierUuid);
+
+        const c = harvester.system.tagConfig;
+        const lvl = actor.system?.attributes?.race?.level ?? 0;
+        const pool = applierActor.system?.[c.harvestResource];
+        if (!pool || !(lvl > 0)) continue;
+        const gain = Math.min(Math.round(lvl * c.harvestPerLevel),
+          Math.round(pool.max ?? 0) - Math.round(pool.value ?? 0));
+        if (gain <= 0) continue;
+        await applierActor.update({
+          [`system.${c.harvestResource}.value`]: Math.round(pool.value ?? 0) + gain,
+        });
+        ChatMessage.create({
+          speaker: ChatMessage.getSpeaker({ actor: applierActor }),
+          content: `<p><em><strong>${harvester.name}</strong> — ${actor.name} dies burning. `
+                 + `${applierActor.name} recovers <strong>${gain}</strong> ${c.harvestResource}.</em></p>`,
+        });
+      }
+    }
+
     // on_death-tagged passive AOE skills auto-fire ONCE from a single
     // representative token. For unlinked actors (one per token) this is
     // the dying token. For linked actors with multiple tokens sharing
