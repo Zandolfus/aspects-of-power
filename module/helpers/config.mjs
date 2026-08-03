@@ -1181,6 +1181,35 @@ ASPECTSOFPOWER.meditation = {
 };
 
 /**
+ * STRAIN — max HP burned to buy a resource conversion past what the body
+ * tolerates (user ruled 2026-08-03).
+ *
+ * THE PROBLEM IT SOLVES: stamina regenerates and mana does not, so any
+ * stamina-to-mana conversion is an engine. In combat that engine is a trickle
+ * (5%/round becomes ~4 mana/round at 5:1, against a median 3-round fight), but
+ * OUT of combat stamina is effectively unlimited, which would delete mana as a
+ * limiter entirely.
+ *
+ * Charging max HP fixes it because max HP is restored only by TIME. The
+ * limiter stops being an amount and becomes a duration — the same currency
+ * meditation already spends.
+ *
+ * ⚠ TUNE AGAINST MEDITATION, NOT IN ISOLATION. Meditation gives 10% of max
+ * mana per hour for free, so conversion is only ever bought for SPEED. The
+ * strain charged should cost roughly the meditation time it saves, or
+ * converting is either pointless or strictly better than resting.
+ *
+ * ⚠ recoveryPerHour is INERT until there is a world-time tick to drive it —
+ * deferred with the clock work. Until then strain must be cleared by hand.
+ */
+ASPECTSOFPOWER.strain = {
+  // Hard floor: strain can never take more than this fraction of true max HP.
+  maxFrac: 0.5,
+  // Fraction of true max HP recovered per hour of world time.
+  recoveryPerHour: 0.05,
+};
+
+/**
  * Quality-relative crafting multiplier (ruling 3 caveat, 2026-07-02):
  * "Smithing at your max potential should take time. Smithing something
  * slipshod that you don't care about should be extremely fast."

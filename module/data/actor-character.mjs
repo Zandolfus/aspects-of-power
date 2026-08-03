@@ -23,6 +23,15 @@ export class CharacterData extends foundry.abstract.TypeDataModel {
       stamina:   resourceSchema(5, 10),
       mana:      resourceSchema(5, 5),
 
+      // STRAIN — max HP temporarily burned away, as a FRACTION of true max.
+      // The price of pushing a resource conversion past what the body
+      // tolerates: you get the mana now and carry the hole until it heals.
+      // Charged in a currency only TIME restores, which is the point — it
+      // turns an out-of-combat "infinite stamina" engine into a time cost.
+      // ⚠ Floored at `strainMaxFrac` (0.5) in prepareDerivedData so this can
+      // never become a suicide button.
+      strain: new fields.NumberField({ initial: 0, min: 0, max: 1 }),
+
       overhealth: new fields.SchemaField({
         value: new fields.NumberField({ initial: 0, min: 0, integer: true }),
         decayRate: new fields.NumberField({ initial: 10, min: 0 }),

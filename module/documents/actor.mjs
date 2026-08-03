@@ -141,6 +141,33 @@ export class AspectsofPowerActor extends Actor {
     }
   }
 
+  /**
+   * @override
+   * Clamp pool values to their maxima on EVERY update.
+   *
+   * Nothing did this before: `value` could sit above `max` indefinitely, and
+   * every consumer had to remember to clamp. It becomes load-bearing the
+   * moment max HP is mutable (strain), because a strained character whose
+   * current HP was above the new max would otherwise keep the excess.
+   *
+   * Only clamps the pools actually present in the update, so a write that
+   * never touches health cannot silently rewrite it.
+   */
+  async _preUpdate(changed, options, user) {
+    const res = await super._preUpdate(changed, options, user);
+    if (res === false) return false;
+    for (const pool of ['health', 'stamina', 'mana']) {
+      const incoming = changed.system?.[pool];
+      if (!incoming || incoming.value === undefined) continue;
+      // The max this update will land on: an explicit new max wins, else the
+      // derived one. Reading the derived value keeps strain in the picture.
+      const max = incoming.max ?? this.system?.[pool]?.max;
+      if (!(max >= 0)) continue;
+      incoming.value = Math.min(Math.max(0, incoming.value), max);
+    }
+    return res;
+  }
+
   /** @override */
   prepareBaseData() {
     // Data modifications in this step occur before processing embedded
@@ -316,7 +343,13 @@ export class AspectsofPowerActor extends Actor {
     // same-rank actors now that pools no longer absorb them (gap-analysis
     // Family D, sim-validated 2026-06-11). Revert = set hpScale to 1.
     const hpScale = CONFIG.ASPECTSOFPOWER.defenseTuning?.hpScale ?? 1;
-    systemData.health.max = Math.round(systemData.abilities.vitality.mod * 1.25 * hpScale * sizeMultipliers.hp);
+    systemData.health.trueMax = Math.round(systemData.abilities.vitality.mod * 1.25 * hpScale * sizeMultipliers.hp);
+    // STRAIN eats into max HP. Floored so a character can never strain below
+    // half their true maximum — the mechanic is meant to make you fragile,
+    // not to offer a way to kill yourself by accounting.
+    const _strainFloor = CONFIG.ASPECTSOFPOWER.strain?.maxFrac ?? 0.5;
+    const _strain = Math.min(Math.max(0, systemData.strain ?? 0), _strainFloor);
+    systemData.health.max = Math.max(1, Math.round(systemData.health.trueMax * (1 - _strain)));
     systemData.mana.max = systemData.abilities.willpower.mod;
     systemData.stamina.max = systemData.abilities.endurance.mod;
 
