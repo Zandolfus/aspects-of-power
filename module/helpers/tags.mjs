@@ -101,6 +101,13 @@ export const TAG_REGISTRY = {
 
   // ── Passive Modifiers ──
   'armored':       { label: 'ASPECTSOFPOWER.SystemTag.armored.label',       category: 'passive', implies: [],                                    description: 'ASPECTSOFPOWER.SystemTag.armored.desc' },
+  // HEALER'S SIGNATURE (design-healer-system.md). The mechanical "sacrifice of
+  // other potential power": the energies a healer channels carry their own
+  // signature, which makes them less effective turned outward. Being a healer
+  // costs a flat share of your offensive damage — see config.healerSignature.
+  // An ACTOR tag (user ruled 2026-08-03), so it can come from a class, a
+  // profession, a race or a direct grant without the engine caring which.
+  'healer':        { label: 'ASPECTSOFPOWER.SystemTag.healer.label',        category: 'passive', implies: [],                                    description: 'ASPECTSOFPOWER.SystemTag.healer.desc' },
   'ethereal':      { label: 'ASPECTSOFPOWER.SystemTag.ethereal.label',      category: 'passive', implies: [],                                    description: 'ASPECTSOFPOWER.SystemTag.ethereal.desc' },
   'heavy':         { label: 'ASPECTSOFPOWER.SystemTag.heavy.label',         category: 'passive', implies: [],                                    description: 'ASPECTSOFPOWER.SystemTag.heavy.desc' },
   'flying':        { label: 'ASPECTSOFPOWER.SystemTag.flying.label',        category: 'passive', implies: [],                                    description: 'ASPECTSOFPOWER.SystemTag.flying.desc' },

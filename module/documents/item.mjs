@@ -5869,6 +5869,24 @@ export class AspectsofPowerItem extends Item {
     let hitRoll = hitFormula ? new Roll(hitFormula, rollData) : null;
     if (hitRoll) await hitRoll.evaluate();
 
+    // ── HEALER'S SIGNATURE (design-healer-system.md) ────────────────────
+    // A healer's channelled energy turns poorly to harm. Applied HERE, at the
+    // single point every damage branch converges on, rather than inside the
+    // spell / weapon / legacy branches separately — three copies of one tax
+    // is three chances for them to drift.
+    //
+    // ⚠ OFFENSIVE ONLY. Gated on the `attack` tag, so heals, barriers and
+    // restoration are untouched: dampening healing would tax the very thing
+    // the signature pays for.
+    //
+    // Single application by construction — `healer` is an ACTOR TAG, so a
+    // healer class AND a healer profession still read as one tag, which is
+    // exactly the no-stacking rule the design asks for.
+    if (tags.includes('attack') && this.actor?.hasTag?.('healer')) {
+      const _sig = Math.max(0, Math.min(1, sc.healerSignature ?? 0));
+      if (_sig > 0) dmgFormula = `(${dmgFormula}) * ${1 - _sig}`;
+    }
+
     let dmgRoll = new Roll(dmgFormula, rollData);
     await dmgRoll.evaluate();
 

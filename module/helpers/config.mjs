@@ -1202,6 +1202,25 @@ ASPECTSOFPOWER.meditation = {
  * ⚠ recoveryPerHour is INERT until there is a world-time tick to drive it —
  * deferred with the clock work. Until then strain must be cleared by hand.
  */
+/**
+ * HEALER'S SIGNATURE (design-healer-system.md) — the fraction of OFFENSIVE
+ * damage a healer gives up.
+ *
+ * "The energies they channel are altered by their own signature, making them
+ * less effective when used offensively." Mechanically this is the sacrifice
+ * that pays for the healer kit: conversions, three healing modes, and the only
+ * in-combat mana refill in the game.
+ *
+ * Driven by the `healer` ACTOR tag (user ruled 2026-08-03), so it can arrive
+ * from a class, a profession, a race or a direct grant without the engine
+ * caring which — and it applies ONCE regardless of how many of those say so,
+ * because a tag is either present or it is not.
+ *
+ * ⚠ Applies to damage only. Healing, barriers and restoration are untouched —
+ * a signature that dampened healing would be taxing the thing it pays for.
+ */
+ASPECTSOFPOWER.healerSignature = 0.25;
+
 ASPECTSOFPOWER.strain = {
   // Hard floor: strain can never take more than this fraction of true max HP.
   maxFrac: 0.5,

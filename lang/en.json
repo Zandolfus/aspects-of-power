@@ -532,6 +532,10 @@
         "label": "Armored",
         "desc": "Grants flat armor bonus"
       },
+      "healer": {
+        "label": "Healer",
+        "desc": "The energies you channel carry your own signature, and turn poorly to harm. Your offensive damage is reduced."
+      },
       "ethereal": {
         "label": "Ethereal",
         "desc": "Grants flat veil bonus"
