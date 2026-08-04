@@ -17,7 +17,8 @@ import {
   crushFlatAmount, riderMaxInvest, itemWeightLb, KG_TO_LB, carriedWeightLb,
   bracedParryWeight, bracedMaxUsefulInvest, defenceMarginMultiplier,
   buffCapacity, buffCost, buffLoadByAbility, buffDefenceCost, buffModCost,
-  abilityMod, abilityModTotal, gradeMultiplierFor, solveBuffScale,
+  abilityMod, abilityModTotal, abilityPostCurveFactors, abilityValues,
+  gradeMultiplierFor, solveBuffScale,
   resolveBuffLoad, auraRadiusFor,
 } from '../module/helpers/formulas.mjs';
 import { moonState, moonNodeAngle, nextSyzygy, eclipseAtSyzygy, planetStates,
@@ -983,28 +984,38 @@ eq('buffCapacity honours config fraction',
 
 // ⚠ THE CURVE IS APPLIED PER ABILITY, THEN SUMMED. Summing values first and
 // curving once is a different number, because x^0.8 is not additive.
-const _nine = Object.fromEntries('abcdefghi'.split('').map(k => [k, { value: 400 }]));
+const _nine = Object.fromEntries('abcdefghi'.split('').map(k => [k, 400]));
 eq('abilityModTotal curves each stat separately',
-   abilityModTotal(_nine, {}, 1, CURVECFG), 9 * abilityMod(400, 1, CURVECFG));
+   abilityModTotal(_nine, 1, null, CURVECFG), 9 * abilityMod(400, 1, CURVECFG));
 eq('abilityModTotal is not the curve of the sum',
-   abilityModTotal(_nine, {}, 1, CURVECFG) !== abilityMod(3600, 1, CURVECFG), true);
-// Negative deltas reconstruct the unbuffed body.
-eq('abilityModTotal: a negative delta removes a buff',
-   abilityModTotal({ a: { value: 500 } }, { a: -100 }, 1, CURVECFG),
-   abilityMod(400, 1, CURVECFG));
-// ⚠ POST-CURVE ADJUSTMENTS SURVIVE. Size scaling multiplies a large creature's
-// strength mod after the curve; recomputing from value alone loses it, which
-// read Phil (large) at 731 capacity against a true 755.
-eq('abilityModTotal anchors on the live mod',
-   abilityModTotal({ strength: { value: 530, mod: 734 } }, {}, 1, CURVECFG), 734);
-// And carries the same factor onto the hypothetical when a delta is applied.
-const _sized = abilityModTotal({ strength: { value: 530, mod: 734 } },
-                               { strength: 100 }, 1, CURVECFG);
-const _plain = abilityModTotal({ strength: { value: 530 } },
-                               { strength: 100 }, 1, CURVECFG);
-eq('abilityModTotal keeps the size factor under a delta', _sized > _plain, true);
-eq('abilityModTotal: size factor is preserved exactly', _sized,
-   Math.round(abilityMod(630, 1, CURVECFG) * (734 / abilityMod(530, 1, CURVECFG))));
+   abilityModTotal(_nine, 1, null, CURVECFG) !== abilityMod(3600, 1, CURVECFG), true);
+// abilityValues flattens an abilities object, optionally with deltas applied -
+// negative deltas are how the unbuffed body is reconstructed.
+eq('abilityValues applies a negative delta',
+   abilityValues({ a: { value: 500 } }, { a: -100 }), { a: 400 });
+
+// ⚠ POST-CURVE ADJUSTMENTS SURVIVE, VIA AN EXPLICIT FACTOR. Size scaling
+// multiplies a large creature's strength mod after the curve; rebuilding from
+// values alone loses it, which read Phil (large) at 731 capacity against 755.
+const _philAb = { strength: { value: 530, mod: 734 } };
+const _philF = abilityPostCurveFactors(_philAb, 1, CURVECFG);
+eq('post-curve factor recovers the live mod',
+   abilityModTotal(abilityValues(_philAb), 1, _philF, CURVECFG), 734);
+eq('a stat with no adjustment has factor 1',
+   abilityPostCurveFactors({ a: { value: 400, mod: abilityMod(400, 1, CURVECFG) } },
+                           1, CURVECFG).a, 1);
+// ⚠⚠ THE FACTOR MUST BE COMPUTED ONCE FROM THE REAL ACTOR, NOT INFERRED PER
+// CALL. Inferring it inside the total function looks equivalent, but a caller
+// pricing a HYPOTHETICAL value hands over a lowered value beside an unlowered
+// mod, and the ratio then swallows the buff instead of the size scaling -
+// live-measured, that priced a +100 strength buff at 704 mod against 145.
+const _liveAb = { strength: { value: 116, mod: abilityMod(116, 1, CURVECFG) } };
+const _liveF = abilityPostCurveFactors(_liveAb, 1, CURVECFG);
+const _reverted = abilityValues(_liveAb, { strength: -100 });   // undo the buff
+eq('re-cast pricing uses the reverted value, not the live mod',
+   buffModCost(_reverted, _liveF,
+               [{ key: 'system.abilities.strength.value', value: 100 }], 1, CURVECFG),
+   abilityMod(116, 1, CURVECFG) - abilityMod(16, 1, CURVECFG));
 
 // Splitting a change list by where the points land.
 const MIXED = [
@@ -1018,35 +1029,35 @@ eq('buffDefenceCost takes the defence half', buffDefenceCost(MIXED), 582);
 // ⚠ Defence points are ALREADY mod-scale (defences are derived from mods), so
 // they pass through uncurved. That is the unit match value space never had.
 eq('buffModCost passes defence through uncurved',
-   buffModCost({ a: { value: 400 } },
+   buffModCost({ a: 400 }, null,
                [{ key: 'system.defense.armor.value', value: 582 }], 1, CURVECFG), 582);
 
 // ⚠ COST IS MARGINAL AND TARGET-DEPENDENT. The same buff is cheaper on someone
 // who already has the stat high — the honest price of measuring real power.
-const _onLow  = buffModCost({ strength: { value: 200 } },
+const _onLow  = buffModCost({ strength: 200 }, null,
   [{ key: 'system.abilities.strength.value', value: 100 }], 1, CURVECFG);
-const _onHigh = buffModCost({ strength: { value: 1000 } },
+const _onHigh = buffModCost({ strength: 1000 }, null,
   [{ key: 'system.abilities.strength.value', value: 100 }], 1, CURVECFG);
 eq('buffModCost: the same buff costs less on a high stat', _onHigh < _onLow, true);
 
 // ⚠ SOLVED, NOT DIVIDED. room/cost overshoots because cost is concave in the
 // change values — the scaled buff must actually fit.
-const _tgt = { strength: { value: 300 } };
+const _tgt = { strength: 300 };
 const _big = [{ key: 'system.abilities.strength.value', value: 800 }];
-const _full = buffModCost(_tgt, _big, 1, CURVECFG);
+const _full = buffModCost(_tgt, null, _big, 1, CURVECFG);
 const _room = Math.round(_full / 2);
-const _s = solveBuffScale(_tgt, _big, 1, _room, CURVECFG);
-const _fits = buffModCost(_tgt,
+const _s = solveBuffScale(_tgt, null, _big, 1, _room, CURVECFG);
+const _fits = buffModCost(_tgt, null,
   _big.map(c => ({ ...c, value: Math.round(c.value * _s) })), 1, CURVECFG);
 eq('solveBuffScale: the scaled buff fits the room', _fits <= _room, true);
 eq('solveBuffScale: and is not needlessly small', _fits >= _room - 2, true);
 eq('solveBuffScale: naive room/cost would have overshot',
-   buffModCost(_tgt, _big.map(c => ({ ...c, value: Math.round(c.value * (_room / _full)) })),
+   buffModCost(_tgt, null, _big.map(c => ({ ...c, value: Math.round(c.value * (_room / _full)) })),
                1, CURVECFG) > _room, true);
 eq('solveBuffScale: a buff that fits is not scaled',
-   solveBuffScale(_tgt, _big, 1, _full * 2, CURVECFG), 1);
+   solveBuffScale(_tgt, null, _big, 1, _full * 2, CURVECFG), 1);
 eq('solveBuffScale: no room means nothing lands',
-   solveBuffScale(_tgt, _big, 1, 0, CURVECFG), 0);
+   solveBuffScale(_tgt, null, _big, 1, 0, CURVECFG), 0);
 
 // Willy's Dreams of Light Lunar (Ally): int +243, wil +229, wis +215.
 const DREAMS = [

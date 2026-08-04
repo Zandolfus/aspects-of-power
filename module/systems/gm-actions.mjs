@@ -10,7 +10,8 @@
  */
 import { EquipmentSystem } from './equipment.mjs';
 import { buffCapacity, buffModCost, buffLoadByAbility, buffDefenceCost,
-         abilityModTotal, gradeMultiplierFor, solveBuffScale,
+         abilityModTotal, abilityPostCurveFactors, abilityValues,
+         gradeMultiplierFor, solveBuffScale,
          resolveBuffLoad } from '../helpers/formulas.mjs';
 
 export async function executeGmAction(payload) {
@@ -278,42 +279,39 @@ export async function executeGmAction(payload) {
           if (replacing && e.id === replacing.id) continue;
           usedDefence += buffDefenceCost(e.changes);
         }
-        const currentTotal  = abilityModTotal(_abil, {}, _gm);
-        const unbuffedTotal = abilityModTotal(_abil, loan, _gm);
+        // Post-curve factors (size scaling) taken ONCE from the live actor,
+        // where value and mod agree, then reused for every hypothetical below.
+        const _f = abilityPostCurveFactors(_abil, _gm);
+        const _vals = abilityValues(_abil);
+        const currentTotal  = abilityModTotal(_vals, _gm, _f);
+        const unbuffedTotal = abilityModTotal(abilityValues(_abil, loan), _gm, _f);
         const buffCap = buffCapacity(unbuffedTotal);
 
         // What the OTHER live buffs cost, in mod: everything on loan, minus the
         // part belonging to the effect we are about to replace.
-        let replacedAbilityMod = 0;
+        // A re-cast must be priced against the body WITHOUT its own previous
+        // application, or the curve would charge it as if it were stacking on
+        // itself. Same reversal removes it from `used`.
+        const _backOut = {};
         if (replacing) {
-          const back = {};
           for (const [k, v] of Object.entries(buffLoadByAbility(replacing.changes))) {
-            back[k] = (back[k] ?? 0) - v;
+            _backOut[k] = (_backOut[k] ?? 0) - v;
           }
-          replacedAbilityMod = currentTotal - abilityModTotal(_abil, back, _gm);
         }
+        const _costVals = replacing ? abilityValues(_abil, _backOut) : _vals;
+        const replacedAbilityMod = replacing
+          ? currentTotal - abilityModTotal(_costVals, _gm, _f)
+          : 0;
         const buffUsed = Math.max(0,
           (currentTotal - unbuffedTotal) - replacedAbilityMod) + usedDefence;
 
-        // Cost is marginal ON THIS TARGET AS THEY STAND — but a re-cast must be
-        // priced against the body WITHOUT its own previous application, or the
-        // curve would charge it as if it were stacking on itself.
-        // ⚠ Carry `mod` across, not just `value` — abilityModTotal anchors on
-        // the live mod to preserve post-curve adjustments (size scaling), and
-        // a value-only clone would quietly drop them.
-        const _costAbil = replacing
-          ? Object.fromEntries(Object.entries(_abil).map(([k, a]) => {
-              const back = buffLoadByAbility(replacing.changes)[k] ?? 0;
-              return [k, { value: (Number(a?.value) || 0) - back, mod: a?.mod }];
-            }))
-          : _abil;
-        const incomingCost = buffModCost(_costAbil, payload.changes, _gm);
+        const incomingCost = buffModCost(_costVals, _f, payload.changes, _gm);
         const acceptOvercap = target.system?.buffs?.acceptOvercap ?? false;
         const room = Math.max(0, buffCap - buffUsed);
         const load = resolveBuffLoad({
           capacity: buffCap, used: buffUsed, cost: incomingCost, acceptOvercap,
           // Solved, not divided: mod cost is concave in the change values.
-          scale: solveBuffScale(_costAbil, payload.changes, _gm, room),
+          scale: solveBuffScale(_costVals, _f, payload.changes, _gm, room),
         });
 
         // Truncation rescales every entry by the same factor so a multi-stat

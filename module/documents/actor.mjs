@@ -3,6 +3,7 @@
 // cannot create the actor->item cycle the code standards forbid.
 import { proficiencyDamageMult } from '../systems/weapon-styles.mjs';
 import { carriedWeightLb, buffCapacity, abilityMod, abilityModTotal,
+         abilityPostCurveFactors, abilityValues,
          buffLoadByAbility, buffDefenceCost } from '../helpers/formulas.mjs';
 
 /**
@@ -364,8 +365,13 @@ export class AspectsofPowerActor extends Actor {
         }
         defenceLoad += buffDefenceCost(e.changes);
       }
-      const currentTotal  = abilityModTotal(systemData.abilities, {}, _gradeMult);
-      const unbuffedTotal = abilityModTotal(systemData.abilities, loan, _gradeMult);
+      // Factors come from the LIVE actor, where value and mod agree, and are
+      // then reused for the hypothetical unbuffed body.
+      const _f = abilityPostCurveFactors(systemData.abilities, _gradeMult);
+      const currentTotal  = abilityModTotal(
+        abilityValues(systemData.abilities), _gradeMult, _f);
+      const unbuffedTotal = abilityModTotal(
+        abilityValues(systemData.abilities, loan), _gradeMult, _f);
       systemData.buffs.capacity = buffCapacity(unbuffedTotal);
       // Used is the mod actually on loan, not the raw points written — the
       // same currency the capacity is denominated in.

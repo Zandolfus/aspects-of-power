@@ -944,26 +944,48 @@ export function gradeMultiplierFor(rank, cfg = null) {
  * @param {number} [gradeMult]
  * @param {object} [cfg]
  */
-export function abilityModTotal(abilities, deltaByKey = {}, gradeMult = 1, cfg = null) {
+export function abilityModTotal(valuesByKey, gradeMult = 1, factorByKey = null, cfg = null) {
   let sum = 0;
-  for (const [k, a] of Object.entries(abilities ?? {})) {
-    const base = Number(a?.value) || 0;
-    const d = Number(deltaByKey?.[k]) || 0;
-    const actual = Number(a?.mod);
-    const hasActual = Number.isFinite(actual);
-    // ⚠ ANCHOR ON THE LIVE `.mod` WHENEVER THERE IS NO DELTA. Some mods are
-    // adjusted AFTER the curve — size scaling multiplies a large creature's
-    // strength — so recomputing from the value alone silently disagrees with
-    // the actor. Measured on Phil (large): capacity read 731 against a true
-    // 755 because his size-boosted strength was rebuilt without the boost.
-    if (!d && hasActual) { sum += actual; continue; }
-    // With a delta, re-curve and carry the SAME post-curve factor across, so
-    // whatever adjusted the live mod still applies to the hypothetical one.
-    const curved = abilityMod(base, gradeMult, cfg);
-    const ratio = (hasActual && curved > 0) ? actual / curved : 1;
-    sum += Math.round(abilityMod(base + d, gradeMult, cfg) * ratio);
+  for (const [k, v] of Object.entries(valuesByKey ?? {})) {
+    const f = Number(factorByKey?.[k]);
+    sum += Math.round(abilityMod(v, gradeMult, cfg) * (Number.isFinite(f) ? f : 1));
   }
   return sum;
+}
+
+/**
+ * Per-ability post-curve factor: how far the actor's LIVE mod sits from what
+ * the curve alone would give. Size scaling multiplies a large creature's
+ * strength after the curve, so rebuilding a total from values alone silently
+ * disagrees with the actor — measured on Phil (large), capacity read 731
+ * against a true 755.
+ *
+ * ⚠ COMPUTE THIS ONCE, FROM THE REAL ACTOR, AND PASS IT AROUND. Deriving the
+ * factor inside the total function looks equivalent and is not: any caller that
+ * asks about a HYPOTHETICAL value (a re-cast priced without its own previous
+ * application) hands over a lowered value beside an unlowered mod, and the
+ * ratio then swallows the buff instead of the size scaling. That mis-priced a
+ * +100 strength buff at 704 mod against a true 145.
+ *
+ * @returns {object} e.g. { strength: 1.2, wisdom: 1 }
+ */
+export function abilityPostCurveFactors(abilities, gradeMult = 1, cfg = null) {
+  const out = {};
+  for (const [k, a] of Object.entries(abilities ?? {})) {
+    const curved = abilityMod(Number(a?.value) || 0, gradeMult, cfg);
+    const actual = Number(a?.mod);
+    out[k] = (Number.isFinite(actual) && curved > 0) ? actual / curved : 1;
+  }
+  return out;
+}
+
+/** Plain {key: value} map of ability values, the input abilityModTotal wants. */
+export function abilityValues(abilities, deltaByKey = null) {
+  const out = {};
+  for (const [k, a] of Object.entries(abilities ?? {})) {
+    out[k] = (Number(a?.value) || 0) + (Number(deltaByKey?.[k]) || 0);
+  }
+  return out;
 }
 
 /**
@@ -997,17 +1019,22 @@ export function buffDefenceCost(changes) {
  * steadily more expensive as the curve flattens. That falls out of the maths
  * rather than needing a rule.
  *
- * @param {object} abilities  Target's CURRENT abilities (buffs included).
- * @param {Array}  changes    The incoming buff's changes.
+ * @param {object} valuesByKey  Target's ability VALUES as the buff would land on.
+ * @param {object} factorByKey  abilityPostCurveFactors from the real actor.
+ * @param {Array}  changes      The incoming buff's changes.
  * @param {number} gradeMult
  * @param {object} [cfg]
  * @returns {number} Cost in mod points.
  */
-export function buffModCost(abilities, changes, gradeMult = 1, cfg = null) {
+export function buffModCost(valuesByKey, factorByKey, changes, gradeMult = 1, cfg = null) {
   const deltas = buffLoadByAbility(changes);
-  const before = abilityModTotal(abilities, {}, gradeMult, cfg);
-  const after  = abilityModTotal(abilities, deltas, gradeMult, cfg);
-  return Math.max(0, after - before) + buffDefenceCost(changes);
+  const after = {};
+  for (const [k, v] of Object.entries(valuesByKey ?? {})) {
+    after[k] = v + (Number(deltas[k]) || 0);
+  }
+  const gain = abilityModTotal(after, gradeMult, factorByKey, cfg)
+             - abilityModTotal(valuesByKey, gradeMult, factorByKey, cfg);
+  return Math.max(0, gain) + buffDefenceCost(changes);
 }
 
 /**
@@ -1019,13 +1046,13 @@ export function buffModCost(abilities, changes, gradeMult = 1, cfg = null) {
  * would consistently overshoot the cap. Twenty bisection steps land within
  * ~1e-6, which is far finer than the whole-point rounding downstream.
  */
-export function solveBuffScale(abilities, changes, gradeMult, room, cfg = null) {
-  const full = buffModCost(abilities, changes, gradeMult, cfg);
+export function solveBuffScale(valuesByKey, factorByKey, changes, gradeMult, room, cfg = null) {
+  const full = buffModCost(valuesByKey, factorByKey, changes, gradeMult, cfg);
   if (full <= 0) return 1;
   if (room >= full) return 1;
   if (room <= 0) return 0;
   const scaled = (s) => buffModCost(
-    abilities,
+    valuesByKey, factorByKey,
     (changes ?? []).map(c => ({ ...c, value: Math.round((Number(c.value) || 0) * s) })),
     gradeMult, cfg);
   let lo = 0, hi = 1;
