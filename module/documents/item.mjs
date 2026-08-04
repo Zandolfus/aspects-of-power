@@ -1,6 +1,6 @@
 import { EquipmentSystem } from '../systems/equipment.mjs';
 import { getPositionalTags } from '../helpers/positioning.mjs';
-import { houseHitFormula, hybridAbilityMod, weaponStatBlend, healStatBlend, spellDamageRef, spellInvestDamage, spellWindupMultiplier, spellCastWeight, strikeInvestDamage, infusionDamage, investSelfDamage as computeInvestSelfDamage, effectiveDodgeValue, splitEvenlyWithRemainder, parryMassMultiplier, bracedParryWeight, bracedMaxUsefulInvest, defenceMarginMultiplier, lunarPhaseMultiplier, dotTickDamage, procStaminaCost, crushFlatAmount, riderMaxInvest, auraRadiusFor, barrierStatBlend } from '../helpers/formulas.mjs';
+import { houseHitFormula, hybridAbilityMod, weaponStatBlend, healStatBlend, spellDamageRef, spellInvestDamage, spellWindupMultiplier, spellCastWeight, strikeInvestDamage, infusionDamage, investSelfDamage as computeInvestSelfDamage, effectiveDodgeValue, splitEvenlyWithRemainder, parryMassMultiplier, bracedParryWeight, bracedMaxUsefulInvest, defenceMarginMultiplier, lunarPhaseMultiplier, dotTickDamage, procStaminaCost, crushFlatAmount, riderMaxInvest, auraRadiusFor, barrierStatBlend, hotTickAmount } from '../helpers/formulas.mjs';
 import { recordActionFired, declareAction, isInActiveCombat, computeActionWait, referenceRoundLength, computeWindupMultiplier, getScrambleStacks, addScrambleStack, applyDodgeCost, findCombatantForActor, perceiveGate } from '../systems/celerity.mjs';
 import { getThreatRadiusFt, actorIsDashing } from '../systems/engagement-halts.mjs';
 import { selectTargetOnCanvas, selectTargetsOnCanvas, skillNeedsTargetPrompt, skillTargetsAtFire, selectMarkerOnCanvas } from '../canvas/target-prompt.mjs';
@@ -3040,6 +3040,25 @@ export class AspectsofPowerItem extends Item {
       targetActor = targetToken?.actor ?? null;
     }
 
+    // HEAL OVER TIME: place a ticking effect instead of healing now. Routed
+    // through the GM like every other restoration, because it writes to a
+    // third party's document.
+    const _hotRounds = this.system.tagConfig?.hotDuration ?? 0;
+    if (_hotRounds > 0 && resource !== 'barrier' && targetActor) {
+      const { tick, total } = hotTickAmount(
+        Math.round(dmgRoll.total), this.system.tagConfig?.hotScale ?? 0.5, _hotRounds);
+      await this._gmAction({
+        type: 'gmApplyHot',
+        targetActorUuid: targetActor.uuid,
+        effectName: `${item.name}`,
+        originUuid: this.uuid,
+        img: item.img ?? 'icons/svg/regen.svg',
+        amount: tick, resource, rounds: _hotRounds, total,
+        speaker, rollMode,
+      });
+      return;
+    }
+
     if (!targetActor) {
       ChatMessage.create({ speaker, rollMode, ...(whisperGM ? { whisper: whisperGM } : {}), content: `<p><em>No valid restoration target.</em></p>` });
       return;
@@ -5086,8 +5105,19 @@ export class AspectsofPowerItem extends Item {
     // the world were both `inferior`.
     // Gated on tier like every other spell, so a heal with no tier stays on
     // the legacy branch until its content is authored.
-    const _isHeal = tags.includes('restoration')
-      && (this.system.tagConfig?.restorationResource ?? 'health') !== 'barrier';
+    // ⚠ A HEALING AURA IS A HEAL, AND IT IS NOT `restoration`-TAGGED.
+    // Auras are spawned by `_handleBuffTag`, so an aura skill carries `buff`.
+    // Tagging it `restoration` as well does NOT work: the dispatch is a
+    // `for (tag of tags)` loop over a switch, so both handlers fire and the
+    // cast delivers a direct heal AND an aura. So the chanter mode has to be
+    // recognised by what the aura DOES, not by the tag that routes it.
+    const _isHealAura = tags.includes('buff')
+      && (this.system.tagConfig?.auraEffectType ?? 'damage') === 'heal'
+      && (this.system.tagConfig?.auraRadius ?? 0) > 0;
+
+    const _isHeal = (tags.includes('restoration')
+      && (this.system.tagConfig?.restorationResource ?? 'health') !== 'barrier')
+      || _isHealAura;
 
     // BARRIERS ARE CASTS, NOT HEALS (user ruled 2026-08-03). They join the same
     // invest branch as an attack spell — same dialog, same Wis invest cap, same
@@ -5101,7 +5131,18 @@ export class AspectsofPowerItem extends Item {
     const _isBarrier = tags.includes('restoration')
       && (this.system.tagConfig?.restorationResource ?? 'health') === 'barrier';
 
-    const isVariableSpell = ['mana', 'health'].includes(rollData.roll.resource)
+    // ⚠ STAMINA IS A CASTING RESOURCE FOR HEALS ONLY. The chanter mode is
+    // defined by casting from stamina (healing.blends.stamina), but stamina was
+    // not an accepted spell resource, so a stamina-cast heal fell to the legacy
+    // branch and the third healing blend was unreachable by construction - no
+    // amount of content could have invoked it. Deliberately NOT widened past
+    // heals: `isVariableWeapon` owns stamina for attacks, and letting attacks
+    // through here would give every weapon skill a second, spell-shaped path.
+    const _castResource = rollData.roll.resource;
+    const _castResourceOk = ['mana', 'health'].includes(_castResource)
+      || (_isHeal && _castResource === 'stamina');
+
+    const isVariableSpell = _castResourceOk
       && spellTier && spellGrade
       && (tags.includes('attack') || _isStackProducer || _isHeal || _isBarrier)
       && !_isPayloadSpender;

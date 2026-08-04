@@ -226,6 +226,38 @@ export async function executeGmAction(payload) {
         break;
       }
 
+      case 'gmApplyHot': {
+        const target = await fromUuid(payload.targetActorUuid);
+        if (!target) return;
+        const combat = game.combat;
+        // Re-applying the same HoT from the same source refreshes rather than
+        // stacking, matching how non-stackable buffs behave. Two DIFFERENT
+        // healers can both HoT the same ally.
+        const existing = target.effects.find(
+          e => e.origin === payload.originUuid && e.name === payload.effectName && !e.disabled
+        );
+        const data = {
+          name: payload.effectName,
+          img: payload.img,
+          origin: payload.originUuid,
+          type: 'base',
+          duration: { rounds: payload.rounds, startRound: combat?.round ?? 0,
+                      startTurn: combat?.turn ?? 0 },
+          disabled: false,
+          system: { hot: true, hotAmount: payload.amount,
+                    hotResource: payload.resource || 'health' },
+        };
+        if (existing) await existing.update(data);
+        else await target.createEmbeddedDocuments('ActiveEffect', [data]);
+        ChatMessage.create({
+          speaker: payload.speaker, ...msgWhisper,
+          content: `<p><strong>${target.name}</strong> gains <strong>${payload.effectName}</strong> — `
+                 + `<strong>${payload.amount}</strong> ${payload.resource} per round `
+                 + `for ${payload.rounds} rounds (${payload.total} total).</p>`,
+        });
+        break;
+      }
+
       case 'gmApplyBuff': {
         const target = await fromUuid(payload.targetActorUuid);
         if (!target) return;

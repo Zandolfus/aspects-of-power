@@ -1150,6 +1150,32 @@ export class AspectsofPowerActor extends Actor {
       }
     }
 
+    // ── 0.6. Heal over time ──
+    // Ticks at the RECIPIENT's turn start, unlike DoTs which are applied from
+    // a chat card: a heal has no mitigation, affinity or defence check to
+    // resolve, so there is nothing for a human to arbitrate.
+    // ⚠ Reads any pending value from `updateData` rather than the live pool —
+    // sustain upkeep above may already have spent from the same resource this
+    // tick, and two writes to one key would silently drop the first.
+    for (const fx of this.effects) {
+      if (fx.disabled || !fx.system?.hot) continue;
+      const amt = Math.round(fx.system.hotAmount ?? 0);
+      if (amt <= 0) continue;
+      const resKey = fx.system.hotResource || 'health';
+      const pool = systemData[resKey];
+      if (!pool) continue;
+      const cur = updateData[`system.${resKey}.value`] ?? pool.value;
+      const next = Math.min(pool.max, cur + amt);
+      const gained = next - cur;
+      if (gained <= 0) continue;
+      updateData[`system.${resKey}.value`] = next;
+      ChatMessage.create({
+        speaker, ...gmWhisper,
+        content: `<p><em>${this.name} — <strong>${fx.name}</strong> restores `
+               + `<strong>${gained}</strong> ${resKey}. (${next} / ${pool.max})</em></p>`,
+      });
+    }
+
     // ── 1. Stamina Regeneration ──
     const stamina = systemData.stamina;
     const regenPct = systemData.staminaRegen ?? 5;

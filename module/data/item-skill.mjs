@@ -151,6 +151,16 @@ export class SkillData extends foundry.abstract.TypeDataModel {
         restorationResource: new fields.StringField({ initial: 'health' }),
         restorationOverhealth: new fields.BooleanField({ initial: false }),
 
+        // HEAL OVER TIME. `hotDuration > 0` turns a restoration skill from an
+        // instant heal into a per-round one on the target: it places an effect
+        // that ticks `roll x hotScale` at the recipient's turn start.
+        // Delayed value should beat instant value - the heal can be wasted if
+        // the target dies first, or overheal if they are topped up - so a HoT
+        // that runs its full duration is worth MORE than the same skill cast
+        // directly. `hotScale` 0.5 over 3 rounds = 1.5x the burst.
+        hotDuration: new fields.NumberField({ initial: 0, min: 0, integer: true }),
+        hotScale:    new fields.NumberField({ initial: 0.5, min: 0 }),
+
         // Buff: array of { attribute, value (multiplier) } pairs + duration.
         // value is a multiplier applied to the roll total (default 1 = full roll value).
         buffEntries: new fields.ArrayField(new fields.SchemaField({

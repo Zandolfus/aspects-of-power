@@ -203,6 +203,29 @@ export function healStatBlend(abilities, resource, cfg = null) {
 }
 
 /**
+ * Per-round tick of a heal-over-time, and what the whole thing is worth.
+ *
+ * A HoT trades certainty for total: it can be wasted if the target dies first
+ * or overheals if they are already topped up, so running the full duration
+ * should beat casting the same skill instantly. At the default 0.5 scale a
+ * 3-round HoT totals 1.5x the burst, which is the premium for waiting.
+ *
+ * ⚠ The tick is frozen at apply time (see effect-base `hotAmount`) — the heal
+ * is as strong as the caster who placed it, not as they are three rounds later.
+ *
+ * @param {number} rollTotal  The skill's rolled heal.
+ * @param {number} [scale]    Per-tick fraction of that roll.
+ * @param {number} [rounds]   Duration, for the `total` figure only.
+ * @returns {{tick: number, total: number}}
+ */
+export function hotTickAmount(rollTotal, scale = 0.5, rounds = 0) {
+  const r = Math.max(0, Number(rollTotal) || 0);
+  const s = Math.max(0, Number(scale) || 0);
+  const tick = Math.round(r * s);
+  return { tick, total: tick * Math.max(0, Math.floor(Number(rounds) || 0)) };
+}
+
+/**
  * Barrier potency: an even blend of intelligence and wisdom.
  *
  * A barrier IS a cast (user ruled 2026-08-03), so it takes the caster's stats

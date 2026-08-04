@@ -21,6 +21,18 @@ export class AopEffectData extends foundry.data.ActiveEffectTypeDataModel {
       roundsAfflicted:  new fields.NumberField({ initial: 0, min: 0, integer: true }), // increments per round; scales break-roll yield; resets on re-apply
 
       // ── Damage over time ──
+      // ── Heal over time ──
+      // The mirror of `dot`, and deliberately NOT built on it: DoTs in this
+      // system are applied per round from a chat card by the GM, because
+      // damage needs mitigation, affinity and a defence check. A heal has
+      // none of that to resolve, so a HoT ticks itself at the recipient's
+      // `onStartTurn` and needs no button.
+      // `hotAmount` is frozen at apply time, like auraAmount — the heal is as
+      // strong as the caster who placed it, not as the caster is later.
+      hot:              new fields.BooleanField({ initial: false }),
+      hotAmount:        new fields.NumberField({ initial: 0, min: 0 }),
+      hotResource:      new fields.StringField({ initial: 'health' }),
+
       dot:              new fields.BooleanField({ initial: false }),
       dotDamage:        new fields.NumberField({ initial: 0 }),
       dotDamageType:    new fields.StringField({ initial: 'physical' }),

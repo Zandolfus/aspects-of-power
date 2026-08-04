@@ -19,7 +19,7 @@ import {
   buffCapacity, buffCost, buffLoadByAbility, buffDefenceCost, buffModCost,
   abilityMod, abilityModTotal, abilityPostCurveFactors, abilityValues,
   gradeMultiplierFor, solveBuffScale,
-  resolveBuffLoad, auraRadiusFor, barrierStatBlend,
+  resolveBuffLoad, auraRadiusFor, barrierStatBlend, hotTickAmount,
 } from '../module/helpers/formulas.mjs';
 import { moonState, moonNodeAngle, nextSyzygy, eclipseAtSyzygy, planetStates,
          meteorShowersOn, cometStates, julianDay, civilDate, worldTimeForDate } from '../module/systems/calendar.mjs';
@@ -919,6 +919,22 @@ eq('convert: five small casts cost the same as one big one',
 eq('convert: nothing spent is nothing gained', convertResources(0, 5, 201, 'stamina', CONVCFG).gained, 0);
 eq('convert: too little to buy one unit yields nothing',
    convertResources(4, 5, 201, 'stamina', CONVCFG).gained, 0);
+
+// ── Heal over time ───────────────────────────────────────────
+// A HoT trades certainty for total - it can be wasted if the target dies or
+// overheals if they are topped up - so a full duration must beat the burst.
+eq('hot: tick is roll x scale', hotTickAmount(240, 0.5).tick, 120);
+eq('hot: 3 rounds at 0.5 totals 1.5x the burst', hotTickAmount(240, 0.5, 3).total, 360);
+eq('hot: and that is more than casting it directly',
+   hotTickAmount(240, 0.5, 3).total > 240, true);
+// Faye's Rejuvenation as a HoT: 124 at basic, 0.5 over 3 rounds.
+eq('hot: Rejuvenation tick', hotTickAmount(124, 0.5).tick, 62);
+eq('hot: Rejuvenation total', hotTickAmount(124, 0.5, 3).total, 186);
+// A one-round HoT is strictly worse than the burst, which is the honest
+// trade - it should never be authored that way.
+eq('hot: one round is worse than instant', hotTickAmount(240, 0.5, 1).total < 240, true);
+eq('hot: no rounds is no total', hotTickAmount(240, 0.5, 0).total, 0);
+eq('hot: nothing rolled is nothing healed', hotTickAmount(0, 0.5, 3).tick, 0);
 
 // ── Barrier potency (barriers are casts, tier is the dial) ────────────────
 // GOLDEN: live mods read 2026-08-03. Willy int 672 / wis 648 -> 660;
