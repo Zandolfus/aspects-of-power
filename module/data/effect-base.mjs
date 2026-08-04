@@ -21,6 +21,24 @@ export class AopEffectData extends foundry.data.ActiveEffectTypeDataModel {
       roundsAfflicted:  new fields.NumberField({ initial: 0, min: 0, integer: true }), // increments per round; scales break-roll yield; resets on re-apply
 
       // ── Damage over time ──
+      // ROUNDS REMAINING — the live duration countdown.
+      //
+      // ⚠⚠ THE DURATION IS NOT READ FROM `duration.rounds`. Foundry v14 stores
+      // an effect duration as `{value, units, expiry, expired}`; the old
+      // `rounds` / `startRound` fields are `undefined`, so the expiry check
+      // that read them skipped EVERY effect and nothing in the world had
+      // expired since the v14 migration. Silent, because a buff that never
+      // wears off throws no error.
+      //
+      // ⚠ AND NOT COMPUTED FROM `combat.round`, which does not advance under
+      // celerity — the same trap that forced reaction cooldowns onto a
+      // rounds-remaining model in May. This is that model, for durations.
+      //
+      // null = not yet seeded; the first countdown seeds it from
+      // `duration.value`. That keeps effects created before this field
+      // existed working without a migration.
+      roundsRemaining: new fields.NumberField({ initial: null, nullable: true, integer: true }),
+
       // ── Heal over time ──
       // The mirror of `dot`, and deliberately NOT built on it: DoTs in this
       // system are applied per round from a chat card by the GM, because

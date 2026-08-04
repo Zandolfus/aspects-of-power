@@ -1101,24 +1101,24 @@ export class AspectsofPowerActor extends Actor {
     // posts an apply-damage chat button per target.
     await this._tickActorAuras(speaker, gmWhisper);
 
-    // ── 0. Effect Expiry — delete effects whose duration has elapsed ──
-    const currentRound = combat.round;
+    // ── 0. Duration countdown — WORK OUT what expires, but do not delete yet.
+    // The actual deletion happens after the per-round ticks below, so a
+    // duration-N effect ticks exactly N times (the same reason the aura tick
+    // above runs first). Deleting here would rob the last tick.
     const toExpire = [];
+    const toDecrement = [];
     for (const effect of this.effects) {
-      const dur = effect.duration;
-      if (!dur?.rounds || dur.rounds <= 0) continue;
-      const startRound = dur.startRound ?? 0;
-      if (startRound > 0 && currentRound - startRound >= dur.rounds) {
-        toExpire.push(effect);
-      }
-    }
-    if (toExpire.length > 0) {
-      const names = toExpire.map(e => e.name).filter(Boolean);
-      await this.deleteEmbeddedDocuments('ActiveEffect', toExpire.map(e => e.id));
-      ChatMessage.create({
-        whisper: ChatMessage.getWhisperRecipients('GM'),
-        content: `<p>Expired effects on <strong>${this.name}</strong>: ${names.join(', ')}</p>`,
-      });
+      // Only round-based durations are ours to count. Seconds-based ones
+      // belong to world time, and untimed effects run until dispelled.
+      const units = effect.duration?.units ?? effect._source?.duration?.units ?? '';
+      if (units && units !== 'rounds') continue;
+      const stored = effect.system?.roundsRemaining;
+      const authored = Number(effect.duration?.value
+        ?? effect._source?.duration?.value ?? 0);
+      const remaining = (stored === null || stored === undefined) ? authored : stored;
+      if (!(remaining > 0)) continue;
+      if (remaining - 1 <= 0) toExpire.push(effect);
+      else toDecrement.push({ effect, next: remaining - 1 });
     }
 
     // ── 0.5. Sustain Upkeep ──
@@ -1174,6 +1174,25 @@ export class AspectsofPowerActor extends Actor {
         content: `<p><em>${this.name} — <strong>${fx.name}</strong> restores `
                + `<strong>${gained}</strong> ${resKey}. (${next} / ${pool.max})</em></p>`,
       });
+    }
+
+    // ── 0.7. Commit the duration countdown ──
+    // AFTER the aura and HoT ticks, so an effect delivers its full N rounds.
+    for (const { effect, next } of toDecrement) {
+      try { await effect.update({ 'system.roundsRemaining': next }); } catch { /* deleted */ }
+    }
+    if (toExpire.length > 0) {
+      const names = toExpire.map(e => e.name).filter(Boolean);
+      // Filter to effects that still exist - a sustain drop or a barrier break
+      // earlier in this same handler may already have removed one.
+      const ids = toExpire.map(e => e.id).filter(id => this.effects.has(id));
+      if (ids.length > 0) {
+        await this.deleteEmbeddedDocuments('ActiveEffect', ids);
+        ChatMessage.create({
+          whisper: ChatMessage.getWhisperRecipients('GM'),
+          content: `<p>Expired effects on <strong>${this.name}</strong>: ${names.join(', ')}</p>`,
+        });
+      }
     }
 
     // ── 1. Stamina Regeneration ──

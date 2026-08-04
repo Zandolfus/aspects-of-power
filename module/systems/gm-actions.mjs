@@ -245,7 +245,10 @@ export async function executeGmAction(payload) {
                       startTurn: combat?.turn ?? 0 },
           disabled: false,
           system: { hot: true, hotAmount: payload.amount,
-                    hotResource: payload.resource || 'health' },
+                    hotResource: payload.resource || 'health',
+                    // Seeded explicitly so a REFRESH restarts the clock rather
+                    // than inheriting the old effect's part-spent countdown.
+                    roundsRemaining: payload.rounds },
         };
         if (existing) await existing.update(data);
         else await target.createEmbeddedDocuments('ActiveEffect', [data]);
@@ -414,6 +417,7 @@ export async function executeGmAction(payload) {
             const updateData = {
               changes: merged,
               'duration.rounds': newDuration,
+              'system.roundsRemaining': newDuration,
               'duration.startRound': startRound,
               'duration.startTurn': startTurn,
             };
@@ -431,6 +435,8 @@ export async function executeGmAction(payload) {
               const updateData = {
                 changes: payload.changes,
                 'duration.rounds': payload.duration,
+              'system.roundsRemaining': payload.duration,
+                'system.roundsRemaining': payload.duration,
                 'duration.startRound': startRound,
                 'duration.startTurn': startTurn,
               };
@@ -452,6 +458,7 @@ export async function executeGmAction(payload) {
               disabled: false,
               changes: payload.changes,
               'duration.rounds': payload.duration,
+              'system.roundsRemaining': payload.duration,
               'duration.startRound': startRound,
               'duration.startTurn': startTurn,
             };
@@ -635,6 +642,7 @@ export async function executeGmAction(payload) {
             const updateData = {
               changes: merged,
               'duration.rounds': newDuration,
+              'system.roundsRemaining': newDuration,
               'duration.startRound': startRound,
               'duration.startTurn': startTurn,
             };
@@ -767,6 +775,7 @@ export async function executeGmAction(payload) {
             if (existingFrozen) {
               await existingFrozen.update({
                 'duration.rounds':     frozenDuration,
+                'system.roundsRemaining': frozenDuration,
                 'duration.startRound': startRound,
                 'duration.startTurn':  startTurn,
               });
