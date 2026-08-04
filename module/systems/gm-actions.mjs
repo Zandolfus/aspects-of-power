@@ -397,7 +397,12 @@ export async function executeGmAction(payload) {
         // "weaker re-cast still overwrites" rule below, and stamping into that
         // object would flip it true for every plain stat buff, letting a weak
         // refresh overwrite a strong active one.
-        const buffSystem = { ...sysOverrides, effectType: 'buff' };
+        // Seed the countdown explicitly rather than leaning on the
+        // seed-from-duration.value fallback. The fallback works, but it depends
+        // on Foundry normalising `{rounds: N}` into `{value: N}` on create -
+        // one more thing that would break silently if v15 moves it again.
+        const buffSystem = { ...sysOverrides, effectType: 'buff',
+                             roundsRemaining: payload.duration };
 
         if (existing && !existing.disabled) {
           if (payload.stackable) {

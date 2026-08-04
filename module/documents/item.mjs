@@ -5196,7 +5196,10 @@ export class AspectsofPowerItem extends Item {
         ChatMessage.create({
           speaker, rollMode, ...(whisperGM ? { whisper: whisperGM } : {}),
           flavor: label,
-          content: `<p>Not enough mana to cast (need ${baseManaAt5ft}, have ${livePool}).</p>`,
+          // Names the ACTUAL resource: stamina is a valid casting resource for
+          // heals now, and a chanter told they lack "mana" would go looking in
+          // the wrong pool.
+          content: `<p>Not enough ${_resKey} to cast (need ${baseManaAt5ft}, have ${livePool}).</p>`,
         });
         return;
       }
