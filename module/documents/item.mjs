@@ -3021,10 +3021,15 @@ export class AspectsofPowerItem extends Item {
     const target   = this.system.tagConfig?.restorationTarget ?? 'selected';
     const resource = this.system.tagConfig?.restorationResource ?? 'health';
 
-    // Barrier: value comes from variable mana cost × multiplier, not roll total.
-    if (resource === 'barrier') {
+    // BARRIERS ARE CASTS (user ruled 2026-08-03): the roll IS the barrier, same
+    // as a heal, so card, preview and applied amount cannot drift apart.
+    // ⚠ Only skills that actually reached the invest branch have a meaningful
+    // roll. An UNTIERED barrier still falls to the legacy path and keeps the old
+    // `investedMana x barrierMultiplier`, or it would read as an unscaled roll
+    // with no tier and no rarity behind it.
+    if (resource === 'barrier' && rollData.roll.variableManaCost != null) {
       const multiplier = this.system.tagConfig?.barrierMultiplier ?? 1;
-      amount = Math.round((rollData.roll.variableManaCost ?? amount) * multiplier);
+      amount = Math.round(rollData.roll.variableManaCost * multiplier);
     }
 
     let targetActor;
@@ -3065,7 +3070,11 @@ export class AspectsofPowerItem extends Item {
       // reform-failure tear down the sustain marker in return.
       if (this.system.tagConfig?.barrierReform) {
         actionPayload.barrierReform = true;
-        actionPayload.reformCost = Math.round(rollData.roll.variableManaCost ?? casterCost) || 0;
+        // Reform re-pays what was actually committed: the invest amount on the
+        // cast path, the prompted mana on the legacy one. `roll.cost` carries
+        // both, so this keeps working now that barriers invest like spells.
+        actionPayload.reformCost =
+          Math.round(rollData.roll.variableManaCost ?? casterCost ?? 0) || 0;
         actionPayload.originUuid = this.uuid;
         actionPayload.sourceSkillId = this.id;
       }
@@ -5080,9 +5089,21 @@ export class AspectsofPowerItem extends Item {
     const _isHeal = tags.includes('restoration')
       && (this.system.tagConfig?.restorationResource ?? 'health') !== 'barrier';
 
+    // BARRIERS ARE CASTS, NOT HEALS (user ruled 2026-08-03). They join the same
+    // invest branch as an attack spell — same dialog, same Wis invest cap, same
+    // tier/windup/rarity — and keep INT as their potency rather than swapping in
+    // a healing blend. A ward is a thing you conjure, so the stat that makes you
+    // a good caster is the stat that makes it big.
+    //
+    // Before this a barrier was `investedMana x barrierMultiplier`: no stat term
+    // at all, so a wisdom-811 healer and a wisdom-200 swordsman made identical
+    // shields, and tier, rarity and windup were all inert.
+    const _isBarrier = tags.includes('restoration')
+      && (this.system.tagConfig?.restorationResource ?? 'health') === 'barrier';
+
     const isVariableSpell = ['mana', 'health'].includes(rollData.roll.resource)
       && spellTier && spellGrade
-      && (tags.includes('attack') || _isStackProducer || _isHeal)
+      && (tags.includes('attack') || _isStackProducer || _isHeal || _isBarrier)
       && !_isPayloadSpender;
 
     const isVariableWeapon = rollData.roll.resource === 'stamina'
@@ -5396,7 +5417,17 @@ export class AspectsofPowerItem extends Item {
         // "how much is a heal worth". Keeping them separate means retuning heal
         // size never disturbs which stats a healer wants.
         const _healCoef = _isHeal ? (sc.healing?.coefficient ?? 1) : 1;
-        dmgFormula = String(strikeInvestDamage(_potency, multiplier * _healCoef,
+        // A barrier rides the same rarity slot: its coefficient says what a
+        // point of temporary HP is worth, and the skill's own barrierMultiplier
+        // stays as a per-skill tweak so authored identity survives (Harvey's
+        // Guardian Ward is a x3 ward on a low-int body, and should still be a
+        // real ward). Uncoefficiented, a max-invested basic barrier measured at
+        // 185% of the caster's OWN health bar.
+        const _barrierCoef = _isBarrier
+          ? (sc.barrier?.coefficient ?? 1) * (this.system.tagConfig?.barrierMultiplier ?? 1)
+          : 1;
+        dmgFormula = String(strikeInvestDamage(_potency,
+          multiplier * _healCoef * _barrierCoef,
           _spellWindup, effectiveInvested, spellDmgRef));
       }
 
@@ -5621,8 +5652,14 @@ export class AspectsofPowerItem extends Item {
       }
     }
 
-    // Variable mana cost for barrier skills — prompt user for amount.
-    const isBarrier = tags.includes('restoration') && this.system.tagConfig?.restorationResource === 'barrier';
+    // Variable mana cost for LEGACY (untiered) barrier skills only.
+    // ⚠ A barrier that reached the invest branch already committed its mana at
+    // the invest dialog — prompting again here would charge twice and overwrite
+    // the roll-driven amount with a flat mana multiple, silently undoing the
+    // whole barriers-are-casts change.
+    const isBarrier = !isVariableSpell
+      && tags.includes('restoration')
+      && this.system.tagConfig?.restorationResource === 'barrier';
     if (isBarrier) {
       const maxMana = this.actor.system[rollData.roll.resource]?.value ?? 0;
       if (maxMana <= 0) {

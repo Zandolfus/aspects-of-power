@@ -1244,6 +1244,32 @@ ASPECTSOFPOWER.strain = {
 };
 
 /**
+ * BARRIERS ARE CASTS, NOT HEALS (user ruled 2026-08-03).
+ *
+ * A barrier runs the attack-spell formula — INT potency, tier, grade, rarity,
+ * windup, invest curve, and the same Wis-based invest cap — and produces
+ * temporary HP instead of damage. It does NOT use the healing blends: the mode
+ * system answers "what kind of healer are you", and a ward is not a heal.
+ *
+ * ⚠ THE COEFFICIENT IS NOT OPTIONAL. Measured 2026-08-03 across all 13 live
+ * barriers: raw, the cast formula pays a median 20x what the old
+ * `investedMana x barrierMultiplier` did at base cost, and a max-invested basic
+ * barrier reached 185% of the caster's OWN health bar (Aiden). 0.25 matches the
+ * healing coefficient, which lands the same barriers at 14-51% of a bar.
+ *
+ * ⚠ The invest CAP is what stops the runaway, not this number — barriers now
+ * inherit `spellMaxInvestAboveBase`, which holds max legal commit to 26-105
+ * mana against the 98-361 the old uncapped prompt allowed.
+ *
+ * `tagConfig.barrierMultiplier` survives as a PER-SKILL tweak on top, so
+ * authored identity is preserved: Harvey's Guardian Ward is a x3 ward on a
+ * low-int body and should still be a real ward.
+ */
+ASPECTSOFPOWER.barrier = {
+  coefficient: 0.25,
+};
+
+/**
  * AURAS (design-healer-system.md — the chanter's range envelope).
  *
  * Radius = authored radius x (1 + Per.mod / perceptionDivisor). See
