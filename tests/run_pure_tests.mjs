@@ -19,7 +19,7 @@ import {
   buffCapacity, buffCost, buffLoadByAbility, buffDefenceCost, buffModCost,
   abilityMod, abilityModTotal, abilityPostCurveFactors, abilityValues,
   gradeMultiplierFor, solveBuffScale,
-  resolveBuffLoad, auraRadiusFor,
+  resolveBuffLoad, auraRadiusFor, barrierStatBlend,
 } from '../module/helpers/formulas.mjs';
 import { moonState, moonNodeAngle, nextSyzygy, eclipseAtSyzygy, planetStates,
          meteorShowersOn, cometStates, julianDay, civilDate, worldTimeForDate } from '../module/systems/calendar.mjs';
@@ -919,6 +919,30 @@ eq('convert: five small casts cost the same as one big one',
 eq('convert: nothing spent is nothing gained', convertResources(0, 5, 201, 'stamina', CONVCFG).gained, 0);
 eq('convert: too little to buy one unit yields nothing',
    convertResources(4, 5, 201, 'stamina', CONVCFG).gained, 0);
+
+// ── Barrier potency (barriers are casts, tier is the dial) ────────────────
+// GOLDEN: live mods read 2026-08-03. Willy int 672 / wis 648 -> 660;
+// Harvey int 243 / wis 811 -> 527; Gabriel int 262 / wis 379 -> 321.
+const BCFG = { barrier: { blend: { primary: 'intelligence', secondary: 'wisdom',
+                                   pw: 0.5, sw: 0.5 } } };
+const mkIW = (i, w) => ({ intelligence: { mod: i }, wisdom: { mod: w } });
+eq('barrier blend: Willy', barrierStatBlend(mkIW(672, 648), BCFG), 660);
+eq('barrier blend: Harvey', barrierStatBlend(mkIW(243, 811), BCFG), 527);
+eq('barrier blend: Gabriel', barrierStatBlend(mkIW(262, 379), BCFG), 321);
+eq('barrier blend: missing abilities are zero', barrierStatBlend(null, BCFG), 0);
+// ⚠ THE POINT OF THE BLEND: pure INT made the WARDERS (low int, high wis) far
+// worse at warding than the artillery casters. Measured 2.48x; the blend puts
+// them at parity. Harvey (int 243) out-blends Aiden (int 741, wis 214) only
+// because his wisdom is the highest in the game.
+const _bHarvey = barrierStatBlend(mkIW(243, 811), BCFG);
+const _bAiden  = barrierStatBlend(mkIW(741, 214), BCFG);
+eq('barrier blend: wisdom rescues the warder', _bHarvey > _bAiden, true);
+eq('barrier blend: pure int would have inverted it', 243 < 741, true);
+// The weights are a knob, and 0/100 collapses to a single stat.
+eq('barrier blend honours config weights',
+   barrierStatBlend(mkIW(100, 900),
+     { barrier: { blend: { primary: 'intelligence', secondary: 'wisdom', pw: 1, sw: 0 } } }),
+   100);
 
 // ── Aura radius (the chanter's range envelope) ────────────────────────────
 // GOLDEN: the two live auras and the real perception spread, read 2026-08-03.

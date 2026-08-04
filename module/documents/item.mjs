@@ -1,6 +1,6 @@
 import { EquipmentSystem } from '../systems/equipment.mjs';
 import { getPositionalTags } from '../helpers/positioning.mjs';
-import { houseHitFormula, hybridAbilityMod, weaponStatBlend, healStatBlend, spellDamageRef, spellInvestDamage, spellWindupMultiplier, spellCastWeight, strikeInvestDamage, infusionDamage, investSelfDamage as computeInvestSelfDamage, effectiveDodgeValue, splitEvenlyWithRemainder, parryMassMultiplier, bracedParryWeight, bracedMaxUsefulInvest, defenceMarginMultiplier, lunarPhaseMultiplier, dotTickDamage, procStaminaCost, crushFlatAmount, riderMaxInvest, auraRadiusFor } from '../helpers/formulas.mjs';
+import { houseHitFormula, hybridAbilityMod, weaponStatBlend, healStatBlend, spellDamageRef, spellInvestDamage, spellWindupMultiplier, spellCastWeight, strikeInvestDamage, infusionDamage, investSelfDamage as computeInvestSelfDamage, effectiveDodgeValue, splitEvenlyWithRemainder, parryMassMultiplier, bracedParryWeight, bracedMaxUsefulInvest, defenceMarginMultiplier, lunarPhaseMultiplier, dotTickDamage, procStaminaCost, crushFlatAmount, riderMaxInvest, auraRadiusFor, barrierStatBlend } from '../helpers/formulas.mjs';
 import { recordActionFired, declareAction, isInActiveCombat, computeActionWait, referenceRoundLength, computeWindupMultiplier, getScrambleStacks, addScrambleStack, applyDodgeCost, findCombatantForActor, perceiveGate } from '../systems/celerity.mjs';
 import { getThreatRadiusFt, actorIsDashing } from '../systems/engagement-halts.mjs';
 import { selectTargetOnCanvas, selectTargetsOnCanvas, skillNeedsTargetPrompt, skillTargetsAtFire, selectMarkerOnCanvas } from '../canvas/target-prompt.mjs';
@@ -5411,23 +5411,27 @@ export class AspectsofPowerItem extends Item {
         // roll: card, preview and applied amount cannot drift apart.
         const _potency = _isHeal
           ? healStatBlend(this.actor.system.abilities, rollData.roll.resource)
-          : intMod;
+          : (_isBarrier
+              ? barrierStatBlend(this.actor.system.abilities)
+              : intMod);
         // The healing coefficient rides the RARITY multiplier rather than the
         // blend: the blend answers "who heals well", the coefficient answers
         // "how much is a heal worth". Keeping them separate means retuning heal
         // size never disturbs which stats a healer wants.
         const _healCoef = _isHeal ? (sc.healing?.coefficient ?? 1) : 1;
-        // A barrier rides the same rarity slot: its coefficient says what a
-        // point of temporary HP is worth, and the skill's own barrierMultiplier
-        // stays as a per-skill tweak so authored identity survives (Harvey's
-        // Guardian Ward is a x3 ward on a low-int body, and should still be a
-        // real ward). Uncoefficiented, a max-invested basic barrier measured at
-        // 185% of the caster's OWN health bar.
-        const _barrierCoef = _isBarrier
-          ? (sc.barrier?.coefficient ?? 1) * (this.system.tagConfig?.barrierMultiplier ?? 1)
-          : 1;
-        dmgFormula = String(strikeInvestDamage(_potency,
-          multiplier * _healCoef * _barrierCoef,
+        // ⚠ A BARRIER TAKES NO COEFFICIENT AND NO barrierMultiplier — TIER IS
+        // THE DIAL (ruled 2026-08-03 after measuring). Both were removed for
+        // the same reason: measured in the RIGHT UNIT they were correcting a
+        // problem that did not exist. Absorption looks alarming against a
+        // health bar, but a barrier eats RAW damage and armour eats most of a
+        // raw hit, so the honest unit is INCOMING HITS ABSORBED. In that unit,
+        // a basic barrier lands at a median 0.95 hits across the live roster —
+        // exactly one attack, which is precisely what a reaction shield is for.
+        // Higher tiers then buy 2-3 hits and justify costing an action.
+        // The multiplier went with it because rarity is the identity lever
+        // every other spell already uses; keeping a second, unbalanced power
+        // axis in a single field is what let a x3 hide inside a `common`.
+        dmgFormula = String(strikeInvestDamage(_potency, multiplier * _healCoef,
           _spellWindup, effectiveInvested, spellDmgRef));
       }
 

@@ -203,6 +203,31 @@ export function healStatBlend(abilities, resource, cfg = null) {
 }
 
 /**
+ * Barrier potency: an even blend of intelligence and wisdom.
+ *
+ * A barrier IS a cast (user ruled 2026-08-03), so it takes the caster's stats
+ * rather than a healing blend — but pure INT inverts the fiction. Measured
+ * across the live roster, pure INT made the two characters whose identity is
+ * warding (Gabriel, Harvey) 2.48x WORSE at it than the artillery casters. The
+ * even blend lands them at 1.03x — dead parity — with no content re-authoring,
+ * because a ward is something you conjure (int) and then hold together (wis).
+ *
+ * ⚠ Wisdom already sets the invest CAP, so it pays twice for barriers. 50/50
+ * halves that double-dip rather than removing it; going further (0.6 wis) tips
+ * warders past casters and compounds it.
+ *
+ * @param {object} abilities  actor.system.abilities
+ * @param {object} [cfg]      CONFIG override (tests)
+ */
+export function barrierStatBlend(abilities, cfg = null) {
+  const sc = cfg ?? (globalThis.CONFIG?.ASPECTSOFPOWER ?? {});
+  const b = sc.barrier?.blend ?? {};
+  const p = Number(abilities?.[b.primary ?? 'intelligence']?.mod) || 0;
+  const s = Number(abilities?.[b.secondary ?? 'wisdom']?.mod) || 0;
+  return Math.round(p * (b.pw ?? 0.5) + s * (b.sw ?? 0.5));
+}
+
+/**
  * The invest curve exponent (config `invest.curveExponent`, default 0.2).
  *
  * ONE exponent governs every commit-more-for-more in the game — spell damage,

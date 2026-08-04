@@ -1251,22 +1251,42 @@ ASPECTSOFPOWER.strain = {
  * temporary HP instead of damage. It does NOT use the healing blends: the mode
  * system answers "what kind of healer are you", and a ward is not a heal.
  *
- * ⚠ THE COEFFICIENT IS NOT OPTIONAL. Measured 2026-08-03 across all 13 live
- * barriers: raw, the cast formula pays a median 20x what the old
- * `investedMana x barrierMultiplier` did at base cost, and a max-invested basic
- * barrier reached 185% of the caster's OWN health bar (Aiden). 0.25 matches the
- * healing coefficient, which lands the same barriers at 14-51% of a bar.
+ * ⚠⚠ NO COEFFICIENT AND NO barrierMultiplier — TIER IS THE DIAL.
  *
- * ⚠ The invest CAP is what stops the runaway, not this number — barriers now
- * inherit `spellMaxInvestAboveBase`, which holds max legal commit to 26-105
- * mana against the 98-361 the old uncapped prompt allowed.
+ * Both were removed after measuring in the right unit. A barrier absorbs RAW
+ * damage, and armour eats most of a raw hit, so "share of a health bar" wildly
+ * overstates it — that framing said 80% of barrier/tier combinations were
+ * broken. The honest unit is INCOMING HITS ABSORBED, and in that unit a basic
+ * barrier lands at a median 0.95 hits across the combat-ready roster: exactly
+ * one attack. Higher tiers buy 2-3 hits and so justify costing an action.
  *
- * `tagConfig.barrierMultiplier` survives as a PER-SKILL tweak on top, so
- * authored identity is preserved: Harvey's Guardian Ward is a x3 ward on a
- * low-int body and should still be a real ward.
+ * So the tier ladder already separates the two jobs, with no extra knob:
+ *   basic          reaction shields - eat the attack that triggered you
+ *   high / greater action-cost wards - absorb 2-3 hits, worth a turn
+ *
+ * The multiplier went with it because RARITY is the identity lever every other
+ * spell already uses. A per-skill x3 is a second, unbalanced power axis hiding
+ * in one field — it is how Harvey's Guardian Ward was a x3 ward while reading
+ * as `common`. Rarity spans 2.67x (inferior 0.45 to divine 1.2) against the
+ * multiplier's 3x, so it can carry the same range honestly.
+ *
+ * ⚠ The invest CAP is what stops a runaway, not a coefficient — barriers
+ * inherit `spellMaxInvestAboveBase`, holding max legal commit to 26-105 mana
+ * against the whole pool the old bespoke prompt allowed.
+ *
+ * ⚠ ACCEPTED (user, 2026-08-03): the premier mage gets the stronger shield.
+ * Willy's mana pool buys the largest invest cap, so his basic reaction shield
+ * absorbs ~2.16 hits against Gabriel's 0.73. That spread is the caster stats
+ * doing their job, not a bug.
+ *
+ * `tagConfig.barrierMultiplier` still exists in the schema and still drives the
+ * LEGACY (untiered) path, which stays `investedMana x multiplier` until a
+ * barrier's content is authored with a tier.
  */
 ASPECTSOFPOWER.barrier = {
-  coefficient: 0.25,
+  // Potency blend. Pure INT made the warders 2.48x worse at warding than the
+  // artillery casters; 50/50 puts them at 1.03x. See barrierStatBlend.
+  blend: { primary: 'intelligence', secondary: 'wisdom', pw: 0.5, sw: 0.5 },
 };
 
 /**
