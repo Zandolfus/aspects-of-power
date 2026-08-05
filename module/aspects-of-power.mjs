@@ -2497,6 +2497,45 @@ Hooks.on('renderChatMessageHTML', (message, html) => {
 
       await target.update(updateData);
 
+      // ── KI ON PIERCE (ki monk, user ruled 2026-08-05) ────────────────────
+      // A passive with `stackOnPierce` + `stackPool` banks stacks when its
+      // owner lands damage that REACHES HP. `remaining` is resolveDamage's
+      // hpLoss, so this asks the pipeline whether the wall was beaten rather
+      // than re-deriving it (playbook-damage-measurement: re-implementing the
+      // chain produced five wrong answers to one question).
+      //
+      // ⚠ THE PIERCE CONDITION IS THE BALANCE, not flavour. A minimum-cost
+      // strike does not get through real armour and banks nothing, so earning
+      // ki means investing above base — which spends above the stamina regen
+      // line by construction. That is what keeps "free strikes -> free ki ->
+      // free healing" from forming, without a separate floor rule.
+      //
+      // Isolated: a ki failure must never break damage application.
+      if (remaining > 0 && attackerActorUuid) {
+        try {
+          const kiActor = (await fromUuid(attackerActorUuid).catch(() => null));
+          const ka = kiActor?.actor ?? kiActor;
+          for (const sk of (ka?.items ?? [])) {
+            if (sk.type !== 'skill') continue;
+            const kc = sk.system?.tagConfig ?? {};
+            if (!(kc.stackOnPierce > 0) || !kc.stackPool) continue;
+            const { addStacks } = await import('./systems/stacks.mjs');
+            const { statStackCap } = await import('./helpers/formulas.mjs');
+            await addStacks(ka, kc.stackPool, kc.stackOnPierce, {
+              cap: statStackCap(
+                kc.stackCapStat ? (ka.system?.abilities?.[kc.stackCapStat]?.mod ?? 0) : 0,
+                kc.stackCap ?? 0),
+              sourceSkill: sk.name,
+              label: `${sk.name} (${kc.stackPool})`,
+              img: sk.img,
+              payload: 0,   // ki is a COUNTER, not a banked payload
+            });
+          }
+        } catch (e) {
+          console.error('[ki] on-pierce generation failed — damage already applied:', e);
+        }
+      }
+
       // Sleep breaks on taking damage.
       if (remaining > 0) {
         const sleepEffect = getActiveDebuff(target, 'sleep');
