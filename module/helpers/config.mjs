@@ -1303,6 +1303,17 @@ ASPECTSOFPOWER.barrier = {
  * character in the world — always covering the huddle, never the battlefield.
  * Dropping it toward 100 makes auras map-wide for the current main cast.
  */
+/**
+ * STACKS — stat-derived caps (ki monk, ruled 2026-08-05).
+ * Stacks are COUNTED OBJECTS, not a resource bar, so an ability mod in the
+ * hundreds has to become a ceiling in the single digits. statCapDivisor does
+ * that; statCapMax stops a colossal endurance build carrying a silly bar.
+ */
+ASPECTSOFPOWER.stacks = {
+  statCapDivisor: 150,
+  statCapMax:     10,
+};
+
 ASPECTSOFPOWER.auras = {
   perceptionDivisor: 1000,
 

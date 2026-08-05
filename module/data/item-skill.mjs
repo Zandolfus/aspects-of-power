@@ -364,6 +364,12 @@ export class SkillData extends foundry.abstract.TypeDataModel {
         stackCost:     new fields.NumberField({ initial: 0, min: 0, integer: true }),
         stackMaxSpend: new fields.NumberField({ initial: 0, min: 0, integer: true }),
         stackCap:      new fields.NumberField({ initial: 0, min: 0, integer: true }),
+        //   stackCapStat   ability whose MOD sets the cap instead of the flat
+        //                  `stackCap` above (ki monk: 'endurance'). Empty =
+        //                  use stackCap verbatim, so this is purely additive.
+        //                  Resolved by formulas.statStackCap; the authored
+        //                  stackCap becomes the FLOOR.
+        stackCapStat:  new fields.StringField({ initial: '' }),
         stackScaling:  new fields.NumberField({ initial: 1.0, min: 0 }),
         // MULTI-TARGET SPREAD. One activation throws F fields across T targets
         // subject to F + T <= stackSpreadBudget. At 6: 5-at-one, 4-at-two,

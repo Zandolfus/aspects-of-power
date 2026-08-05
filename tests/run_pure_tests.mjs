@@ -1331,6 +1331,28 @@ eq('capping is reported', capped.capped, true);
 eq('moments are one period apart',
    F2.auraTickMoments(1000, 1350, P, AURA_CFG).moments, [1100, 1200, 1300]);
 
+// ── KI CAP: a stack ceiling from an ability mod ─────────────────────────────
+// Stacks are COUNTED OBJECTS, so a mod in the hundreds must become a ceiling
+// in the single digits. The additive-safety property is the one that matters:
+// no stat named -> the authored value comes back untouched, so every existing
+// producer in the world is unchanged by this feature existing.
+const KI = { stacks: { statCapDivisor: 150, statCapMax: 10 } };
+eq('no stat named returns the authored cap', F2.statStackCap(0, 3, KI), 3);
+eq('no stat and no authored cap is 0', F2.statStackCap(0, 0, KI), 0);
+eq('endurance 600 -> 4 ki', F2.statStackCap(600, 0, KI), 4);
+eq('endurance 1085 -> 7 ki', F2.statStackCap(1085, 0, KI), 7);
+// The authored value is a FLOOR, never a ceiling — an author who wrote 3 meant
+// at least 3, even for a low-endurance carrier.
+eq('authored value floors a small stat', F2.statStackCap(150, 3, KI), 3);
+eq('a big stat beats the authored floor', F2.statStackCap(1500, 3, KI), 10);
+// Hard max stops a colossal build carrying an absurd bar.
+eq('cap is bounded by statCapMax', F2.statStackCap(99999, 0, KI), 10);
+eq('divisor is a knob',
+   F2.statStackCap(600, 0, { stacks: { statCapDivisor: 75, statCapMax: 10 } }), 8);
+// Junk must not produce NaN stacks.
+eq('non-finite stat falls back to authored', F2.statStackCap(NaN, 2, KI), 2);
+eq('negative stat falls back to authored', F2.statStackCap(-50, 2, KI), 2);
+
 // ── SOURCE GUARD: flag scopes ────────────────────────────────────────────────
 // Not a formula test — a repo scan, because this bug class is invisible to
 // every other kind of check we run.

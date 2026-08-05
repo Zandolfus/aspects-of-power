@@ -1,6 +1,6 @@
 import { EquipmentSystem } from '../systems/equipment.mjs';
 import { getPositionalTags } from '../helpers/positioning.mjs';
-import { houseHitFormula, hybridAbilityMod, weaponStatBlend, healStatBlend, spellDamageRef, spellInvestDamage, spellWindupMultiplier, spellCastWeight, strikeInvestDamage, infusionDamage, investSelfDamage as computeInvestSelfDamage, effectiveDodgeValue, splitEvenlyWithRemainder, parryMassMultiplier, bracedParryWeight, bracedMaxUsefulInvest, defenceMarginMultiplier, lunarPhaseMultiplier, dotTickDamage, procStaminaCost, crushFlatAmount, riderMaxInvest, auraRadiusFor, barrierStatBlend, hotTickAmount } from '../helpers/formulas.mjs';
+import { houseHitFormula, hybridAbilityMod, weaponStatBlend, healStatBlend, spellDamageRef, spellInvestDamage, spellWindupMultiplier, spellCastWeight, strikeInvestDamage, infusionDamage, investSelfDamage as computeInvestSelfDamage, effectiveDodgeValue, splitEvenlyWithRemainder, parryMassMultiplier, bracedParryWeight, bracedMaxUsefulInvest, defenceMarginMultiplier, lunarPhaseMultiplier, dotTickDamage, procStaminaCost, crushFlatAmount, riderMaxInvest, auraRadiusFor, barrierStatBlend, hotTickAmount, statStackCap } from '../helpers/formulas.mjs';
 import { recordActionFired, declareAction, isInActiveCombat, computeActionWait, referenceRoundLength, computeWindupMultiplier, getScrambleStacks, addScrambleStack, applyDodgeCost, findCombatantForActor, perceiveGate } from '../systems/celerity.mjs';
 import { getThreatRadiusFt, actorIsDashing } from '../systems/engagement-halts.mjs';
 import { selectTargetOnCanvas, selectTargetsOnCanvas, skillNeedsTargetPrompt, skillTargetsAtFire, selectMarkerOnCanvas } from '../canvas/target-prompt.mjs';
@@ -220,7 +220,15 @@ export class AspectsofPowerItem extends Item {
     const payload = cfg.stackProduces > 0 && castDamage > 0
       ? castDamage / cfg.stackProduces : 0;
     const after = await addStacks(this.actor, cfg.stackPool, cfg.stackProduces, {
-      cap: cfg.stackCap ?? 0,
+      // Ki monk: the cap can come from an ABILITY MOD rather than a hand-
+      // authored constant (user ruled 2026-08-05, "a cap likely tied to
+      // endurance"). statStackCap returns the authored value untouched when no
+      // stat is named, so every existing producer is unchanged.
+      cap: statStackCap(
+        cfg.stackCapStat
+          ? (this.actor.system?.abilities?.[cfg.stackCapStat]?.mod ?? 0)
+          : 0,
+        cfg.stackCap ?? 0),
       sourceSkill: this.name,
       label: `${this.name} (${cfg.stackPool})`,
       img: this.img,

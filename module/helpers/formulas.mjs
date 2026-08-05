@@ -963,6 +963,36 @@ export function auraTickMoments(lastTick, newClock, period, cfg = null) {
   return { moments, newLastTick, capped: owed < owedRaw };
 }
 
+/**
+ * STAT-DERIVED STACK CAP (ki monk, user ruled 2026-08-05: "it just needs a cap
+ * likely tied to endurance").
+ *
+ * `tagConfig.stackCap` is a hand-authored constant, which cannot express "your
+ * ki ceiling grows with your endurance". This turns an ability MOD into a stack
+ * ceiling via a divisor, so a stat in the hundreds becomes a pool in the
+ * single digits — stacks are counted objects, not a resource bar.
+ *
+ * Returns 0 when no stat is named, which the caller reads as "use the authored
+ * `stackCap`" — so this is purely additive and every existing producer is
+ * unchanged.
+ *
+ * @param {number} statMod    e.g. endurance.mod
+ * @param {number} authored   tagConfig.stackCap, the fallback / floor
+ * @param {object|null} cfg
+ * @returns {number}
+ */
+export function statStackCap(statMod, authored = 0, cfg = null) {
+  const sc = cfg ?? (globalThis.CONFIG?.ASPECTSOFPOWER ?? {});
+  const divisor = Number(sc.stacks?.statCapDivisor);
+  const div = Number.isFinite(divisor) && divisor > 0 ? divisor : 150;
+  const floor = Math.max(0, Math.round(Number(authored) || 0));
+  const mod = Number(statMod);
+  if (!Number.isFinite(mod) || mod <= 0) return floor;
+  const hardMax = Math.max(1, Math.round(Number(sc.stacks?.statCapMax) || 10));
+  // Never BELOW the authored value: an author who wrote 3 meant at least 3.
+  return Math.max(floor, Math.min(hardMax, Math.round(mod / div)));
+}
+
 /* ------------------------------------------------------------------ */
 /*  Buff capacity (design-healer-system.md, healer pillar phase 6)      */
 /* ------------------------------------------------------------------ */
