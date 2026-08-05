@@ -2776,15 +2776,44 @@ Hooks.on('updateActor', async (actor, changes, _options, userId) => {
   // Hook fires on the HP-zero crossing; if HP later climbs above 0 and crosses
   // again, this fires again (each death is its own event).
   if (actor.system.health.value <= 0) {
-    const deathSustains = actor.effects.filter(e =>
-      !e.disabled && e.system?.effectType === 'sustain'
-    );
-    if (deathSustains.length > 0) {
-      await actor.deleteEmbeddedDocuments('ActiveEffect', deathSustains.map(e => e.id));
-      ChatMessage.create({
-        content: `<p><strong>${actor.name}</strong>'s sustained skills end — ${deathSustains.map(e => e.name).join(', ')}.</p>`,
-      });
-    }
+    // ── STAGE ISOLATION ──────────────────────────────────────────────────
+    // Death runs six INDEPENDENT stages: sustain teardown, Burnt Offering,
+    // Brand of Shadows Bound, the on_death fan-out, unqueueing the corpse's
+    // declared action, and hostile auto-defeat. Nothing downstream depends on
+    // anything upstream, but until 2026-08-05 they shared one unguarded
+    // `await` chain — so ONE throw silently cancelled every stage after it.
+    //
+    // Proved, not theorised: a bad flag scope in the Brand stage took the
+    // on_death fan-out, the unqueue and auto-defeat down with it, and the only
+    // symptom was an unhandled rejection in the console. A dead actor would
+    // have kept its queued action and stayed un-defeated with no error shown
+    // at the table.
+    //
+    // Each stage now runs inside `stage()`: a failure is reported, loudly and
+    // once, and the remaining stages still run. Order is preserved because
+    // Burnt Offering must read the effect list before a death bloom can wipe
+    // it — isolation must not become reordering.
+    const stage = async (name, fn) => {
+      try { await fn(); }
+      catch (err) {
+        console.error(`[death:${name}] failed for ${actor.name} — remaining stages still run:`, err);
+        if (game.user.isGM) {
+          ui.notifications?.error(`Death handling step "${name}" failed for ${actor.name}. See console.`);
+        }
+      }
+    };
+
+    await stage('sustains', async () => {
+      const deathSustains = actor.effects.filter(e =>
+        !e.disabled && e.system?.effectType === 'sustain'
+      );
+      if (deathSustains.length > 0) {
+        await actor.deleteEmbeddedDocuments('ActiveEffect', deathSustains.map(e => e.id));
+        ChatMessage.create({
+          content: `<p><strong>${actor.name}</strong>'s sustained skills end — ${deathSustains.map(e => e.name).join(', ')}.</p>`,
+        });
+      }
+    });
 
     // ── HARVEST ON DOT DEATH (Burnt Offering) ────────────────────────────
     // ⚠ THE TRIGGER IS "DIED WHILE BURNING", NOT "KILLED BY THE BURN"
@@ -2798,7 +2827,8 @@ Hooks.on('updateActor', async (actor, changes, _options, userId) => {
     //
     // ⚠ Gated on isActingGM: this mutates a THIRD party's resources from a
     // hook, and this table runs two GM logins — bare isGM would pay twice.
-    if (isActingGM()) {
+    await stage('burnt-offering', async () => {
+     if (!isActingGM()) return;
       const seen = new Set();
       for (const eff of actor.effects) {
         if (eff.disabled || !eff.system?.dot) continue;
@@ -2834,7 +2864,7 @@ Hooks.on('updateActor', async (actor, changes, _options, userId) => {
                  + `${applierActor.name} recovers <strong>${gain}</strong> ${c.harvestResource}.</em></p>`,
         });
       }
-    }
+    });
 
     // ── BRAND OF SHADOWS BOUND: gear that feeds on kills ─────────────────
     // Every augment on the KILLER's equipped gear carrying `onKillProgress`
@@ -2853,7 +2883,8 @@ Hooks.on('updateActor', async (actor, changes, _options, userId) => {
     //
     // ⚠ isActingGM for the same reason as Burnt Offering: this mutates a THIRD
     // party's items from a hook, and two GM logins would pay twice.
-    if (isActingGM()) {
+    await stage('brand-of-shadows-bound', async () => {
+     if (!isActingGM()) return;
       const killerUuid = actor.flags?.aspectsofpower?.lastDamageSourceUuid;
       const killer = killerUuid ? await fromUuid(killerUuid).catch(() => null) : null;
       const killerActor = killer?.actor ?? killer;
@@ -2955,13 +2986,14 @@ Hooks.on('updateActor', async (actor, changes, _options, userId) => {
           });
         }
       }
-    }
+    });
 
     // on_death-tagged passive AOE skills auto-fire ONCE from a single
     // representative token. For unlinked actors (one per token) this is
     // the dying token. For linked actors with multiple tokens sharing
     // HP, only one burst — firing from every token of a shared actor
     // would produce N death blooms for one death.
+    await stage('on-death-skills', async () => {
     const deathSkills = actor.items.filter(i =>
       i.type === 'skill' && (i.system?.tags ?? []).includes('on_death')
     );
@@ -2977,9 +3009,11 @@ Hooks.on('updateActor', async (actor, changes, _options, userId) => {
         }
       }
     }
+    });
 
     // Unqueue any pending celerity action — a corpse can't act. Posts a
     // chat note so other players see why the next-up indicator changed.
+    await stage('unqueue-action', async () => {
     for (const combat of game.combats) {
       const cm = combat.combatants.find(c => c.actorId === actor.id);
       const declared = cm?.flags?.aspectsofpower?.declaredAction
@@ -2995,10 +3029,12 @@ Hooks.on('updateActor', async (actor, changes, _options, userId) => {
         content: `<p><em>${actor.name}'s queued <strong>${declared.label}</strong> is cancelled — incapacitated.</em></p>`,
       });
     }
+    });
 
     // Auto-death for hostiles (pending-combat-ai-backlog): hostile NPCs at
     // 0 HP are marked defeated + skulled without GM action. Player-owned
     // actors are exempt — downed PCs stay a GM/narrative call.
+    await stage('auto-defeat', async () => {
     if ((CONFIG.ASPECTSOFPOWER.ai?.autoDefeatHostiles ?? true) && !actor.hasPlayerOwner) {
       // getActiveTokens(linked, document): linked=true returns ONLY tokens
       // linked to the actor — empty for unlinked-token NPCs (i.e. nearly every
@@ -3022,6 +3058,7 @@ Hooks.on('updateActor', async (actor, changes, _options, userId) => {
         }
       }
     }
+    });
   }
 
   const threshold = game.settings.get('aspects-of-power', 'woundedTokenThreshold');

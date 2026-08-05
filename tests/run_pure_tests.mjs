@@ -1288,6 +1288,48 @@ eq('cap and stacking are both registered',
    [T.TAG_REGISTRY.stacking?.category, T.TAG_REGISTRY.cap?.category], ['passive', 'conditional']);
 eq('cap declares what it qualifies', T.TAG_REGISTRY.cap.qualifies, 'stacking');
 
+// ── SOURCE GUARD: flag scopes ────────────────────────────────────────────────
+// Not a formula test — a repo scan, because this bug class is invisible to
+// every other kind of check we run.
+//
+// `getFlag`/`setFlag`/`unsetFlag` VALIDATE their scope against installed
+// package ids and THROW on anything else. The flag namespace used throughout
+// this system is `aspectsofpower`; the package id is `aspects-of-power`. So
+// the ergonomic API and the 78 direct `flags.aspectsofpower.*` reads disagree
+// by one hyphen, and reaching for the wrong one is a runtime crash, not a
+// silent miss.
+//
+// It shipped once (2026-08-05) inside the actor-death handler and took the
+// on_death fan-out, unqueue and auto-defeat down with it. Green pure tests and
+// a clean dry run both passed — neither executes a hook. This scan is what
+// would have caught it, so it runs with them.
+{
+  const { readFileSync, readdirSync, statSync } = await import('node:fs');
+  const { join } = await import('node:path');
+  const SYSTEM_ID = JSON.parse(readFileSync('system.json', 'utf8')).id;
+  const walk = (dir) => readdirSync(dir).flatMap((f) => {
+    const p = join(dir, f);
+    return statSync(p).isDirectory() ? walk(p) : (p.endsWith('.mjs') ? [p] : []);
+  });
+  const bad = [];
+  for (const file of walk('module')) {
+    // ⚠ NORMALISE CRLF FIRST. These files are checked out with CRLF endings,
+    // and in JS `.` does not match `\r` — so a naive /\/\/.*$/ never matches a
+    // comment on a CRLF line, and the comment survives stripping. Caught by
+    // this very test flagging the warning comment that documents the trap.
+    const src = readFileSync(file, 'utf8').replace(/\r/g, '');
+    // Strip line comments so prose about this trap does not trip the check
+    // that enforces it.
+    const code = src.split('\n').map(l => l.replace(/\/\/.*$/, '')).join('\n');
+    for (const m of code.matchAll(/\b(?:get|set|unset)Flag\(\s*['"]([^'"]+)['"]/g)) {
+      if (m[1] !== SYSTEM_ID) {
+        bad.push(`${file.replace(/\\/g, '/')}: scope "${m[1]}" (must be "${SYSTEM_ID}")`);
+      }
+    }
+  }
+  eq(`flag API scopes all match the package id "${SYSTEM_ID}"`, bad, []);
+}
+
 if (failures) { console.error(`\n${failures} FAILURES`); process.exit(1); }
 console.log('\nAll pure-function tests pass.');
 
