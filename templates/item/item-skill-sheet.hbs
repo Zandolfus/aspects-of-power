@@ -170,6 +170,24 @@
               <input type='number' name='system.roll.cost' value='{{system.roll.cost}}' min='0' step='1' />
             </div>
             {{/unless}}
+            {{! A FLAT second cost — a prerequisite, not an invest. Ki gates how
+                often the big abilities come out; it never scales the roll. }}
+            <div class='aop-field'>
+              <label class='resource-label' title='A second resource spent FLAT as a prerequisite. Blank = none.'>2nd Resource</label>
+              <select name='system.roll.secondaryResource'>
+                <option value='' {{#unless system.roll.secondaryResource}}selected{{/unless}}>None</option>
+                <option value='ki' {{#if (eq system.roll.secondaryResource "ki")}}selected{{/if}}>Ki</option>
+                <option value='mana' {{#if (eq system.roll.secondaryResource "mana")}}selected{{/if}}>Mana</option>
+                <option value='stamina' {{#if (eq system.roll.secondaryResource "stamina")}}selected{{/if}}>Stamina</option>
+                <option value='health' {{#if (eq system.roll.secondaryResource "health")}}selected{{/if}}>Health</option>
+              </select>
+            </div>
+            {{#if system.roll.secondaryResource}}
+            <div class='aop-field'>
+              <label class='resource-label'>2nd Cost</label>
+              <input type='number' name='system.roll.secondaryCost' value='{{system.roll.secondaryCost}}' min='0' step='1' />
+            </div>
+            {{/if}}
             <div class='aop-field'>
               <label class='resource-label'>Skill Type</label>
               <select name='system.roll.type' data-dtype='String'>

@@ -6030,6 +6030,28 @@ export class AspectsofPowerItem extends Item {
       return;
     }
 
+    // ── FLAT SECONDARY COST (ki monk, ruled 2026-08-05) ──────────────────
+    // A second resource spent flat rather than invested — ki gates HOW OFTEN
+    // the big abilities come out, while stamina remains the invested dial.
+    // Checked at the same chokepoint as the primary so a skill can never fire
+    // half-paid, and read LIVE for the same reason the primary is.
+    const _secRes = rollData.roll.secondaryResource;
+    const _secCost = Math.max(0, Math.round(rollData.roll.secondaryCost ?? 0));
+    if (_secRes && _secCost > 0) {
+      const livePool = this.actor.system[_secRes];
+      // ⚠ A missing pool is a REFUSAL, not a free pass. An actor without the
+      // `ki` tag has ki.max 0, and letting the cast through because the pool
+      // "isn't there" would hand every untagged actor free ki abilities.
+      const liveSec = livePool?.value ?? 0;
+      if (!livePool || liveSec < _secCost) {
+        ChatMessage.create({
+          speaker, rollMode, flavor: label,
+          content: `Not enough ${_secRes} (need ${_secCost}, have ${liveSec}).`,
+        });
+        return;
+      }
+    }
+
     // ── Evaluate both rolls (shared across all tags) ────────────────────
     // `let` so the detonate-redirect block below can swap in the summon's
     // rolls when this cast is consuming a mine (damage = summon identity).
@@ -6111,6 +6133,14 @@ export class AspectsofPowerItem extends Item {
       if (infusedManaCost > 0 && resource !== 'mana') {
         const liveMana = this.actor.system.mana?.value ?? 0;
         updates['system.mana.value'] = Math.max(0, Math.round(liveMana - infusedManaCost));
+      }
+      // Flat secondary cost (ki). Same guard as the infused case above: skip
+      // when it IS the primary resource, or the cast would be charged twice.
+      const _sr = rollData.roll.secondaryResource;
+      const _sc2 = Math.max(0, Math.round(rollData.roll.secondaryCost ?? 0));
+      if (_sr && _sc2 > 0 && _sr !== resource && this.actor.system[_sr]) {
+        const liveSec = this.actor.system[_sr]?.value ?? 0;
+        updates[`system.${_sr}.value`] = Math.max(0, Math.round(liveSec - _sc2));
       }
       // Orb charge: discharge resets charge to 0; normal qualifying cast
       // banks the spell's tier weight onto the existing charge.

@@ -48,6 +48,22 @@ export class SkillData extends foundry.abstract.TypeDataModel {
         abilities:    new fields.StringField({ initial: '' }),  // primary ability (back-compat name)
         resource:     new fields.StringField({ initial: '' }),
         cost:         new fields.NumberField({ initial: 0, integer: true }),
+        // ── FLAT SECONDARY COST (ruled 2026-08-05) ──
+        // A second resource spent as a FLAT prerequisite, not invested. Driving
+        // case is the ki monk: stamina is the invested resource (it scales the
+        // strike and is what makes you pierce), while ki is a gate on FREQUENCY
+        // — "spend 3 ki" — so it needs no slider and no damage term.
+        //
+        // ⚠ DELIBERATELY NOT multi-invest. A genuine second INVEST slider
+        // already exists but is welded to the `infused` spellstrike path and
+        // hardcodes a damage term per resource; generalising that is a separate
+        // unbuilt design ([[pending-multi-invest]]). This is the small half:
+        // check it, spend it, done.
+        //
+        // Ignored when 0 or when the resource is unset, so every existing skill
+        // is unaffected.
+        secondaryResource: new fields.StringField({ initial: '' }),
+        secondaryCost:     new fields.NumberField({ initial: 0, min: 0, integer: true }),
         type:         new fields.StringField({ initial: '' }),
         diceBonus:    new fields.NumberField({ initial: 1 }),
         // Which of the four defenses this skill tests against (melee/ranged/mind/soul).
