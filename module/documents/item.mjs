@@ -5387,7 +5387,21 @@ export class AspectsofPowerItem extends Item {
           // power 300 → invest 52). The gem's power is the gem's power.
           ? (options.ritualActivation
               ? Math.max(1, options.preInvestAmount)
-              : Math.min(options.preInvestAmount, maxInvest))  // clamp pre-capture too
+              // ⚠ FLOOR AT baseMana, NOT JUST CAP AT maxInvest (user ruled
+              // 2026-08-05: "if we floor the cost/tier we should be fine").
+              // The dialog already enforces this floor (`min="${baseCost}"`)
+              // and aiAutoInvest casts at exactly baseMana — this path was the
+              // only one that would accept LESS than a minimum cast.
+              //
+              // It matters because of renewability: the healer sim found 23
+              // self-funding configurations, EVERY ONE of them stamina and
+              // EVERY ONE below 1x base cost. Stamina regenerates 5% of max
+              // per round while mana regenerates nothing in combat, so a heal
+              // cheaper than its own base turns a renewable pool into a
+              // perpetual healing engine. At 1x base nothing self-funds.
+              // Flooring here makes the unreachable-by-dialog case
+              // unreachable by script and AI too.
+              : Math.min(Math.max(baseMana, options.preInvestAmount), maxInvest))
           : options.aiAutoInvest
           ? Math.min(baseMana, maxInvest)                  // AI: minimum cast, no prompt
           : await this._promptResourceInvest({
@@ -5678,7 +5692,11 @@ export class AspectsofPowerItem extends Item {
         let invested = null;
         let manaInvested = 0;
         if (options.preInvestAmount != null) {
-          invested = Math.min(options.preInvestAmount, maxPool);
+          // Same floor as the spell path: a swing cannot cost less than its
+          // own base stamina. Deferred re-spend passes a dialog-approved
+          // value which is already >= base, so this is a no-op there and a
+          // guard against scripted/AI callers.
+          invested = Math.min(Math.max(baseStamina, options.preInvestAmount), maxPool);
           // Deferred-fire: re-spend the mana invest captured at declare time
           // so the infusion damage/cost matches what the player committed to.
           if (useInfused && options.preManaInvestAmount != null) {
