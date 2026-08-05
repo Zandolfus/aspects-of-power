@@ -48,7 +48,11 @@
     curves: window.__healCurves ?? [0.2, 0.5],
     // Invest multiples of the tier's base cost, to see how much the mana dial
     // actually buys under each curve.
-    investMultiples: [1, 2, 4, 8],
+    // ⚠ SWEEP BELOW 1x. The danger zone for a renewable resource is the CHEAP
+    // heal — small, spammable, spending under the regen line — not the big
+    // one. Sampling only 1x and up cannot find where a mode becomes
+    // self-funding, which is the whole renewability question.
+    investMultiples: window.__healInvestMultiples ?? [0.1, 0.25, 0.5, 0.75, 1, 2, 4, 8],
     tiers: ['basic', 'high', 'greater'],
     // A heal is worth measuring against what it is trying to outpace.
     // Reference defender = the highest-HP player character present.
