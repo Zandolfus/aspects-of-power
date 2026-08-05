@@ -1328,6 +1328,31 @@ eq('cap declares what it qualifies', T.TAG_REGISTRY.cap.qualifies, 'stacking');
     }
   }
   eq(`flag API scopes all match the package id "${SYSTEM_ID}"`, bad, []);
+
+  // ── The SILENT half of the same problem ──────────────────────────────────
+  // This system stores flags under TWO namespaces: `aspects-of-power` (the
+  // package id, 19 live documents, reachable by the getFlag API) and
+  // `aspectsofpower` (185 live documents, reached only by direct paths).
+  //
+  // The scope check above catches the CRASHING mistake. The dangerous one is
+  // quieter: `getFlag('aspects-of-power', 'clockTick')` is a perfectly VALID
+  // scope, so it never throws — it just reads the wrong store and returns
+  // undefined. Same for a direct `flags.aspects-of-power.<compactKey>` path.
+  //
+  // A key belongs to exactly one namespace. Any key appearing under both is a
+  // split store: written one place, read from another, no error either way.
+  const nsOfKey = {};
+  for (const file of walk('module')) {
+    const code = readFileSync(file, 'utf8').replace(/\r/g, '')
+      .split('\n').map(l => l.replace(/\/\/.*$/, '')).join('\n');
+    const add = (key, ns) => ((nsOfKey[key] ??= new Set()).add(ns));
+    for (const m of code.matchAll(/flags\.(aspects-of-power|aspectsofpower)\.([A-Za-z0-9_]+)/g)) add(m[2], m[1]);
+    for (const m of code.matchAll(/Flag\(\s*['"](aspects-of-power|aspectsofpower)['"]\s*,\s*['"]([A-Za-z0-9_]+)['"]/g)) add(m[2], m[1]);
+  }
+  const split = Object.entries(nsOfKey)
+    .filter(([, v]) => v.size > 1)
+    .map(([k, v]) => `${k} -> ${[...v].join(' + ')}`);
+  eq('no flag key is used under both namespaces', split, []);
 }
 
 if (failures) { console.error(`\n${failures} FAILURES`); process.exit(1); }
