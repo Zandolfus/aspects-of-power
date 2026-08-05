@@ -1162,8 +1162,17 @@ ASPECTSOFPOWER.activities = {
   // world time you could have spent travelling or crafting.
   // The fraction is read from the ACTOR (`system.meditation.fraction`), not
   // fixed here, so a passive can raise it — see meditation.baseFraction.
+  // ⚠ TWO RESTORES, INDEPENDENTLY GATED. Mana is a fraction of a pool; ki is a
+  // STACK pool with no `.max` to take a fraction of, so it refills to its
+  // `stackCapStat`-derived ceiling instead. Anyone without a ki producer
+  // resolves a cap of 0 and simply skips it, so meditating mages are unchanged.
+  //
+  // Ki is restored by TIME because time is the one currency that cannot be
+  // farmed in place — this is what stops a monk banking ki on a training dummy
+  // between fights (ruled 2026-08-05).
   meditate:    { label: 'Meditate', cost: 0, class: 'clock', clockSeconds: 3600,
-                 restore: { resource: 'mana', fractionPath: 'meditation.fraction' } },
+                 restore: { resource: 'mana', fractionPath: 'meditation.fraction',
+                            stackPool: 'ki' } },
 };
 
 /**

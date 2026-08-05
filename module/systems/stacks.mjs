@@ -28,6 +28,8 @@
  */
 
 /** Effect name shown on the caster's sheet. */
+import { statStackCap } from '../helpers/formulas.mjs';
+
 const STACK_EFFECT_PREFIX = 'Stacks';
 
 /**
@@ -165,6 +167,39 @@ export function getStackPayload(actor, pool) {
  *
  * @returns {Promise<number>} Stacks held after the add.
  */
+/**
+ * What is THIS actor's ceiling for THIS stack pool?
+ *
+ * Scans the actor's own skills for anything that declares the pool and resolves
+ * its cap — flat `stackCap`, or `stackCapStat` naming an ability whose mod sets
+ * it (ki: endurance). Highest wins, so a monk carrying two ki producers gets
+ * one ceiling rather than whichever fired last.
+ *
+ * ⚠ EXISTS BECAUSE THREE CALL SITES WERE ABOUT TO DUPLICATE IT: the stack
+ * producer, ki-on-pierce, and meditation restore. The user flagged exactly this
+ * ("we encounter this a lot") — every site hand-extracting the same fields off
+ * the actor is where the wiring bugs live. One resolver, one place to be wrong.
+ *
+ * Returns 0 for "no declared ceiling", which addStacks reads as unbounded.
+ *
+ * @param {Actor} actor
+ * @param {string} pool
+ * @returns {number}
+ */
+export function resolveStackCap(actor, pool) {
+  if (!actor || !pool) return 0;
+  let best = 0;
+  for (const sk of (actor.items ?? [])) {
+    if (sk.type !== 'skill') continue;
+    const c = sk.system?.tagConfig ?? {};
+    if (c.stackPool !== pool) continue;
+    const statMod = c.stackCapStat
+      ? (actor.system?.abilities?.[c.stackCapStat]?.mod ?? 0) : 0;
+    best = Math.max(best, statStackCap(statMod, c.stackCap ?? 0));
+  }
+  return best;
+}
+
 export async function addStacks(actor, pool, amount, opts = {}) {
   const { cap = 0, sourceSkill = '', label = '', img = null, durationRounds = 0, payload = 0 } = opts;
   const add = Math.max(0, Math.floor(Number(amount) || 0));

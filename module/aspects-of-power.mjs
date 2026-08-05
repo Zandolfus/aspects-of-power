@@ -2515,21 +2515,31 @@ Hooks.on('renderChatMessageHTML', (message, html) => {
         try {
           const kiActor = (await fromUuid(attackerActorUuid).catch(() => null));
           const ka = kiActor?.actor ?? kiActor;
-          for (const sk of (ka?.items ?? [])) {
-            if (sk.type !== 'skill') continue;
-            const kc = sk.system?.tagConfig ?? {};
-            if (!(kc.stackOnPierce > 0) || !kc.stackPool) continue;
-            const { addStacks } = await import('./systems/stacks.mjs');
-            const { statStackCap } = await import('./helpers/formulas.mjs');
-            await addStacks(ka, kc.stackPool, kc.stackOnPierce, {
-              cap: statStackCap(
-                kc.stackCapStat ? (ka.system?.abilities?.[kc.stackCapStat]?.mod ?? 0) : 0,
-                kc.stackCap ?? 0),
-              sourceSkill: sk.name,
-              label: `${sk.name} (${kc.stackPool})`,
-              img: sk.img,
-              payload: 0,   // ki is a COUNTER, not a banked payload
-            });
+          // ⚠ GATE FIRST, WORK SECOND. This runs on EVERY damage application in
+          // the game, and almost nobody has a ki producer. Collect the matching
+          // skills with a cheap filter and bail before touching the dynamic
+          // import or the cap resolver — otherwise every sword swing in the
+          // world pays for a feature one class uses.
+          const kiProducers = (ka?.items ?? []).filter((sk) => {
+            if (sk.type !== 'skill') return false;
+            const c = sk.system?.tagConfig ?? {};
+            return c.stackOnPierce > 0 && !!c.stackPool;
+          });
+          if (kiProducers.length) {
+            const { addStacks, resolveStackCap } = await import('./systems/stacks.mjs');
+            // Resolve each POOL's ceiling once, not once per producer.
+            const capOf = new Map();
+            for (const sk of kiProducers) {
+              const kc = sk.system.tagConfig;
+              if (!capOf.has(kc.stackPool)) capOf.set(kc.stackPool, resolveStackCap(ka, kc.stackPool));
+              await addStacks(ka, kc.stackPool, kc.stackOnPierce, {
+                cap: capOf.get(kc.stackPool),
+                sourceSkill: sk.name,
+                label: `${sk.name} (${kc.stackPool})`,
+                img: sk.img,
+                payload: 0,   // ki is a COUNTER, not a banked payload
+              });
+            }
           }
         } catch (e) {
           console.error('[ki] on-pierce generation failed — damage already applied:', e);

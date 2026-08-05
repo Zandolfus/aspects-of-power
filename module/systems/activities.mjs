@@ -215,6 +215,37 @@ export async function performActivity(actor, key, opts = {}) {
   // active effect — John meditates at 15% where everyone else gets 10%.
   const restoreCfg = (CONFIG.ASPECTSOFPOWER.activities ?? {})[key]?.restore;
   let restored = null;
+
+  // ── STACK-POOL restore (ki monk, ruled 2026-08-05) ───────────────────────
+  // Ki is the stacks subsystem, not an actor resource pool, so it has no
+  // `.max`/`.value` to take a fraction of — its ceiling comes from the
+  // producer's `stackCapStat`. Meditation refills it because ki is restored by
+  // TIME, the one currency that cannot be farmed in place; that is what stops
+  // a monk banking ki on a training dummy between fights.
+  //
+  // ⚠ Gated on the actor ACTUALLY HAVING the pool declared: resolveStackCap
+  // returns 0 for anyone with no producer, and we skip rather than creating an
+  // empty stack effect on every meditating mage in the world.
+  if (restoreCfg?.stackPool) {
+    const { resolveStackCap, getStackCount, addStacks } = await import('./stacks.mjs');
+    const cap = resolveStackCap(actor, restoreCfg.stackPool);
+    if (cap > 0) {
+      const before = getStackCount(actor, restoreCfg.stackPool);
+      // 0 / unset = fill to the ceiling. An hour of meditation is a full bar.
+      const want = Math.max(0, Math.round(Number(restoreCfg.stackAmount) || 0)) || cap;
+      if (before < cap) {
+        const after = await addStacks(actor, restoreCfg.stackPool, want, {
+          cap,
+          sourceSkill: result.label,
+          label: `Stacks: ${restoreCfg.stackPool}`,
+        });
+          restoredStacks = { stackPool: restoreCfg.stackPool, gain: after - before, from: before, max: cap };
+      } else {
+          restoredStacks = { stackPool: restoreCfg.stackPool, gain: 0, from: before, max: cap };
+      }
+    }
+  }
+
   if (restoreCfg?.resource) {
     const pool = actor.system[restoreCfg.resource];
     const own = restoreCfg.fractionPath
@@ -237,7 +268,11 @@ export async function performActivity(actor, key, opts = {}) {
     content: `<p><strong>${actor.name}</strong>: ${result.label}${qualityNote}</p>`
       + `<p>Time taken: <strong>${result.display}</strong></p>`
       + `<p><em>${basis}</em></p>`
-      + (restored
+      + (restored?.stackPool
+          ? `<p>Recovers <strong>${restored.gain}</strong> ${restored.stackPool}`
+            + ` — ${restored.from + restored.gain} / ${restored.max}.</p>`
+          : '')
+      + (restored?.resource
           ? `<p>Recovers <strong>${restored.gain}</strong> ${restored.resource}`
             + ` (${Math.round(restored.frac * 100)}% of ${restored.max})`
             + ` — ${restored.from + restored.gain} / ${restored.max}.</p>`
@@ -249,7 +284,7 @@ export async function performActivity(actor, key, opts = {}) {
   });
 
   if (opts.advanceTime !== false) await advanceWorldTime(result.seconds);
-  return { ...result, restored };
+  return { ...result, restored, restoredStacks };
 }
 
 /**
