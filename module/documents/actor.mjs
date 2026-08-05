@@ -1429,9 +1429,20 @@ export class AspectsofPowerActor extends Actor {
    * iterating the whole scene.
    */
   async _tickActorAuras(speaker, gmWhisper) {
-    const auraEffects = this.effects.filter(e =>
-      !e.disabled && (e.system?.auraRadius ?? 0) > 0
-    );
+    // ⚠ RESOURCE AURAS ARE NOT PAID HERE ANY MORE (design-aura-ticks). They
+    // pay in thirds of the caster's reference round, driven by the clock
+    // advance in systems/aura-ticks.mjs. Leaving them in this round-start
+    // sweep as well would pay them FOUR times a round — the full amount here
+    // plus three thirds — which is the kind of double-application that reads
+    // as a balance problem rather than a bug.
+    //
+    // Damage auras stay here, once per round, because flat DR applies per hit
+    // and thirds of damage get shaved to nothing.
+    const auraEffects = this.effects.filter(e => {
+      if (e.disabled || (e.system?.auraRadius ?? 0) <= 0) return false;
+      const t = e.system?.auraEffectType ?? 'damage';
+      return !(t === 'heal' || t === 'stam');
+    });
     if (auraEffects.length === 0) return;
     const token = this.getActiveTokens()[0];
     if (!token) return;
@@ -1500,9 +1511,14 @@ export class AspectsofPowerActor extends Actor {
    * Called by both the round-start tick (_tickActorAuras) and the
    * movement-hook entry trigger.
    */
-  async _applyAuraToTarget(effect, targetActor, speaker, gmWhisper = {}) {
+  async _applyAuraToTarget(effect, targetActor, speaker, gmWhisper = {}, amountOverride = null) {
     const sys = effect.system;
-    const amount = sys.auraAmount ?? sys.auraDamage ?? 0;
+    // `amountOverride` is the per-tick share used by the resource-aura cadence
+    // (design-aura-ticks). Absent, the whole snapshotted amount applies — the
+    // round-start path and the movement-entry trigger both still pay in full.
+    const amount = Number.isFinite(amountOverride)
+      ? amountOverride
+      : (sys.auraAmount ?? sys.auraDamage ?? 0);
     if (amount <= 0) return;
     const effectType = sys.auraEffectType ?? 'damage';
 

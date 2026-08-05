@@ -3508,6 +3508,9 @@ export class AspectsofPowerItem extends Item {
       systemOverrides.auraEffectType    = tc.auraEffectType ?? 'damage';
       systemOverrides.auraHealResource  = tc.auraHealResource ?? 'health';
       systemOverrides.auraHealOverhealth = tc.auraHealOverhealth ?? false;
+      // Seed the resource-aura cadence cursor to NOW, so an aura cast mid-round
+      // starts owing from this moment instead of paying a backlog from tick 0.
+      systemOverrides.auraLastTick = game.combat?.flags?.aspectsofpower?.clockTick ?? 0;
     }
 
     // Weapon buff snapshot (Flameblade — design-spellstriker.md). Flat

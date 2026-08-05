@@ -899,6 +899,70 @@ export function auraRadiusFor(authoredRadius, perMod, cfg = null) {
   return Math.round(base * (1 + per / div));
 }
 
+/**
+ * Aura tick period in clock ticks: one Nth of the caster's reference round.
+ *
+ * @param {number} refRoundLen  referenceRoundLength(casterRL)
+ * @param {object|null} cfg
+ * @returns {number}  0 when the cadence is disabled or nonsensical
+ */
+export function auraTickPeriod(refRoundLen, cfg = null) {
+  const sc = cfg ?? (globalThis.CONFIG?.ASPECTSOFPOWER ?? {});
+  const n = Number(sc.auras?.ticksPerReferenceRound);
+  const per = Number(refRoundLen);
+  if (!Number.isFinite(n) || n <= 0) return 0;
+  if (!Number.isFinite(per) || per <= 0) return 0;
+  return per / n;
+}
+
+/**
+ * WHICH MOMENTS does an aura owe between its last payout and the new clock?
+ *
+ * Returns the actual tick MOMENTS, not just a count, because each one is a
+ * separate position sample — the whole point of the cadence. A caller that
+ * only wanted `owed x perTick` would pay an ally who left early in full and
+ * pay nothing to one who arrived late.
+ *
+ * `lastTick` null/undefined means "never paid": we seed to `newClock` and owe
+ * nothing, so an aura cast mid-round does not immediately dump a backlog.
+ *
+ * @param {number|null} lastTick
+ * @param {number} newClock
+ * @param {number} period      from auraTickPeriod
+ * @param {object|null} cfg
+ * @returns {{moments:number[], newLastTick:number, capped:boolean}}
+ */
+export function auraTickMoments(lastTick, newClock, period, cfg = null) {
+  const sc = cfg ?? (globalThis.CONFIG?.ASPECTSOFPOWER ?? {});
+  const clock = Number(newClock);
+  if (!Number.isFinite(clock)) return { moments: [], newLastTick: 0, capped: false };
+  if (!Number.isFinite(period) || period <= 0) {
+    return { moments: [], newLastTick: Number(lastTick) || clock, capped: false };
+  }
+  // ⚠ TEST null/undefined BEFORE Number(). `Number(null)` is 0 and
+  // `Number.isFinite(0)` is TRUE, so a finite-check alone treats an unseeded
+  // aura as "last paid at tick 0" and owes it the entire history of the
+  // combat. The same trap already cost this codebase a silently-dead buff-cap
+  // fallback; caught here by the golden test rather than in play.
+  const unseeded = lastTick === null || lastTick === undefined || lastTick === '';
+  const last = Number(lastTick);
+  // Unseeded, or a clock that moved BACKWARD (reset / manual rewind): resync
+  // silently rather than paying a negative or enormous backlog.
+  if (unseeded || !Number.isFinite(last) || last > clock) {
+    return { moments: [], newLastTick: clock, capped: false };
+  }
+  const maxN = Math.max(0, Math.round(Number(sc.auras?.maxCatchUpTicks) || 0)) || Infinity;
+  const owedRaw = Math.floor((clock - last) / period);
+  if (owedRaw <= 0) return { moments: [], newLastTick: last, capped: false };
+  const owed = Math.min(owedRaw, maxN);
+  const moments = [];
+  for (let i = 1; i <= owed; i++) moments.push(last + i * period);
+  // When capped we RESYNC to the clock rather than leaving the remainder
+  // owed — otherwise every later advance keeps paying a stale backlog.
+  const newLastTick = (owed < owedRaw) ? clock : last + owed * period;
+  return { moments, newLastTick, capped: owed < owedRaw };
+}
+
 /* ------------------------------------------------------------------ */
 /*  Buff capacity (design-healer-system.md, healer pillar phase 6)      */
 /* ------------------------------------------------------------------ */

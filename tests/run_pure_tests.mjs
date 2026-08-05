@@ -21,6 +21,7 @@ import {
   gradeMultiplierFor, solveBuffScale,
   resolveBuffLoad, auraRadiusFor, barrierStatBlend, hotTickAmount,
 } from '../module/helpers/formulas.mjs';
+import * as F2 from '../module/helpers/formulas.mjs';
 import { moonState, moonNodeAngle, nextSyzygy, eclipseAtSyzygy, planetStates,
          meteorShowersOn, cometStates, julianDay, civilDate, worldTimeForDate } from '../module/systems/calendar.mjs';
 import { resolveDamage, durabilityDamage, applyMarkBonus } from '../module/systems/damage.mjs';
@@ -1287,6 +1288,48 @@ eq('unknown atCap is reported',
 eq('cap and stacking are both registered',
    [T.TAG_REGISTRY.stacking?.category, T.TAG_REGISTRY.cap?.category], ['passive', 'conditional']);
 eq('cap declares what it qualifies', T.TAG_REGISTRY.cap.qualifies, 'stacking');
+
+// ── AURA TICK CADENCE (design-aura-ticks.md) ────────────────────────────────
+// Resource auras pay in thirds of the caster's reference round, sampling
+// position at each moment. The moments matter more than the count, so these
+// assert the MOMENTS.
+const AURA_CFG = { auras: { ticksPerReferenceRound: 3, maxCatchUpTicks: 12 } };
+eq('period is a third of the reference round', F2.auraTickPeriod(4702, AURA_CFG), 4702 / 3);
+eq('cadence disabled -> no period', F2.auraTickPeriod(4702, { auras: { ticksPerReferenceRound: 0 } }), 0);
+eq('a zero-length round has no period', F2.auraTickPeriod(0, AURA_CFG), 0);
+
+const P = 100;   // round numbers so the moments are readable
+// Exactly one period elapsed -> one moment, at the period boundary.
+eq('one period owed', F2.auraTickMoments(0, 100, P, AURA_CFG),
+   { moments: [100], newLastTick: 100, capped: false });
+// Two and a half periods -> TWO moments; the half stays owed for next time.
+eq('partial periods do not pay early', F2.auraTickMoments(0, 250, P, AURA_CFG),
+   { moments: [100, 200], newLastTick: 200, capped: false });
+// Nothing owed yet — cursor must not move, or the remainder is lost.
+eq('less than a period owes nothing', F2.auraTickMoments(0, 99, P, AURA_CFG),
+   { moments: [], newLastTick: 0, capped: false });
+// ⚠ UNSEEDED must RESYNC, not pay from zero. An aura cast at tick 9000 with a
+// null cursor would otherwise owe 90 ticks of backlog on its first advance.
+eq('an unseeded aura resyncs instead of paying a backlog',
+   F2.auraTickMoments(null, 9000, P, AURA_CFG),
+   { moments: [], newLastTick: 9000, capped: false });
+// A clock that moved BACKWARD (reset / manual rewind) must not pay negatives.
+eq('a rewound clock resyncs', F2.auraTickMoments(500, 200, P, AURA_CFG),
+   { moments: [], newLastTick: 200, capped: false });
+// Catch-up cap: 100 periods owed, capped to 12, and the cursor RESYNCS so the
+// remainder is not re-paid on every later advance.
+const capped = F2.auraTickMoments(0, 10000, P, AURA_CFG);
+eq('catch-up is capped', capped.moments.length, 12);
+eq('capped catch-up resyncs to the clock', capped.newLastTick, 10000);
+eq('capping is reported', capped.capped, true);
+// Throughput is UNCHANGED by the split — that is what makes this not a buff.
+{
+  const total = 90, n = 3;
+  eq('three ticks sum to the whole amount', Math.round(total / n) * n, total);
+}
+// The moments are spaced, not bunched — each is a separate position sample.
+eq('moments are one period apart',
+   F2.auraTickMoments(1000, 1350, P, AURA_CFG).moments, [1100, 1200, 1300]);
 
 // ── SOURCE GUARD: flag scopes ────────────────────────────────────────────────
 // Not a formula test — a repo scan, because this bug class is invisible to

@@ -129,6 +129,12 @@ export class AopEffectData extends foundry.data.ActiveEffectTypeDataModel {
       auraEffectType:    new fields.StringField({ initial: 'damage' }),  // 'damage' | 'heal' | 'stam'
       auraHealResource:  new fields.StringField({ initial: 'health' }),  // for 'heal' type: 'health' | 'mana' | 'stamina'
       auraHealOverhealth: new fields.BooleanField({ initial: false }),   // for 'heal' type: overflow into overhealth
+      // Clock tick of this aura's last RESOURCE payout (design-aura-ticks).
+      // Nullable and seeded at apply time from the live clock: null means
+      // "never paid", which resyncs to now rather than dumping a backlog on
+      // an aura that was cast mid-round. Only resource auras use it — damage
+      // auras still tick once at round start.
+      auraLastTick: new fields.NumberField({ initial: null, nullable: true }),
 
       // ── Effect tags ──
       // Subset of skill tags that propagate to the spawned effect when

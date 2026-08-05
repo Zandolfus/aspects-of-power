@@ -112,6 +112,24 @@ async function _onCelAdvance(event, target) {
     newClock = declared.scheduledTick;
   }
 
+  // ── RESOURCE-AURA CADENCE (design-aura-ticks.md) ──────────────────────
+  // ⚠ THE ORDER HERE IS THE WHOLE TRICK. This runs with `newClock` final but
+  // BEFORE the movement block below animates tokens and clears their
+  // `declaredMovement` flags. That is the only window in which every mover's
+  // movement is still readable AND token documents still sit at their OLD
+  // positions — which is what lets an aura sample a target's position at each
+  // intermediate tick moment instead of judging the whole round by where
+  // everyone happened to end up. Move this after the commit and the feature
+  // silently degrades to one all-or-nothing sample.
+  //
+  // Isolated: an aura failure must not cancel the clock advance itself.
+  try {
+    const { sweepAuraTicks } = await import('../systems/aura-ticks.mjs');
+    await sweepAuraTicks(combat, newClock);
+  } catch (e) {
+    console.error('[aura] tick sweep failed — clock still advances:', e);
+  }
+
   // Animate every in-flight movement to its interpolated position at the
   // new clock tick BEFORE the action resolves. Per design discussion
   // 2026-05-10: at every pause, all moving tokens slide in parallel to

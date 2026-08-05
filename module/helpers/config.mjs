@@ -1305,6 +1305,25 @@ ASPECTSOFPOWER.barrier = {
  */
 ASPECTSOFPOWER.auras = {
   perceptionDivisor: 1000,
+
+  // ── TICK CADENCE (design-aura-ticks.md, user ruled 2026-08-04) ──
+  // "Heals in fractions, unlike damage, is always fine. Maybe we split aura
+  // resource effects into three ticks per reference round."
+  //
+  // RESOURCE auras (heal / stam) pay in thirds of the caster's reference
+  // round. Throughput is unchanged — each tick is amount/N — so this is not a
+  // buff. What it buys is SPATIAL FIDELITY: the celerity clock is a continuous
+  // axis, so a target walking through an aura is credited for the thirds they
+  // were actually inside instead of being judged by one all-or-nothing sample.
+  //
+  // ⚠ DAMAGE AURAS STAY AT ONE TICK PER ROUND. Flat armour and DR apply PER
+  // HIT, so splitting damage three ways lets the full wall shave each third —
+  // often to zero. The split is lossless for healing and lossy for damage.
+  ticksPerReferenceRound: 3,
+  // Backstop on catch-up work. An aura whose last payout is far behind (a
+  // reloaded world, a long manual clock jump) would otherwise loop thousands
+  // of times. Past this we pay the capped number and resync, and say so.
+  maxCatchUpTicks: 12,
 };
 
 /**
