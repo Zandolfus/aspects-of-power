@@ -1,10 +1,11 @@
-import { TAG_REGISTRY, TAG_CATEGORIES } from './tags.mjs';
+import { TAG_REGISTRY, TAG_CATEGORIES, CAP_BEHAVIOURS } from './tags.mjs';
 
 export const ASPECTSOFPOWER = {};
 
 // Tag system.
 ASPECTSOFPOWER.tagRegistry   = TAG_REGISTRY;
 ASPECTSOFPOWER.tagCategories = TAG_CATEGORIES;
+ASPECTSOFPOWER.capBehaviours = CAP_BEHAVIOURS;
 
 /**
  * The set of Ability Scores used within the system.

@@ -338,7 +338,16 @@
         "passive": "Passive",
         "size": "Size",
         "path": "Path Structure",
-        "sense": "Sense"
+        "sense": "Sense",
+        "conditional": "Conditional"
+      },
+      "stacking": {
+        "label": "Stacking",
+        "desc": "Accumulates from repeated events rather than applying once. Bound it with a cap conditional."
+      },
+      "cap": {
+        "label": "Cap",
+        "desc": "Qualifies Stacking: the most that can ever be accumulated. Does nothing without the Stacking tag."
       },
       "affinitySight": {
         "label": "Affinity Sight",
@@ -893,6 +902,11 @@
       "psychic": "Psychic",
       "time": "Time",
       "karma": "Karma"
+    },
+    "CapBehaviour": {
+      "stop": "Stop",
+      "transform": "Transform (not yet implemented)",
+      "trigger": "Trigger (not yet implemented)"
     }
   },
   "TYPES": {

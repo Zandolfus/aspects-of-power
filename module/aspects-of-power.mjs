@@ -30,6 +30,7 @@ import { preloadHandlebarsTemplates } from './helpers/templates.mjs';
 import { ASPECTSOFPOWER } from './helpers/config.mjs';
 import { isActingGM } from './helpers/gm.mjs';
 import { deriveItemStats } from './systems/item-derivation.mjs';
+import { conditionalFor, hasSystemTag } from './helpers/tags.mjs';
 import { getPositionalTags } from './helpers/positioning.mjs';
 // Import systems.
 import { EquipmentSystem } from './systems/equipment.mjs';
@@ -2869,6 +2870,7 @@ Hooks.on('updateActor', async (actor, changes, _options, userId) => {
           const seenIds = new Set();
           let gain = 0;
           let capacity = 0;
+          let unbounded = false;
           for (const entry of slotted) {
             if (!entry?.augmentId || seenIds.has(entry.augmentId)) continue;
             seenIds.add(entry.augmentId);
@@ -2876,19 +2878,40 @@ Hooks.on('updateActor', async (actor, changes, _options, userId) => {
             // augment document, because the sheet's drag-to-slot path stores
             // only an id and no snapshot at all.
             let per = Math.round(Number(entry.onKillProgress) || 0);
-            let max = Math.round(Number(entry.onKillProgressMax) ?? NaN);
-            if (per <= 0 || !Number.isFinite(max)) {
+            let tags = entry.tags ?? [];
+            let conds = entry.conditionalTags ?? [];
+            if (per <= 0 || !conds.length) {
               const doc = killerActor.items.get(entry.augmentId)
                 ?? (await fromUuid(entry.augmentId).catch(() => null));
               if (per <= 0) per = Math.round(Number(doc?.system?.onKillProgress) || 0);
-              if (!Number.isFinite(max)) max = Math.round(Number(doc?.system?.onKillProgressMax) ?? 100);
+              if (!conds.length) {
+                tags = doc?.system?.tags ?? tags;
+                conds = doc?.system?.conditionalTags ?? [];
+              }
             }
             if (per > 0) {
               gain += per;
-              // Two brands on one host share ONE budget, the largest declared.
-              // The cap belongs to the item's capacity to be fed, not to each
-              // mark on it - otherwise stacking brands buys around the limit.
-              capacity = Math.max(capacity, Number.isFinite(max) ? max : 100);
+              // THE CAP IS A CONDITIONAL TAG on `stacking` (user ruled
+              // 2026-08-05). conditionalFor returns null when `stacking` is
+              // absent, so an unmarked accumulator is UNBOUNDED rather than
+              // silently capped at some default nobody chose.
+              const cap = conditionalFor(tags, conds, 'stacking');
+              if (!cap) {
+                unbounded = true;
+                if (!hasSystemTag(tags, 'stacking')) {
+                  console.warn(`[brand] ${gear.name}: an augment grants progress per kill `
+                    + `but is not tagged 'stacking' — it is unbounded. Tag it and add a cap.`);
+                }
+              } else {
+                // Two brands on one host share ONE budget, the largest
+                // declared. The cap belongs to the item's capacity to be fed,
+                // not to each mark on it, or stacking brands buys around it.
+                capacity = Math.max(capacity, cap.value);
+                if (cap.atCap !== 'stop') {
+                  console.warn(`[brand] ${gear.name}: at-cap behaviour '${cap.atCap}' `
+                    + `is declared but not implemented — behaving as 'stop'.`);
+                }
+              }
             }
           }
           if (gain <= 0) continue;
@@ -2896,9 +2919,14 @@ Hooks.on('updateActor', async (actor, changes, _options, userId) => {
           // ── THE LIFETIME CAP (user ruled 2026-08-05: "maximum 100 stacks") ──
           // Counted on the HOST and never reset, so unslotting and re-slotting
           // cannot refill the well. A fed-out item simply stops gaining.
+          //
+          // `unbounded` means no cap conditional resolved — an accumulator
+          // nobody bounded. It keeps feeding, and the console said why. The
+          // alternative, defaulting to some number, would invent a rule the
+          // author never wrote.
           const fed = Math.max(0, Math.round(
             gear.getFlag('aspectsofpower', 'onKillProgressGained') ?? 0));
-          const room = Math.max(0, capacity - fed);
+          const room = unbounded ? gain : Math.max(0, capacity - fed);
           if (room <= 0) continue;          // silent: a capped item every kill would spam
           const applied = Math.min(gain, room);
 
@@ -2907,9 +2935,11 @@ Hooks.on('updateActor', async (actor, changes, _options, userId) => {
             'system.progress': next,
             'flags.aspectsofpower.onKillProgressGained': fed + applied,
           });
-          const capNote = (fed + applied >= capacity)
-            ? ' — <strong>the brand is full</strong>'
-            : ` (${fed + applied}/${capacity} fed)`;
+          const capNote = unbounded
+            ? ''
+            : (fed + applied >= capacity)
+              ? ' — <strong>the brand is full</strong>'
+              : ` (${fed + applied}/${capacity} fed)`;
           ChatMessage.create({
             speaker: ChatMessage.getSpeaker({ actor: killerActor }),
             content: `<p><em><strong>${gear.name}</strong> drinks the death of ${actor.name} — `

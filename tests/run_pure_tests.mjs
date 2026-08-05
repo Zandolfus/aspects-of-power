@@ -1231,6 +1231,63 @@ const bash = { name: 'Shield Bash', system: { tagConfig: { requiresWeaponTag: 's
 eq('Shield Bash accepts a greatshield', WS.canUseSkill(phil, bash).allowed, true);
 eq('Shield Bash still refuses a swordsman', WS.canUseSkill(swordsman, bash).allowed, false);
 
+// ── CONDITIONAL TAGS: `cap` qualifying `stacking` ──────────────────────────
+// The cap is a TAG, not a field (user ruled 2026-08-05). Its whole failure
+// mode is being silently inert, so the readers are tested for exactly that.
+const T = await import('../module/helpers/tags.mjs');
+
+const brandTags = ['combat', 'stacking'];
+const brandConds = [{ id: 'cap', qualifies: 'stacking', value: 100, atCap: 'stop' }];
+
+eq('cap resolves when stacking is present',
+   T.conditionalFor(brandTags, brandConds, 'stacking'), { value: 100, atCap: 'stop' });
+// THE INERT CASE: a cap on a carrier that never declared stacking bounds
+// nothing. Returning null (not 100) is what lets the caller say so out loud.
+eq('cap without the stacking tag is INERT',
+   T.conditionalFor(['combat'], brandConds, 'stacking'), null);
+eq('no conditional at all', T.conditionalFor(brandTags, [], 'stacking'), null);
+eq('a cap with no number does not resolve',
+   T.conditionalFor(brandTags, [{ id: 'cap', qualifies: 'stacking' }], 'stacking'), null);
+// A conditional qualifying a DIFFERENT tag must not answer for stacking.
+eq('cap on another tag does not answer here',
+   T.conditionalFor(brandTags, [{ id: 'cap', qualifies: 'burning', value: 5 }], 'stacking'), null);
+eq('atCap defaults to stop',
+   T.conditionalFor(brandTags, [{ id: 'cap', qualifies: 'stacking', value: 7 }], 'stacking').atCap, 'stop');
+// Zero is a real cap (feeds nothing), not a missing one.
+eq('a cap of zero is a real bound',
+   T.conditionalFor(brandTags, [{ id: 'cap', qualifies: 'stacking', value: 0 }], 'stacking'), { value: 0, atCap: 'stop' });
+
+// hasSystemTag accepts both the flat and legacy {id,value} shapes.
+eq('hasSystemTag flat', T.hasSystemTag(['a', 'stacking'], 'stacking'), true);
+eq('hasSystemTag legacy objects', T.hasSystemTag([{ id: 'stacking', value: 0 }], 'stacking'), true);
+eq('hasSystemTag absent', T.hasSystemTag(['a'], 'stacking'), false);
+
+// The author-facing validator — the reason the inert case is survivable.
+eq('clean config reports no problems',
+   T.conditionalTagProblems(brandTags, brandConds).length, 0);
+eq('inert cap is reported',
+   T.conditionalTagProblems(['combat'], brandConds)[0].includes('currently does nothing'), true);
+eq('unknown tag id is reported',
+   T.conditionalTagProblems(brandTags, [{ id: 'nonsense', qualifies: 'stacking', value: 1 }])[0]
+     .includes('not in the tag registry'), true);
+eq('a non-conditional tag cannot qualify',
+   T.conditionalTagProblems(brandTags, [{ id: 'healer', qualifies: 'stacking', value: 1 }])[0]
+     .includes('cannot qualify'), true);
+eq('missing value is reported',
+   T.conditionalTagProblems(brandTags, [{ id: 'cap', qualifies: 'stacking' }])
+     .some(p => p.includes('needs a number')), true);
+// Declared-but-unimplemented at-cap behaviours must announce themselves rather
+// than quietly acting like `stop` — the dump's caps often transform at the top.
+eq('unimplemented atCap is announced',
+   T.conditionalTagProblems(brandTags, [{ id: 'cap', qualifies: 'stacking', value: 5, atCap: 'transform' }])
+     .some(p => p.includes('NOT YET IMPLEMENTED')), true);
+eq('unknown atCap is reported',
+   T.conditionalTagProblems(brandTags, [{ id: 'cap', qualifies: 'stacking', value: 5, atCap: 'wat' }])
+     .some(p => p.includes('unknown at-cap')), true);
+eq('cap and stacking are both registered',
+   [T.TAG_REGISTRY.stacking?.category, T.TAG_REGISTRY.cap?.category], ['passive', 'conditional']);
+eq('cap declares what it qualifies', T.TAG_REGISTRY.cap.qualifies, 'stacking');
+
 if (failures) { console.error(`\n${failures} FAILURES`); process.exit(1); }
 console.log('\nAll pure-function tests pass.');
 

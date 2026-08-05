@@ -1322,7 +1322,13 @@ class CraftingSkills {
       // Counter, not a magnitude — snapshotted verbatim, never scaled by the
       // crafter's rarity (see the field note on AugmentData).
       onKillProgress: Math.max(0, Math.round(augmentDoc.system?.onKillProgress ?? 0)),
-      onKillProgressMax: Math.max(0, Math.round(augmentDoc.system?.onKillProgressMax ?? 100)),
+      // Carry the augment's own tags AND its conditionals into the snapshot.
+      // Both or neither: a `cap` without the `stacking` it qualifies reads as
+      // inert, so snapshotting one without the other would silently uncap.
+      tags: [...(augmentDoc.system?.tags ?? [])],
+      conditionalTags: (augmentDoc.system?.conditionalTags ?? []).map(c => ({
+        id: c.id, qualifies: c.qualifies, value: c.value, atCap: c.atCap,
+      })),
     };
     // Prune cleared {augmentId: ''} entries so garbage from earlier removes
     // doesn't accumulate and the array stays aligned with actual usage.

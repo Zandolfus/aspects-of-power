@@ -23,6 +23,37 @@ export const TAG_CATEGORIES = {
   size:       { label: 'ASPECTSOFPOWER.SystemTag.Category.size',       color: '#78909c' },
   path:       { label: 'ASPECTSOFPOWER.SystemTag.Category.path',       color: '#26a69a' },
   sense:      { label: 'ASPECTSOFPOWER.SystemTag.Category.sense',      color: '#7e57c2' },
+  // CONDITIONAL tags do not describe the thing that carries them - they
+  // QUALIFY another tag on the same thing. `cap` qualifies `stacking`: the
+  // stacking tag says "this accumulates", the cap says "up to 100, then stop".
+  // A conditional whose qualified tag is absent is INERT and is reported as
+  // such rather than being quietly ignored.
+  //
+  // Deliberately NOT the same thing as design-conditional-tags.md, which is
+  // about a SKILL testing a TARGET's state ("bonus damage vs undead"). That is
+  // a different question - someone else's state, not a property of mine - and
+  // stays a separate subsystem. Reviewing the pre-system skill dump, 18 skills
+  // want that one and 10 want this one; conflating them would serve neither.
+  conditional: { label: 'ASPECTSOFPOWER.SystemTag.Category.conditional', color: '#ff7043' },
+};
+
+/**
+ * At-cap behaviours for a `cap` conditional tag.
+ *
+ * The pre-system skill dump is the reason this exists at all: most caps in the
+ * design are GATEWAYS, not ceilings. Chilled at 5 stacks becomes frozen solid;
+ * Sinner's Remorse at its limit costs the target their actions; armour reduced
+ * below 10% shatters outright. A cap that could only clamp would have served
+ * Brand of Shadows Bound and mis-served seven other skills.
+ *
+ * Only `stop` is implemented today. The other two are declared so the
+ * vocabulary is fixed and an author can SEE what is coming - and any consumer
+ * meeting one logs it loudly instead of silently treating it as `stop`.
+ */
+export const CAP_BEHAVIOURS = {
+  stop:      { label: 'ASPECTSOFPOWER.CapBehaviour.stop',      implemented: true },
+  transform: { label: 'ASPECTSOFPOWER.CapBehaviour.transform', implemented: false },
+  trigger:   { label: 'ASPECTSOFPOWER.CapBehaviour.trigger',   implemented: false },
 };
 
 /* ------------------------------------------------------------------ */
@@ -128,4 +159,99 @@ export const TAG_REGISTRY = {
   'threefold-path': { label: 'ASPECTSOFPOWER.SystemTag.threefoldPath.label', category: 'path', implies: [], description: 'ASPECTSOFPOWER.SystemTag.threefoldPath.desc' },
   'twofold-path':   { label: 'ASPECTSOFPOWER.SystemTag.twofoldPath.label',   category: 'path', implies: [], description: 'ASPECTSOFPOWER.SystemTag.twofoldPath.desc' },
   'onefold-path':   { label: 'ASPECTSOFPOWER.SystemTag.onefoldPath.label',   category: 'path', implies: [], description: 'ASPECTSOFPOWER.SystemTag.onefoldPath.desc' },
+
+  // ── Accumulation ──
+  // `stacking` marks a thing whose effect ACCUMULATES from repeated events
+  // rather than applying once. It says nothing about the rate - how much is
+  // gained per event stays with whatever drives the event, because the rate is
+  // inseparable from the trigger (per kill, per target hit, per round chilled).
+  // What the tag buys is a single question every accumulator answers the same
+  // way: "is this bounded, and by what?"
+  'stacking': { label: 'ASPECTSOFPOWER.SystemTag.stacking.label', category: 'passive', implies: [], description: 'ASPECTSOFPOWER.SystemTag.stacking.desc' },
+
+  // ── Conditionals (qualifiers) ──
+  'cap': {
+    label: 'ASPECTSOFPOWER.SystemTag.cap.label',
+    category: 'conditional',
+    qualifies: 'stacking',   // inert without it
+    valued: true,            // carries a number
+    behaviours: 'CAP_BEHAVIOURS',
+    implies: [],
+    description: 'ASPECTSOFPOWER.SystemTag.cap.desc',
+  },
 };
+
+/* ------------------------------------------------------------------ */
+/*  Conditional tag readers (pure - no Foundry, golden-tested)         */
+/* ------------------------------------------------------------------ */
+
+const _idsOf = (tags) => (tags ?? []).map(t => (typeof t === 'string' ? t : t?.id)).filter(Boolean);
+
+/**
+ * Does this tag list carry `id`? Accepts both the flat string form and the
+ * legacy `{id, value}` objects, so callers need not know which they hold.
+ */
+export function hasSystemTag(tags, id) {
+  return _idsOf(tags).includes(id);
+}
+
+/**
+ * The conditional qualifying `qualifiesTag`, or null.
+ *
+ * Returns null when the qualified tag is ABSENT - a `cap` on something that
+ * does not declare `stacking` bounds nothing, and silently honouring it would
+ * hide an authoring mistake behind working-looking behaviour. Use
+ * `conditionalTagProblems` to surface that case to an author.
+ *
+ * @param {Array} tags             flat tag list of the carrier
+ * @param {Array} conditionalTags  [{id, qualifies, value, atCap}]
+ * @param {string} qualifiesTag    the tag being qualified, e.g. 'stacking'
+ * @param {string} id              which conditional, default 'cap'
+ * @returns {{value:number, atCap:string}|null}
+ */
+export function conditionalFor(tags, conditionalTags, qualifiesTag, id = 'cap') {
+  if (!hasSystemTag(tags, qualifiesTag)) return null;
+  const hit = (conditionalTags ?? []).find(c => c?.id === id && c?.qualifies === qualifiesTag);
+  if (!hit) return null;
+  const value = Number(hit.value);
+  if (!Number.isFinite(value)) return null;
+  return { value, atCap: hit.atCap || 'stop' };
+}
+
+/**
+ * Author-facing validation. Returns human-readable problems, empty when clean.
+ *
+ * Exists because the failure this system keeps producing is the SILENTLY INERT
+ * setting - a field that looks configured and does nothing. A conditional that
+ * qualifies a tag its carrier lacks is exactly that shape, so it is named out
+ * loud on the sheet instead of being discovered months later.
+ *
+ * @returns {string[]}
+ */
+export function conditionalTagProblems(tags, conditionalTags, registry = TAG_REGISTRY) {
+  const problems = [];
+  for (const c of (conditionalTags ?? [])) {
+    if (!c?.id) { problems.push('A conditional tag has no id.'); continue; }
+    const def = registry[c.id];
+    if (!def) { problems.push(`"${c.id}" is not in the tag registry.`); continue; }
+    if (def.category !== 'conditional') {
+      problems.push(`"${c.id}" is a ${def.category} tag, not a conditional - it cannot qualify anything.`);
+      continue;
+    }
+    const needs = c.qualifies || def.qualifies;
+    if (!needs) { problems.push(`"${c.id}" does not say which tag it qualifies.`); continue; }
+    if (!hasSystemTag(tags, needs)) {
+      problems.push(`"${c.id}" qualifies "${needs}", which this does not have - it currently does nothing.`);
+    }
+    if (def.valued && !Number.isFinite(Number(c.value))) {
+      problems.push(`"${c.id}" needs a number and has none.`);
+    }
+    if (c.atCap && CAP_BEHAVIOURS[c.atCap] && !CAP_BEHAVIOURS[c.atCap].implemented) {
+      problems.push(`"${c.id}" uses at-cap behaviour "${c.atCap}", which is declared but NOT YET IMPLEMENTED - it will behave as "stop".`);
+    }
+    if (c.atCap && !CAP_BEHAVIOURS[c.atCap]) {
+      problems.push(`"${c.id}" has an unknown at-cap behaviour "${c.atCap}".`);
+    }
+  }
+  return problems;
+}

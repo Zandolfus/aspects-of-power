@@ -100,13 +100,33 @@ export class AugmentData extends foundry.abstract.TypeDataModel {
       //
       // NOT scaled by magnifierPct/scaleWithCrafter: this is a counter, not a
       // magnitude, and a crafter-scaled +2.7 progress per kill means nothing.
+      // The RATE stays a field, not a tag: how much is gained per event is
+      // inseparable from the event itself (per kill here; per target hit for
+      // Flames Without; per round for a chill). Tags answer the general
+      // question - does this accumulate, and is it bounded.
       onKillProgress: new fields.NumberField({ initial: 0, min: 0, integer: true }),
-      // LIFETIME CAP in progress points (user ruled 2026-08-05: "maximum 100
-      // stacks"). Counted on the HOST, in
-      // `flags.aspectsofpower.onKillProgressGained`, and deliberately NOT
-      // reset by unslotting and re-slotting - the item already grew, and a
-      // reset would make the cap a formality. An item fed to its cap is done.
-      onKillProgressMax: new fields.NumberField({ initial: 100, min: 0, integer: true }),
+
+      // ── CONDITIONAL TAGS (user ruled 2026-08-05) ──
+      // Qualifiers on this augment's own `tags`. The lifetime cap lives here:
+      //   tags:            ['combat', 'stacking']
+      //   conditionalTags: [{ id: 'cap', qualifies: 'stacking', value: 100 }]
+      //
+      // Parallel to `tags` rather than folded into it because `tags` is read as
+      // a flat string array in 109 places (shield detection, weapon types, slot
+      // eligibility); giving those entries a value would have meant touching
+      // every one, with silent non-matching as the failure mode.
+      //
+      // Counted on the HOST in `flags.aspectsofpower.onKillProgressGained`, and
+      // deliberately NOT reset by unslotting and re-slotting - the item already
+      // grew, and a reset would make the cap a formality.
+      conditionalTags: new fields.ArrayField(new fields.SchemaField({
+        id:        new fields.StringField({ initial: 'cap' }),
+        qualifies: new fields.StringField({ initial: 'stacking' }),
+        value:     new fields.NumberField({ initial: 0 }),
+        // stop | transform | trigger — see CAP_BEHAVIOURS. Only `stop` is
+        // implemented; the others are declared so the vocabulary is fixed.
+        atCap:     new fields.StringField({ initial: 'stop' }),
+      }), { initial: [] }),
     };
   }
 }

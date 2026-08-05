@@ -123,7 +123,16 @@ export class ItemItemData extends foundry.abstract.TypeDataModel {
         // Brand of Shadows Bound: item progress gained per enemy the WEARER
         // kills. See the actor-death handler in aspects-of-power.mjs.
         onKillProgress: new fields.NumberField({ initial: 0, min: 0, integer: true }),
-        onKillProgressMax: new fields.NumberField({ initial: 100, min: 0, integer: true }),
+        // Snapshotted from the augment so the cap survives slotting. The
+        // carrier's own tags come along too — a conditional is meaningless
+        // without the tag it qualifies.
+        tags: new fields.ArrayField(new fields.StringField(), { initial: [] }),
+        conditionalTags: new fields.ArrayField(new fields.SchemaField({
+          id:        new fields.StringField({ initial: 'cap' }),
+          qualifies: new fields.StringField({ initial: 'stacking' }),
+          value:     new fields.NumberField({ initial: 0 }),
+          atCap:     new fields.StringField({ initial: 'stop' }),
+        }), { initial: [] }),
       }), { initial: [] }),
 
       // Profession augment slots — additional slots on profession gear that
@@ -150,7 +159,16 @@ export class ItemItemData extends foundry.abstract.TypeDataModel {
         grantsTags: new fields.ArrayField(new fields.StringField(), { initial: [] }),
         slotCost: new fields.NumberField({ initial: 1, min: 1, integer: true }),
         onKillProgress: new fields.NumberField({ initial: 0, min: 0, integer: true }),
-        onKillProgressMax: new fields.NumberField({ initial: 100, min: 0, integer: true }),
+        // Snapshotted from the augment so the cap survives slotting. The
+        // carrier's own tags come along too — a conditional is meaningless
+        // without the tag it qualifies.
+        tags: new fields.ArrayField(new fields.StringField(), { initial: [] }),
+        conditionalTags: new fields.ArrayField(new fields.SchemaField({
+          id:        new fields.StringField({ initial: 'cap' }),
+          qualifies: new fields.StringField({ initial: 'stacking' }),
+          value:     new fields.NumberField({ initial: 0 }),
+          atCap:     new fields.StringField({ initial: 'stop' }),
+        }), { initial: [] }),
       }), { initial: [] }),
 
       // Skill IDs this item grants access to when equipped.

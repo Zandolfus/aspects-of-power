@@ -89,6 +89,20 @@ export class AspectsofPowerItemSheet extends foundry.applications.api.Handlebars
       }
     }
 
+    // Augment sheet: conditional-tag editor. The PROBLEM list is the point —
+    // a conditional qualifying a tag its carrier lacks does nothing at all,
+    // and that is the exact silently-inert shape this system keeps producing.
+    // Say so on the sheet rather than letting it be found months later.
+    if (this.item.type === 'augment') {
+      const { conditionalTagProblems } = await import('../helpers/tags.mjs');
+      const reg = CONFIG.ASPECTSOFPOWER.tagRegistry ?? {};
+      context.conditionalTagOptions = Object.entries(reg)
+        .filter(([, d]) => d.category === 'conditional').map(([k]) => k);
+      context.capBehaviourOptions = Object.keys(CONFIG.ASPECTSOFPOWER.capBehaviours ?? {});
+      context.conditionalTagProblems = conditionalTagProblems(
+        this.item.system.tags ?? [], this.item.system.conditionalTags ?? [], reg);
+    }
+
     // Skill sheet: build filtered roll type and resource lists based on actor gate tags.
     if (this.item.type === 'skill') {
       const allRollTypes = CONFIG.ASPECTSOFPOWER.rollTypes ?? {};
@@ -820,9 +834,14 @@ export class AspectsofPowerItemSheet extends foundry.applications.api.Handlebars
         await this.document.update({ 'system.slotCost': v });
         return;
       }
-      if (event.target?.name === 'system.onKillProgressMax') {
-        const v = Math.max(0, Math.round(Number(event.target.value) || 0));
-        await this.document.update({ 'system.onKillProgressMax': v });
+      // Conditional-tag rows: rebuild the whole array from the DOM, the same
+      // way alteration rows do — positional dot-paths reach a full-form submit
+      // as an object with numeric keys, which an ArrayField will not take.
+      if (event.target?.classList?.contains('conditional-tag-id')
+        || event.target?.classList?.contains('conditional-tag-qualifies')
+        || event.target?.classList?.contains('conditional-tag-value')
+        || event.target?.classList?.contains('conditional-tag-atcap')) {
+        await this._saveConditionalTags();
         return;
       }
       if (event.target?.name === 'system.onKillProgress') {
@@ -984,6 +1003,26 @@ export class AspectsofPowerItemSheet extends foundry.applications.api.Handlebars
     await this.document.update({ 'system.craftBonuses': [{ type, value, affinity }] });
   }
 
+  /**
+   * Rebuild `system.conditionalTags` from every row in the DOM.
+   *
+   * Whole-array rebuild rather than positional dot-paths, for the reason the
+   * alteration rows already document: `system.conditionalTags.0.value` reaches
+   * a full-form submit as an OBJECT with numeric keys, which an ArrayField
+   * rejects.
+   */
+  async _saveConditionalTags() {
+    const form = this.element.querySelector('form');
+    const rows = [...form.querySelectorAll('.conditional-tag-row')];
+    const conditionalTags = rows.map(row => ({
+      id:        row.querySelector('.conditional-tag-id')?.value || 'cap',
+      qualifies: row.querySelector('.conditional-tag-qualifies')?.value || 'stacking',
+      value:     Number(row.querySelector('.conditional-tag-value')?.value) || 0,
+      atCap:     row.querySelector('.conditional-tag-atcap')?.value || 'stop',
+    }));
+    await this.document.update({ 'system.conditionalTags': conditionalTags });
+  }
+
   /** @override – save scroll position + section open-states before DOM replacement. */
   _preRender(context, options) {
     this._savedScrollTop = this.element?.querySelector('.sheet-body')?.scrollTop ?? 0;
@@ -1083,6 +1122,24 @@ export class AspectsofPowerItemSheet extends foundry.applications.api.Handlebars
         const alterations = [...(this.item.system.alterations ?? [])];
         alterations.splice(idx, 1);
         await this.document.update({ 'system.alterations': alterations });
+      });
+    });
+
+    // --- Augment: Add / Delete conditional-tag rows ---
+    // A fresh row defaults to `cap` on `stacking`, the only pairing that is
+    // wired today, so the common case is one click and a number.
+    this.element.querySelector('.conditional-tag-add')?.addEventListener('click', async () => {
+      const conditionalTags = [...(this.item.system.conditionalTags ?? []),
+        { id: 'cap', qualifies: 'stacking', value: 0, atCap: 'stop' }];
+      await this.document.update({ 'system.conditionalTags': conditionalTags });
+    });
+
+    this.element.querySelectorAll('.conditional-tag-delete').forEach(el => {
+      el.addEventListener('click', async () => {
+        const idx = Number(el.dataset.index);
+        const conditionalTags = [...(this.item.system.conditionalTags ?? [])];
+        conditionalTags.splice(idx, 1);
+        await this.document.update({ 'system.conditionalTags': conditionalTags });
       });
     });
 

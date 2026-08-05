@@ -40,11 +40,44 @@
           <input type="number" name="system.onKillProgress" value="{{system.onKillProgress}}" min="0" step="1" data-dtype="Number" style="width:60px;" />
           <span class="hint" style="font-size:11px;color:#888;">Host item gains this much progress each time the wearer lands a killing blow.</span>
         </label>
-        <label style="display:flex;align-items:center;gap:6px;margin-top:6px;">
-          <span>Lifetime Cap:</span>
-          <input type="number" name="system.onKillProgressMax" value="{{system.onKillProgressMax}}" min="0" step="1" data-dtype="Number" style="width:60px;" />
-          <span class="hint" style="font-size:11px;color:#888;">Total progress this can ever feed one item. Counted on the host and never reset by unslotting.</span>
-        </label>
+      </div>
+
+      {{! ── Conditional tags: qualifiers on this augment's own tags ── }}
+      <div class="equip-section">
+        <div class="equip-section-header flexrow">
+          <h4>Conditional Tags</h4>
+          <a class="item-control conditional-tag-add" title="Add a conditional tag"><i class="fas fa-plus"></i></a>
+        </div>
+        <p class="hint" style="font-size:11px;color:#888;margin:0 0 6px 0;">
+          A conditional qualifies another tag on this augment. <code>cap</code> bounds <code>stacking</code>:
+          the stacking tag says it accumulates, the cap says how far.
+        </p>
+        {{#each system.conditionalTags as |c i|}}
+        <div class="conditional-tag-row flexrow" data-index="{{i}}" style="align-items:center;gap:6px;margin-bottom:4px;">
+          <select class="conditional-tag-id" data-index="{{i}}" style="width:90px;">
+            {{#each ../conditionalTagOptions as |opt|}}
+              <option value="{{opt}}" {{#if (eq opt ../c.id)}}selected{{/if}}>{{opt}}</option>
+            {{/each}}
+          </select>
+          <span style="font-size:11px;color:#888;">qualifies</span>
+          <input type="text" class="conditional-tag-qualifies" data-index="{{i}}" value="{{c.qualifies}}" style="width:90px;" />
+          <span style="font-size:11px;color:#888;">value</span>
+          <input type="number" class="conditional-tag-value" data-index="{{i}}" value="{{c.value}}" step="1" style="width:70px;" />
+          <select class="conditional-tag-atcap" data-index="{{i}}" style="width:100px;">
+            {{#each ../capBehaviourOptions as |b|}}
+              <option value="{{b}}" {{#if (eq b ../c.atCap)}}selected{{/if}}>at cap: {{b}}</option>
+            {{/each}}
+          </select>
+          <a class="item-control conditional-tag-delete" data-index="{{i}}" title="Remove"><i class="fas fa-trash"></i></a>
+        </div>
+        {{/each}}
+        {{#if conditionalTagProblems.length}}
+        <div class="conditional-tag-problems" style="margin-top:6px;padding:6px;border-left:3px solid #ef5350;background:rgba(239,83,80,0.08);">
+          {{#each conditionalTagProblems}}
+          <div style="font-size:11px;color:#c62828;">{{this}}</div>
+          {{/each}}
+        </div>
+        {{/if}}
       </div>
 
       {{#if system.isProfessionAugment}}
