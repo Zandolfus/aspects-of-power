@@ -22,6 +22,10 @@ export class CharacterData extends foundry.abstract.TypeDataModel {
       health:    resourceSchema(5, 10),
       stamina:   resourceSchema(5, 10),
       mana:      resourceSchema(5, 5),
+      // KI — the monk resource. Granted by the `ki` ACTOR TAG: `ki.max` derives
+      // from endurance in prepareDerivedData and is 0 for anyone without the
+      // tag, so the field existing costs every other actor nothing.
+      ki:        resourceSchema(0, 0),
 
       // STRAIN — max HP temporarily burned away, as a FRACTION of true max.
       // The price of pushing a resource conversion past what the body

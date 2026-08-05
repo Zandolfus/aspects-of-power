@@ -964,6 +964,30 @@ export function auraTickMoments(lastTick, newClock, period, cfg = null) {
 }
 
 /**
+ * KI POOL MAXIMUM from endurance (ruled 2026-08-05).
+ *
+ * Ki is a RESOURCE, not stacks — it carries no per-cast payload, is spent at
+ * varying costs by many abilities, and wants the existing cost / affordability
+ * / bar machinery that pools already have. The bar is deliberately SMALL: ki
+ * funds big abilities, it is not a second mana pool.
+ *
+ * ⚠ The `ki` TAG decides whether anyone has this at all — the caller passes 0
+ * for an untagged actor, and a 0 max is what keeps the resource invisible.
+ *
+ * @param {number} enduranceMod
+ * @param {object|null} cfg
+ * @returns {number}
+ */
+export function kiMaxFor(enduranceMod, cfg = null) {
+  const sc = cfg ?? (globalThis.CONFIG?.ASPECTSOFPOWER ?? {});
+  const div = Number(sc.ki?.capDivisor) > 0 ? Number(sc.ki.capDivisor) : 150;
+  const hardMax = Math.max(0, Math.round(Number(sc.ki?.capMax ?? 10)));
+  const mod = Number(enduranceMod);
+  if (!Number.isFinite(mod) || mod <= 0) return 0;
+  return Math.max(0, Math.min(hardMax, Math.round(mod / div)));
+}
+
+/**
  * STAT-DERIVED STACK CAP (ki monk, user ruled 2026-08-05: "it just needs a cap
  * likely tied to endurance").
  *

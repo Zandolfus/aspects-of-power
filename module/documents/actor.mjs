@@ -4,7 +4,7 @@
 import { proficiencyDamageMult } from '../systems/weapon-styles.mjs';
 import { carriedWeightLb, buffCapacity, abilityMod, abilityModTotal,
          abilityPostCurveFactors, abilityValues,
-         buffLoadByAbility, buffDefenceCost } from '../helpers/formulas.mjs';
+         buffLoadByAbility, buffDefenceCost, kiMaxFor } from '../helpers/formulas.mjs';
 
 /**
  * Change keys that `prepareDerivedData` consumes BY HAND — every ability, plus
@@ -398,6 +398,24 @@ export class AspectsofPowerActor extends Actor {
     systemData.health.max = Math.max(1, Math.round(systemData.health.trueMax * (1 - _strain)));
     systemData.mana.max = systemData.abilities.willpower.mod;
     systemData.stamina.max = systemData.abilities.endurance.mod;
+
+    // ── KI (ruled 2026-08-05) ────────────────────────────────────────────
+    // A RESOURCE granted by the `ki` ACTOR TAG, not a stack pool: ki carries no
+    // per-cast payload and is spent at varying costs by many abilities, so it
+    // wants the cost/affordability/bar machinery pools already have.
+    //
+    // ⚠ Gated on the tag, so `ki.max` is 0 for everyone else and the bar never
+    // appears — the field existing costs the rest of the world nothing. Safe to
+    // read here because _collectTags runs early (line ~200) for exactly this
+    // kind of dependency.
+    //
+    // Composes by tag: healer monk = healer + ki + affinity; destroyer monk =
+    // ki alone, no Healer's Signature. See playbook-tag-driven-classes.
+    if (systemData.ki) {
+      systemData.ki.max = this.hasTag('ki')
+        ? kiMaxFor(systemData.abilities.endurance.mod) : 0;
+      systemData.ki.value = Math.min(systemData.ki.value ?? 0, systemData.ki.max);
+    }
 
     // Overhealth cap: 200% of max HP (characters only).
     if (systemData.overhealth) {

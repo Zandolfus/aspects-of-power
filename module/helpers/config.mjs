@@ -1162,17 +1162,17 @@ ASPECTSOFPOWER.activities = {
   // world time you could have spent travelling or crafting.
   // The fraction is read from the ACTOR (`system.meditation.fraction`), not
   // fixed here, so a passive can raise it — see meditation.baseFraction.
-  // ⚠ TWO RESTORES, INDEPENDENTLY GATED. Mana is a fraction of a pool; ki is a
-  // STACK pool with no `.max` to take a fraction of, so it refills to its
-  // `stackCapStat`-derived ceiling instead. Anyone without a ki producer
-  // resolves a cap of 0 and simply skips it, so meditating mages are unchanged.
-  //
-  // Ki is restored by TIME because time is the one currency that cannot be
-  // farmed in place — this is what stops a monk banking ki on a training dummy
-  // between fights (ruled 2026-08-05).
+  // ⚠ TWO RESTORES, INDEPENDENTLY GATED. Each entry is skipped when its pool's
+  // max is 0, so a mage (ki.max 0, no `ki` tag) gets only the mana line and a
+  // monk gets both. Ki refills FULLY — `fraction: 1` — because ki is restored
+  // by TIME, the one currency that cannot be farmed in place, and that is what
+  // stops a monk banking ki on a training dummy between fights (ruled
+  // 2026-08-05). An hour of meditation is a full ki bar.
   meditate:    { label: 'Meditate', cost: 0, class: 'clock', clockSeconds: 3600,
-                 restore: { resource: 'mana', fractionPath: 'meditation.fraction',
-                            stackPool: 'ki' } },
+                 restore: [
+                   { resource: 'mana', fractionPath: 'meditation.fraction' },
+                   { resource: 'ki',   fraction: 1 },
+                 ] },
 };
 
 /**
@@ -1318,6 +1318,20 @@ ASPECTSOFPOWER.barrier = {
  * hundreds has to become a ceiling in the single digits. statCapDivisor does
  * that; statCapMax stops a colossal endurance build carrying a silly bar.
  */
+/**
+ * KI — the monk resource (ruled 2026-08-05). A real POOL, not stacks: ki
+ * carries no per-cast payload, is spent at varying costs by many abilities,
+ * and wants the existing cost/affordability/bar machinery. Granted by the `ki`
+ * ACTOR TAG; without it ki.max derives to 0 and the resource never appears.
+ *
+ * max = clamp(round(endurance.mod / capDivisor), 0, capMax)
+ * Deliberately a SMALL bar — ki funds big abilities, it is not a mana pool.
+ */
+ASPECTSOFPOWER.ki = {
+  capDivisor: 150,
+  capMax:     10,
+};
+
 ASPECTSOFPOWER.stacks = {
   statCapDivisor: 150,
   statCapMax:     10,

@@ -370,18 +370,21 @@ export class SkillData extends foundry.abstract.TypeDataModel {
         //                  Resolved by formulas.statStackCap; the authored
         //                  stackCap becomes the FLOOR.
         stackCapStat:  new fields.StringField({ initial: '' }),
-        //   stackOnPierce  ki monk (ruled 2026-08-05). A PASSIVE carrying this
-        //                  plus `stackPool` banks this many stacks whenever its
-        //                  owner lands damage that REACHES HP — i.e. a strike
-        //                  that actually pierced the wall.
+        //   kiOnPierce     ki monk (ruled 2026-08-05). A skill carrying this
+        //                  grants its owner that much KI whenever they land
+        //                  damage that REACHES HP — a strike that pierced.
         //
         //   ⚠ THE PIERCE CONDITION IS THE BALANCE. A minimum-cost strike does
-        //   not get through real armour, so it banks NOTHING; generating ki
-        //   means investing above base, which spends above the stamina regen
-        //   line by construction. That is what stops "free strikes -> free ki
-        //   -> free healing" without needing a separate floor rule. Do not
-        //   relax it to "on any attack" — that recreates the engine.
-        stackOnPierce: new fields.NumberField({ initial: 0, min: 0, integer: true }),
+        //   not get through real armour, so it grants NOTHING; earning ki means
+        //   investing above base, which spends above the stamina regen line by
+        //   construction. That is what stops 'free strikes -> free ki -> free
+        //   healing' without a separate floor rule. Do NOT relax it to 'on any
+        //   attack' — that recreates the engine.
+        //
+        //   Ki is a RESOURCE (system.ki), not stacks: it carries no per-cast
+        //   payload and is spent at varying costs, so it uses the pool
+        //   machinery. Gated on the `ki` ACTOR TAG.
+        kiOnPierce:    new fields.NumberField({ initial: 0, min: 0, integer: true }),
         stackScaling:  new fields.NumberField({ initial: 1.0, min: 0 }),
         // MULTI-TARGET SPREAD. One activation throws F fields across T targets
         // subject to F + T <= stackSpreadBudget. At 6: 5-at-one, 4-at-two,

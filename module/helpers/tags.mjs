@@ -35,6 +35,9 @@ export const TAG_CATEGORIES = {
   // stays a separate subsystem. Reviewing the pre-system skill dump, 18 skills
   // want that one and 10 want this one; conflating them would serve neither.
   conditional: { label: 'ASPECTSOFPOWER.SystemTag.Category.conditional', color: '#ff7043' },
+  // Tags that GRANT A RESOURCE POOL rather than modifying a number or gating
+  // an action. The only category whose members create UI.
+  resource:    { label: 'ASPECTSOFPOWER.SystemTag.Category.resource',    color: '#29b6f6' },
 };
 
 /**
@@ -159,6 +162,17 @@ export const TAG_REGISTRY = {
   'threefold-path': { label: 'ASPECTSOFPOWER.SystemTag.threefoldPath.label', category: 'path', implies: [], description: 'ASPECTSOFPOWER.SystemTag.threefoldPath.desc' },
   'twofold-path':   { label: 'ASPECTSOFPOWER.SystemTag.twofoldPath.label',   category: 'path', implies: [], description: 'ASPECTSOFPOWER.SystemTag.twofoldPath.desc' },
   'onefold-path':   { label: 'ASPECTSOFPOWER.SystemTag.onefoldPath.label',   category: 'path', implies: [], description: 'ASPECTSOFPOWER.SystemTag.onefoldPath.desc' },
+
+  // ── Resource-granting ──
+  // ⚠ A tag that TURNS ON A POOL. `ki` gives its bearer the ki resource: the
+  // actor derives `ki.max` from endurance and the bar appears. Without the tag
+  // ki.max is 0 and the resource is invisible, so every other actor in the
+  // world is unaffected by the field existing.
+  //
+  // Composes: a healer monk carries healer + ki + an affinity; a destroyer
+  // monk carries ki alone and never pays the Healer's Signature. Nothing in
+  // the engine knows what a 'monk' is — see playbook-tag-driven-classes.
+  'ki': { label: 'ASPECTSOFPOWER.SystemTag.ki.label', category: 'resource', implies: [], description: 'ASPECTSOFPOWER.SystemTag.ki.desc' },
 
   // ── Accumulation ──
   // `stacking` marks a thing whose effect ACCUMULATES from repeated events

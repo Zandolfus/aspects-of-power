@@ -339,7 +339,8 @@
         "size": "Size",
         "path": "Path Structure",
         "sense": "Sense",
-        "conditional": "Conditional"
+        "conditional": "Conditional",
+        "resource": "Resource"
       },
       "stacking": {
         "label": "Stacking",
@@ -632,6 +633,10 @@
       "onefoldPath": {
         "label": "Onefold-Path",
         "desc": "Race only (e.g., dragons, monsters); race level driven directly, not derived"
+      },
+      "ki": {
+        "label": "Ki",
+        "desc": "Grants the ki resource. Earned by strikes that pierce; restored by meditation. Capped by endurance."
       }
     },
     "Effect": {

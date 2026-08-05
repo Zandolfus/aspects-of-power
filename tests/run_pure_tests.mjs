@@ -1353,6 +1353,20 @@ eq('divisor is a knob',
 eq('non-finite stat falls back to authored', F2.statStackCap(NaN, 2, KI), 2);
 eq('negative stat falls back to authored', F2.statStackCap(-50, 2, KI), 2);
 
+// ── KI POOL MAX from endurance (ruled 2026-08-05) ───────────────────────────
+// Ki is a RESOURCE, not stacks: no per-cast payload, varying spend costs, and
+// it wants the pool machinery. The bar is deliberately SMALL.
+const KICFG = { ki: { capDivisor: 150, capMax: 10 } };
+eq('endurance 1085 -> 7 ki', F2.kiMaxFor(1085, KICFG), 7);
+eq('endurance 600 -> 4 ki', F2.kiMaxFor(600, KICFG), 4);
+eq('ki is bounded by capMax', F2.kiMaxFor(99999, KICFG), 10);
+// ⚠ 0 IS THE UNTAGGED CASE and must stay 0 — a nonzero floor would give a bar
+// to every actor in the world the moment the field exists.
+eq('no endurance -> no ki', F2.kiMaxFor(0, KICFG), 0);
+eq('negative endurance -> no ki', F2.kiMaxFor(-50, KICFG), 0);
+eq('NaN endurance -> no ki', F2.kiMaxFor(NaN, KICFG), 0);
+eq('divisor is a knob', F2.kiMaxFor(600, { ki: { capDivisor: 75, capMax: 10 } }), 8);
+
 // ── SOURCE GUARD: flag scopes ────────────────────────────────────────────────
 // Not a formula test — a repo scan, because this bug class is invisible to
 // every other kind of check we run.

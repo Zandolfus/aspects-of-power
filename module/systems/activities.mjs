@@ -210,60 +210,39 @@ export async function performActivity(actor, key, opts = {}) {
       + (result.taskClass === 'hybrid' ? ', or the clock, whichever is longer.' : '.');
 
   // ── Resource restoration (meditation and friends) ────────────────────────
-  // An activity may declare `restore: { resource, fraction | fractionPath }`.
-  // `fractionPath` reads from the ACTOR so a passive can raise it via an
-  // active effect — John meditates at 15% where everyone else gets 10%.
-  const restoreCfg = (CONFIG.ASPECTSOFPOWER.activities ?? {})[key]?.restore;
-  let restored = null;
-  // Kept SEPARATE from `restored` on purpose: meditation restores BOTH a mana
-  // fraction and a ki stack pool, and a single variable meant the resource
-  // branch silently clobbered the stack result.
-  let restoredStacks = null;
-
-  // ── STACK-POOL restore (ki monk, ruled 2026-08-05) ───────────────────────
-  // Ki is the stacks subsystem, not an actor resource pool, so it has no
-  // `.max`/`.value` to take a fraction of — its ceiling comes from the
-  // producer's `stackCapStat`. Meditation refills it because ki is restored by
-  // TIME, the one currency that cannot be farmed in place; that is what stops
-  // a monk banking ki on a training dummy between fights.
+  // An activity declares `restore`, either one config or a LIST of them:
+  //   { resource, fraction | fractionPath }
+  // `fractionPath` reads from the ACTOR so a passive can raise it via an active
+  // effect — John meditates at 15% where everyone else gets 10%.
   //
-  // ⚠ Gated on the actor ACTUALLY HAVING the pool declared: resolveStackCap
-  // returns 0 for anyone with no producer, and we skip rather than creating an
-  // empty stack effect on every meditating mage in the world.
-  if (restoreCfg?.stackPool) {
-    const { resolveStackCap, getStackCount, addStacks } = await import('./stacks.mjs');
-    const cap = resolveStackCap(actor, restoreCfg.stackPool);
-    if (cap > 0) {
-      const before = getStackCount(actor, restoreCfg.stackPool);
-      // 0 / unset = fill to the ceiling. An hour of meditation is a full bar.
-      const want = Math.max(0, Math.round(Number(restoreCfg.stackAmount) || 0)) || cap;
-      if (before < cap) {
-        const after = await addStacks(actor, restoreCfg.stackPool, want, {
-          cap,
-          sourceSkill: result.label,
-          label: `Stacks: ${restoreCfg.stackPool}`,
-        });
-          restoredStacks = { stackPool: restoreCfg.stackPool, gain: after - before, from: before, max: cap };
-      } else {
-          restoredStacks = { stackPool: restoreCfg.stackPool, gain: 0, from: before, max: cap };
-      }
-    }
-  }
-
-  if (restoreCfg?.resource) {
+  // A LIST because meditation restores TWO things: a mana fraction and ki.
+  // Each entry is gated on its own pool having a max, so a mage with ki.max 0
+  // silently skips the ki entry and a monk gets both. Ki is restored by TIME
+  // because time is the one currency that cannot be farmed in place — that is
+  // what stops a monk banking ki on a training dummy between fights.
+  const _rawRestore = (CONFIG.ASPECTSOFPOWER.activities ?? {})[key]?.restore;
+  const restoreList = Array.isArray(_rawRestore) ? _rawRestore : (_rawRestore ? [_rawRestore] : []);
+  const restoredAll = [];
+  for (const restoreCfg of restoreList) {
+    if (!restoreCfg?.resource) continue;
     const pool = actor.system[restoreCfg.resource];
     const own = restoreCfg.fractionPath
       ? Number(foundry.utils.getProperty(actor.system, restoreCfg.fractionPath)) || 0
       : Number(restoreCfg.fraction) || 0;
-    const aura = meditationAuraBonusFor(actor);
+    // The meditation aura raises MANA specifically (Mana Attraction); it has no
+    // business inflating a ki refill.
+    const aura = restoreCfg.resource === 'mana'
+      ? meditationAuraBonusFor(actor) : { bonus: 0, sources: [] };
     const frac = own + aura.bonus;
     const max = Math.round(pool?.max ?? 0);
     const cur = Math.round(pool?.value ?? 0);
+    // max 0 = this actor does not have the resource at all (a mage's ki), so
+    // the entry is skipped rather than creating an empty bar entry.
     if (max > 0 && frac > 0) {
       const gain = Math.min(Math.round(max * frac), max - cur);
       if (gain > 0) await actor.update({ [`system.${restoreCfg.resource}.value`]: cur + gain });
-      restored = { resource: restoreCfg.resource, gain: Math.max(0, gain), frac, from: cur, max,
-                   own, aura };
+      restoredAll.push({ resource: restoreCfg.resource, gain: Math.max(0, gain), frac,
+                         from: cur, max, own, aura });
     }
   }
 
@@ -272,23 +251,21 @@ export async function performActivity(actor, key, opts = {}) {
     content: `<p><strong>${actor.name}</strong>: ${result.label}${qualityNote}</p>`
       + `<p>Time taken: <strong>${result.display}</strong></p>`
       + `<p><em>${basis}</em></p>`
-      + (restored?.stackPool
-          ? `<p>Recovers <strong>${restored.gain}</strong> ${restored.stackPool}`
-            + ` — ${restored.from + restored.gain} / ${restored.max}.</p>`
-          : '')
-      + (restored?.resource
-          ? `<p>Recovers <strong>${restored.gain}</strong> ${restored.resource}`
-            + ` (${Math.round(restored.frac * 100)}% of ${restored.max})`
-            + ` — ${restored.from + restored.gain} / ${restored.max}.</p>`
-            + (restored.aura?.bonus > 0
-                ? `<p><em>+${Math.round(restored.aura.bonus * 100)}% from `
-                  + `${restored.aura.sources.join(', ')}.</em></p>` : '')
-          : '')
+      + restoredAll.map(r =>
+          `<p>Recovers <strong>${r.gain}</strong> ${r.resource}`
+          + ` (${Math.round(r.frac * 100)}% of ${r.max})`
+          + ` — ${r.from + r.gain} / ${r.max}.</p>`
+          + (r.aura?.bonus > 0
+              ? `<p><em>+${Math.round(r.aura.bonus * 100)}% from `
+                + `${r.aura.sources.join(', ')}.</em></p>` : '')
+        ).join('')
       + (opts.note ? `<p>${opts.note}</p>` : ''),
   });
 
   if (opts.advanceTime !== false) await advanceWorldTime(result.seconds);
-  return { ...result, restored, restoredStacks };
+  // `restored` kept as the FIRST entry for back-compat with existing callers
+  // that read a single result; `restoredAll` is the full list.
+  return { ...result, restored: restoredAll[0] ?? null, restoredAll };
 }
 
 /**

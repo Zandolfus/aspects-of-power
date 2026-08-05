@@ -2498,11 +2498,14 @@ Hooks.on('renderChatMessageHTML', (message, html) => {
       await target.update(updateData);
 
       // ── KI ON PIERCE (ki monk, user ruled 2026-08-05) ────────────────────
-      // A passive with `stackOnPierce` + `stackPool` banks stacks when its
-      // owner lands damage that REACHES HP. `remaining` is resolveDamage's
-      // hpLoss, so this asks the pipeline whether the wall was beaten rather
-      // than re-deriving it (playbook-damage-measurement: re-implementing the
-      // chain produced five wrong answers to one question).
+      // A skill with `kiOnPierce` grants its owner ki when they land damage
+      // that REACHES HP. `remaining` is resolveDamage's hpLoss, so this asks
+      // the pipeline whether the wall was beaten rather than re-deriving it
+      // (playbook-damage-measurement: re-implementing the chain produced five
+      // wrong answers to one question).
+      //
+      // Ki is a RESOURCE, not stacks — it carries no per-cast payload and is
+      // spent at varying costs, so it rides the pool machinery.
       //
       // ⚠ THE PIERCE CONDITION IS THE BALANCE, not flavour. A minimum-cost
       // strike does not get through real armour and banks nothing, so earning
@@ -2520,25 +2523,26 @@ Hooks.on('renderChatMessageHTML', (message, html) => {
           // skills with a cheap filter and bail before touching the dynamic
           // import or the cap resolver — otherwise every sword swing in the
           // world pays for a feature one class uses.
-          const kiProducers = (ka?.items ?? []).filter((sk) => {
-            if (sk.type !== 'skill') return false;
-            const c = sk.system?.tagConfig ?? {};
-            return c.stackOnPierce > 0 && !!c.stackPool;
-          });
-          if (kiProducers.length) {
-            const { addStacks, resolveStackCap } = await import('./systems/stacks.mjs');
-            // Resolve each POOL's ceiling once, not once per producer.
-            const capOf = new Map();
-            for (const sk of kiProducers) {
-              const kc = sk.system.tagConfig;
-              if (!capOf.has(kc.stackPool)) capOf.set(kc.stackPool, resolveStackCap(ka, kc.stackPool));
-              await addStacks(ka, kc.stackPool, kc.stackOnPierce, {
-                cap: capOf.get(kc.stackPool),
-                sourceSkill: sk.name,
-                label: `${sk.name} (${kc.stackPool})`,
-                img: sk.img,
-                payload: 0,   // ki is a COUNTER, not a banked payload
-              });
+          // ⚠ THE TAG IS THE GATE, and it is the cheapest possible check —
+          // this runs on EVERY damage application in the game and almost
+          // nobody has ki. Bail on a Map lookup before touching items at all.
+          if (ka?.hasTag?.('ki') && (ka.system?.ki?.max ?? 0) > 0) {
+            let gain = 0;
+            for (const sk of ka.items) {
+              if (sk.type !== 'skill') continue;
+              gain += Math.max(0, Math.round(sk.system?.tagConfig?.kiOnPierce ?? 0));
+            }
+            if (gain > 0) {
+              const ki = ka.system.ki;
+              const next = Math.min(ki.max, (ki.value ?? 0) + gain);
+              if (next !== ki.value) {
+                await ka.update({ 'system.ki.value': next });
+                ChatMessage.create({
+                  speaker: ChatMessage.getSpeaker({ actor: ka }),
+                  content: `<p><em>${ka.name} gathers <strong>${next - (ki.value ?? 0)}</strong> ki `
+                         + `— the blow landed (${next} / ${ki.max}).</em></p>`,
+                });
+              }
             }
           }
         } catch (e) {
