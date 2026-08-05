@@ -2924,8 +2924,16 @@ Hooks.on('updateActor', async (actor, changes, _options, userId) => {
           // nobody bounded. It keeps feeding, and the console said why. The
           // alternative, defaulting to some number, would invent a rule the
           // author never wrote.
+          // ⚠ READ THE FLAG DIRECTLY, NOT VIA getFlag. The flag NAMESPACE is
+          // `aspectsofpower` but the system ID is `aspects-of-power`, and
+          // getFlag validates its scope against installed package ids — so
+          // `getFlag('aspectsofpower', …)` THROWS "Flag scope not valid".
+          // Thrown here it took the whole death handler with it: no brand, and
+          // no death blooms, unqueue or auto-defeat either, since they run
+          // after this block. All 78 other flag reads in this codebase use the
+          // direct path for exactly this reason.
           const fed = Math.max(0, Math.round(
-            gear.getFlag('aspectsofpower', 'onKillProgressGained') ?? 0));
+            gear.flags?.aspectsofpower?.onKillProgressGained ?? 0));
           const room = unbounded ? gain : Math.max(0, capacity - fed);
           if (room <= 0) continue;          // silent: a capped item every kill would spam
           const applied = Math.min(gain, room);
