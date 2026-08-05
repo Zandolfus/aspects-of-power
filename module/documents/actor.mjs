@@ -1196,9 +1196,35 @@ export class AspectsofPowerActor extends Actor {
     }
 
     // ── 1. Stamina Regeneration ──
+    // ⚠ SUSPENDED WHILE THIS ACTOR SUSTAINS A HEALER AURA (user ruled
+    // 2026-08-05). Stamina refills 5% of max per round while mana refills
+    // nothing in combat, so a healer whose upkeep is under their regen heals
+    // FOREVER at no cost. The Chanter's Litany is 25 upkeep against 34 regen —
+    // net +9/round, i.e. free.
+    //
+    // The reason this is worth a rule rather than a tuning pass is that
+    // infinite healing ESCALATES rather than plateauing: an unlimited stamina
+    // healer topping up a VITALITY healer, who converts HP into healing at a
+    // measured 5.3x, yields ~1558 hp/round of party healing from two actors
+    // spending nothing. Neither looks broken alone, which is why the cap
+    // belongs on the input.
+    //
+    // ⚠ SCOPE IS DELIBERATELY NARROW: healer auras only (auraEffectType
+    // heal/stam). Damage auras like Stormstride are unrelated content and are
+    // NOT penalised, and a healer who casts direct heals without an aura still
+    // regenerates — that case is bounded by base cost instead.
+    const _healerAura = this.effects.some(e => !e.disabled
+      && (e.system?.auraRadius ?? 0) > 0
+      && ['heal', 'stam'].includes(e.system?.auraEffectType));
     const stamina = systemData.stamina;
-    const regenPct = systemData.staminaRegen ?? 5;
+    const regenPct = _healerAura ? 0 : (systemData.staminaRegen ?? 5);
     const regenAmt = Math.floor(stamina.max * (regenPct / 100));
+    if (_healerAura) {
+      ChatMessage.create({
+        speaker, ...gmWhisper,
+        content: `<p><em>${this.name}'s stamina does not recover — the aura is drawing on it.</em></p>`,
+      });
+    }
     // Respect any pending stamina change from sustain upkeep above.
     const staminaBase = updateData['system.stamina.value'] ?? stamina.value;
     if (staminaBase < stamina.max) {
