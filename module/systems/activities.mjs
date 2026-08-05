@@ -215,6 +215,10 @@ export async function performActivity(actor, key, opts = {}) {
   // active effect — John meditates at 15% where everyone else gets 10%.
   const restoreCfg = (CONFIG.ASPECTSOFPOWER.activities ?? {})[key]?.restore;
   let restored = null;
+  // Kept SEPARATE from `restored` on purpose: meditation restores BOTH a mana
+  // fraction and a ki stack pool, and a single variable meant the resource
+  // branch silently clobbered the stack result.
+  let restoredStacks = null;
 
   // ── STACK-POOL restore (ki monk, ruled 2026-08-05) ───────────────────────
   // Ki is the stacks subsystem, not an actor resource pool, so it has no
