@@ -421,7 +421,6 @@ export async function executeGmAction(payload) {
             const newDuration = Math.max(existingRemaining, payload.duration);
             const updateData = {
               changes: merged,
-              'duration.rounds': newDuration,
               'system.roundsRemaining': newDuration,
               'duration.startRound': startRound,
               'duration.startTurn': startTurn,
@@ -439,7 +438,6 @@ export async function executeGmAction(payload) {
             if (newTotal > currentTotal || hasSysOverrides) {
               const updateData = {
                 changes: payload.changes,
-                'duration.rounds': payload.duration,
               'system.roundsRemaining': payload.duration,
                 'system.roundsRemaining': payload.duration,
                 'duration.startRound': startRound,
@@ -462,7 +460,6 @@ export async function executeGmAction(payload) {
             const updateData = {
               disabled: false,
               changes: payload.changes,
-              'duration.rounds': payload.duration,
               'system.roundsRemaining': payload.duration,
               'duration.startRound': startRound,
               'duration.startTurn': startTurn,
@@ -646,7 +643,6 @@ export async function executeGmAction(payload) {
 
             const updateData = {
               changes: merged,
-              'duration.rounds': newDuration,
               'system.roundsRemaining': newDuration,
               'duration.startRound': startRound,
               'duration.startTurn': startTurn,
@@ -779,7 +775,6 @@ export async function executeGmAction(payload) {
             const frozenDuration = 2;
             if (existingFrozen) {
               await existingFrozen.update({
-                'duration.rounds':     frozenDuration,
                 'system.roundsRemaining': frozenDuration,
                 'duration.startRound': startRound,
                 'duration.startTurn':  startTurn,

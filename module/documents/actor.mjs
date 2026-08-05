@@ -1438,11 +1438,24 @@ export class AspectsofPowerActor extends Actor {
     const scene = token.document?.parent;
     if (!scene || !canvas.scene || scene.id !== canvas.scene.id) return;
 
-    const myCenter = token.center;
     const gridDist = canvas.grid.distance;
     const gridSize = canvas.grid.size;
     const pxPerFt = gridSize / gridDist;
     const myDisp = token.document.disposition;
+
+    // ⚠ CENTRE FROM THE DOCUMENT, NOT THE PLACEABLE. `token.center` is the
+    // ANIMATED position and lags during movement, so a token read right after
+    // being repositioned reports where it USED to be — which made a token 60 ft
+    // away test as in-range, twice. Same fix already applied to
+    // `meditationAuraBonusFor`; this path still had the old form.
+    // It also fixes a second bug: the target loop read `otherDoc.object`, which
+    // is null for any token not currently drawn, so unrendered tokens silently
+    // received no aura at all.
+    const centreOf = (doc) => ({
+      x: doc.x + (doc.width * gridSize) / 2,
+      y: doc.y + (doc.height * gridSize) / 2,
+    });
+    const myCenter = centreOf(token.document);
 
     for (const effect of auraEffects) {
       const sys = effect.system;
@@ -1460,11 +1473,12 @@ export class AspectsofPowerActor extends Actor {
       for (const otherDoc of scene.tokens) {
         const isSelf = otherDoc.id === token.document.id;
         if (isSelf && !includeSelf) continue;
-        const other = otherDoc.object;
-        if (!other) continue;
-        const dx = other.center.x - myCenter.x;
-        const dy = other.center.y - myCenter.y;
-        if (Math.hypot(dx, dy) > radiusPx) continue;
+        const otherCentre = centreOf(otherDoc);
+        const dist = Math.hypot(otherCentre.x - myCenter.x, otherCentre.y - myCenter.y);
+        // ⚠ Guard NaN explicitly. `NaN > radiusPx` is FALSE, so a malformed
+        // position would PASS the range check rather than fail it — the aura
+        // would silently apply at any distance.
+        if (!Number.isFinite(dist) || dist > radiusPx) continue;
 
         // Self is always a valid recipient of one's own supportive aura, even
         // when the targeting mode is written for other people.
