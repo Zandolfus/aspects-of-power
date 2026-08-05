@@ -119,9 +119,18 @@
   };
 
   /* ---------- who heals, who hits ---------- */
-  const healers = game.actors.filter(a => a.items.some(i => i.type === 'skill'
-    && (i.system.tags ?? []).includes('restoration')
-    && (i.system.tagConfig?.restorationResource ?? 'health') === 'health'));
+  // ⚠ AURA HEALERS COUNT. Selecting only on a `restoration`-tagged skill
+  // EXCLUDED THE ONE PURPOSE-BUILT STAMINA HEALER in the world — the Chanter,
+  // whose only heal is a `buff`-tagged aura — so the mode this sim exists to
+  // judge had never actually been in a run. Also accept the `healer` ACTOR tag,
+  // which is now earned from class and is the system's own answer to "is this
+  // a healer".
+  const healers = game.actors.filter(a => a.items.some(i => i.type === 'skill' && (
+    ((i.system.tags ?? []).includes('restoration')
+      && (i.system.tagConfig?.restorationResource ?? 'health') === 'health')
+    || ((i.system.tags ?? []).includes('buff')
+      && ['heal', 'stam'].includes(i.system.tagConfig?.auraEffectType))
+  )) || (a.hasTag?.('healer') ?? false));
 
   // ⚠ SAME ROSTER + ROTATION CONVENTIONS AS migration/archetype_sim.js, on
   // purpose — one setup drives both sims.
@@ -332,6 +341,15 @@
               // runs dry and sustain is unbounded. That is the number this
               // whole question turns on, and the old model could not express
               // it.
+              // ⚠⚠ THE CHECK THAT ACTUALLY DECIDES IT (user, 2026-08-05):
+              // "the base cost for a basic spell is less than its regen at 34".
+              // Cadence-derived drain flatters the mode, because a computed
+              // casts-per-round above 1 inflates the spend. At the REALISTIC
+              // one-action-per-round cadence the test is simply
+              // baseCost vs regen — and if regen wins, the mode is a perpetual
+              // healing engine at its MINIMUM legal cast, which no invest floor
+              // can close. Self-funding whenever stamMax > 20 x baseCost.
+              selfFundingAtOneCastPerRound: baseCost <= regenFor(h, res),
               regenPerRound: regenFor(h, res),
               netDrainPerRound: Math.round(
                 (invested * (roundLen / Math.max(1, wait))) - regenFor(h, res)),
