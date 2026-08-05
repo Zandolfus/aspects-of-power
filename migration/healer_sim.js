@@ -98,6 +98,22 @@
     F.strikeInvestDamage(blend, mult, windup, invested, ref,
       { invest: { curveExponent: curve } });
 
+  /**
+   * IN-COMBAT regen per reference round, per resource. The axis the original
+   * sim omitted entirely — and the only axis on which the three modes
+   * actually differ, since a controlled test (2026-08-05) showed they heal
+   * IDENTICALLY per point spent.
+   *
+   *   stamina  5% of max PER ROUND  (actor.onStartTurn, system.staminaRegen)
+   *   mana     0 in combat          (meditation is 10%/HOUR, out of combat)
+   *   health   0 ever               (and the floor is death)
+   */
+  const regenFor = (actor, res) => {
+    if (res !== 'stamina') return 0;
+    const pct = actor.system?.staminaRegen ?? 5;
+    return Math.floor((actor.system?.stamina?.max ?? 0) * (pct / 100));
+  };
+
   /* ---------- who heals, who hits ---------- */
   const healers = game.actors.filter(a => a.items.some(i => i.type === 'skill'
     && (i.system.tags ?? []).includes('restoration')
@@ -294,6 +310,32 @@
               casts: Math.floor(pool / Math.max(1, invested)),
               sustainRounds: Math.round(Math.floor(pool / Math.max(1, invested)) * (wait / roundLen) * 10) / 10,
               pctOfBar: Math.round(heal / def.hp * 100),
+
+              // ── RENEWABILITY (added 2026-08-05) ────────────────────────
+              // ⚠ THE ORIGINAL SUSTAIN MODEL WAS `pool / invested` — a fixed
+              // tank draining to zero, with NO regen for ANY resource. Under
+              // that assumption the three modes are interchangeable, which is
+              // exactly the wrong answer: stamina refills 5% of max EVERY
+              // ROUND in combat while mana refills NOTHING (meditation is
+              // 10% per HOUR, out of combat) and health never refills at all.
+              //
+              // config.mjs already rules "VALUE FOLLOWS RENEWABILITY" and
+              // prices it in the conversion table at stamina->mana 5:1. A
+              // direct heal bypasses that tax, so a stamina heal is a 1:1
+              // conversion of the cheapest resource into the dearest one.
+              //
+              // netDrain <= 0 means REGEN COVERS THE SPEND: the healer never
+              // runs dry and sustain is unbounded. That is the number this
+              // whole question turns on, and the old model could not express
+              // it.
+              regenPerRound: regenFor(h, res),
+              netDrainPerRound: Math.round(
+                (invested * (roundLen / Math.max(1, wait))) - regenFor(h, res)),
+              freeForever: (invested * (roundLen / Math.max(1, wait))) <= regenFor(h, res),
+              // The spend rate at which this mode becomes self-funding —
+              // i.e. the largest heal-per-round that costs nothing at all.
+              breakEvenHpr: Math.round(
+                regenFor(h, res) * (heal / Math.max(1, invested))),
             });
           }
         }
