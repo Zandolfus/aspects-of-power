@@ -101,6 +101,12 @@ export class AugmentData extends foundry.abstract.TypeDataModel {
       // NOT scaled by magnifierPct/scaleWithCrafter: this is a counter, not a
       // magnitude, and a crafter-scaled +2.7 progress per kill means nothing.
       onKillProgress: new fields.NumberField({ initial: 0, min: 0, integer: true }),
+      // LIFETIME CAP in progress points (user ruled 2026-08-05: "maximum 100
+      // stacks"). Counted on the HOST, in
+      // `flags.aspectsofpower.onKillProgressGained`, and deliberately NOT
+      // reset by unslotting and re-slotting - the item already grew, and a
+      // reset would make the cap a formality. An item fed to its cap is done.
+      onKillProgressMax: new fields.NumberField({ initial: 100, min: 0, integer: true }),
     };
   }
 }

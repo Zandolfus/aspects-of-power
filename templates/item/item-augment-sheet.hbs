@@ -40,6 +40,11 @@
           <input type="number" name="system.onKillProgress" value="{{system.onKillProgress}}" min="0" step="1" data-dtype="Number" style="width:60px;" />
           <span class="hint" style="font-size:11px;color:#888;">Host item gains this much progress each time the wearer lands a killing blow.</span>
         </label>
+        <label style="display:flex;align-items:center;gap:6px;margin-top:6px;">
+          <span>Lifetime Cap:</span>
+          <input type="number" name="system.onKillProgressMax" value="{{system.onKillProgressMax}}" min="0" step="1" data-dtype="Number" style="width:60px;" />
+          <span class="hint" style="font-size:11px;color:#888;">Total progress this can ever feed one item. Counted on the host and never reset by unslotting.</span>
+        </label>
       </div>
 
       {{#if system.isProfessionAugment}}

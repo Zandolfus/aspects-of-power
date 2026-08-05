@@ -820,6 +820,11 @@ export class AspectsofPowerItemSheet extends foundry.applications.api.Handlebars
         await this.document.update({ 'system.slotCost': v });
         return;
       }
+      if (event.target?.name === 'system.onKillProgressMax') {
+        const v = Math.max(0, Math.round(Number(event.target.value) || 0));
+        await this.document.update({ 'system.onKillProgressMax': v });
+        return;
+      }
       if (event.target?.name === 'system.onKillProgress') {
         // Same direct-write reason as slotCost above: the full-form processor
         // trips over grantsTags being a string in the DOM and an array in the

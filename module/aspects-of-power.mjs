@@ -2868,6 +2868,7 @@ Hooks.on('updateActor', async (actor, changes, _options, userId) => {
           // derivation applies to its bonuses.
           const seenIds = new Set();
           let gain = 0;
+          let capacity = 0;
           for (const entry of slotted) {
             if (!entry?.augmentId || seenIds.has(entry.augmentId)) continue;
             seenIds.add(entry.augmentId);
@@ -2875,20 +2876,44 @@ Hooks.on('updateActor', async (actor, changes, _options, userId) => {
             // augment document, because the sheet's drag-to-slot path stores
             // only an id and no snapshot at all.
             let per = Math.round(Number(entry.onKillProgress) || 0);
-            if (per <= 0) {
+            let max = Math.round(Number(entry.onKillProgressMax) ?? NaN);
+            if (per <= 0 || !Number.isFinite(max)) {
               const doc = killerActor.items.get(entry.augmentId)
                 ?? (await fromUuid(entry.augmentId).catch(() => null));
-              per = Math.round(Number(doc?.system?.onKillProgress) || 0);
+              if (per <= 0) per = Math.round(Number(doc?.system?.onKillProgress) || 0);
+              if (!Number.isFinite(max)) max = Math.round(Number(doc?.system?.onKillProgressMax) ?? 100);
             }
-            if (per > 0) gain += per;
+            if (per > 0) {
+              gain += per;
+              // Two brands on one host share ONE budget, the largest declared.
+              // The cap belongs to the item's capacity to be fed, not to each
+              // mark on it - otherwise stacking brands buys around the limit.
+              capacity = Math.max(capacity, Number.isFinite(max) ? max : 100);
+            }
           }
           if (gain <= 0) continue;
-          const next = Math.max(0, Math.round(gear.system.progress ?? 0)) + gain;
-          await gear.update({ 'system.progress': next });
+
+          // ── THE LIFETIME CAP (user ruled 2026-08-05: "maximum 100 stacks") ──
+          // Counted on the HOST and never reset, so unslotting and re-slotting
+          // cannot refill the well. A fed-out item simply stops gaining.
+          const fed = Math.max(0, Math.round(
+            gear.getFlag('aspectsofpower', 'onKillProgressGained') ?? 0));
+          const room = Math.max(0, capacity - fed);
+          if (room <= 0) continue;          // silent: a capped item every kill would spam
+          const applied = Math.min(gain, room);
+
+          const next = Math.max(0, Math.round(gear.system.progress ?? 0)) + applied;
+          await gear.update({
+            'system.progress': next,
+            'flags.aspectsofpower.onKillProgressGained': fed + applied,
+          });
+          const capNote = (fed + applied >= capacity)
+            ? ' — <strong>the brand is full</strong>'
+            : ` (${fed + applied}/${capacity} fed)`;
           ChatMessage.create({
             speaker: ChatMessage.getSpeaker({ actor: killerActor }),
             content: `<p><em><strong>${gear.name}</strong> drinks the death of ${actor.name} — `
-                   + `progress <strong>${next}</strong> (+${gain}).</em></p>`,
+                   + `progress <strong>${next}</strong> (+${applied})${capNote}.</em></p>`,
           });
         }
       }
