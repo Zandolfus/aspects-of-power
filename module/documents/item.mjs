@@ -1786,6 +1786,34 @@ export class AspectsofPowerItem extends Item {
                 await this._gmAction({ type: 'gmConsumeReaction', targetActorUuid: reactor.uuid });
                 const _cd = chosen.system?.tagConfig?.reactionCooldown ?? 1;
                 if (_cd > 0) await reactor.update({ [`flags.aspectsofpower.reactionCooldowns.${chosen.id}`]: _cd });
+
+                // ── GEAR-SOURCED SELF-BUFF ON INTERCEPT ──────────────────
+                // An interceptor that also braces its own kit (John's Shield
+                // Barrier: "while it holds, its own defensive properties are
+                // increased by 10 percent") must have that buff UP before the
+                // redirected attack resolves against them — this runs ahead of
+                // the target swap below for exactly that reason.
+                //
+                // ⚠ ONLY gear-sourced buffs. This path deliberately does not
+                // roll the skill, so there is no dmgRoll for a roll-scaled buff
+                // to be a fraction OF; applying one here would silently write a
+                // zero. A gear-sourced magnitude is the one kind that needs no
+                // roll, which is what makes it safe to fire from a trigger.
+                const _gTc = chosen.system?.tagConfig ?? {};
+                if (_gTc.buffFromEquipment && (_gTc.buffEntries ?? []).length > 0) {
+                  try {
+                    await chosen._handleBuffTag(
+                      chosen, chosen.getRollData(), { total: 0 },
+                      ChatMessage.getSpeaker({ actor: reactor }), 'roll', chosen.name);
+                    // Effect creation re-prepares the actor, but reset() makes
+                    // the armour read below unambiguous rather than depending
+                    // on that (playbook-live-data-reliability).
+                    reactor.reset();
+                  } catch (err) {
+                    console.warn('[reactions] intercept self-buff failed:', chosen.name, err);
+                  }
+                }
+
                 ChatMessage.create({
                   speaker: ChatMessage.getSpeaker({ actor: reactor }),
                   content: `<p><em><strong>${reactor.name}</strong> intercepts the attack on ${targetActor.name} with <strong>${chosen.name}</strong> — they take the hit!</em></p>`,
