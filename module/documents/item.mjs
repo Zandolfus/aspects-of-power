@@ -6039,14 +6039,24 @@ export class AspectsofPowerItem extends Item {
     const _secCost = Math.max(0, Math.round(rollData.roll.secondaryCost ?? 0));
     if (_secRes && _secCost > 0) {
       const livePool = this.actor.system[_secRes];
+      // ⚠ CHECK THE COMBINED DEMAND ON THIS POOL, not just this cost. A
+      // spellstriker's `infused` path already spends mana; a skill that is both
+      // infused AND declares a flat mana secondary must afford BOTH, or the
+      // gate passes and the deduction floors at 0 — a partial spend that looks
+      // like a successful cast.
+      const _alsoInfused = (_secRes === 'mana' && rollData.roll.resource !== 'mana')
+        ? Math.max(0, Math.round(infusedManaCost || 0)) : 0;
+      const _need = _secCost + _alsoInfused;
       // ⚠ A missing pool is a REFUSAL, not a free pass. An actor without the
       // `ki` tag has ki.max 0, and letting the cast through because the pool
       // "isn't there" would hand every untagged actor free ki abilities.
       const liveSec = livePool?.value ?? 0;
-      if (!livePool || liveSec < _secCost) {
+      if (!livePool || liveSec < _need) {
         ChatMessage.create({
           speaker, rollMode, flavor: label,
-          content: `Not enough ${_secRes} (need ${_secCost}, have ${liveSec}).`,
+          content: `Not enough ${_secRes} (need ${_need}`
+            + (_alsoInfused ? ` — ${_secCost} cost + ${_alsoInfused} infusion` : '')
+            + `, have ${liveSec}).`,
         });
         return;
       }
@@ -6121,26 +6131,42 @@ export class AspectsofPowerItem extends Item {
     // and commit can't cause an overspend.
     const _commitCastCost = async () => {
       if (isBarrier) return;
-      const liveRes = this.actor.system[resource]?.value ?? 0;
-      const newResVal = Math.max(0, Math.round(liveRes - rollData.roll.cost));
-      const updates = { [`system.${resource}.value`]: newResVal };
+      const updates = {};
       if (investSelfDamage > 0) {
         const curHp = this.actor.system.health?.value ?? 0;
         updates['system.health.value'] = Math.max(0, curHp - investSelfDamage);
       }
-      // Infused-melee secondary cost: deduct mana on top of stamina. Skipped
-      // when the primary resource IS mana (avoid double-deducting).
-      if (infusedManaCost > 0 && resource !== 'mana') {
-        const liveMana = this.actor.system.mana?.value ?? 0;
-        updates['system.mana.value'] = Math.max(0, Math.round(liveMana - infusedManaCost));
-      }
-      // Flat secondary cost (ki). Same guard as the infused case above: skip
-      // when it IS the primary resource, or the cast would be charged twice.
+
+      // ── ACCUMULATE SPENDS, THEN WRITE ONCE ─────────────────────────────
+      // ⚠ TWO CONTRIBUTORS TO THE SAME POOL MUST SUM, NOT OVERWRITE. A
+      // spellstriker invests stamina AND mana via the `infused` path; if that
+      // skill also declared a flat mana secondary, the two writes both targeted
+      // `system.mana.value` and the LAST one won — silently discarding the
+      // infusion cost, so the striker got their invested mana free.
+      //
+      // Each contributor also has to be measured against the SAME starting
+      // value; computing `live - amount` independently per contributor would
+      // subtract each from the original pool rather than from the running
+      // total, which is the same bug wearing a different hat.
+      const _spend = new Map();
+      const _addSpend = (res, amt) => {
+        const n = Math.round(Number(amt) || 0);
+        if (!res || n <= 0 || !this.actor.system[res]) return;
+        _spend.set(res, (_spend.get(res) ?? 0) + n);
+      };
+      _addSpend(resource, rollData.roll.cost);
+      // Infused-melee: mana on top of the stamina invest. The `resource !==
+      // 'mana'` guard is PRESERVED from the original — when the primary already
+      // IS mana, roll.cost is taken to cover it.
+      if (resource !== 'mana') _addSpend('mana', infusedManaCost);
+      // Flat secondary (ki). Same guard, same reason.
       const _sr = rollData.roll.secondaryResource;
       const _sc2 = Math.max(0, Math.round(rollData.roll.secondaryCost ?? 0));
-      if (_sr && _sc2 > 0 && _sr !== resource && this.actor.system[_sr]) {
-        const liveSec = this.actor.system[_sr]?.value ?? 0;
-        updates[`system.${_sr}.value`] = Math.max(0, Math.round(liveSec - _sc2));
+      if (_sr !== resource) _addSpend(_sr, _sc2);
+
+      for (const [res, amt] of _spend) {
+        const live = this.actor.system[res]?.value ?? 0;
+        updates[`system.${res}.value`] = Math.max(0, Math.round(live - amt));
       }
       // Orb charge: discharge resets charge to 0; normal qualifying cast
       // banks the spell's tier weight onto the existing charge.
