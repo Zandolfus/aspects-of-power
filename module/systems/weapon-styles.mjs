@@ -297,9 +297,69 @@ export function heldImplementWeight(actor) {
 }
 
 /**
+ * Weapon TYPE keys that satisfy a required type, INCLUDING its family.
+ *
+ * An author who picks `shield` means "a shield", not "the 120-weight one" —
+ * before this, Shield Bash gated on the literal key and Phil's greatshield did
+ * not satisfy it. Families are declared in CONFIG.weaponTypeFamilies; a key
+ * with no family is its own sole member, so every existing gate is unchanged.
+ *
+ * @param {string} typeKey
+ * @returns {string[]}
+ */
+export function weaponTypeFamily(typeKey) {
+  const fams = globalThis.CONFIG?.ASPECTSOFPOWER?.weaponTypeFamilies ?? {};
+  return fams[typeKey] ?? [typeKey];
+}
+
+/**
+ * Resolve the EQUIPPED item a gear-sourced magnitude reads from.
+ *
+ * Selector is `<source>.<system path>` — `shield.armorBonus` means "the
+ * equipped shield's system.armorBonus". Sources:
+ *   shield    — the equipped shield-family item with the largest value
+ *   weapon    — the heaviest equipped non-shield weapon (the strike weapon)
+ *   implement — the equipped wand/staff/orb/tome with the largest value
+ *
+ * Exists so a buff can scale off gear instead of off its own damage roll
+ * (design: John's Shield Barrier is 10% of the shield he is actually holding).
+ * Returns null when nothing satisfies it, which is what makes the gate a hard
+ * failure rather than a silent zero.
+ *
+ * @param {Actor} actor
+ * @param {string} selector
+ * @returns {{item:Item, value:number, source:string, path:string}|null}
+ */
+export function resolveGearSource(actor, selector) {
+  if (!actor || !selector) return null;
+  const dot = String(selector).indexOf('.');
+  if (dot <= 0) return null;
+  const source = selector.slice(0, dot);
+  const path = selector.slice(dot + 1);
+  if (!path) return null;
+
+  const eq = equippedWeapons(actor);
+  let pool;
+  if (source === 'shield') pool = eq.filter(isShield);
+  else if (source === 'implement') pool = eq.filter(isImplement);
+  else if (source === 'weapon') pool = eq.filter(i => !isShield(i) && !isImplement(i));
+  else return null;
+
+  let best = null;
+  let bestVal = 0;
+  for (const i of pool) {
+    const v = Number(foundry.utils.getProperty(i.system ?? {}, path));
+    if (!Number.isFinite(v) || v <= 0) continue;
+    if (!best || v > bestVal) { best = i; bestVal = v; }
+  }
+  return best ? { item: best, value: bestVal, source, path } : null;
+}
+
+/**
  * May this skill be used with what the actor currently has, and knows?
  * Gates on `requiresStyle` (the arrangement), `requiresWeaponTag` (the type
- * in hand), and `styleSkill` (the governing Passive the actor must OWN).
+ * in hand), `styleSkill` (the governing Passive the actor must OWN), and
+ * `buffFromEquipment` (the gear the magnitude is READ FROM must be present).
  */
 export function canUseSkill(actor, skill) {
   const C = globalThis.CONFIG?.ASPECTSOFPOWER ?? {};
@@ -309,8 +369,18 @@ export function canUseSkill(actor, skill) {
     const label = C.weaponCombinations?.[tc.requiresStyle]?.label ?? tc.requiresStyle;
     return { allowed: false, reason: `${skill.name} needs the ${label} combination — check what you have equipped.` };
   }
-  if (tc.requiresWeaponTag && !weaponTypesOf(actor).includes(tc.requiresWeaponTag)) {
-    return { allowed: false, reason: `${skill.name} requires a ${tc.requiresWeaponTag} in hand.` };
+  if (tc.requiresWeaponTag) {
+    const family = weaponTypeFamily(tc.requiresWeaponTag);
+    if (!weaponTypesOf(actor).some(t => family.includes(t))) {
+      return { allowed: false, reason: `${skill.name} requires a ${tc.requiresWeaponTag} in hand.` };
+    }
+  }
+  // Gear as a blocker: a skill whose magnitude comes off an item cannot be
+  // cast without that item. Refused here, before any cost is paid, rather
+  // than falling through to a magnitude of zero.
+  if (tc.buffFromEquipment && !resolveGearSource(actor, tc.buffFromEquipment)) {
+    const src = String(tc.buffFromEquipment).split('.')[0];
+    return { allowed: false, reason: `${skill.name} draws its strength from your ${src} — you have none equipped.` };
   }
   // The style is a key you must own. Matched by NAME so content can be
   // authored and granted without threading ids through every skill.
@@ -327,5 +397,5 @@ export function canUseSkill(actor, skill) {
 export const WeaponStyleHelpers = {
   weaponTypesOf, weaponTypesOfItem, detectStyles, hasStyle,
   proficiencyFor, activeProficiencies, proficiencyDamageMult,
-  heldWeaponWeight, canUseSkill,
+  heldWeaponWeight, canUseSkill, weaponTypeFamily, resolveGearSource,
 };

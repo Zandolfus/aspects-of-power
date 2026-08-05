@@ -78,7 +78,15 @@ export async function tickDotsFor(combat, applierUuid) {
     // ONE health write for all pools — re-reading system.health between updates
     // returns a stale DataModel (see playbook-live-data-reliability).
     const newHealth = Math.max(0, health.value - totalDamage);
-    await c.actor.update({ 'system.health.value': newHealth });
+    // Credit the DoT's applier as the last thing that hurt them, in the same
+    // write as the HP. A victim who bleeds out belongs to whoever placed the
+    // bleed, not to whoever last swung at them — see the actor-death handler.
+    await c.actor.update({
+      'system.health.value': newHealth,
+      ...(totalDamage > 0
+        ? { 'flags.aspectsofpower.lastDamageSourceUuid': applierUuid }
+        : {}),
+    });
 
     ChatMessage.create({
       whisper: ChatMessage.getWhisperRecipients('GM'),

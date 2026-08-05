@@ -1319,6 +1319,9 @@ class CraftingSkills {
       craftBonuses: snapshotCraftBonuses,
       grantsTags:   [...(augmentDoc.system?.grantsTags ?? [])],
       slotCost:     _slotCost,
+      // Counter, not a magnitude — snapshotted verbatim, never scaled by the
+      // crafter's rarity (see the field note on AugmentData).
+      onKillProgress: Math.max(0, Math.round(augmentDoc.system?.onKillProgress ?? 0)),
     };
     // Prune cleared {augmentId: ''} entries so garbage from earlier removes
     // doesn't accumulate and the array stays aligned with actual usage.

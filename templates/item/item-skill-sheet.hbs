@@ -527,6 +527,32 @@
             </div>
           </div>
 
+          {{! Gear-sourced magnitude. When set, the buff is a fraction of an
+              EQUIPPED item's field instead of this skill's damage roll — and
+              the cast is REFUSED outright when that gear is missing. }}
+          <div class='aop-subblock'>
+            <span class='aop-subblock-title'>Scale From Gear</span>
+            <div class='aop-field-grid'>
+              <div class='aop-field'>
+                <label class='resource-label' title='Blank = scale off the damage roll as usual.'>Source Field</label>
+                <select name='system.tagConfig.buffFromEquipment'>
+                  <option value='' {{#unless system.tagConfig.buffFromEquipment}}selected{{/unless}}>None (use roll)</option>
+                  <option value='shield.armorBonus' {{#if (eq system.tagConfig.buffFromEquipment "shield.armorBonus")}}selected{{/if}}>Shield armour</option>
+                  <option value='weapon.armorBonus' {{#if (eq system.tagConfig.buffFromEquipment "weapon.armorBonus")}}selected{{/if}}>Weapon armour</option>
+                  <option value='implement.armorBonus' {{#if (eq system.tagConfig.buffFromEquipment "implement.armorBonus")}}selected{{/if}}>Implement armour</option>
+                </select>
+              </div>
+              <div class='aop-field'>
+                <label class='resource-label' title='Fraction of the gear value the buff is worth. 0.1 = 10%.'>Fraction</label>
+                <input type='number' name='system.tagConfig.buffFromEquipmentFrac'
+                       value='{{system.tagConfig.buffFromEquipmentFrac}}' min='0' step='0.05' />
+              </div>
+            </div>
+            {{#if system.tagConfig.buffFromEquipment}}
+            <p class='hint'>Requires that gear equipped &mdash; the skill refuses to cast without it.</p>
+            {{/if}}
+          </div>
+
           {{#if (includes system.tags "movement")}}
           <div class='aop-subblock'>
             <span class='aop-subblock-title'>Movement</span>

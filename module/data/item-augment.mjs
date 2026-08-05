@@ -85,6 +85,22 @@ export class AugmentData extends foundry.abstract.TypeDataModel {
       // and removing it clears all N. Bonuses still apply ONCE regardless of
       // slotCost (iteration code dedupes by augment id).
       slotCost: new fields.NumberField({ initial: 1, min: 1, integer: true }),
+
+      // ── ON-KILL PROGRESS (Brand of Shadows Bound, ruled 2026-08-05) ──
+      // Item `progress` the HOST gains each time the wearer kills something.
+      // Progress drives crafted stats, so a branded weapon genuinely levels
+      // with use rather than sitting at whatever it was forged at.
+      //
+      // ⚠ THE CREDIT RULE IS "LANDED THE KILLING BLOW" — deliberately the
+      // OPPOSITE of Burnt Offering, which pays out when a victim dies WHILE
+      // carrying your DoT regardless of what actually killed them. Both hang
+      // off the same actor-death hook; do not copy one rule into the other.
+      // Resolved via flags.aspectsofpower.lastDamageSourceUuid, stamped by
+      // whichever damage path wrote the lethal HP.
+      //
+      // NOT scaled by magnifierPct/scaleWithCrafter: this is a counter, not a
+      // magnitude, and a crafter-scaled +2.7 progress per kill means nothing.
+      onKillProgress: new fields.NumberField({ initial: 0, min: 0, integer: true }),
     };
   }
 }

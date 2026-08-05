@@ -643,6 +643,8 @@ export class AspectsofPowerItemSheet extends foundry.applications.api.Handlebars
         buffDuration:      numOr('buffDuration', 1),
         buffStackable:     bool('buffStackable', false),
         buffTarget:        str('buffTarget', 'selected'),
+        buffFromEquipment:     str('buffFromEquipment', ''),
+        buffFromEquipmentFrac: numOr('buffFromEquipmentFrac', 0.1),
         movementSpeedBuff: numOr('movementSpeedBuff', 1),
         movementStaminaBuff: numOr('movementStaminaBuff', 1),
         auraRadius:        numOrZero('auraRadius', 0),
@@ -816,6 +818,14 @@ export class AspectsofPowerItemSheet extends foundry.applications.api.Handlebars
         // choke on grantsTags being a string-vs-array.
         const v = Math.max(1, Math.round(Number(event.target.value) || 1));
         await this.document.update({ 'system.slotCost': v });
+        return;
+      }
+      if (event.target?.name === 'system.onKillProgress') {
+        // Same direct-write reason as slotCost above: the full-form processor
+        // trips over grantsTags being a string in the DOM and an array in the
+        // schema, so anything relying on it saves silently-not-at-all.
+        const v = Math.max(0, Math.round(Number(event.target.value) || 0));
+        await this.document.update({ 'system.onKillProgress': v });
         return;
       }
     }

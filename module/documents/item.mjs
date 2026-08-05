@@ -422,9 +422,13 @@ export class AspectsofPowerItem extends Item {
   _proficiencyWeapon() {
     const tag = this.system?.tagConfig?.requiresWeaponTag;
     if (tag) {
+      // Family-aware, matching the gate in canUseSkill: a skill that declares
+      // `shield` is about whatever shield is in hand, greatshield included.
+      const fams = CONFIG.ASPECTSOFPOWER?.weaponTypeFamilies ?? {};
+      const family = fams[tag] ?? [tag];
       const match = this.actor.items.find(i => i.type === 'item'
         && i.system?.slot === 'weaponry' && i.system?.equipped === true
-        && (i.system?.tags ?? []).includes(tag));
+        && (i.system?.tags ?? []).some(t => family.includes(t)));
       if (match) return match;
     }
     return this._resolveWeaponForSkill?.() ?? null;
@@ -3393,10 +3397,30 @@ export class AspectsofPowerItem extends Item {
     const duration = tc.buffDuration ?? 1;
     const rollTotal = Math.round(dmgRoll.total);
 
+    // GEAR-SOURCED MAGNITUDE. When `buffFromEquipment` names an item field, the
+    // buff is a fraction of THE GEAR, not of this skill's damage roll — a shield
+    // ward is worth what the shield is worth. The cast is already refused in
+    // canUseSkill when the gear is absent, so an unresolved source here means a
+    // skill reached this path without the roll-time gate; fall back to the roll
+    // rather than silently applying nothing.
+    let magnitudeBase = rollTotal;
+    let gearNote = '';
+    if (tc.buffFromEquipment) {
+      const { resolveGearSource } = await import('../systems/weapon-styles.mjs');
+      const src = resolveGearSource(this.actor, tc.buffFromEquipment);
+      if (src) {
+        magnitudeBase = src.value * (tc.buffFromEquipmentFrac ?? 0.1);
+        gearNote = ` — ${Math.round((tc.buffFromEquipmentFrac ?? 0.1) * 100)}% of ${src.item.name}`;
+      } else {
+        console.warn(`[buff] ${item.name}: buffFromEquipment '${tc.buffFromEquipment}' `
+          + `did not resolve on ${this.actor?.name}; falling back to the roll total.`);
+      }
+    }
+
     const changes = entries.map(e => ({
       key:   `system.${e.attribute}.value`,
       type:  'add',
-      value: Math.round(rollTotal * (e.value || 1)),
+      value: Math.round(magnitudeBase * (e.value || 1)),
     }));
 
     // System overrides for non-stat buff fields (e.g. movement multipliers
@@ -3483,6 +3507,7 @@ export class AspectsofPowerItem extends Item {
       stackable: tc.buffStackable ?? false,
       img: item.img ?? 'icons/svg/aura.svg',
       systemOverrides,
+      magnitudeNote: gearNote,
       speaker, rollMode,
     });
   }
@@ -4684,7 +4709,7 @@ export class AspectsofPowerItem extends Item {
     // refused skill never charges the actor.
     if (this.type === 'skill' && this.actor) {
       const tc = this.system?.tagConfig ?? {};
-      if (tc.requiresStyle || tc.requiresWeaponTag || tc.styleSkill) {
+      if (tc.requiresStyle || tc.requiresWeaponTag || tc.styleSkill || tc.buffFromEquipment) {
         const { canUseSkill } = await import('../systems/weapon-styles.mjs');
         const verdict = canUseSkill(this.actor, this);
         if (!verdict.allowed) {

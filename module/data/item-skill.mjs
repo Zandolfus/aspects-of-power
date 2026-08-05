@@ -167,6 +167,21 @@ export class SkillData extends foundry.abstract.TypeDataModel {
           attribute: new fields.StringField({ initial: 'abilities.strength' }),
           value:     new fields.NumberField({ initial: 1, min: 0 }),
         }), { initial: [] }),
+        // GEAR-SOURCED MAGNITUDE (John's Shield Barrier, ruled 2026-08-05).
+        // When set, the buff's magnitude comes off an EQUIPPED ITEM instead of
+        // off this skill's own damage roll:
+        //     magnitude = gearValue x buffFromEquipmentFrac x entry.value
+        // Selector is `<source>.<system path>`; 'shield.armorBonus' reads the
+        // equipped shield's armour. Resolved by weapon-styles.resolveGearSource,
+        // which is ALSO a hard gate in canUseSkill — a skill that reads its
+        // strength off a shield refuses to cast without one, rather than
+        // quietly applying zero.
+        //
+        // Shield Barrier was authored as a roll-scaled buff and applied ~193
+        // armour off a 47-armour shield, about 40x its intent. The roll was
+        // never a proxy for the gear.
+        buffFromEquipment:     new fields.StringField({ initial: '' }),
+        buffFromEquipmentFrac: new fields.NumberField({ initial: 0.1, min: 0 }),
         buffDuration:  new fields.NumberField({ initial: 1, integer: true, min: 0 }),
         buffStackable: new fields.BooleanField({ initial: false }),
         buffTarget:    new fields.StringField({ initial: 'selected' }), // 'self' | 'selected'

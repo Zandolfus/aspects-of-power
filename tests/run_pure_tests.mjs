@@ -1158,6 +1158,79 @@ eq('resolveBuffLoad: splitting a buff cannot dodge the price', _thrice,
 eq('resolveBuffLoad: a free buff is free',
    resolveBuffLoad({ capacity: 326, used: 900, cost: 0 }).strainDamage, 0);
 
+// ── GEAR-SOURCED BUFF MAGNITUDE + THE SHIELD FAMILY ────────────────────────
+// weapon-styles reads globalThis.CONFIG and foundry.utils lazily, so a shim
+// installed before the dynamic import is enough to exercise it in plain node.
+// Worth testing outside Foundry: this gate decides whether Shield Barrier
+// fires AT ALL, and its failure mode is a silent magnitude of zero.
+globalThis.CONFIG = {
+  ASPECTSOFPOWER: {
+    weaponWeights: { shield: 120, greatshield: 190, buckler: 50, sword: 100, greataxe: 220, unarmed: 40, wand: 40 },
+    weaponTypeFamilies: { shield: ['shield', 'greatshield', 'buckler'] },
+  },
+};
+globalThis.foundry = {
+  utils: {
+    getProperty: (obj, path) => path.split('.').reduce((o, k) => (o == null ? o : o[k]), obj),
+  },
+};
+const WS = await import('../module/systems/weapon-styles.mjs');
+
+const gearItem = (name, tags, sys = {}) => ({
+  name, type: 'item',
+  system: { equipped: true, slot: 'weaponry', tags, ...sys },
+});
+const actorWith = (...items) => ({ items });
+
+// John: Benjamin's Final Joy, armorBonus 47 (live value, 2026-08-05).
+const john = actorWith(gearItem("Benjamin's Final Joy", ['shield'], { armorBonus: 47 }));
+const johnSrc = WS.resolveGearSource(john, 'shield.armorBonus');
+eq('gear source finds the shield', johnSrc?.item?.name, "Benjamin's Final Joy");
+eq('gear source reads armorBonus', johnSrc?.value, 47);
+// THE WHOLE POINT: 10% of 47 is 5, against the ~193 the roll-scaled version
+// applied. Roughly 40x, which is why this had to stop coming off the roll.
+eq('Shield Barrier magnitude is 10% of the shield', Math.round(47 * 0.1), 5);
+
+// A greatshield is a shield. Before weaponTypeFamilies, Phil's did not count.
+const phil = actorWith(gearItem('Bulwark', ['greatshield'], { armorBonus: 210 }));
+eq('greatshield satisfies the shield family', WS.resolveGearSource(phil, 'shield.armorBonus')?.value, 210);
+eq('weaponTypeFamily(shield)', WS.weaponTypeFamily('shield'), ['shield', 'greatshield', 'buckler']);
+eq('weaponTypeFamily is identity for unlisted types', WS.weaponTypeFamily('greataxe'), ['greataxe']);
+
+// No shield → null, which is what makes the gate a REFUSAL and not a zero.
+const swordsman = actorWith(gearItem('Longsword', ['sword'], { armorBonus: 0 }));
+eq('no shield resolves to nothing', WS.resolveGearSource(swordsman, 'shield.armorBonus'), null);
+// A shield with no armour value is as good as no shield for this purpose.
+eq('a valueless shield does not resolve',
+   WS.resolveGearSource(actorWith(gearItem('Plank', ['shield'], { armorBonus: 0 })), 'shield.armorBonus'), null);
+// The largest wins when two qualify.
+eq('two shields: the better one sources it',
+   WS.resolveGearSource(actorWith(
+     gearItem('Small', ['buckler'], { armorBonus: 12 }),
+     gearItem('Big', ['greatshield'], { armorBonus: 88 }),
+   ), 'shield.armorBonus')?.value, 88);
+// Unequipped gear is not in hand.
+eq('an unequipped shield does not count',
+   WS.resolveGearSource(actorWith(
+     gearItem('Stowed', ['shield'], { armorBonus: 47, equipped: false }),
+   ), 'shield.armorBonus'), null);
+// `weapon` excludes shields — the source keys are not interchangeable.
+eq('weapon source skips shields',
+   WS.resolveGearSource(john, 'weapon.armorBonus'), null);
+// Malformed selectors resolve to nothing rather than throwing.
+eq('selector with no field', WS.resolveGearSource(john, 'shield'), null);
+eq('unknown source key', WS.resolveGearSource(john, 'boots.armorBonus'), null);
+
+// canUseSkill: the gate itself, both directions.
+const barrier = { name: 'Shield Barrier', system: { tagConfig: { buffFromEquipment: 'shield.armorBonus' } } };
+eq('Shield Barrier is allowed with a shield', WS.canUseSkill(john, barrier).allowed, true);
+eq('Shield Barrier is refused without one', WS.canUseSkill(swordsman, barrier).allowed, false);
+eq('and says why', WS.canUseSkill(swordsman, barrier).reason.includes('shield'), true);
+// requiresWeaponTag is family-aware too, so a greatshield satisfies `shield`.
+const bash = { name: 'Shield Bash', system: { tagConfig: { requiresWeaponTag: 'shield' } } };
+eq('Shield Bash accepts a greatshield', WS.canUseSkill(phil, bash).allowed, true);
+eq('Shield Bash still refuses a swordsman', WS.canUseSkill(swordsman, bash).allowed, false);
+
 if (failures) { console.error(`\n${failures} FAILURES`); process.exit(1); }
 console.log('\nAll pure-function tests pass.');
 

@@ -2480,6 +2480,20 @@ Hooks.on('renderChatMessageHTML', (message, html) => {
       updateData['system.health.value'] = newHealth;
       parts.push(...dmgRes.parts);
 
+      // WHO HIT THEM LAST. Stamped in the SAME update as the HP write, so the
+      // actor-death hook — which fires on this very update — can name whoever
+      // landed the killing blow (Brand of Shadows Bound, ruled 2026-08-05).
+      // A separate write would race the hook.
+      //
+      // Written on every damaging application, not only lethal ones: the flag
+      // is "the last thing that hurt you", so a victim finished off by a DoT
+      // tick credits the DoT's applier rather than the last sword swing.
+      // Every damage path that knows its source must stamp this, or credit
+      // silently falls to whoever preceded it.
+      if (attackerActorUuid && remaining > 0) {
+        updateData['flags.aspectsofpower.lastDamageSourceUuid'] = attackerActorUuid;
+      }
+
       await target.update(updateData);
 
       // Sleep breaks on taking damage.
@@ -2818,6 +2832,65 @@ Hooks.on('updateActor', async (actor, changes, _options, userId) => {
           content: `<p><em><strong>${harvester.name}</strong> — ${actor.name} dies burning. `
                  + `${applierActor.name} recovers <strong>${gain}</strong> ${c.harvestResource}.</em></p>`,
         });
+      }
+    }
+
+    // ── BRAND OF SHADOWS BOUND: gear that feeds on kills ─────────────────
+    // Every augment on the KILLER's equipped gear carrying `onKillProgress`
+    // adds that much to its host item's `progress`, which is what crafted
+    // stats derive from — so a branded weapon genuinely grows with use.
+    //
+    // ⚠ THE CREDIT RULE IS "LANDED THE KILLING BLOW" (user ruled 2026-08-05),
+    // which is deliberately NOT Burnt Offering's rule directly above. That one
+    // fires for a victim who died WHILE burning whatever killed them; this one
+    // asks who actually dealt the lethal damage. Same hook, opposite question.
+    //
+    // The killer comes from a flag stamped by the damage path in the same
+    // update as the lethal HP write, so it is readable here. No flag (an
+    // environmental death, a GM setting HP to 0 by hand) means no credit —
+    // silence is correct, not a fallback to the last known attacker.
+    //
+    // ⚠ isActingGM for the same reason as Burnt Offering: this mutates a THIRD
+    // party's items from a hook, and two GM logins would pay twice.
+    if (isActingGM()) {
+      const killerUuid = actor.flags?.aspectsofpower?.lastDamageSourceUuid;
+      const killer = killerUuid ? await fromUuid(killerUuid).catch(() => null) : null;
+      const killerActor = killer?.actor ?? killer;
+      // Never pay for killing yourself — self-damage from over-invest, a
+      // reflected hit, or a bleed you applied to your own body all stamp the
+      // victim as their own killer.
+      if (killerActor?.items && killerActor.id !== actor.id) {
+        for (const gear of killerActor.items) {
+          if (gear.type !== 'item' || gear.system?.equipped !== true) continue;
+          const slotted = [...(gear.system.augments ?? []), ...(gear.system.profAugments ?? [])];
+          // Dedupe by augment id: a multi-slot augment occupies `slotCost`
+          // consecutive entries and must pay ONCE, the same rule item
+          // derivation applies to its bonuses.
+          const seenIds = new Set();
+          let gain = 0;
+          for (const entry of slotted) {
+            if (!entry?.augmentId || seenIds.has(entry.augmentId)) continue;
+            seenIds.add(entry.augmentId);
+            // Snapshot first (the crafting path writes it); fall back to the
+            // augment document, because the sheet's drag-to-slot path stores
+            // only an id and no snapshot at all.
+            let per = Math.round(Number(entry.onKillProgress) || 0);
+            if (per <= 0) {
+              const doc = killerActor.items.get(entry.augmentId)
+                ?? (await fromUuid(entry.augmentId).catch(() => null));
+              per = Math.round(Number(doc?.system?.onKillProgress) || 0);
+            }
+            if (per > 0) gain += per;
+          }
+          if (gain <= 0) continue;
+          const next = Math.max(0, Math.round(gear.system.progress ?? 0)) + gain;
+          await gear.update({ 'system.progress': next });
+          ChatMessage.create({
+            speaker: ChatMessage.getSpeaker({ actor: killerActor }),
+            content: `<p><em><strong>${gear.name}</strong> drinks the death of ${actor.name} — `
+                   + `progress <strong>${next}</strong> (+${gain}).</em></p>`,
+          });
+        }
       }
     }
 

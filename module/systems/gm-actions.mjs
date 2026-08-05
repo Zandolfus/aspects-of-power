@@ -438,7 +438,6 @@ export async function executeGmAction(payload) {
             if (newTotal > currentTotal || hasSysOverrides) {
               const updateData = {
                 changes: payload.changes,
-              'system.roundsRemaining': payload.duration,
                 'system.roundsRemaining': payload.duration,
                 'duration.startRound': startRound,
                 'duration.startTurn': startTurn,
@@ -501,7 +500,8 @@ export async function executeGmAction(payload) {
             : '';
           const fullSummary = [statSummary, sysSummary, weaponBuffSummary, reactionSummary].filter(Boolean).join('; ') || 'effect';
           ChatMessage.create({ speaker: payload.speaker, ...msgWhisper,
-            content: `<p><strong>${target.name}</strong> buffed: ${fullSummary} for ${payload.duration} rounds.</p>`,
+            content: `<p><strong>${target.name}</strong> buffed: ${fullSummary} for ${payload.duration} rounds`
+                   + `${payload.magnitudeNote ?? ''}.</p>`,
           });
         }
         break;

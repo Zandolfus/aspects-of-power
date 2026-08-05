@@ -1550,6 +1550,21 @@ ASPECTSOFPOWER.weaponWeights = {
 };
 
 /**
+ * Weapon TYPE keys that stand in for a FAMILY when a skill gates on them.
+ *
+ * `requiresWeaponTag: 'shield'` means "a shield", not "the 120-weight one" —
+ * without this, Shield Bash refused Phil's greatshield, which is the exact
+ * object the skill is about. A key absent from this table is its own sole
+ * member, so gates on specific types (greataxe, longbow) are unaffected.
+ *
+ * Only shields need this today: they are the one type key that doubles as a
+ * category name. Add an entry when another does.
+ */
+ASPECTSOFPOWER.weaponTypeFamilies = {
+  shield: ['shield', 'greatshield', 'buckler'],
+};
+
+/**
  * Default reach in feet by weapon type-tag. Drives item-derivation and the
  * skill-cast range gate. Greatsword/greataxe/polearm are giant weapons in
  * this system → 10ft. Spear is a 1H reach weapon → 10ft. Everything else is

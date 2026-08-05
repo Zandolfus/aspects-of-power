@@ -114,6 +114,15 @@ export class ItemItemData extends foundry.abstract.TypeDataModel {
           affinity: new fields.StringField({ initial: '' }),
         }), { initial: [] }),
         grantsTags: new fields.ArrayField(new fields.StringField(), { initial: [] }),
+        // Both snapshotted at slot time by crafting-skills, and both were
+        // being SILENTLY DROPPED — a SchemaField discards keys it does not
+        // declare, so `slotCost` never survived the write despite the writer
+        // and the sheet both assuming it did (the sheet's fromUuid fallback
+        // masked it). Declared here so the snapshot is what it claims to be.
+        slotCost: new fields.NumberField({ initial: 1, min: 1, integer: true }),
+        // Brand of Shadows Bound: item progress gained per enemy the WEARER
+        // kills. See the actor-death handler in aspects-of-power.mjs.
+        onKillProgress: new fields.NumberField({ initial: 0, min: 0, integer: true }),
       }), { initial: [] }),
 
       // Profession augment slots — additional slots on profession gear that
@@ -138,6 +147,8 @@ export class ItemItemData extends foundry.abstract.TypeDataModel {
           affinity: new fields.StringField({ initial: '' }),
         }), { initial: [] }),
         grantsTags: new fields.ArrayField(new fields.StringField(), { initial: [] }),
+        slotCost: new fields.NumberField({ initial: 1, min: 1, integer: true }),
+        onKillProgress: new fields.NumberField({ initial: 0, min: 0, integer: true }),
       }), { initial: [] }),
 
       // Skill IDs this item grants access to when equipped.
