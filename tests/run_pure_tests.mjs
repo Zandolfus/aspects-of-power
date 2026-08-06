@@ -1411,6 +1411,27 @@ eq('junk situational entries are skipped, not NaN',
   Math.round(F2.effectiveDamageMultiplier(0.8, [0.50], [1.5, null, NaN, 'x']) * 1e6) / 1e6,
   1.8);
 
+// ── SOURCE GUARD: restorationScale must default to a no-op ─────────────────
+// A heal scale that defaulted to anything but 1 would silently re-price EVERY
+// restoration skill in the game the moment it shipped. Added for the Dreams of
+// Light ally halves ("Heal for 1/2 of rolled value"), which spend a payload
+// their producer priced as damage.
+{
+  const { readFileSync } = await import('node:fs');
+  const src = readFileSync(new URL('../module/data/item-skill.mjs', import.meta.url), 'utf8')
+    .replace(/\r/g, '');
+  eq('restorationScale exists and defaults to 1',
+    /restorationScale:\s*new fields\.NumberField\(\{\s*initial:\s*1\b/.test(src), true);
+  // And the handler must MULTIPLY by it rather than replace the amount.
+  const item = readFileSync(new URL('../module/documents/item.mjs', import.meta.url), 'utf8')
+    .replace(/\r/g, '');
+  eq('the restoration handler multiplies the roll by the scale',
+    /amount\s*=\s*Math\.round\(dmgRoll\.total\s*\*\s*_restScale\)/.test(item), true);
+  // The HoT path must scale too, or authoring hotDuration would undo it.
+  eq('the heal-over-time path scales as well',
+    /hotTickAmount\(\s*Math\.round\(dmgRoll\.total\s*\*\s*_restScale\)/.test(item), true);
+}
+
 // ── SOURCE GUARD: the spell grade ladder must track the stat curve ──────────
 // The 2026-08-06 bug was these two drifting apart: costs stepped x2.3 per rank
 // while ability mods (driving BOTH damage and the mana pool) stepped x1.25, so

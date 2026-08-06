@@ -166,6 +166,16 @@ export class SkillData extends foundry.abstract.TypeDataModel {
         restorationTarget:   new fields.StringField({ initial: 'selected' }),
         restorationResource: new fields.StringField({ initial: 'health' }),
         restorationOverhealth: new fields.BooleanField({ initial: false }),
+        // Fraction of the roll actually restored. 1 = the roll IS the heal
+        // (every existing skill, unchanged).
+        //
+        // Added for the Dreams of Light ally halves, whose own description
+        // specifies "Heal for 1/2 of rolled value": they spend a BANKED
+        // PAYLOAD that the producer priced as DAMAGE, and the same field is
+        // worth less as a heal than as a nightmare. Without this the only way
+        // to halve it would be to author a second payload, which would break
+        // the one-pool-two-uses shape the skill is built around.
+        restorationScale:    new fields.NumberField({ initial: 1, min: 0 }),
 
         // HEAL OVER TIME. `hotDuration > 0` turns a restoration skill from an
         // instant heal into a per-round one on the target: it places an effect

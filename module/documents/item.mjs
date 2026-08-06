@@ -3053,7 +3053,12 @@ export class AspectsofPowerItem extends Item {
    */
   async _handleRestorationTag(item, rollData, dmgRoll, speaker, rollMode, label, targetTokenOverride = null) {
     const whisperGM = !_isPlayerCharacter(this.actor) ? ChatMessage.getWhisperRecipients('GM') : undefined;
-    let amount     = Math.round(dmgRoll.total);
+    // `restorationScale` is 1 for every skill that does not set it, so this is
+    // a no-op everywhere it is not authored. See the schema note: it exists so
+    // a BANKED-PAYLOAD spender can restore a fraction of a payload that was
+    // priced as damage (Dreams of Light: "Heal for 1/2 of rolled value").
+    const _restScale = this.system.tagConfig?.restorationScale ?? 1;
+    let amount     = Math.round(dmgRoll.total * _restScale);
     const target   = this.system.tagConfig?.restorationTarget ?? 'selected';
     const resource = this.system.tagConfig?.restorationResource ?? 'health';
 
@@ -3081,8 +3086,10 @@ export class AspectsofPowerItem extends Item {
     // third party's document.
     const _hotRounds = this.system.tagConfig?.hotDuration ?? 0;
     if (_hotRounds > 0 && resource !== 'barrier' && targetActor) {
+      // ⚠ Scale applies here too — a heal that restores half its roll must
+      // also tick half, or authoring `hotDuration` would silently undo it.
       const { tick, total } = hotTickAmount(
-        Math.round(dmgRoll.total), this.system.tagConfig?.hotScale ?? 0.5, _hotRounds);
+        Math.round(dmgRoll.total * _restScale), this.system.tagConfig?.hotScale ?? 0.5, _hotRounds);
       await this._gmAction({
         type: 'gmApplyHot',
         targetActorUuid: targetActor.uuid,
@@ -6569,11 +6576,45 @@ export class AspectsofPowerItem extends Item {
           if (result) hitResults.set(null, result);
           break;
         }
+        // RESTORATION / BUFF SPREAD. A banked payload can be split across
+        // several ALLIES exactly as the attack case splits it across enemies —
+        // Dreams of Light hurls the same five fields either way, so the two
+        // halves must divide them by the same rule.
+        //
+        // ⚠ Without this a spread spender would SPEND every stack and heal only
+        // ONE target for the first share: `dmgRoll` is built from
+        // `stackSpread[0].fields`, and these handlers otherwise fall back to
+        // `game.user.targets.first()`. The stacks would be gone with nothing to
+        // show for them.
         case 'restoration':
-          await this._handleRestorationTag(item, rollData, dmgRoll, speaker, rollMode, label);
+          if (stackSpread?.length > 1) {
+            for (const asg of stackSpread) {
+              const tok = canvas.tokens.get(asg.id);
+              if (!tok) continue;
+              const share = Math.max(1, Math.round(stackPayloadEach * asg.fields));
+              const shareRoll = await new Roll(String(share)).evaluate();
+              await this._handleRestorationTag(item, rollData, shareRoll, speaker, rollMode,
+                `${label} — ${asg.fields} at ${asg.name}`, tok);
+            }
+            break;
+          }
+          await this._handleRestorationTag(item, rollData, dmgRoll, speaker, rollMode, label,
+            stackSpread?.length === 1 ? canvas.tokens.get(stackSpread[0].id) : null);
           break;
         case 'buff':
-          await this._handleBuffTag(item, rollData, dmgRoll, speaker, rollMode, label);
+          if (stackSpread?.length > 1) {
+            for (const asg of stackSpread) {
+              const tok = canvas.tokens.get(asg.id);
+              if (!tok) continue;
+              const share = Math.max(1, Math.round(stackPayloadEach * asg.fields));
+              const shareRoll = await new Roll(String(share)).evaluate();
+              await this._handleBuffTag(item, rollData, shareRoll, speaker, rollMode,
+                `${label} — ${asg.fields} at ${asg.name}`, tok);
+            }
+            break;
+          }
+          await this._handleBuffTag(item, rollData, dmgRoll, speaker, rollMode, label,
+            stackSpread?.length === 1 ? canvas.tokens.get(stackSpread[0].id) : null);
           break;
         case 'debuff': {
           // Skip debuff if the attack missed or barrier fully absorbed.
