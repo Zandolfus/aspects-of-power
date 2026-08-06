@@ -3690,10 +3690,17 @@ export class AspectsofPowerItem extends Item {
     // Marked subsystem: when the skill defines markBonus > 0, the spawned
     // effect tags the caster's UUID so apply-damage can multiply the
     // marker's incoming damage against this target.
+    // ⚠ GATED ON THE `mark` TAG (user ruled 2026-08-06: "Mark should likely be
+    // a tag of its own"). Before this the mark rode along on any skill that
+    // happened to set markBonus, so marking REQUIRED being a debuff —
+    // Mathilda's Blood Bolt carried `debuff` with no debuff content whatsoever,
+    // purely to deliver a mark. All five live mark skills were tagged BEFORE
+    // this gate shipped, so nothing lost its mark in between.
     const markBonus        = this.system.tagConfig?.markBonus ?? 0;
     const markAttackBonus  = this.system.tagConfig?.markAttackBonus ?? 0;
     const markExpiresOnHit = this.system.tagConfig?.markExpiresOnHit ?? false;
-    const markActive       = markBonus > 0 || markAttackBonus > 0;
+    const markActive       = _tags.includes('mark')
+      && (markBonus > 0 || markAttackBonus > 0);
     // Armor Crush (armor-answer system): a pure crush debuff has no stat
     // entries / DoT / debuffType, so it would otherwise fail the effectData
     // gate below and silently apply nothing. Treat a non-zero armorCrush as
@@ -4424,6 +4431,18 @@ export class AspectsofPowerItem extends Item {
               if (attackResult?.fullyBlocked) break;
               const defMult = attackResult?.damageMultiplier ?? 1;
               await this._handleDebuffTag(item, rollData, dmgRoll, speaker, rollMode, label, targetToken, defMult);
+              break;
+            }
+            // MARK WITHOUT DEBUFF. `mark` routes to the same handler: the
+            // effect-spawn gate already fires on `markActive` alone, so a
+            // skill carrying only `mark` produces a mark-bearing effect with
+            // no debuff content. Skipped when `debuff` is also present, or
+            // the handler would run twice and apply the mark twice.
+            case 'mark': {
+              if (orderedTags.includes('debuff')) break;
+              const _mr = hitResults.get(targetToken);
+              if (_mr && !_mr.isHit) break;
+              await this._handleDebuffTag(item, rollData, dmgRoll, speaker, rollMode, label, targetToken, _mr?.damageMultiplier ?? 1);
               break;
             }
             case 'restoration':
@@ -6421,6 +6440,18 @@ export class AspectsofPowerItem extends Item {
               await dispatchItem._handleDebuffTag(dispatchItem, rollData, dmgRoll, speaker, rollMode, label, targetToken, defMult);
               break;
             }
+            // MARK WITHOUT DEBUFF. `mark` routes to the same handler: the
+            // effect-spawn gate already fires on `markActive` alone, so a
+            // skill carrying only `mark` produces a mark-bearing effect with
+            // no debuff content. Skipped when `debuff` is also present, or
+            // the handler would run twice and apply the mark twice.
+            case 'mark': {
+              if (orderedTags.includes('debuff')) break;
+              const _mr = hitResults.get(targetToken);
+              if (_mr && !_mr.isHit) break;
+              await dispatchItem._handleDebuffTag(dispatchItem, rollData, dmgRoll, speaker, rollMode, label, targetToken, _mr?.damageMultiplier ?? 1);
+              break;
+            }
             case 'repair':
               await dispatchItem._handleRepairTag(dispatchItem, rollData, dmgRoll, speaker, rollMode, label, targetToken);
               break;
@@ -6616,6 +6647,15 @@ export class AspectsofPowerItem extends Item {
           await this._handleBuffTag(item, rollData, dmgRoll, speaker, rollMode, label,
             stackSpread?.length === 1 ? canvas.tokens.get(stackSpread[0].id) : null);
           break;
+        // MARK WITHOUT DEBUFF — see the note on the AOE dispatch above.
+        case 'mark': {
+          if (orderedTags.includes('debuff')) break;
+          const _mr = hitResults.get(null);
+          if (_mr && !_mr.isHit) break;
+          if (_mr?.fullyBlocked) break;
+          await this._handleDebuffTag(item, rollData, dmgRoll, speaker, rollMode, label, null, _mr?.damageMultiplier ?? 1);
+          break;
+        }
         case 'debuff': {
           // Skip debuff if the attack missed or barrier fully absorbed.
           const attackResult = hitResults.get(null);

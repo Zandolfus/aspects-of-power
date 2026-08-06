@@ -1883,6 +1883,12 @@ ASPECTSOFPOWER.combatTags = {
   restoration: 'ASPECTSOFPOWER.Tag.restoration',
   buff:        'ASPECTSOFPOWER.Tag.buff',
   debuff:      'ASPECTSOFPOWER.Tag.debuff',
+  // MARK is its own section-driving tag (user ruled 2026-08-06: "Mark should
+  // likely be a tag of its own"). It used to be reachable ONLY as a field on a
+  // debuff — `markBonus` is read inside `_handleDebuffTag` — so marking
+  // required being a debuff. Mathilda's Blood Bolt was the proof: it carried
+  // `debuff` with no debuff content at all, purely to deliver a mark.
+  mark:        'ASPECTSOFPOWER.Tag.mark',
   cleanse:     'ASPECTSOFPOWER.Tag.cleanse',
   aoe:         'ASPECTSOFPOWER.Tag.aoe',
   sustain:     'ASPECTSOFPOWER.Tag.sustain',
