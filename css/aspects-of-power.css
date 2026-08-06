@@ -38,6 +38,9 @@
   --aop-overhealth: #2e7d32;
   --aop-barrier: #5c6bc0;
   --aop-buffs: #b58b2a;
+  /* ki: teal — deliberately distinct from mana blue and stamina amber, since a
+     monk shows all three bars at once. */
+  --aop-ki: #00897b;
   --aop-health-bright: #ef5350;
   --aop-mana-bright: #42a5f5;
   --aop-stamina-bright: #ffca28;
@@ -420,6 +423,7 @@
 .aspects-of-power .bar-fill-overhealth { background: var(--aop-overhealth); }
 .aspects-of-power .bar-fill-barrier  { background: var(--aop-barrier); }
 .aspects-of-power .bar-fill-buffs    { background: var(--aop-buffs); }
+.aspects-of-power .bar-fill-ki       { background: var(--aop-ki); }
 /* Buff capacity: the toggle sits inline with the numbers, dim until enabled,
    because accepting overcap means volunteering to bleed for a buff. */
 .aspects-of-power .overcap-toggle {

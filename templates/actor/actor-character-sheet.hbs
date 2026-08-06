@@ -54,6 +54,23 @@
           </div>
         </div>
 
+        {{! KI — only for actors carrying the `ki` tag. ki.max derives to 0
+            without it, so gating on max keeps the bar off every other sheet
+            without needing the tag check in the template. }}
+        {{#if (gt system.ki.max 0)}}
+        <div class="resource-bar-row resource-ki" data-tooltip="Ki — earned by strikes that pierce, restored by meditation. Capped by endurance.">
+          <label class="bar-label">KI</label>
+          <div class="bar-track">
+            <div class="bar-fill bar-fill-ki" style="width: {{math system.ki.value '/' system.ki.max '*' 100}}%"></div>
+          </div>
+          <div class="bar-values">
+            <input type="number" name="system.ki.value" value="{{system.ki.value}}" min="0" max="{{system.ki.max}}"/>
+            <span class="bar-separator">/</span>
+            <span class="bar-max">{{system.ki.max}}</span>
+          </div>
+        </div>
+        {{/if}}
+
         {{!-- Overhealth — always present, dims when empty --}}
         <div class="resource-bar-row resource-overhealth {{#unless (gt system.overhealth.value 0)}}bar-empty{{/unless}}">
           <label class="bar-label">OH</label>
