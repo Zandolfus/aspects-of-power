@@ -177,9 +177,53 @@ ASPECTSOFPOWER.alterationTags = {
   ambush:      { label: 'ASPECTSOFPOWER.Alteration.ambush',      dmgMod:  0.50, costMod:  0.30, weightMod: 0.00, category: 'conditional',  stacking: 'max_one'  },
 };
 
-ASPECTSOFPOWER.spellGradeFactors = {
-  G: 2.5, F: 5, E: 10, D: 24, C: 56, B: 130, A: 300, S: 700,
-};
+/**
+ * SPELL GRADE FACTORS — DERIVED FROM THE STAT CURVE, NOT A SEPARATE LADDER.
+ * (Ruled + simmed 2026-08-06. Was `G 2.5, F 5, E 10, D 24, C 56, B 130,
+ * A 300, S 700`.)
+ *
+ * ⚠⚠ THE OLD TABLE PUNISHED EVERY RANK-UP. It stepped x~2.3 per rank while
+ * ability mods — which drive BOTH damage and the mana pool — step x1.25
+ * (`statCurve.MULT_BASE ^ gradeIndex`). Measured on a caster who actually
+ * levels, each rank-up roughly HALVED casts-per-pool at the moment of
+ * transition and cost ~100 levels to claw back:
+ *
+ *     E->D at lvl 100: 20 casts -> 10      C->B at lvl 300: 13 -> 7
+ *     D->C at lvl 200: 18 -> 9             B->A at lvl 400:  9 -> 4
+ *                                          A->S at lvl 500:  5 -> 3
+ *
+ * Damage per cast still rose, so it was a SUSTAIN failure, not an output one —
+ * a higher-rank caster hit harder and ran dry far faster. It also shrank AOEs
+ * (sizing is capped by `2^n x base <= pool`): 2^3 at E down to 2^0 by A.
+ *
+ * ⚡ WEAPONS ALREADY GOT THIS RIGHT, which is what settled the shape.
+ * `baseStamina` is `(weight/divisor) x (blend/normalizer)` with NO grade term,
+ * so cost and pool both scale x1.25 and strikes-per-pool is rank-invariant
+ * (measured 133/125/125/111/122/111 from E to S). Spells were the outlier.
+ * This does not invent a rule; it makes casting obey the one striking follows.
+ *
+ * DERIVED, NOT TABULATED, so the two ladders can never drift apart again —
+ * that drift is the entire bug. `gradeIndex` is 0 for G, F AND E, so cost is
+ * flat exactly where the stat multiplier is flat (user 2026-08-06: G/F->E
+ * "relatively flat ... g isn't really a thing outside of preinitiation
+ * humans"). Resulting values:
+ *
+ *     G 10   F 10   E 10   D 12.5   C 15.625   B 19.531   A 24.414   S 30.518
+ *
+ * Live-content impact when this landed: E is unchanged and 108 of the world's
+ * 222 actors are E. At G only 5 of 101 actors had a tiered spell (Aaron — a
+ * standing "ignore" case, two carrying the retired Drain Animus, one monster,
+ * and Beastman Hordecaller); at F only 3 of 13. Tightest real case was Arjan
+ * Terry, 44 mana, 4 basic casts -> 2.
+ *
+ * ⚠ Consumed for BOTH cost and the damage reference — `baseMana` at
+ * item.mjs:5216/5664 and `spellDamageRef()` at :5423/:5516/:5673 — so it
+ * reaches spells, heals, barriers, spellstrike infusions and AOE sizing.
+ * It does NOT reach weapon strikes, ki or stacks.
+ */
+ASPECTSOFPOWER.spellGradeFactors = Object.fromEntries(
+  Object.entries(ASPECTSOFPOWER.statCurve.gradeIndex).map(([rank, gi]) =>
+    [rank, 10 * Math.pow(ASPECTSOFPOWER.statCurve.MULT_BASE, gi)]));
 
 /**
  * MAGIC/MELEE UNIFICATION (2026-08-02) — OFF by default, flip to test.

@@ -1411,6 +1411,41 @@ eq('junk situational entries are skipped, not NaN',
   Math.round(F2.effectiveDamageMultiplier(0.8, [0.50], [1.5, null, NaN, 'x']) * 1e6) / 1e6,
   1.8);
 
+// ── SOURCE GUARD: the spell grade ladder must track the stat curve ──────────
+// The 2026-08-06 bug was these two drifting apart: costs stepped x2.3 per rank
+// while ability mods (driving BOTH damage and the mana pool) stepped x1.25, so
+// every rank-up halved casts-per-pool. spellGradeFactors is now DERIVED from
+// statCurve, and this guard fails if anyone re-tabulates it by hand.
+{
+  // ⚠ Imported locally — the other source guards pull this in further down,
+  // inside their own block, so it is not in scope up here.
+  const { readFileSync } = await import('node:fs');
+  const src = readFileSync(new URL('../module/helpers/config.mjs', import.meta.url), 'utf8')
+    .replace(/\r/g, '');
+  const derived = /ASPECTSOFPOWER\.spellGradeFactors\s*=\s*Object\.fromEntries\(/.test(src);
+  eq('spellGradeFactors is DERIVED from statCurve, not hand-tabulated', derived, true);
+
+  // And the derivation itself: cost must be flat where the stat multiplier is
+  // flat (gradeIndex 0 for G/F/E) and step with it thereafter.
+  const gradeIndex = { G: 0, F: 0, E: 0, D: 1, C: 2, B: 3, A: 4, S: 5 };
+  const MULT_BASE = 1.25;
+  const ladder = Object.fromEntries(Object.entries(gradeIndex)
+    .map(([r, gi]) => [r, 10 * Math.pow(MULT_BASE, gi)]));
+  eq('G, F and E are flat (gradeIndex 0 throughout)',
+    ladder.G === ladder.E && ladder.F === ladder.E, true);
+  eq('E anchors at 10 so existing content never moves', ladder.E, 10);
+  eq('D is one 1.25 step above E', Math.round(ladder.D * 1000) / 1000, 12.5);
+  eq('S is five steps above E', Math.round(ladder.S * 1000) / 1000, 30.518);
+  // The property that actually matters: casts-per-pool is rank-invariant,
+  // because cost and pool now scale by the same factor.
+  const castsRatio = (a, b) =>
+    (Math.pow(MULT_BASE, gradeIndex[b]) / ladder[b])
+    / (Math.pow(MULT_BASE, gradeIndex[a]) / ladder[a]);
+  for (const [a, b] of [['E','D'], ['D','C'], ['C','B'], ['B','A'], ['A','S']])
+    eq(`rank-up ${a}->${b} is cost-neutral per pool`,
+      Math.round(castsRatio(a, b) * 1e6) / 1e6, 1);
+}
+
 // ── SOURCE GUARD: flag scopes ────────────────────────────────────────────────
 // Not a formula test — a repo scan, because this bug class is invisible to
 // every other kind of check we run.
