@@ -262,6 +262,21 @@ export class CalendarTracker extends HandlebarsApplicationMixin(ApplicationV2) {
  * A tool on the `tokens` group rather than a control group of its own: a
  * control GROUP activates a canvas layer, and the calendar has no layer to
  * activate. `tokens` is the group every user already sits in.
+ *
+ * ⚠⚠ MUST BE CALLED AT `init`, NOT `ready`. v14 builds the control set in
+ * `SceneControls##prepareControls`, and that is only reached from
+ *
+ *     _configureRenderOptions(options) {
+ *       if ( options.reset || options.isFirstRender ) this.#controls = this.#prepareControls();
+ *     }
+ *
+ * — so `getSceneControlButtons` fires ONLY on the first render or an explicit
+ * `render({reset: true})`. Registered from `ready` the hook is correctly
+ * attached, reports as attached, and never fires: the controls were built
+ * before it existed. That is exactly how this shipped invisible the first
+ * time, with `Hooks.events.getSceneControlButtons === 1` the whole while.
+ * `initialize()` does NOT help — it is deprecated and forwards to `render()`
+ * without `reset`.
  */
 export function registerCalendarTracker() {
   Hooks.on('getSceneControlButtons', (controls) => {
@@ -285,6 +300,15 @@ export function registerCalendarTracker() {
     if (foundry.utils.hasProperty(changes, 'flags.aspectsofpower.downtime')
       || foundry.utils.hasProperty(changes, 'flags.aspectsofpower.-=downtime')) {
       CalendarTracker.refresh();
+    }
+  });
+
+  // Belt and braces: if anything ever moves this registration back after the
+  // first render, one reset render still surfaces the button rather than
+  // failing silently.
+  Hooks.once('ready', () => {
+    if (!ui.controls?.controls?.tokens?.tools?.aopCalendar) {
+      ui.controls?.render({ reset: true });
     }
   });
 }

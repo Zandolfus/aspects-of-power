@@ -78,6 +78,13 @@ function getActiveDebuff(actor, types) {
 /* -------------------------------------------- */
 
 Hooks.once('init', function () {
+  // Calendar & downtime tracker: scene-control button + refresh hooks.
+  // ⚠ MUST be here, not in `ready`. v14 only runs SceneControls##prepareControls
+  // — the one place `getSceneControlButtons` is called — on the first render or
+  // an explicit render({reset:true}). Registered from `ready` the hook attaches
+  // correctly, REPORTS as attached, and never fires.
+  registerCalendarTracker();
+
   // Replace Foundry's sidebar combat tracker with our celerity-aware subclass.
   // Must happen at init, before Foundry instantiates ui.combat.
   CONFIG.ui.combat = CelerityCombatTracker;
@@ -897,11 +904,6 @@ Hooks.once('ready', async function () {
 
   // Register channel-subsystem updateCombat hook (sub-turn tick scheduler).
   registerChannelHooks();
-
-  // Calendar & downtime tracker: scene-control button + refresh hooks.
-  // The celestial engine and the downtime barrier were both correct and
-  // invisible; this is the door the user actually asked for.
-  registerCalendarTracker();
 
   // ── THE CLOCK ANNOUNCES ITSELF ─────────────────────────────────────────
   // Until now `updateWorldTime` had ZERO listeners (verified 2026-08-06):
