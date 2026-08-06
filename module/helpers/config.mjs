@@ -1326,9 +1326,21 @@ ASPECTSOFPOWER.barrier = {
  *
  * max = clamp(round(endurance.mod / capDivisor), 0, capMax)
  * Deliberately a SMALL bar — ki funds big abilities, it is not a mana pool.
+ *
+ * ⚠⚠ capDivisor WAS 150, WHICH MADE THE POOL SMALLER THAN A SINGLE SPEND.
+ * Measured 2026-08-06 across the 11 plausible monk bodies on the live roster:
+ * at 150 the pools came out 1,3,1,2,3,2,1,2,2,1,1 — so with Rising Mist
+ * costing 3 ki, only 2 of 11 could cast their own class heal AT ALL, and
+ * those two only by emptying the bar. The class was mathematically unable to
+ * use its own resource, and nothing reported it: an unaffordable cast just
+ * quietly never happens.
+ *
+ * 60 gives pools of 2-8 (10 of 11 can afford a 3-ki heal, a strong-endurance
+ * monk banks two casts), which keeps the bar small and readable while making
+ * ki an actual currency rather than a locked door.
  */
 ASPECTSOFPOWER.ki = {
-  capDivisor: 150,
+  capDivisor: 60,
   capMax:     10,
 };
 
