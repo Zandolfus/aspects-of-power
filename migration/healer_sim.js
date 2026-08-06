@@ -98,8 +98,25 @@
    * shipped function rather than mirroring it is the whole point — a mirror
    * is how the last five wrong answers happened.
    */
+  //
+  // ⚠⚠ THE COEFFICIENT WAS MISSING AND EVERY HEAL THIS SIM EVER PRINTED WAS 4x
+  // TOO BIG (found 2026-08-06). The shipped path is
+  //     strikeInvestDamage(potency, multiplier * healing.coefficient, ...)
+  // at item.mjs:5551, with the coefficient at 0.25 — it rides the RARITY
+  // multiplier rather than the blend, precisely so retuning heal size never
+  // disturbs which stats a healer wants. This mirror passed `mult` alone.
+  //
+  // Its COST and RENEWABILITY conclusions survived (those compare invested
+  // against regen, and heal size never enters), but every throughput,
+  // share-of-a-bar and break-even number it produced was wrong by 4x. Two of
+  // them were quoted to the user and had to be retracted.
+  //
+  // Read from CONFIG rather than hardcoding 0.25, so a retune of the
+  // coefficient moves the sim automatically instead of silently desyncing it
+  // again — which is the whole failure mode being fixed here.
+  const HEAL_COEF = sc.healing?.coefficient ?? 1;
   const healAmount = (blend, mult, windup, invested, ref, curve) =>
-    F.strikeInvestDamage(blend, mult, windup, invested, ref,
+    F.strikeInvestDamage(blend, mult * HEAL_COEF, windup, invested, ref,
       { invest: { curveExponent: curve } });
 
   /**
@@ -367,6 +384,9 @@
 
   window.__healerSim = { rows, incoming, medianDpr, def, defTank, defSquish, roundLen, healers: healers.map(h => h.name) };
   return JSON.stringify({
+    // Surfaced so a future reader can SEE the coefficient is applied. Its
+    // absence is what made every heal 4x too big and went unnoticed for days.
+    healingCoefficientApplied: HEAL_COEF,
     reference: { measuredAgainst: def.name, hp: def.hp, tankForContrast: defTank.name + ' ' + defTank.hp, roundLen, medianAttackerDpr: medianDpr },
     topIncoming: incoming.slice(0, 5),
     healers: healers.map(h => h.name),
