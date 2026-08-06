@@ -54,14 +54,38 @@ function foldHalf(deg) {
   return r > 90 ? r - 180 : r;
 }
 
+/**
+ * Resolve a worldTime argument, defaulting to the live clock.
+ *
+ * ⚠⚠ EVERY PUBLIC ENTRY POINT HERE TAKES worldTime, AND ONLY `moonState` USED
+ * TO DEFAULT IT. The rest were required positionals, so the natural bare call
+ * — `civilDate()` from a macro or a template — produced `NaN-NaN-NaN` instead
+ * of today's date, and a caller guarding with Number.isFinite would quietly
+ * fall back to "no effect" with nothing to show it had failed. That is exactly
+ * how the lunar empowerment shipped dead in `44d6ec6`; `civilDate()` was still
+ * doing it on 2026-08-06.
+ *
+ * THROWS rather than returning a sentinel when there is no clock to fall back
+ * on. A loud failure in a node test beats another silent NaN in play — silence
+ * is the entire bug being fixed.
+ */
+function atTime(worldTime) {
+  if (worldTime !== null && worldTime !== undefined) return worldTime;
+  const t = globalThis.game?.time?.worldTime;
+  if (!Number.isFinite(t)) {
+    throw new Error('calendar: no worldTime supplied and game.time is unavailable');
+  }
+  return t;
+}
+
 /** Julian Day for a world time, via the real-instant anchor. */
-export function julianDay(worldTime, c = null) {
+export function julianDay(worldTime = null, c = null) {
   const k = c ?? cfg();
-  return (k.julianDayAtWorldZero ?? 2451544.5) + worldTime / DAY_SECONDS;
+  return (k.julianDayAtWorldZero ?? 2451544.5) + atTime(worldTime) / DAY_SECONDS;
 }
 
 /** Julian centuries from J2000 — the argument every mean element takes. */
-export function julianCenturies(worldTime, c = null) {
+export function julianCenturies(worldTime = null, c = null) {
   return (julianDay(worldTime, c) - 2451545.0) / 36525;
 }
 
@@ -71,7 +95,7 @@ export function julianCenturies(worldTime, c = null) {
  * zero, so its label reads 0024 where reality says 2024, and rather than fight
  * that we derive the real date straight from the anchor.
  */
-export function civilDate(worldTime, c = null) {
+export function civilDate(worldTime = null, c = null) {
   const jd = julianDay(worldTime, c);
   const z = Math.floor(jd + 0.5);
   const f = jd + 0.5 - z;
@@ -131,7 +155,7 @@ export function worldTimeForDate(year, month, day, hour = 0, minute = 0, second 
  */
 export function moonState(worldTime = null, c = null) {
   const k = c ?? cfg();
-  const T = julianCenturies(worldTime ?? game.time.worldTime, k);
+  const T = julianCenturies(atTime(worldTime), k);
   const el = k.moonElongation ?? { atEpoch: 297.8501921, degPerCentury: 445267.1114034 };
   const phases = k.phases ?? ['New Moon', 'Waxing Crescent', 'First Quarter', 'Waxing Gibbous',
     'Full Moon', 'Waning Gibbous', 'Last Quarter', 'Waning Crescent'];
@@ -151,7 +175,7 @@ export function moonState(worldTime = null, c = null) {
 }
 
 /** Argument of latitude F: the moon's angular distance from its ascending node. */
-export function moonNodeAngle(worldTime, c = null) {
+export function moonNodeAngle(worldTime = null, c = null) {
   const k = c ?? cfg();
   const f = k.moonArgLatitude ?? { atEpoch: 93.2720950, degPerCentury: 483202.0175233 };
   return mod(f.atEpoch + f.degPerCentury * julianCenturies(worldTime, k), 360);
@@ -165,7 +189,7 @@ export function moonNodeAngle(worldTime, c = null) {
  *
  * @returns {{time:number, kind:'new'|'full'}}
  */
-export function nextSyzygy(worldTime, c = null) {
+export function nextSyzygy(worldTime = null, c = null) {
   const k = c ?? cfg();
   const cycle = (k.lunarCycleDays ?? 29.530588853) * DAY_SECONDS;
   const D0 = moonState(worldTime, k).elongation;
@@ -190,7 +214,7 @@ export function nextSyzygy(worldTime, c = null) {
  * @returns {{type:'solar'|'lunar'|null, magnitude:'total'|'partial'|null,
  *            nodeDistanceDeg:number}}
  */
-export function eclipseAtSyzygy(worldTime, kind, c = null) {
+export function eclipseAtSyzygy(worldTime = null, kind, c = null) {
   const k = c ?? cfg();
   const lim = k.eclipseLimits ?? { solarPartial: 18.4, solarTotal: 11.8, lunarPartial: 12.2, lunarTotal: 5.9 };
   // Distance to the nearer node. Both nodes sit half a turn apart, so this is
@@ -244,7 +268,7 @@ function geocentricLongitude(name, T, k) {
  * longitude DECREASING — by sampling a day either side, rather than by
  * hardcoding "Mercury is retrograde three times a year".
  */
-export function planetStates(worldTime, c = null) {
+export function planetStates(worldTime = null, c = null) {
   const k = c ?? cfg();
   const zodiac = k.zodiac ?? [];
   const T = julianCenturies(worldTime, k);
@@ -311,7 +335,7 @@ export function meteorShowersOn(month, day, c = null) {
 }
 
 /** Years until each known comet's next perihelion (negative = just passed). */
-export function cometStates(worldTime, c = null) {
+export function cometStates(worldTime = null, c = null) {
   const k = c ?? cfg();
   const jd = julianDay(worldTime, k);
   return (k.comets ?? []).map(cm => {

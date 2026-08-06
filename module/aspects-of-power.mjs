@@ -894,6 +894,37 @@ Hooks.once('ready', async function () {
   // Register channel-subsystem updateCombat hook (sub-turn tick scheduler).
   registerChannelHooks();
 
+  // ── THE CLOCK ANNOUNCES ITSELF ─────────────────────────────────────────
+  // Until now `updateWorldTime` had ZERO listeners (verified 2026-08-06):
+  // the GM could advance days and the sky would change in total silence —
+  // a new moon, an eclipse or a solstice would arrive with nothing to show
+  // it. The celestial engine has been correct and unheard since `4f4e420`.
+  //
+  // Fires on a DAY BOUNDARY, not every tick: downtime routinely advances
+  // hours at a time (a craft, a ritual), and reporting per-advance would
+  // spam the log while telling the table nothing new.
+  //
+  // GM-only, or every connected client posts its own copy of the same card.
+  Hooks.on('updateWorldTime', (worldTime, dt) => {
+    try {
+      if (!isActingGM()) return;
+      if (!Number.isFinite(dt) || dt === 0) return;
+      const cal = game.aspectsofpower?.calendar;
+      if (!cal?.civilDate) return;
+      // Compare the CIVIL day either side of the jump. dt can be negative
+      // when a GM rewinds, and a rewind across midnight is still a change.
+      const before = cal.civilDate(worldTime - dt);
+      const after  = cal.civilDate(worldTime);
+      if (before.year === after.year && before.month === after.month
+        && before.day === after.day) return;
+      cal.postCelestialReport?.();
+    } catch (err) {
+      // Never let a sky report break time advancement — downtime resolution
+      // rides the same clock.
+      console.error('Aspects of Power | celestial day-change report failed', err);
+    }
+  });
+
   // Register AI dispatch hook (fires on declared-action completion → routes
   // to the actor's `aiProfile` for next-action decision).
   registerAIHooks();
