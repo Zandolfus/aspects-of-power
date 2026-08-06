@@ -1,0 +1,97 @@
+{{!--
+  Calendar & Downtime tracker. All geometry is precomputed in
+  _prepareContext — this template does no arithmetic, it only places
+  percentages. Keep it that way; the last three UI bugs in this system were
+  a template and a handler disagreeing about the same number.
+--}}
+<div class="aop-cal">
+
+  {{#if sky}}
+  <header class="aop-cal-sky">
+    <div class="aop-cal-date">{{sky.date}}</div>
+    <div class="aop-cal-moon">
+      <i class="fas fa-moon"></i>
+      {{sky.moon}} &middot; {{sky.illum}}% lit
+      {{#if sky.waxing}}<span class="hint">waxing</span>{{else}}<span class="hint">waning</span>{{/if}}
+    </div>
+    {{#if sky.eclipse}}<div class="aop-cal-flag">Eclipse: {{sky.eclipse}}</div>{{/if}}
+    {{#if sky.quarterDay}}<div class="aop-cal-flag">{{sky.quarterDay}}</div>{{/if}}
+  </header>
+  {{/if}}
+
+  {{#if next.length}}
+  <ul class="aop-cal-next">
+    {{#each next}}
+      <li><span class="aop-cal-in">{{this.inDays}}d</span> {{this.label}}</li>
+    {{/each}}
+  </ul>
+  {{/if}}
+
+  <section class="aop-cal-timelines">
+    <div class="aop-cal-axis-head">
+      <span>Timelines</span>
+      <span class="hint">span {{spanLabel}}</span>
+    </div>
+
+    {{#if hasRows}}
+      <div class="aop-cal-grid">
+        {{!-- gridlines + the now marker sit behind every lane --}}
+        <div class="aop-cal-gridlines">
+          {{#each ticks}}
+            <div class="aop-cal-tick" style="left:{{this.pct}}%"><span>{{this.label}}</span></div>
+          {{/each}}
+          <div class="aop-cal-now" style="left:{{nowPct}}%" data-tooltip="Now"></div>
+        </div>
+
+        {{#each rows}}
+          <div class="aop-cal-row {{#if this.isOwn}}is-own{{/if}}">
+            <div class="aop-cal-who">
+              <img src="{{this.img}}" alt="" />
+              <span class="aop-cal-name" style="border-left-color:{{this.colour}}">{{this.name}}</span>
+            </div>
+            <div class="aop-cal-lane">
+              {{#if this.declared}}
+                <div class="aop-cal-block {{#if this.overdue}}is-overdue{{/if}}"
+                     style="left:{{this.leftPct}}%; width:{{this.widthPct}}%; background:{{this.colour}}"
+                     data-tooltip="{{this.label}} — {{this.display}}{{#if this.remaining}} ({{this.remaining}} left){{/if}}">
+                  <span class="aop-cal-block-label">{{this.label}}</span>
+                </div>
+              {{else}}
+                <div class="aop-cal-idle">not declared</div>
+              {{/if}}
+            </div>
+          </div>
+        {{/each}}
+      </div>
+    {{else}}
+      <p class="hint aop-cal-empty">Nobody is on the clock. Players declare from the
+        hourglass on their token's HUD.</p>
+    {{/if}}
+
+    <div class="aop-cal-status">
+      {{#if allDeclared}}
+        <span class="aop-cal-ready">All declared — ready to advance.</span>
+      {{else if waitingOn.length}}
+        <span class="hint">Waiting on: {{#each waitingOn}}{{this}}{{#unless @last}}, {{/unless}}{{/each}}</span>
+      {{/if}}
+    </div>
+  </section>
+
+  {{#if isGM}}
+  <footer class="aop-cal-controls">
+    <button type="button" data-action="advanceNext" {{#unless anyDeclared}}disabled{{/unless}}>
+      <i class="fas fa-forward-step"></i> Next event end
+    </button>
+    <button type="button" data-action="advanceCustom">
+      <i class="fas fa-clock"></i> Advance by&hellip;
+    </button>
+    <button type="button" data-action="cancelAll" {{#unless anyDeclared}}disabled{{/unless}}>
+      <i class="fas fa-ban"></i> Interrupt
+    </button>
+    <button type="button" data-action="postRoster">
+      <i class="fas fa-comment"></i> Post
+    </button>
+  </footer>
+  {{/if}}
+
+</div>

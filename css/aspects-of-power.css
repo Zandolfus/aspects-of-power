@@ -2357,3 +2357,74 @@ body.aop-targeting #board canvas {
 .aspects-of-power .aop-val-dmg { color: #9cf; }
 .aspects-of-power .aop-val-cost { color: #fc9; }
 .aspects-of-power .aop-val-weight { color: #cf9; }
+
+/* ── Calendar & Downtime tracker ──────────────────────────────────────────
+   Timeline blocks are positioned in PERCENT against a shared axis computed in
+   _prepareContext, so a 1h block is visibly twice a 30m block and both start
+   where they were declared. The template does no arithmetic — see the note
+   at the top of calendar-tracker.hbs. */
+.aop-calendar .aop-cal { display: flex; flex-direction: column; gap: 8px; }
+
+.aop-cal-sky { display: flex; flex-wrap: wrap; align-items: baseline; gap: 10px; }
+.aop-cal-date { font-size: 1.15em; font-weight: 600; }
+.aop-cal-moon { opacity: 0.9; }
+.aop-cal-moon .hint { margin-left: 4px; font-style: italic; opacity: 0.7; }
+.aop-cal-flag {
+  padding: 1px 6px; border-radius: 3px;
+  background: rgba(255, 200, 80, 0.18); border: 1px solid rgba(255, 200, 80, 0.4);
+}
+
+.aop-cal-next { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 4px 12px; }
+.aop-cal-next li { font-size: 0.9em; opacity: 0.85; }
+.aop-cal-in { display: inline-block; min-width: 2.4em; font-variant-numeric: tabular-nums; opacity: 0.65; }
+
+.aop-cal-axis-head { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 2px; }
+.aop-cal-axis-head .hint { font-size: 0.85em; opacity: 0.6; }
+
+/* The lane column is a positioning context for both the gridlines and the
+   blocks, so they share one coordinate space. */
+.aop-cal-grid { position: relative; }
+.aop-cal-gridlines {
+  position: absolute; inset: 0 0 0 0; margin-left: 140px; pointer-events: none;
+}
+.aop-cal-tick { position: absolute; top: 0; bottom: 0; border-left: 1px dashed rgba(0, 0, 0, 0.15); }
+.aop-cal-tick span {
+  position: absolute; top: -2px; left: 3px; font-size: 0.7em; opacity: 0.5;
+  font-variant-numeric: tabular-nums;
+}
+.aop-cal-now { position: absolute; top: 0; bottom: 0; width: 2px; background: #c9593f; opacity: 0.8; }
+
+.aop-cal-row { display: flex; align-items: center; gap: 6px; padding: 3px 0; min-height: 30px; }
+.aop-cal-who { display: flex; align-items: center; gap: 6px; width: 140px; flex: 0 0 140px; }
+.aop-cal-who img { width: 22px; height: 22px; border: none; border-radius: 3px; object-fit: cover; }
+.aop-cal-name {
+  border-left: 3px solid #7a7971; padding-left: 5px;
+  font-size: 0.9em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.aop-cal-row.is-own .aop-cal-name { font-weight: 600; }
+
+.aop-cal-lane {
+  position: relative; flex: 1 1 auto; height: 22px;
+  background: rgba(0, 0, 0, 0.06); border-radius: 3px; overflow: hidden;
+}
+.aop-cal-block {
+  position: absolute; top: 0; bottom: 0;
+  border-radius: 3px; box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.25);
+  display: flex; align-items: center; overflow: hidden;
+}
+.aop-cal-block-label {
+  padding: 0 6px; font-size: 0.78em; white-space: nowrap;
+  color: #fff; text-shadow: 0 1px 2px rgba(0, 0, 0, 0.7);
+}
+/* Finished but not yet resolved — it resolves on the next advance, so it must
+   not read as still running. */
+.aop-cal-block.is-overdue { opacity: 0.55; background-image: repeating-linear-gradient(
+  45deg, rgba(255,255,255,0.25) 0 4px, transparent 4px 8px); }
+.aop-cal-idle { font-size: 0.8em; opacity: 0.45; padding-left: 6px; line-height: 22px; }
+
+.aop-cal-empty { margin: 6px 0; }
+.aop-cal-status { margin-top: 4px; font-size: 0.85em; }
+.aop-cal-ready { color: #2e7d32; font-weight: 600; }
+
+.aop-cal-controls { display: flex; flex-wrap: wrap; gap: 4px; }
+.aop-cal-controls button { flex: 1 1 auto; white-space: nowrap; }

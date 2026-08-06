@@ -40,6 +40,7 @@ import * as TemplateMigration from './systems/template-migration.mjs';
 import * as Celerity from './systems/celerity.mjs';
 import * as Activities from './systems/activities.mjs';
 import * as Calendar from './systems/calendar.mjs';
+import { CalendarTracker, registerCalendarTracker } from './apps/calendar-tracker.mjs';
 import * as Downtime from './systems/downtime.mjs';
 import { DotHelpers } from './systems/dot.mjs';
 import * as Affinity from './systems/affinity.mjs';
@@ -107,6 +108,9 @@ Hooks.once('init', function () {
     // Downtime declare/resolve barrier (systems/downtime.mjs): players commit
     // timed actions, the clock advances to whoever finishes FIRST.
     downtime: { ...Downtime },
+    // The visible face of both: date, sky, and one proportional timeline
+    // per participant. `CalendarTracker.toggle()` for a macro.
+    CalendarTracker,
     // Affinity roster + usage gating (systems/affinity.mjs). Gate is OFF until
     // actors carry rosters — run affinity.auditGating() before enabling.
     affinity: { ...Affinity },
@@ -893,6 +897,11 @@ Hooks.once('ready', async function () {
 
   // Register channel-subsystem updateCombat hook (sub-turn tick scheduler).
   registerChannelHooks();
+
+  // Calendar & downtime tracker: scene-control button + refresh hooks.
+  // The celestial engine and the downtime barrier were both correct and
+  // invisible; this is the door the user actually asked for.
+  registerCalendarTracker();
 
   // ── THE CLOCK ANNOUNCES ITSELF ─────────────────────────────────────────
   // Until now `updateWorldTime` had ZERO listeners (verified 2026-08-06):
