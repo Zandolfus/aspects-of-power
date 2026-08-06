@@ -707,6 +707,10 @@
       "self_buff": "Self-Buff",
       "ambush": "Ambush (strike from surprise)"
     },
+    "Situational": {
+      "proficiency": "Weapon Proficiency",
+      "lunar": "Lunar Phase"
+    },
     "Gate": {
       "blocked": "cannot use this skill type"
     },

@@ -1390,10 +1390,26 @@ eq('factor never goes negative', F2.alterationDamageFactor([-2]) >= 0, true);
 // silently changed power.
 eq('rare + ambush == divine, exactly',
   Math.round(F2.effectiveDamageMultiplier(0.8, [0.50]) * 1e6) / 1e6, 1.2);
-eq('effective mult folds proficiency and lunar',
-  Math.round(F2.effectiveDamageMultiplier(1.0, [-0.20], 1.167, 1.1) * 1e6) / 1e6,
-  Math.round(1.0 * 0.8 * 1.167 * 1.1 * 1e6) / 1e6);
 eq('effective mult clamps at zero', F2.effectiveDamageMultiplier(-5, []), 0);
+
+// SITUATIONAL TERMS ARE A LIST, NOT NAMED PARAMETERS (2026-08-06). They were
+// `profMult, lunarMult` positional args, which meant this function had to know
+// the name of every engine-evaluated modifier that would ever exist. See
+// systems/situational-mods.mjs.
+eq('no situational mods -> authored value only',
+  Math.round(F2.effectiveDamageMultiplier(0.8, [0.50], []) * 1e6) / 1e6, 1.2);
+eq('situational mods MULTIPLY in',
+  Math.round(F2.effectiveDamageMultiplier(1.0, [-0.20], [1.167, 1.1]) * 1e6) / 1e6,
+  Math.round(1.0 * 0.8 * 1.167 * 1.1 * 1e6) / 1e6);
+eq('an omitted situational list is the same as an empty one',
+  F2.effectiveDamageMultiplier(0.8, [0.50]),
+  F2.effectiveDamageMultiplier(0.8, [0.50], []));
+eq('a situational penalty below 1 is honoured (below-trained proficiency)',
+  Math.round(F2.effectiveDamageMultiplier(0.8, [0.50], [0.833333]) * 1e6) / 1e6,
+  Math.round(1.2 * 0.833333 * 1e6) / 1e6);
+eq('junk situational entries are skipped, not NaN',
+  Math.round(F2.effectiveDamageMultiplier(0.8, [0.50], [1.5, null, NaN, 'x']) * 1e6) / 1e6,
+  1.8);
 
 // ── SOURCE GUARD: flag scopes ────────────────────────────────────────────────
 // Not a formula test — a repo scan, because this bug class is invisible to

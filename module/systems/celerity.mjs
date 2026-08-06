@@ -151,7 +151,7 @@ export function computeActionWait(actor, skill, weapon = null, investAmount = nu
   // skill = 1 × 1 = 1 (unchanged); a Cleave-altered skill picks up
   // the cleave tag's weightMod automatically.
   const manualMult = skill?.system?.roll?.actionWeightMultiplier ?? 1.0;
-  const altMult    = skill?._resolveRarityMods?.()?.effectiveWeightMultiplier ?? 1.0;
+  const altMult    = skill?._resolveCostWeightMods?.()?.effectiveWeightMultiplier ?? 1.0;
   const multiplier = manualMult * altMult;
   const baseWait = Math.max(1, Math.round((weight * multiplier * sc.SCALE) / speed));
 
@@ -361,7 +361,7 @@ export function computeWindupMultiplier(skill, weapon = null) {
   if (_MAGIC_TYPES.has(type)) return 1.0;
   const weight = _resolveCelerityWeight(skill, weapon);
   const manualMult = skill?.system?.roll?.actionWeightMultiplier ?? 1.0;
-  const altMult = skill?._resolveRarityMods?.()?.effectiveWeightMultiplier ?? 1.0;
+  const altMult = skill?._resolveCostWeightMods?.()?.effectiveWeightMultiplier ?? 1.0;
   const raw = (weight * manualMult * altMult) / 100;
   return Math.min(dt.windupMax ?? 3.0, Math.max(dt.windupMin ?? 0.5, raw));
 }

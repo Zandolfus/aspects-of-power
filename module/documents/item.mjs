@@ -1,6 +1,7 @@
 import { EquipmentSystem } from '../systems/equipment.mjs';
 import { getPositionalTags } from '../helpers/positioning.mjs';
-import { houseHitFormula, hybridAbilityMod, weaponStatBlend, healStatBlend, spellDamageRef, spellInvestDamage, spellWindupMultiplier, spellCastWeight, strikeInvestDamage, infusionDamage, investSelfDamage as computeInvestSelfDamage, effectiveDodgeValue, splitEvenlyWithRemainder, parryMassMultiplier, bracedParryWeight, bracedMaxUsefulInvest, defenceMarginMultiplier, lunarPhaseMultiplier, dotTickDamage, procStaminaCost, crushFlatAmount, riderMaxInvest, auraRadiusFor, barrierStatBlend, hotTickAmount, effectiveDamageMultiplier } from '../helpers/formulas.mjs';
+import { houseHitFormula, hybridAbilityMod, weaponStatBlend, healStatBlend, spellDamageRef, spellInvestDamage, spellWindupMultiplier, spellCastWeight, strikeInvestDamage, infusionDamage, investSelfDamage as computeInvestSelfDamage, effectiveDodgeValue, splitEvenlyWithRemainder, parryMassMultiplier, bracedParryWeight, bracedMaxUsefulInvest, defenceMarginMultiplier, dotTickDamage, procStaminaCost, crushFlatAmount, riderMaxInvest, auraRadiusFor, barrierStatBlend, hotTickAmount, effectiveDamageMultiplier } from '../helpers/formulas.mjs';
+import { resolveSituationalMods } from '../systems/situational-mods.mjs';
 import { recordActionFired, declareAction, isInActiveCombat, computeActionWait, referenceRoundLength, computeWindupMultiplier, getScrambleStacks, addScrambleStack, applyDodgeCost, findCombatantForActor, perceiveGate } from '../systems/celerity.mjs';
 import { getThreatRadiusFt, actorIsDashing } from '../systems/engagement-halts.mjs';
 import { selectTargetOnCanvas, selectTargetsOnCanvas, skillNeedsTargetPrompt, skillTargetsAtFire, selectMarkerOnCanvas } from '../canvas/target-prompt.mjs';
@@ -300,6 +301,33 @@ export class AspectsofPowerItem extends Item {
    *
    * @returns {{rarityMult:number, effectiveMult:number, costMultiplier:number, effectiveWeightMultiplier:number}}
    */
+  /**
+   * COST + WEIGHT ONLY — the cheap half, depending on nothing but the skill's
+   * own authored alterations.
+   *
+   * ⚠ SPLIT OUT 2026-08-06 BECAUSE CELERITY WAS PAYING FOR DAMAGE TERMS.
+   * `computeActionWait` / `computeWindupMultiplier` call this for
+   * `effectiveWeightMultiplier` alone, but the combined method also resolved
+   * weapon proficiency and ran a `calendar.moonState(worldTime)` lookup — so
+   * deciding how long a sword swing takes consulted the phase of the moon.
+   * Neither term affects weight. Keep it that way: nothing that only needs
+   * cost or weight should call `_resolveRarityMods`.
+   *
+   * @returns {{costMultiplier:number, effectiveWeightMultiplier:number}}
+   */
+  _resolveCostWeightMods() {
+    const sc = CONFIG.ASPECTSOFPOWER;
+    let costMod = 0;
+    let weightMod = 0;
+    for (const alt of this.system.alterations || []) {
+      const tag = sc.alterationTags?.[alt.id];
+      if (!tag) continue;
+      costMod   += tag.costMod   ?? 0;
+      weightMod += tag.weightMod ?? 0;
+    }
+    return { costMultiplier: 1 + costMod, effectiveWeightMultiplier: 1 + weightMod };
+  }
+
   _resolveRarityMods() {
     const sc = CONFIG.ASPECTSOFPOWER;
     const rarity     = this.system.rarity || 'common';
@@ -342,59 +370,28 @@ export class AspectsofPowerItem extends Item {
     if (skillTags.includes('debuff') && skillTags.includes('attack') && !altIds.has('debuff')) {
       dmgMods.push(sc.alterationTags?.debuff?.dmgMod ?? 0);
     }
-    // WEAPON PROFICIENCY (ruled 2026-07-27) — mastery of the weapon TYPE in
-    // hand scales the damage of attacks made with it, anchored so `common`
-    // (trained) is neutral. Folded in here rather than at the formula builder
-    // because this one method feeds both the plain roll path and the two
-    // invest paths; attaching it anywhere else would leave invest unscaled.
-    // Absence is NEUTRAL, never a penalty — see systems/weapon-styles.mjs.
-    const profMult = this._proficiencyDamageMult();
-
-    // LUNAR PHASE (ruled 2026-07-29) — a lunar ritual is empowered under its
-    // own moon and weakened under the opposite one. Folded in here for the same
-    // reason proficiency is: this method feeds the plain roll path and both
-    // invest paths, so one attachment covers all three.
-    const lunarMult = this._lunarPhaseMult();
+    // SITUATIONAL MODIFIERS — weapon proficiency, lunar phase, and whatever
+    // comes next. These used to be two hardcoded named terms right here; they
+    // are now a registry (systems/situational-mods.mjs) so adding the next
+    // conditional is an entry rather than an edit to the damage core.
+    // The attachment point is still this method, which is what the original
+    // comment was actually right about: it feeds the plain roll path AND both
+    // invest paths, so attaching anywhere else would leave invest unscaled.
+    const situational = resolveSituationalMods(this);
 
     return {
       rarityMult,
-      profMult,
-      lunarMult,
-      effectiveMult:             effectiveDamageMultiplier(rarityMult, dmgMods, profMult, lunarMult),
+      // Which situational effects are LIVE on this roll, [{id, mult}]. Only
+      // ones that actually apply appear — the hardcoded version could not
+      // express that, because an inapplicable term was an indistinguishable 1.
+      situational,
+      effectiveMult:             effectiveDamageMultiplier(rarityMult, dmgMods,
+                                   situational.map(s => s.mult)),
       costMultiplier:            1 + costMod,
       effectiveWeightMultiplier: 1 + weightMod,
     };
   }
 
-  /**
-   * Lunar phase multiplier for THIS skill, or 1 when it does not apply.
-   * Which moon the skill belongs to comes from `tagConfig.lunarPhase` if set,
-   * otherwise from the skill's NAME matched against CONFIG.celestial.phases —
-   * the eight authored rituals are named byte-identically to the eight phases
-   * precisely so that join works without per-skill authoring.
-   * @returns {number}
-   */
-  _lunarPhaseMult() {
-    const cel = CONFIG.ASPECTSOFPOWER?.celestial ?? {};
-    if (!(cel.lunarAmplitude > 0)) return 1;
-    const needTag = cel.lunarRequiresTag;
-    // The tag gate stops a non-lunar skill that happens to share a name from
-    // being caught by accident.
-    if (needTag && !(this.system?.tags ?? []).includes(needTag)) return 1;
-
-    const phases = cel.phases ?? [];
-    const declared = this.system?.tagConfig?.lunarPhase || '';
-    const idx = phases.indexOf(declared || this.name);
-    if (idx < 0) return 1;
-
-    // Pass worldTime EXPLICITLY. Omitting it is what made this ship dead in
-    // `44d6ec6`: moonState had no default, so it returned NaN elongation and the
-    // finite-check below quietly reported "no moon effect".
-    const elong = game.aspectsofpower?.calendar
-      ?.moonState?.(game.time.worldTime)?.elongation;
-    if (!Number.isFinite(elong)) return 1;
-    return lunarPhaseMultiplier(idx, elong);
-  }
 
   /**
    * Proficiency damage multiplier for THIS skill, or 1 when it does not apply.

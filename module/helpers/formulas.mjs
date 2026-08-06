@@ -1355,20 +1355,44 @@ export function alterationDamageFactor(dmgMods) {
 
 /**
  * The full effect multiplier a skill applies to its roll.
- *   effective = rarityMult x Π(1 + dmgMod) x proficiency x lunar
+ *
+ *   effective = rarityMult x Π(1 + authored dmgMod) x Π(situational mult)
+ *
+ * ⚠ THE SITUATIONAL TERMS ARE A LIST, NOT NAMED PARAMETERS. They used to be
+ * `profMult` and `lunarMult` positional args, which meant this function had to
+ * know the name of every engine-evaluated modifier that would ever exist —
+ * and every new one (stealth, terrain, elevation) was another signature change
+ * plus another hardcoded term in `Item#_resolveRarityMods`. See
+ * systems/situational-mods.mjs for the registry that produces this list.
+ *
  * Never negative — a stack of penalties bottoms out at zero rather than
  * flipping the sign of the damage.
  *
  * @param {number} rarityMult
- * @param {number[]} dmgMods
- * @param {number} [profMult=1]
- * @param {number} [lunarMult=1]
+ * @param {number[]} dmgMods            authored alteration dmgMods (Π(1 + m))
+ * @param {number[]} [situationalMults] engine-evaluated multipliers (Π m)
  * @returns {number}
  */
-export function effectiveDamageMultiplier(rarityMult, dmgMods, profMult = 1, lunarMult = 1) {
-  const r = Number(rarityMult); const p = Number(profMult); const l = Number(lunarMult);
+export function effectiveDamageMultiplier(rarityMult, dmgMods, situationalMults = []) {
+  const r = Number(rarityMult);
+  let sit = 1;
+  for (const m of situationalMults ?? []) {
+    // ⚠⚠ TEST null/undefined BEFORE Number(). `Number(null)` is 0 and
+    // `Number.isFinite(0)` is TRUE, so the obvious finite-check lets a null
+    // through as a ZERO and silently deletes ALL of the skill's damage.
+    // The neutral value differs between the two halves of this formula and
+    // that is exactly what makes this trap easy to walk into:
+    //   authored dmgMods  -> neutral is 0 (they are 1 + m)
+    //   situational mults -> neutral is 1 (they multiply directly)
+    // So a missing entry must become 1 here, never 0. Caught by a golden test
+    // the first time this function was written; the same trap previously ate
+    // `auraTickMoments` (see design-aura-ticks).
+    if (m === null || m === undefined || m === '') continue;
+    const n = Number(m);
+    if (!Number.isFinite(n)) continue;
+    sit *= n;
+  }
   return Math.max(0, (Number.isFinite(r) ? r : 0)
     * alterationDamageFactor(dmgMods)
-    * (Number.isFinite(p) ? p : 1)
-    * (Number.isFinite(l) ? l : 1));
+    * Math.max(0, sit));
 }

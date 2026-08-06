@@ -99,8 +99,13 @@ export class SkillUpgradeDialog extends foundry.applications.api.HandlebarsAppli
     // Display value: the NET damage change the alterations apply, expressed as
     // a delta so the existing template still reads as "+/- x%".
     const previewDmgMod  = alterationDamageFactor(previewDmgMods) - 1;
+    // ⚠ NO SITUATIONAL TERMS HERE ON PURPOSE. The preview answers "what does
+    // this UPGRADE buy", which is a property of the skill, not of the moment
+    // it is swung — proficiency and lunar depend on the weapon in hand and the
+    // phase of the moon at roll time. Passing an empty list is the honest
+    // answer, and now it is EXPLICIT rather than an accident of the signature.
     const previewEffectiveMult = nextMult != null
-      ? effectiveDamageMultiplier(nextMult, previewDmgMods) : null;
+      ? effectiveDamageMultiplier(nextMult, previewDmgMods, []) : null;
 
     context.skill = this.skill;
     context.ownedByActor = !!this.actor;
