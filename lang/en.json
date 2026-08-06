@@ -704,7 +704,8 @@
       "reach": "Reach",
       "thrust": "Thrust (+5 melee reach)",
       "channeled": "Channeled",
-      "self_buff": "Self-Buff"
+      "self_buff": "Self-Buff",
+      "ambush": "Ambush (strike from surprise)"
     },
     "Gate": {
       "blocked": "cannot use this skill type"

@@ -1322,3 +1322,53 @@ export function resolveBuffLoad({ capacity = 0, used = 0, cost = 0,
     : Math.max(0, Math.min(1, Number(scale)));
   return { scale: s, applied: room, excess: 0, strainDamage: 0, truncated: true };
 }
+
+/**
+ * Alteration damage factor — Π(1 + dmgMod), the multiplicative form ruled in
+ * design-dmgmod-multiplicative.md and shipped `300ce09`.
+ *
+ * ⚠⚠ EXTRACTED 2026-08-06 BECAUSE THE PREVIEW HAD NEVER FOLLOWED THE SHIP.
+ * `_resolveRarityMods` went multiplicative in `300ce09`; the skill-upgrade
+ * dialog kept summing dmgMods ADDITIVELY and adding the sum to the rarity
+ * multiplier. The two agree only when rarityMult is exactly 1.0 and one
+ * alteration is present — which is why nobody caught it. At common (0.6) with
+ * `aoe` (-0.20) the dialog previewed 0.40 against a real 0.48, understating by
+ * 17%, and a POSITIVE dmgMod makes the gap far worse (0.6 + 0.5 = 1.10
+ * previewed against a real 0.6 x 1.5 = 0.90).
+ *
+ * Both callers now go through here. See playbook-damage-measurement: a preview
+ * that does not call the same function as the real path is a lie the player
+ * commits resources against.
+ *
+ * @param {number[]} dmgMods  per-alteration dmgMod values (may be +/-)
+ * @returns {number}
+ */
+export function alterationDamageFactor(dmgMods) {
+  let factor = 1;
+  for (const m of dmgMods ?? []) {
+    const n = Number(m);
+    if (!Number.isFinite(n)) continue;
+    factor *= 1 + n;
+  }
+  return Math.max(0, factor);
+}
+
+/**
+ * The full effect multiplier a skill applies to its roll.
+ *   effective = rarityMult x Π(1 + dmgMod) x proficiency x lunar
+ * Never negative — a stack of penalties bottoms out at zero rather than
+ * flipping the sign of the damage.
+ *
+ * @param {number} rarityMult
+ * @param {number[]} dmgMods
+ * @param {number} [profMult=1]
+ * @param {number} [lunarMult=1]
+ * @returns {number}
+ */
+export function effectiveDamageMultiplier(rarityMult, dmgMods, profMult = 1, lunarMult = 1) {
+  const r = Number(rarityMult); const p = Number(profMult); const l = Number(lunarMult);
+  return Math.max(0, (Number.isFinite(r) ? r : 0)
+    * alterationDamageFactor(dmgMods)
+    * (Number.isFinite(p) ? p : 1)
+    * (Number.isFinite(l) ? l : 1));
+}

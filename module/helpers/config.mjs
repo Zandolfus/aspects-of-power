@@ -149,6 +149,32 @@ ASPECTSOFPOWER.alterationTags = {
   reach:       { label: 'ASPECTSOFPOWER.Alteration.reach',       dmgMod: -0.05, costMod:  0.10, weightMod: 0.10, category: 'range',        stacking: 'multiple' },
   channeled:   { label: 'ASPECTSOFPOWER.Alteration.channeled',   dmgMod: -0.10, costMod: -0.50, weightMod: 1.00, category: 'cost_shape',   stacking: 'max_one'  },
   self_buff:   { label: 'ASPECTSOFPOWER.Alteration.self_buff',   dmgMod: -0.10, costMod:  0.00, weightMod: 0.10, category: 'self',         stacking: 'multiple' },
+  // ── AMBUSH — THE FIRST POSITIVE dmgMod IN THE GAME (ruled 2026-08-06) ──
+  //
+  // Every other alteration is a PRICE: you give up damage to buy area, reach,
+  // a rider, a DoT. There was no way to buy POWER, so the only lever an author
+  // had for "this attack hits harder" was the RARITY LADDER — and rarity is
+  // the how-well-do-you-know-this-skill axis, not a power axis. Three sneak
+  // attacks (Frieda's Snipe, Gabriel's Sneak Attack, Philip Patton's
+  // Assassinate) had been pushed to `divine` purely to raise their damage,
+  // which is why they sat on a rarity the user had ruled unreachable.
+  //
+  // 0.50 is chosen so that `rare` x ambush reproduces `divine` EXACTLY:
+  //     0.8 x 1.5 = 1.20 = skillRarities.divine.mult
+  // so the three skills keep their damage to the digit while rarity goes back
+  // to meaning proficiency — and they can still grow, which divine could not.
+  //
+  // costMod 0.30 is the PLACEHOLDER FOR THE STEALTH PRECONDITION. An ambush
+  // should be paid for by setup (being unseen), but no stealth STATE exists
+  // yet — engagement-halts.mjs says so explicitly and the only thing available
+  // is Foundry's `token.hidden`, a GM VISIBILITY toggle that means something
+  // else. Until stealth lands, the resource cost stands in for the setup.
+  // ⚠ When stealth ships, revisit: the cost should probably drop and the
+  // damage should become CONDITIONAL rather than always-on.
+  //
+  // weightMod 0 deliberately: weightMod feeds computeWindupMultiplier, so any
+  // value would ALSO change per-hit damage and break the exact-divine match.
+  ambush:      { label: 'ASPECTSOFPOWER.Alteration.ambush',      dmgMod:  0.50, costMod:  0.30, weightMod: 0.00, category: 'conditional',  stacking: 'max_one'  },
 };
 
 ASPECTSOFPOWER.spellGradeFactors = {

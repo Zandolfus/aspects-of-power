@@ -1367,6 +1367,34 @@ eq('negative endurance -> no ki', F2.kiMaxFor(-50, KICFG), 0);
 eq('NaN endurance -> no ki', F2.kiMaxFor(NaN, KICFG), 0);
 eq('divisor is a knob', F2.kiMaxFor(600, { ki: { capDivisor: 75, capMax: 10 } }), 8);
 
+// ── ALTERATION DAMAGE FACTOR (multiplicative, shared by real path + preview) ─
+// The bug these exist to prevent: the skill-upgrade dialog summed dmgMods
+// ADDITIVELY and added the sum to rarityMult, while _resolveRarityMods
+// multiplies. They coincide ONLY at rarityMult 1.0 with a single alteration,
+// which is exactly why it survived from `300ce09` to 2026-08-06 unnoticed.
+eq('no alterations -> factor 1', F2.alterationDamageFactor([]), 1);
+eq('single penalty', F2.alterationDamageFactor([-0.20]), 0.8);
+eq('penalties COMPOUND, they do not sum',
+  Math.round(F2.alterationDamageFactor([-0.20, -0.10]) * 1e6) / 1e6, 0.72);  // NOT 0.70
+eq('a positive mod multiplies up', F2.alterationDamageFactor([0.50]), 1.5);
+eq('mixed signs compound',
+  Math.round(F2.alterationDamageFactor([0.50, -0.20]) * 1e6) / 1e6, 1.2);    // NOT 1.30
+eq('junk entries are skipped, not NaN',
+  F2.alterationDamageFactor([0.5, null, undefined, NaN, 'x']), 1.5);
+eq('factor never goes negative', F2.alterationDamageFactor([-2]) >= 0, true);
+
+// ⚡ THE IDENTITY THE WHOLE AMBUSH DESIGN RESTS ON: `rare` carrying `ambush`
+// reproduces `divine` EXACTLY, so the three sneak attacks keep their damage
+// to the digit while rarity goes back to meaning proficiency. If this ever
+// fails, either the rarity ladder or ambush.dmgMod moved and the content
+// silently changed power.
+eq('rare + ambush == divine, exactly',
+  Math.round(F2.effectiveDamageMultiplier(0.8, [0.50]) * 1e6) / 1e6, 1.2);
+eq('effective mult folds proficiency and lunar',
+  Math.round(F2.effectiveDamageMultiplier(1.0, [-0.20], 1.167, 1.1) * 1e6) / 1e6,
+  Math.round(1.0 * 0.8 * 1.167 * 1.1 * 1e6) / 1e6);
+eq('effective mult clamps at zero', F2.effectiveDamageMultiplier(-5, []), 0);
+
 // ── SOURCE GUARD: flag scopes ────────────────────────────────────────────────
 // Not a formula test — a repo scan, because this bug class is invisible to
 // every other kind of check we run.

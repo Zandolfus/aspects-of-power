@@ -1,6 +1,6 @@
 import { EquipmentSystem } from '../systems/equipment.mjs';
 import { getPositionalTags } from '../helpers/positioning.mjs';
-import { houseHitFormula, hybridAbilityMod, weaponStatBlend, healStatBlend, spellDamageRef, spellInvestDamage, spellWindupMultiplier, spellCastWeight, strikeInvestDamage, infusionDamage, investSelfDamage as computeInvestSelfDamage, effectiveDodgeValue, splitEvenlyWithRemainder, parryMassMultiplier, bracedParryWeight, bracedMaxUsefulInvest, defenceMarginMultiplier, lunarPhaseMultiplier, dotTickDamage, procStaminaCost, crushFlatAmount, riderMaxInvest, auraRadiusFor, barrierStatBlend, hotTickAmount } from '../helpers/formulas.mjs';
+import { houseHitFormula, hybridAbilityMod, weaponStatBlend, healStatBlend, spellDamageRef, spellInvestDamage, spellWindupMultiplier, spellCastWeight, strikeInvestDamage, infusionDamage, investSelfDamage as computeInvestSelfDamage, effectiveDodgeValue, splitEvenlyWithRemainder, parryMassMultiplier, bracedParryWeight, bracedMaxUsefulInvest, defenceMarginMultiplier, lunarPhaseMultiplier, dotTickDamage, procStaminaCost, crushFlatAmount, riderMaxInvest, auraRadiusFor, barrierStatBlend, hotTickAmount, effectiveDamageMultiplier } from '../helpers/formulas.mjs';
 import { recordActionFired, declareAction, isInActiveCombat, computeActionWait, referenceRoundLength, computeWindupMultiplier, getScrambleStacks, addScrambleStack, applyDodgeCost, findCombatantForActor, perceiveGate } from '../systems/celerity.mjs';
 import { getThreatRadiusFt, actorIsDashing } from '../systems/engagement-halts.mjs';
 import { selectTargetOnCanvas, selectTargetsOnCanvas, skillNeedsTargetPrompt, skillTargetsAtFire, selectMarkerOnCanvas } from '../canvas/target-prompt.mjs';
@@ -312,14 +312,18 @@ export class AspectsofPowerItem extends Item {
     // it toward the zero floor. The factor form is a constant percentage at
     // every rarity, demotion-immune, and never zeroes. Anchored at legendary
     // (rarityMult 1.0), where additive and multiplicative coincide.
-    let dmgFactor = 1;
+    // ⚠ dmgMods are COLLECTED here and multiplied by the shared pure function
+    // (formulas.alterationDamageFactor) rather than folded in inline, so the
+    // skill-upgrade dialog's PREVIEW can call the identical math. It could
+    // not before, and had silently kept the pre-`300ce09` additive form.
+    const dmgMods = [];
     let costMod = 0;
     let weightMod = 0;
     const altIds = new Set();
     for (const alt of alterations) {
       const tag = sc.alterationTags?.[alt.id];
       if (!tag) continue;
-      dmgFactor *= 1 + (tag.dmgMod ?? 0);
+      dmgMods.push(tag.dmgMod ?? 0);
       costMod   += tag.costMod   ?? 0;
       weightMod += tag.weightMod ?? 0;
       altIds.add(alt.id);
@@ -333,10 +337,10 @@ export class AspectsofPowerItem extends Item {
     // to attack spells so pure-utility debuffs (slow/fear) aren't taxed on damage.
     const skillTags = this.system.tags ?? [];
     if ((skillTags.includes('aoe') || this.system.aoe?.enabled === true) && !altIds.has('aoe')) {
-      dmgFactor *= 1 + (sc.alterationTags?.aoe?.dmgMod ?? 0);
+      dmgMods.push(sc.alterationTags?.aoe?.dmgMod ?? 0);
     }
     if (skillTags.includes('debuff') && skillTags.includes('attack') && !altIds.has('debuff')) {
-      dmgFactor *= 1 + (sc.alterationTags?.debuff?.dmgMod ?? 0);
+      dmgMods.push(sc.alterationTags?.debuff?.dmgMod ?? 0);
     }
     // WEAPON PROFICIENCY (ruled 2026-07-27) — mastery of the weapon TYPE in
     // hand scales the damage of attacks made with it, anchored so `common`
@@ -356,7 +360,7 @@ export class AspectsofPowerItem extends Item {
       rarityMult,
       profMult,
       lunarMult,
-      effectiveMult:             Math.max(0, rarityMult * dmgFactor * profMult * lunarMult),
+      effectiveMult:             effectiveDamageMultiplier(rarityMult, dmgMods, profMult, lunarMult),
       costMultiplier:            1 + costMod,
       effectiveWeightMultiplier: 1 + weightMod,
     };

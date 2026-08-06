@@ -5,8 +5,11 @@
  *
  *   - Each upgrade bumps rarity by one tier (the constant +0.1 mult).
  *   - Specialization keeps the skill clean — no new behavior.
- *   - Alteration adds an alteration tag (subtracts from effective mult,
- *     adds to base resource cost, grants the tag's capability).
+ *   - Alteration adds an alteration tag (scales the effective mult, adds to
+ *     base resource cost, grants the tag's capability).
+ *     ⚠ NOT always a subtraction any more — `ambush` (2026-08-06) is the first
+ *     alteration with a POSITIVE dmgMod, so the tag can now buy power as well
+ *     as sell it.
  *   - The OG skill is preserved; upgrades create NEW skill items linked
  *     via `originalSkillId`. Lineage is linear forward, OG-only branching.
  *   - Stacking rules from CONFIG.ASPECTSOFPOWER.alterationTags[id].stacking:
@@ -14,6 +17,7 @@
  *       'max_one'     — only one per skill
  *       'replace_aoe' — adding any AOE tag removes existing AOE tag(s)
  */
+import { alterationDamageFactor, effectiveDamageMultiplier } from '../helpers/formulas.mjs';
 
 export class SkillUpgradeDialog extends foundry.applications.api.HandlebarsApplicationMixin(
   foundry.applications.api.ApplicationV2
@@ -81,9 +85,22 @@ export class SkillUpgradeDialog extends foundry.applications.api.HandlebarsAppli
         previewAlterations = [...previewAlterations, { id: this.selectedAlterationId, params: {} }];
       }
     }
-    const previewDmgMod  = previewAlterations.reduce((s, a) => s + (sc.alterationTags?.[a.id]?.dmgMod ?? 0), 0);
+    // ⚠⚠ THIS PREVIEW WAS ADDITIVE AND THE REAL PATH IS MULTIPLICATIVE.
+    // `_resolveRarityMods` moved to Π(1 + dmgMod) in `300ce09`
+    // (design-dmgmod-multiplicative.md); this dialog kept summing the mods and
+    // ADDING the sum to the rarity multiplier. The two agree only when
+    // rarityMult is exactly 1.0 with a single alteration, which is why it went
+    // unnoticed — at `common` (0.6) with `aoe` (-0.20) it previewed 0.40
+    // against a real 0.48. A POSITIVE dmgMod breaks it wide open: the new
+    // `ambush` (+0.50) on a common skill would have previewed 1.10 against a
+    // real 0.90. Both sides now call the same pure function.
+    const previewDmgMods = previewAlterations.map(a => sc.alterationTags?.[a.id]?.dmgMod ?? 0);
     const previewCostMod = previewAlterations.reduce((s, a) => s + (sc.alterationTags?.[a.id]?.costMod ?? 0), 0);
-    const previewEffectiveMult = nextMult != null ? Math.max(0, nextMult + previewDmgMod) : null;
+    // Display value: the NET damage change the alterations apply, expressed as
+    // a delta so the existing template still reads as "+/- x%".
+    const previewDmgMod  = alterationDamageFactor(previewDmgMods) - 1;
+    const previewEffectiveMult = nextMult != null
+      ? effectiveDamageMultiplier(nextMult, previewDmgMods) : null;
 
     context.skill = this.skill;
     context.ownedByActor = !!this.actor;
