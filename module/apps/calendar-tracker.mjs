@@ -33,6 +33,10 @@ const { ApplicationV2, HandlebarsApplicationMixin, DialogV2 } = foundry.applicat
 /** Minimum axis span so a single short action is not a full-width bar. */
 const MIN_SPAN_SECONDS = 600;
 
+/** The two candidate inks for a block label. See `_textOn`. */
+const INK_DARK = '#111111';
+const INK_LIGHT = '#ffffff';
+
 export class CalendarTracker extends HandlebarsApplicationMixin(ApplicationV2) {
   static DEFAULT_OPTIONS = {
     id: 'aop-calendar-tracker',
@@ -81,25 +85,35 @@ export class CalendarTracker extends HandlebarsApplicationMixin(ApplicationV2) {
     return c?.css ?? (typeof c === 'string' ? c : '#7a7971');
   }
 
-  /**
-   * Black or white, whichever is legible ON `css`.
-   *
-   * The lane colour is PLAYER-CHOSEN and can be anything, so no fixed text
-   * colour is safe: white on one player's pale cyan was very nearly invisible
-   * in the first render. Relative luminance per WCAG, threshold tuned against
-   * the three colours actually in this world (pale cyan 0.85 and bright green
-   * 0.44 both want dark text; mid blue 0.36 wants light).
-   */
-  static _textOn(css) {
+  /** WCAG relative luminance of a #rrggbb string, or null if unparseable. */
+  static _luminance(css) {
     const m = /^#?([0-9a-f]{6})$/i.exec(String(css ?? '').trim());
-    if (!m) return '#ffffff';
+    if (!m) return null;
     const n = parseInt(m[1], 16);
     const lin = [(n >> 16) & 255, (n >> 8) & 255, n & 255].map(v => {
       const c = v / 255;
       return c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4);
     });
-    const L = 0.2126 * lin[0] + 0.7152 * lin[1] + 0.0722 * lin[2];
-    return L > 0.4 ? '#111111' : '#ffffff';
+    return 0.2126 * lin[0] + 0.7152 * lin[1] + 0.0722 * lin[2];
+  }
+
+  /**
+   * The ink that is actually more readable ON `css` — the two candidate
+   * contrast ratios computed and compared, not a luminance threshold.
+   *
+   * ⚠ A THRESHOLD IS THE TRAP HERE. The first version guessed `L > 0.4`,
+   * eyeballed against the three colours in this world, and put white on a
+   * mid-blue at 2.56:1 where black gives 7.4:1 — it deliberately picked the
+   * failing option. The real crossover for these two inks is near L = 0.19,
+   * nowhere near 0.4, and staring at three swatches would never have found it.
+   * Comparing the ratios is exact, needs no tuning, and cannot be mis-set.
+   */
+  static _textOn(css) {
+    const L = CalendarTracker._luminance(css);
+    if (L === null) return INK_LIGHT;
+    const ratio = (a, b) => (Math.max(a, b) + 0.05) / (Math.min(a, b) + 0.05);
+    const dark = CalendarTracker._luminance(INK_DARK);
+    return ratio(L, dark) >= ratio(L, 1) ? INK_DARK : INK_LIGHT;
   }
 
   /**
