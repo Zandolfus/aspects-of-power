@@ -970,12 +970,21 @@ export class AspectsofPowerActor extends Actor {
       && (i.system?.tagConfig?.profFor ?? '') === 'unarmed');
     if (!passive) return {};
 
-    // Armed? Shields excluded — the same exclusion `_resolveWeaponForSkill`
-    // makes, so "armed" means one thing across the codebase.
+    // ⚠ SHIELDS COUNT AS ARMED (user ruled 2026-08-07: "shields are weapons").
+    // Anything in the weaponry slot fills the hand and brings its own stat
+    // block, so nothing here needs replacing.
+    //
+    // ⚠ THIS IS DELIBERATELY *NOT* THE SAME TEST AS `_resolveWeaponForSkill`,
+    // which excludes shields. The two answer different questions and must not
+    // be unified:
+    //   _resolveWeaponForSkill — "which of these do I SWING?"  A sword-and-board
+    //     fighter swings the sword; letting shields win that selection by
+    //     weight would have them bashing with the shield instead.
+    //   here                   — "are my hands EMPTY?"  A shield-bearer's are
+    //     not, so they get no stand-in stats.
     const wielding = this.items.some(i => i.type === 'item'
       && i.system?.slot === 'weaponry'
-      && i.system?.equipped === true
-      && !(i.system?.tags ?? []).includes('shield'));
+      && i.system?.equipped === true);
     if (wielding) return {};
 
     return unarmedStatGrant(passive.system?.rarity ?? 'common');
