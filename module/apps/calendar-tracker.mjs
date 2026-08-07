@@ -25,9 +25,8 @@
  */
 
 import { DowntimeHelpers } from '../systems/downtime.mjs';
-import { celestialState, upcomingEvents } from '../systems/calendar.mjs';
+import { celestialState, upcomingEvents, civilDate } from '../systems/calendar.mjs';
 import { ActivityHelpers } from '../systems/activities.mjs';
-import { isActingGM } from '../helpers/gm.mjs';
 
 const { ApplicationV2, HandlebarsApplicationMixin, DialogV2 } = foundry.applications.api;
 
@@ -82,10 +81,26 @@ export class CalendarTracker extends HandlebarsApplicationMixin(ApplicationV2) {
     return c?.css ?? (typeof c === 'string' ? c : '#7a7971');
   }
 
+  /**
+   * "11d" / "6h" for an event horizon. `upcomingEvents` returns `inDays` as a
+   * raw float because it is derived from a real syzygy time — printing it
+   * straight put `10.868109118985357d` in the panel.
+   */
+  static _inLabel(inDays) {
+    if (!Number.isFinite(inDays)) return '—';
+    if (inDays < 1) return `${Math.max(1, Math.round(inDays * 24))}h`;
+    return `${Math.round(inDays)}d`;
+  }
+
   async _prepareContext(options) {
     const context = await super._prepareContext(options);
     const now = game.time.worldTime;
-    const gm = isActingGM();
+    // ⚠ PLAIN `isGM`, not `isActingGM()`. This gates whether the controls are
+    // VISIBLE, not whether a mutation runs — and `activeGM` is exactly one of
+    // the connected GMs, so the acting-GM test hid the whole footer from every
+    // other GM at the table. A button is pressed once by a person; it is not a
+    // hook firing on every client, which is what that helper exists to tame.
+    const gm = game.user.isGM;
 
     /* ---------- sky ---------- */
     let sky = null;
@@ -103,8 +118,10 @@ export class CalendarTracker extends HandlebarsApplicationMixin(ApplicationV2) {
       console.error('Aspects of Power | calendar tracker: sky failed', err);
     }
     let next = [];
-    try { next = (upcomingEvents(45) ?? []).slice(0, 3); }
-    catch (err) { console.error('Aspects of Power | calendar tracker: events failed', err); }
+    try {
+      next = (upcomingEvents(45) ?? []).slice(0, 3)
+        .map(e => ({ ...e, inLabel: CalendarTracker._inLabel(e.inDays) }));
+    } catch (err) { console.error('Aspects of Power | calendar tracker: events failed', err); }
 
     /* ---------- timelines ---------- */
     const entries = DowntimeHelpers.roster();
@@ -144,13 +161,21 @@ export class CalendarTracker extends HandlebarsApplicationMixin(ApplicationV2) {
     });
 
     // Axis gridlines — 5 evenly spaced labels across the window.
+    //
+    // WALL-CLOCK, not elapsed. Elapsed labelled the left edge `0.0ms`, and a
+    // player asking "when am I free" wants a time of day, not an offset from
+    // whenever the earliest of someone else's actions happened to start. Long
+    // spans fall back to the date, where the hour has stopped being the point.
+    const p2 = (n) => String(n).padStart(2, '0');
+    const byDate = span > 2 * 86400;
+    const tickLabel = (t) => {
+      const d = civilDate(Math.round(t));
+      return byDate ? `${p2(d.month)}-${p2(d.day)}` : `${p2(d.hour)}:${p2(d.minute)}`;
+    };
     const ticks = [];
     for (let i = 0; i <= 4; i++) {
       const t = axisStart + (span * i) / 4;
-      ticks.push({
-        pct: (i / 4) * 100,
-        label: ActivityHelpers.formatSeconds(Math.round(t - axisStart)),
-      });
+      ticks.push({ pct: (i / 4) * 100, label: tickLabel(t) });
     }
 
     Object.assign(context, {
