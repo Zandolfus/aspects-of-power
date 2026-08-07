@@ -38,7 +38,7 @@
         {{!-- gridlines + the now marker sit behind every lane --}}
         <div class="aop-cal-gridlines">
           {{#each ticks}}
-            <div class="aop-cal-tick" style="left:{{this.pct}}%"><span>{{this.label}}</span></div>
+            <div class="aop-cal-tick {{#if this.isLast}}is-last{{/if}}" style="left:{{this.pct}}%"><span>{{this.label}}</span></div>
           {{/each}}
           <div class="aop-cal-now" style="left:{{nowPct}}%" data-tooltip="Now"></div>
         </div>
@@ -52,7 +52,7 @@
             <div class="aop-cal-lane">
               {{#if this.declared}}
                 <div class="aop-cal-block {{#if this.overdue}}is-overdue{{/if}}"
-                     style="left:{{this.leftPct}}%; width:{{this.widthPct}}%; background:{{this.colour}}"
+                     style="left:{{this.leftPct}}%; width:{{this.widthPct}}%; background:{{this.colour}}; color:{{this.ink}}"
                      data-tooltip="{{this.label}} — {{this.display}}{{#if this.remaining}} ({{this.remaining}} left){{/if}}">
                   <span class="aop-cal-block-label">{{this.label}}</span>
                 </div>

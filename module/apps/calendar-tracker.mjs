@@ -82,6 +82,27 @@ export class CalendarTracker extends HandlebarsApplicationMixin(ApplicationV2) {
   }
 
   /**
+   * Black or white, whichever is legible ON `css`.
+   *
+   * The lane colour is PLAYER-CHOSEN and can be anything, so no fixed text
+   * colour is safe: white on one player's pale cyan was very nearly invisible
+   * in the first render. Relative luminance per WCAG, threshold tuned against
+   * the three colours actually in this world (pale cyan 0.85 and bright green
+   * 0.44 both want dark text; mid blue 0.36 wants light).
+   */
+  static _textOn(css) {
+    const m = /^#?([0-9a-f]{6})$/i.exec(String(css ?? '').trim());
+    if (!m) return '#ffffff';
+    const n = parseInt(m[1], 16);
+    const lin = [(n >> 16) & 255, (n >> 8) & 255, n & 255].map(v => {
+      const c = v / 255;
+      return c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4);
+    });
+    const L = 0.2126 * lin[0] + 0.7152 * lin[1] + 0.0722 * lin[2];
+    return L > 0.4 ? '#111111' : '#ffffff';
+  }
+
+  /**
    * "11d" / "6h" for an event horizon. `upcomingEvents` returns `inDays` as a
    * raw float because it is derived from a real syzygy time — printing it
    * straight put `10.868109118985357d` in the panel.
@@ -144,6 +165,7 @@ export class CalendarTracker extends HandlebarsApplicationMixin(ApplicationV2) {
         name: e.actor.name,
         img: e.actor.img,
         colour,
+        ink: CalendarTracker._textOn(colour),
         isOwn: e.actor.isOwner,
         declared: !!d,
         label: d?.label ?? null,
@@ -175,7 +197,10 @@ export class CalendarTracker extends HandlebarsApplicationMixin(ApplicationV2) {
     const ticks = [];
     for (let i = 0; i <= 4; i++) {
       const t = axisStart + (span * i) / 4;
-      ticks.push({ pct: (i / 4) * 100, label: tickLabel(t) });
+      // The last label would hang off the right edge and get clipped, so it
+      // is anchored from the right instead. Flagged here rather than in CSS
+      // because :last-child would also have to know the tick count.
+      ticks.push({ pct: (i / 4) * 100, label: tickLabel(t), isLast: i === 4 });
     }
 
     Object.assign(context, {
