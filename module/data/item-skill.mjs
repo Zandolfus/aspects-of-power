@@ -214,10 +214,17 @@ export class SkillData extends foundry.abstract.TypeDataModel {
         // reads this field?" before assuming it needs one.
         activityHasteMult:      new fields.NumberField({ initial: 0, min: 0 }),
         activityHasteFor:       new fields.StringField({ initial: '' }),
-        // Radius multiplier when the aura is projected from a placed PYLON
-        // rather than from the caster. ⚠ INERT TODAY: `pylon` exists only as a
-        // ritual medium type (range 300, placement: true) marked deferred, and
-        // no pylon item exists in the world. Wired now so the content is ready.
+        // Radius multiplier when the aura is projected from a deployed PYLON
+        // rather than from the caster.
+        //
+        // ⚠ A PYLON IS A RARE DEPLOYABLE (user, 2026-08-07), i.e. a placed
+        // actor, NOT the `pylon` ritual-medium entry in config — that is a
+        // different and deferred thing and reading it as the same cost a wrong
+        // description once already.
+        //
+        // Detected by the source actor carrying the `pylon` TAG, so the scan
+        // stays source-agnostic: it already walks every token on the scene and
+        // does not care whether the aura comes from a person or an object.
         activityHastePylonMult: new fields.NumberField({ initial: 1, min: 1 }),
         restorationTarget:   new fields.StringField({ initial: 'selected' }),
         restorationResource: new fields.StringField({ initial: 'health' }),

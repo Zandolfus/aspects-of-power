@@ -250,8 +250,13 @@ export function activityHasteFor(actor, skill = null) {
       // carry it — so a crafting aura does not also speed up lockpicking.
       const need = c.activityHasteFor ?? '';
       if (need && !myTags.includes(need)) continue;
-      const radiusFt = auraRadiusFor(c.auraRadius,
+      let radiusFt = auraRadiusFor(c.auraRadius,
         src.system?.abilities?.perception?.mod ?? 0);
+      // DEPLOYED ON A PYLON: a rare deployable projecting the aura instead of
+      // the caster, reaching very much further. The scan needs no special case
+      // for "is this an object" — it already walks every token on the scene —
+      // so this is only the radius multiplier.
+      if (src.hasTag?.('pylon')) radiusFt *= (Number(c.activityHastePylonMult) || 1);
       if (radiusFt <= 0) continue;
       const them = centreOf(tokenDoc);
       const dist = Math.hypot(me.x - them.x, me.y - them.y);
