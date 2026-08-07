@@ -3209,6 +3209,33 @@ export class AspectsofPowerItem extends Item {
     const target   = this.system.tagConfig?.restorationTarget ?? 'selected';
     const resource = this.system.tagConfig?.restorationResource ?? 'health';
 
+    // ── CAUTERISED REGENERATION ──────────────────────────────────────────
+    // A heal may declare a damage type that switches it OFF while the
+    // recipient carries a DoT of that type — "burn the stumps or the heads
+    // grow back", as content rather than as a special case bolted to one
+    // monster. Inert unless authored, so no existing heal changes.
+    //
+    // ⚠ Reads the DoT effect list, NOT the last damage source. What most
+    // recently hit the target is irrelevant; what matters is whether the
+    // wound is still burning right now. Same reasoning as Burnt Offering's
+    // "died WHILE burning, not killed BY the burn".
+    const _suppressType = this.system.tagConfig?.regenSuppressedByDot ?? '';
+    if (_suppressType) {
+      const _recipient = targetTokenOverride?.actor
+        ?? game.user.targets.first()?.actor ?? this.actor;
+      const _burning = _recipient?.effects?.some(e => !e.disabled && e.system?.dot
+        && e.system?.dotDamageType === _suppressType);
+      if (_burning) {
+        ChatMessage.create({
+          speaker, rollMode, ...(whisperGM ? { whisper: whisperGM } : {}),
+          flavor: label,
+          content: `<p><em><strong>${_recipient.name}</strong> cannot regenerate — the `
+                 + `${_suppressType} is still in the wound.</em></p>`,
+        });
+        return;
+      }
+    }
+
     // BARRIERS ARE CASTS (user ruled 2026-08-03): the roll IS the barrier, same
     // as a heal, so card, preview and applied amount cannot drift apart.
     // ⚠ Only skills that actually reached the invest branch have a meaningful

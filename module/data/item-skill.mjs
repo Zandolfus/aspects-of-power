@@ -165,6 +165,17 @@ export class SkillData extends foundry.abstract.TypeDataModel {
       tagConfig: new fields.SchemaField({
         restorationTarget:   new fields.StringField({ initial: 'selected' }),
         restorationResource: new fields.StringField({ initial: 'health' }),
+        // CAUTERISED REGENERATION (ruled 2026-08-07 for hydras): a damage type
+        // that SHUTS THIS HEAL OFF while the recipient is carrying a DoT of
+        // that type. '' = never suppressed, which is every existing skill, so
+        // this is inert until authored. The classic "you must burn the stumps
+        // or the heads grow back", expressed as content rather than hardcoded
+        // into one monster.
+        //
+        // Matched against the DoT effect's `dotDamageType`, so it composes with
+        // whatever the burn subsystem already applies rather than inventing a
+        // second notion of "on fire".
+        regenSuppressedByDot: new fields.StringField({ initial: '' }),
         restorationOverhealth: new fields.BooleanField({ initial: false }),
         // Fraction of the roll actually restored. 1 = the roll IS the heal
         // (every existing skill, unchanged).
