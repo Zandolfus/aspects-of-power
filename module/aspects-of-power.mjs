@@ -2569,11 +2569,25 @@ Hooks.on('renderChatMessageHTML', (message, html) => {
           // this runs on EVERY damage application in the game and almost
           // nobody has ki. Bail on a Map lookup before touching items at all.
           if (ka?.hasTag?.('ki') && (ka.system?.ki?.max ?? 0) > 0) {
-            let gain = 0;
-            for (const sk of ka.items) {
-              if (sk.type !== 'skill') continue;
-              gain += Math.max(0, Math.round(sk.system?.tagConfig?.kiOnPierce ?? 0));
+            // ⚠⚠ PER-SKILL, NOT PER-ACTOR (fixed 2026-08-07). This used to
+            // walk every skill the actor owned and SUM their kiOnPierce, then
+            // grant that total on any piercing hit — so a spender generated as
+            // much ki as the builder did, merely by both being in the sheet,
+            // and the field's name was a lie. The card now carries the skill
+            // that actually struck.
+            //
+            // ⚠ A path that does not stamp the skill grants NOTHING, which is
+            // the correct reading of a per-skill field but is also silent. The
+            // warning below is the tripwire: if a ki monk stops banking, this
+            // is the first thing to look for.
+            const srcUuid = btn.dataset.sourceSkillUuid || '';
+            const srcSkill = srcUuid ? await fromUuid(srcUuid).catch(() => null) : null;
+            if (!srcSkill) {
+              console.warn('Aspects of Power | ki: damage applied with no source skill '
+                + 'stamped on the card — no ki granted. Damage paths must set '
+                + 'data-source-skill-uuid.', { attackerActorUuid, srcUuid });
             }
+            const gain = Math.max(0, Math.round(srcSkill?.system?.tagConfig?.kiOnPierce ?? 0));
             if (gain > 0) {
               const ki = ka.system.ki;
               const next = Math.min(ki.max, (ki.value ?? 0) + gain);

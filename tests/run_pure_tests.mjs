@@ -1534,6 +1534,35 @@ eq('junk situational entries are skipped, not NaN',
   eq('no flag key is used under both namespaces', split, []);
 }
 
+// -- CLASH (damage-vs-damage counter, ruled 2026-08-07) ---------------------
+// The first reaction that can turn an attack around rather than blunt it, so
+// the boundary cases carry real weight: a clash that merely TIES must not
+// reward either side, and a losing clash must still have blunted the hit by
+// exactly what it was worth.
+{
+  const co = F2.clashOutcome;
+  const r = (o) => [o.winner, o.defenderTakes, o.attackerTakes, +o.damageMultiplier.toFixed(4)];
+
+  eq('clash: defender wins, attacker eats the excess', r(co(100, 150)), ['defender', 0, 50, 0]);
+  eq('clash: attacker wins, defender eats the excess', r(co(150, 100)), ['attacker', 50, 0, 0.3333]);
+  eq('clash: dead heat cancels both blows',            r(co(100, 100)), ['tie', 0, 0, 0]);
+
+  // A losing clash is still worth exactly what it rolled: the surviving
+  // fraction must equal (incoming - clash) / incoming, so the multiplier and
+  // the flat amount can never disagree about how much was absorbed.
+  const lose = co(200, 50);
+  eq('clash: losing multiplier matches the flat absorption',
+     +(lose.damageMultiplier * 200).toFixed(4), lose.defenderTakes);
+
+  // Degenerate inputs must not produce a NaN multiplier and silently delete or
+  // duplicate damage downstream - the 0/0 division is the trap here.
+  eq('clash: no incoming attack lands nothing',  r(co(0, 500)),   ['tie', 0, 0, 0]);
+  eq('clash: zero counter leaves the hit whole', r(co(100, 0)),   ['attacker', 100, 0, 1]);
+  eq('clash: negative inputs clamp to zero',     r(co(-50, -50)), ['tie', 0, 0, 0]);
+  eq('clash: non-numeric input does not produce NaN',
+     Number.isFinite(co(undefined, 'x').damageMultiplier), true);
+}
+
 if (failures) { console.error(`\n${failures} FAILURES`); process.exit(1); }
 console.log('\nAll pure-function tests pass.');
 

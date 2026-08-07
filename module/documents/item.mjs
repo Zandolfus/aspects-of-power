@@ -1,6 +1,6 @@
 import { EquipmentSystem } from '../systems/equipment.mjs';
 import { getPositionalTags } from '../helpers/positioning.mjs';
-import { houseHitFormula, hybridAbilityMod, weaponStatBlend, healStatBlend, spellDamageRef, spellInvestDamage, spellWindupMultiplier, spellCastWeight, strikeInvestDamage, infusionDamage, investSelfDamage as computeInvestSelfDamage, effectiveDodgeValue, splitEvenlyWithRemainder, parryMassMultiplier, bracedParryWeight, bracedMaxUsefulInvest, defenceMarginMultiplier, dotTickDamage, procStaminaCost, crushFlatAmount, riderMaxInvest, auraRadiusFor, barrierStatBlend, hotTickAmount, effectiveDamageMultiplier } from '../helpers/formulas.mjs';
+import { houseHitFormula, hybridAbilityMod, weaponStatBlend, healStatBlend, spellDamageRef, spellInvestDamage, spellWindupMultiplier, spellCastWeight, strikeInvestDamage, infusionDamage, investSelfDamage as computeInvestSelfDamage, effectiveDodgeValue, splitEvenlyWithRemainder, parryMassMultiplier, bracedParryWeight, bracedMaxUsefulInvest, defenceMarginMultiplier, dotTickDamage, procStaminaCost, crushFlatAmount, riderMaxInvest, auraRadiusFor, barrierStatBlend, hotTickAmount, effectiveDamageMultiplier, clashOutcome } from '../helpers/formulas.mjs';
 import { resolveSituationalMods } from '../systems/situational-mods.mjs';
 import { recordActionFired, declareAction, isInActiveCombat, computeActionWait, referenceRoundLength, computeWindupMultiplier, getScrambleStacks, addScrambleStack, applyDodgeCost, findCombatantForActor, perceiveGate } from '../systems/celerity.mjs';
 import { getThreatRadiusFt, actorIsDashing } from '../systems/engagement-halts.mjs';
@@ -18,6 +18,25 @@ import { stackDamageMultiplier, spendableRange, clampSpread, getStackCount, getS
  */
 function _isPlayerCharacter(actor) {
   return game.users.some(u => !u.isGM && u.active && u.character?.id === actor.id);
+}
+
+/**
+ * The damage figure a `clash` reaction is measured against.
+ *
+ * Only the clash branch reads this; every other reaction resolves off the
+ * to-hit. Dual-defence attacks split their damage 50/50 across the two halves
+ * and each half is gated by its own defence check, so a clash meeting one half
+ * must be measured against that half — otherwise a single counter would be
+ * judged against a blow twice the size it is actually stopping, and would lose
+ * clashes it should win.
+ *
+ * @param {Roll|null} dmgRoll
+ * @param {boolean} hasDualDefense
+ * @returns {number}
+ */
+function _clashIncoming(dmgRoll, hasDualDefense) {
+  const total = Math.max(0, Math.round(dmgRoll?.total ?? 0));
+  return hasDualDefense ? Math.round(total / 2) : total;
 }
 
 /**
@@ -1297,7 +1316,14 @@ export class AspectsofPowerItem extends Item {
     return this._firePassiveReactions(targetActor, attackerToken, triggerKey);
   }
 
-  async _resolveDefenseCheck(item, targetActor, defKey, hitTotal, attackerToken = null) {
+  /**
+   * @param {number} incomingDamage  The attack's own damage roll, needed ONLY
+   *   by the `clash` reaction, which compares blow against blow. Every other
+   *   reaction works off the to-hit, which is why this arrives late and
+   *   defaults to 0 — a clash with nothing to measure simply does nothing.
+   */
+  async _resolveDefenseCheck(item, targetActor, defKey, hitTotal, attackerToken = null,
+                             incomingDamage = 0) {
     const pool    = targetActor.system.defense[defKey]?.pool ?? 0;
     const poolMax = targetActor.system.defense[defKey]?.poolMax ?? 0;
     const defLabel = defKey.charAt(0).toUpperCase() + defKey.slice(1);
@@ -1502,6 +1528,67 @@ export class AspectsofPowerItem extends Item {
           ChatMessage.create({ speaker: reactionSpeaker,
             content: `<p><strong>${targetActor.name}</strong> raises a barrier with <strong>${reactionSkill.name}</strong>!</p>`,
           });
+        } else if (rType === 'clash') {
+          // CLASH — meet the blow with a blow (design-clash-reaction.md).
+          //
+          // The defender rolls their counter's DAMAGE and it is measured
+          // against the incoming damage directly. Larger wins; only the
+          // difference lands, on whoever lost. This is the one reaction that
+          // can hurt the attacker by defending, so it is also the one that can
+          // leave the defender worse off than simply eating the hit would
+          // have — that symmetry is the point, not an oversight.
+          //
+          // ⚠ IT DOES NOT STACK WITH THE DODGE/POOL RESULT. Parry above takes
+          // the BETTER of itself and whatever the pool already achieved, which
+          // is right for a defence that only ever subtracts. A clash REPLACES
+          // the outcome, because the excess dealt back to the attacker is
+          // computed from this exact exchange; blending it with a partial dodge
+          // would pay the defender twice for the same blow.
+          const clashRoll = await reactionSkill.roll({ clashOnly: true });
+          const clashDamage = clashRoll ? Math.max(0, Math.round(clashRoll.total)) : 0;
+          const outcome = clashOutcome(incomingDamage, clashDamage);
+
+          damageMultiplier = outcome.damageMultiplier;
+          isHit = outcome.damageMultiplier > 0;
+
+          const tally = `${clashDamage} vs ${Math.round(incomingDamage)}`;
+          if (outcome.winner === 'defender') {
+            // The attacker eats the excess RAW — see clashOutcome's contract.
+            // Stamped as a damage source so a kill here still credits the
+            // clasher (new damage paths that skip this lose kill credit
+            // silently — design-gear-sourced-skills).
+            const atkActor = attackerToken?.actor ?? this.actor ?? null;
+            const excess = outcome.attackerTakes;
+            if (atkActor && excess > 0) {
+              const h = atkActor.system?.health ?? {};
+              await atkActor.update({
+                'system.health.value': Math.max(0, (h.value ?? 0) - excess),
+                'flags.aspectsofpower.lastDamageSourceUuid': targetActor.uuid,
+              });
+            }
+            reactionLine = `<p><em>${targetActor.name} overpowers the blow with `
+                         + `<strong>${reactionSkill.name}</strong> (${tally})!</em></p>`;
+            ChatMessage.create({ speaker: reactionSpeaker,
+              content: `<p><strong>${targetActor.name}</strong> meets the attack with `
+                     + `<strong>${reactionSkill.name}</strong> and overpowers it (${tally}) — `
+                     + `<strong>${atkActor?.name ?? 'the attacker'}</strong> takes `
+                     + `<strong>${excess}</strong> from the backlash.</p>`,
+            });
+          } else if (outcome.winner === 'tie') {
+            reactionLine = `<p><em>${targetActor.name} meets the blow exactly with `
+                         + `<strong>${reactionSkill.name}</strong> (${tally}) — both are spent.</em></p>`;
+            ChatMessage.create({ speaker: reactionSpeaker,
+              content: `<p><strong>${targetActor.name}</strong> and the attack annihilate each other exactly (${tally}).</p>`,
+            });
+          } else {
+            reactionLine = `<p><em>${targetActor.name} is overpowered through `
+                         + `<strong>${reactionSkill.name}</strong> (${tally}) — `
+                         + `${outcome.defenderTakes} gets through.</em></p>`;
+            ChatMessage.create({ speaker: reactionSpeaker,
+              content: `<p><strong>${targetActor.name}</strong> clashes with `
+                     + `<strong>${reactionSkill.name}</strong> but is overpowered (${tally}).</p>`,
+            });
+          }
         } else if (rType === 'retaliation') {
           // Phase B post-resolve: counter-strike the attacker. The incoming
           // attack still resolves normally (retaliation doesn't negate it);
@@ -1901,10 +1988,16 @@ export class AspectsofPowerItem extends Item {
       // damage still applies to the ally (targetActor) downstream.
       const _defender = coverGuardian ?? targetActor;
       if (hitRoll && targetDefKey) {
-        primaryResult = await this._resolveDefenseCheck(item, _defender, targetDefKey, hitTotal, attackerToken);
+        // ⚠ The raw damage roll is threaded in for `clash` only. On a DUAL
+        // defence each half faces its own check, so the clash is measured
+        // against the HALF it actually meets — passing the full total there
+        // would let one counter out-clash a blow twice its real size.
+        primaryResult = await this._resolveDefenseCheck(item, _defender, targetDefKey, hitTotal, attackerToken,
+          _clashIncoming(dmgRoll, hasDualDefense));
       }
       if (hasDualDefense && hitRoll) {
-        secondaryResult = await this._resolveDefenseCheck(item, _defender, secondaryDefKey, hitTotal, attackerToken);
+        secondaryResult = await this._resolveDefenseCheck(item, _defender, secondaryDefKey, hitTotal, attackerToken,
+          _clashIncoming(dmgRoll, hasDualDefense));
       }
     }
 
@@ -2124,7 +2217,15 @@ export class AspectsofPowerItem extends Item {
     // piggyback on the same button when applicable.
     const _attackerType = this.constructor._classifyAttackType(this);
     const _attackerActorUuid = this.actor?.uuid ?? '';
-    const _atkAttr = ` data-attacker-token-id="${attackerToken?.id ?? ''}" data-attacker-actor-uuid="${_attackerActorUuid}" data-attacker-attack-type="${_attackerType}"`;
+    // ⚠ THE SOURCE SKILL RIDES THE CARD (2026-08-07). `kiOnPierce` is a
+    // PER-SKILL field, but the apply-damage handler only ever received the
+    // attacking ACTOR — so it summed kiOnPierce across every skill the actor
+    // owned and granted that total on any piercing hit, from any skill. A
+    // dedicated ki builder and a skill that merely sat in the sheet were
+    // indistinguishable. Stamping the skill here is what makes the field mean
+    // what its name says.
+    const _sourceSkillUuid = this.uuid ?? '';
+    const _atkAttr = ` data-attacker-token-id="${attackerToken?.id ?? ''}" data-attacker-actor-uuid="${_attackerActorUuid}" data-attacker-attack-type="${_attackerType}" data-source-skill-uuid="${_sourceSkillUuid}"`;
     const fmAttrs = hasForcedMovement
       ? `${_atkAttr} data-forced-dir="${fmDir}" data-forced-dist="${fmDist}" data-hit-total="${hitTotal}"`
       : _atkAttr;
@@ -4854,6 +4955,24 @@ export class AspectsofPowerItem extends Item {
       await hitRoll.evaluate();
       await hitRoll.toMessage({ speaker, rollMode, ...(whisperGM ? { whisper: whisperGM } : {}), flavor: `${label} — Parry` });
       return hitRoll;
+    }
+
+    // ── Clash-only mode: evaluate just the DAMAGE, for a damage-vs-damage
+    // counter (`reactionType: 'clash'`). Sibling of parryOnly above, which
+    // takes the hit formula for the same reason — the caller needs one number
+    // to compare and must not fire a second full attack pipeline to get it.
+    //
+    // ⚠ RARITY IS APPLIED HERE. `_buildRollFormulas` defaults to the PREVIEW
+    // shape, which omits the rarity multiplier; a clash priced against a
+    // rarity-boosted attack while rolling its own damage un-boosted would lose
+    // clashes it should win, and nothing about the result would look wrong.
+    if (options.clashOnly) {
+      const { dmgFormula } = this._buildRollFormulas(rollData, { applyRarityMult: true });
+      if (!dmgFormula) return null;
+      const clashRoll = new Roll(dmgFormula, rollData);
+      await clashRoll.evaluate();
+      await clashRoll.toMessage({ speaker, rollMode, ...(whisperGM ? { whisper: whisperGM } : {}), flavor: `${label} — Clash` });
+      return clashRoll;
     }
 
     // Passive skills → post description only (no roll).

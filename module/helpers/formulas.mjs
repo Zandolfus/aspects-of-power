@@ -1396,3 +1396,53 @@ export function effectiveDamageMultiplier(rarityMult, dmgMods, situationalMults 
     * alterationDamageFactor(dmgMods)
     * Math.max(0, sit));
 }
+
+/**
+ * CLASH: a damage-versus-damage counter. Both sides commit a blow, the larger
+ * one wins, and only the DIFFERENCE lands — on the loser.
+ *
+ * Ruled 2026-08-07 for the Destroyer Monk's explosive counter ("whoever would
+ * inflict more damage wins"). Every other reaction in this system reduces or
+ * redirects a hit; this is the first that can turn one around.
+ *
+ * The shape matters and is deliberately symmetric:
+ *
+ *   defender wins  -> incoming fully negated, attacker eats (clash − incoming)
+ *   attacker wins  -> defender eats (incoming − clash), attacker untouched
+ *   dead heat      -> both blows cancel and nobody takes anything
+ *
+ * ⚠ IT RETURNS A MULTIPLIER, NOT A SUBTRACTION, for the defender's side. The
+ * caller's whole mitigation chain (armour, DR, margin) is expressed as
+ * `damageMultiplier`, so handing back a flat "reduce by N" would either
+ * double-count the wall or bypass it depending on where it was applied. As a
+ * fraction of the incoming hit it composes with everything already there.
+ *
+ * ⚠ `attackerTakes` is RAW and deliberately so. It is the excess force of a
+ * blow that already beat the incoming attack outright; running it back through
+ * the attacker's own armour would let a heavily-armoured attacker clash for
+ * free, which is precisely the trade this reaction exists to refuse.
+ *
+ * @param {number} incomingDamage  the attack's damage before this reaction
+ * @param {number} clashDamage     the defender's counter-blow damage
+ * @returns {{winner:'defender'|'attacker'|'tie', defenderTakes:number,
+ *            attackerTakes:number, damageMultiplier:number}}
+ */
+export function clashOutcome(incomingDamage, clashDamage) {
+  const inc = Math.max(0, Number(incomingDamage) || 0);
+  const cls = Math.max(0, Number(clashDamage) || 0);
+
+  // Nothing incoming: there is no blow to meet, so the counter has nothing to
+  // beat and lands nothing. Guards the 0/0 division below too.
+  if (inc <= 0) {
+    return { winner: 'tie', defenderTakes: 0, attackerTakes: 0, damageMultiplier: 0 };
+  }
+  if (cls > inc) {
+    return { winner: 'defender', defenderTakes: 0,
+             attackerTakes: cls - inc, damageMultiplier: 0 };
+  }
+  if (cls === inc) {
+    return { winner: 'tie', defenderTakes: 0, attackerTakes: 0, damageMultiplier: 0 };
+  }
+  return { winner: 'attacker', defenderTakes: inc - cls, attackerTakes: 0,
+           damageMultiplier: (inc - cls) / inc };
+}

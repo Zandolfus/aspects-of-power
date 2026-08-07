@@ -2118,7 +2118,18 @@ ASPECTSOFPOWER.reactionTypes = {
   barrier: 'ASPECTSOFPOWER.Reaction.barrier',
   swap:    'ASPECTSOFPOWER.Reaction.swap',
   guardian: 'ASPECTSOFPOWER.Reaction.guardian',
+  // CLASH (ruled 2026-08-07): meet the blow with a blow. Both damages are
+  // compared, the larger wins, and only the difference lands — on the loser.
+  // The only reaction that can hurt the attacker by DEFENDING, as opposed to
+  // `retaliation`, which lets the hit land and answers it separately.
+  clash:   'ASPECTSOFPOWER.Reaction.clash',
 };
+
+// ⚠ `retaliation` is a REAL reactionType that is deliberately absent from the
+// map above: this map populates the authoring dropdown, and retaliation is
+// selected by tagging rather than by picking it there. Do not "fix" the
+// omission by adding it — and do not assume this map is the complete
+// vocabulary when reading the dispatch in item.mjs.
 
 // Guardian-reaction behavior modes (per design-guardian-reactions.md).
 // Apply when reactionType === 'guardian' on an `ally_attacked` reaction:

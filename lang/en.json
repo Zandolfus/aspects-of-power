@@ -242,7 +242,8 @@
       "parry": "Parry",
       "barrier": "Barrier",
       "swap": "Swap",
-      "guardian": "Guardian"
+      "guardian": "Guardian",
+      "clash": "Clash (damage vs damage)"
     },
     "Guardian": {
       "intercept": "Intercept (take the hit)",
