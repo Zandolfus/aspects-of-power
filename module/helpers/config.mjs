@@ -1240,8 +1240,24 @@ ASPECTSOFPOWER.activities = {
   // 2026-08-05). An hour of meditation is a full ki bar.
   meditate:    { label: 'Meditate', cost: 0, class: 'clock', clockSeconds: 3600,
                  restore: [
-                   { resource: 'mana', fractionPath: 'meditation.fraction' },
-                   { resource: 'ki',   fraction: 1 },
+                   // Mana reads the ACTOR's fraction so a passive (and the
+                   // meditation aura) can raise it. 0.10 baseline.
+                   { resource: 'mana',    fractionPath: 'meditation.fraction' },
+                   // ⚠ KI IS A FRACTION, NOT A FULL REFILL (user ruled
+                   // 2026-08-07). Ki is earned by piercing a guard; an hour of
+                   // sitting still should not hand back a full pool, or every
+                   // fight opens at maximum ki without any of it being earned.
+                   // A quarter is ~4 hours from empty.
+                   //
+                   // ⚠ 0.25 IS ALSO THE PRACTICAL FLOOR. Restores round —
+                   // `gain = round(max * frac)` — and ki pools are small
+                   // integers (cap 10, typically 3-8). At 0.10 a pool of 4
+                   // rounds to ZERO and the entry does nothing at all.
+                   { resource: 'ki',      fraction: 0.25 },
+                   // Stamina recovers on its own out of combat, so this is
+                   // convenience rather than a new lever; kept fractional so
+                   // meditation does not become the canonical stamina button.
+                   { resource: 'stamina', fraction: 0.50 },
                  ] },
 };
 
