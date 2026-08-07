@@ -5061,10 +5061,26 @@ export class AspectsofPowerItem extends Item {
     // ⚠ REFUSED IN COMBAT. Declaring an hour of meditation mid-fight is
     // nonsense, and silently writing a downtime flag on a combatant would put
     // a block on the calendar that nobody meant to start.
-    if ((item.system.tags ?? []).includes('activity')) {
-      const key = item.system.tagConfig?.activityKey ?? '';
-      if (!key) {
-        ui.notifications?.warn(`${item.name} is tagged 'activity' but names no activityKey.`);
+    // ⚠⚠ `fromActivityCompletion` SKIPS THIS ENTIRELY. The downtime resolver
+    // fires the declaring skill so its real payload runs, and that skill still
+    // carries the `activity` tag — without this guard it would declare the same
+    // block again and the clock would never get past it.
+    if ((item.system.tags ?? []).includes('activity') && !options.fromActivityCompletion) {
+      const tc = item.system.tagConfig ?? {};
+      const key = tc.activityKey ?? '';
+      // Inline timing, for the profession skills that will not each earn a
+      // registry entry. A named key still wins — see computeActivityTime.
+      const inline = (tc.activityCost > 0 || tc.activitySeconds > 0)
+        ? { label: item.name,
+            class: tc.activityClass || (tc.activitySeconds > 0 && !tc.activityCost ? 'clock' : 'celerity'),
+            cost: tc.activityCost || 0,
+            clockSeconds: tc.activitySeconds || 0,
+            qualityScaled: tc.activityQualityScaled === true }
+        : null;
+
+      if (!key && !inline) {
+        ui.notifications?.warn(`${item.name} is tagged 'activity' but names no activityKey `
+          + `and carries no inline duration.`);
         return;
       }
       if (this.actor && isInActiveCombat(this.actor)) {
@@ -5072,7 +5088,13 @@ export class AspectsofPowerItem extends Item {
         return;
       }
       const { DowntimeHelpers } = await import('../systems/downtime.mjs');
-      return DowntimeHelpers.declare(this.actor, key);
+      return DowntimeHelpers.declare(this.actor, key, {
+        inline,
+        sourceSkillUuid: this.uuid,
+        // The activity's stat falls back to this skill's own roll ability, so
+        // a smithing skill is paced by the smith's stat with nothing authored.
+        skill: this,
+      });
     }
 
     // Passive skills → post description only (no roll).

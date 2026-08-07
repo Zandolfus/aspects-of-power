@@ -92,6 +92,15 @@ export async function declare(actor, activityKey, opts = {}) {
     startTime: now,
     endTime: now + Math.round(timing.seconds),
     display: timing.display,
+    // WHO DECLARED THIS, so completion can fire the skill rather than only the
+    // activity. Without it a crafting skill spends its hours and produces
+    // nothing, because `performActivity` only posts a card and applies the
+    // activity's `restore` block — which is the entire payload for meditation
+    // and none of it for a craft.
+    sourceSkillUuid: opts.sourceSkillUuid ?? null,
+    // The inline activity shape, if this was not a registry key — resolution
+    // happens later and has to be able to price the same block again.
+    inline: opts.inline ?? null,
   };
   await actor.update({ [FLAG_PATH]: declaration });
   ChatMessage.create({
@@ -145,8 +154,31 @@ export async function advance({ force = false, seconds = null } = {}) {
       quality: d.quality ?? undefined,
       advanceTime: false,          // the barrier already spent the time
       note: `<em>Declared downtime, completed on the clock.</em>`,
+      inline: d.inline ?? undefined,
     });
+
+    // ── THE SKILL'S OWN PAYLOAD ──────────────────────────────────────────
+    // The activity above only posts a card and applies its `restore` block.
+    // For meditation that IS the payload; for a craft it is none of it. Fire
+    // the declaring skill so its remaining tags actually run.
+    //
+    // ⚠⚠ `fromActivityCompletion` IS LOAD-BEARING, NOT DECORATION. The skill
+    // carries the `activity` tag — that is how it got here — so rolling it
+    // normally would declare the same downtime again, forever. The flag is
+    // what tells roll() to skip the declaration branch and resolve the rest.
+    //
+    // ⚠ Cleared BEFORE the skill fires, so a skill that legitimately declares
+    // follow-on work can do so without this loop deleting it a line later.
     await entry.actor.update({ [FLAG_UNSET]: null });
+
+    if (d.sourceSkillUuid) {
+      try {
+        const skill = await fromUuid(d.sourceSkillUuid);
+        if (skill) await skill.roll({ executeDeferred: true, fromActivityCompletion: true });
+      } catch (err) {
+        console.error('Aspects of Power | downtime: source skill failed to resolve', err);
+      }
+    }
     resolved.push(entry.actor.name);
   }
   return { advanced: delta, resolved, waitingOn: waiting };

@@ -65,7 +65,14 @@ function resolveStatKey(activity, { statKey = null, skill = null } = {}) {
  */
 export function computeActivityTime(actor, key, opts = {}) {
   const registry = CONFIG.ASPECTSOFPOWER.activities ?? {};
-  const activity = registry[key];
+  // INLINE ACTIVITIES (2026-08-07): a caller may supply an activity-shaped
+  // object instead of naming a registry key, so a profession skill can carry
+  // its own duration without config.mjs gaining an entry per craft.
+  //
+  // ⚠ THE REGISTRY WINS when the key resolves. That ordering is deliberate:
+  // a named shared verb (`meditate`) must mean the same thing everywhere, and
+  // a skill should not be able to redefine it locally by accident.
+  const activity = registry[key] ?? opts.inline ?? null;
   if (!activity || !actor) return null;
 
   // Quality is about the quality of an OUTPUT. A sword can be forged roughly

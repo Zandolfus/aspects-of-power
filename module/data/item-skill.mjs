@@ -171,6 +171,27 @@ export class SkillData extends foundry.abstract.TypeDataModel {
         // rather than resolving as a combat action. Meditation becomes an hour
         // that must actually be spent instead of a button that grants mana.
         activityKey:         new fields.StringField({ initial: '' }),
+        // INLINE ACTIVITY TIMING (ruled 2026-08-07). Most profession skills
+        // will be activities, and giving each one a hand-written entry in
+        // config.mjs makes every new craft a CODE change. These let a skill
+        // carry its own duration; a registry `activityKey` still wins when
+        // named, so shared verbs like `meditate` stay centralised.
+        //
+        //   activityClass 'celerity' — cost / the actor's stat mod, so a
+        //                              better crafter genuinely finishes sooner
+        //                 'clock'    — activitySeconds flat, same for everyone
+        //                 'hybrid'   — whichever of the two is LONGER, which is
+        //                              what most crafts actually want: a floor
+        //                              in real hours that skill can't undercut
+        //
+        // ⚠ The driving STAT needs no field. `resolveStatKey` already falls
+        // back to the skill's own `roll.abilities` — crafting rides its
+        // profession's stat for free.
+        activityClass:       new fields.StringField({ initial: '', blank: true,
+                               choices: ['', 'celerity', 'clock', 'hybrid'] }),
+        activityCost:        new fields.NumberField({ initial: 0, min: 0 }),
+        activitySeconds:     new fields.NumberField({ initial: 0, min: 0 }),
+        activityQualityScaled: new fields.BooleanField({ initial: false }),
         restorationTarget:   new fields.StringField({ initial: 'selected' }),
         restorationResource: new fields.StringField({ initial: 'health' }),
         // CAUTERISED REGENERATION (ruled 2026-08-07 for hydras): a damage type
