@@ -152,7 +152,8 @@
       "holy": "Holy",
       "arcane": "Arcane",
       "psychic": "Psychic",
-      "activity": "Activity (declares downtime)"
+      "activity": "Activity (declares downtime)",
+      "haste": "Haste (speeds activities)"
     },
     "TagConfig": {
       "restorationTarget": "Target",
@@ -162,7 +163,15 @@
       "duration": "Duration (rounds)",
       "debuffDealsDamage": "Deals Damage",
       "debuffDamageType": "Damage Type",
-      "repairMaterials": "Repair Materials"
+      "repairMaterials": "Repair Materials",
+      "activityKey": "Registry Key",
+      "activityClass": "Timing Class",
+      "activityHours": "Hours",
+      "activityCost": "Celerity Cost",
+      "activityQualityScaled": "Quality Scales Time",
+      "activityHasteMult": "Time Multiplier",
+      "activityHasteFor": "Applies To Tag",
+      "activityHastePylonMult": "Pylon Radius Multiplier"
     },
     "Material": {
       "label": "Material",

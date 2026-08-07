@@ -1905,6 +1905,11 @@ ASPECTSOFPOWER.combatTags = {
   // its `restore` block when the CLOCK reaches the end of the block, which is
   // the entire point of the downtime barrier: you commit the hour first.
   activity:    'ASPECTSOFPOWER.Tag.activity',
+  // HASTE (ruled 2026-08-07): an aura that makes OTHER PEOPLE'S activities
+  // faster — Gabriel's Call to Arms. Distinct from `activity` because the
+  // hastening skill is NOT itself an activity: Call to Arms is a buff, and
+  // without its own tag its config had no section to live in on the sheet.
+  haste:       'ASPECTSOFPOWER.Tag.haste',
   restoration: 'ASPECTSOFPOWER.Tag.restoration',
   buff:        'ASPECTSOFPOWER.Tag.buff',
   debuff:      'ASPECTSOFPOWER.Tag.debuff',

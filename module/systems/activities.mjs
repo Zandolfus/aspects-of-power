@@ -243,6 +243,16 @@ export function activityHasteFor(actor, skill = null) {
     if (!src?.items) continue;
     for (const sk of src.items) {
       if (sk.type !== 'skill') continue;
+      // ⚠ TAG-GATED as of 2026-08-07. This began as an ungated subscription
+      // scan (the meditationAuraBonus shape). It is gated now because the
+      // hastening skill needs a tag anyway to get a SECTION on the skill
+      // sheet — Call to Arms is a `buff`, not an `activity`, so its config had
+      // nowhere to render. Gate and section come from the same decision.
+      //
+      // ⚠ The content was tagged BEFORE this gate shipped, per the
+      // skill-authoring rule: tag first (a no-op), gate second. Reversed, the
+      // capability dies for the length of the pass.
+      if (!(sk.system?.tags ?? []).includes('haste')) continue;
       const c = sk.system?.tagConfig ?? {};
       const mult = Number(c.activityHasteMult) || 0;
       if (mult <= 0 || mult >= 1) continue;          // 0 = off, >=1 = not haste

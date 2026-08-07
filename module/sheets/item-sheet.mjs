@@ -155,6 +155,8 @@ export class AspectsofPowerItemSheet extends foundry.applications.api.Handlebars
         debuff:      has('debuff'),
         reaction:    sys.skillType === 'Reaction'
                      || (sys.skillType === 'Passive' && has('retaliation')),
+        activity:    has('activity'),
+        haste:       has('haste'),
         summon:      has('summon'),
         mine:        has('mine'),
         shrapnel:    has('shrapnel'),

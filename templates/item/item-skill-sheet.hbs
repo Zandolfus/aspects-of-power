@@ -431,6 +431,101 @@
       </details>
       {{/if}}
 
+      {{! ── SECTION: Activity (downtime clock) ── }}
+      {{#if show.activity}}
+      <details class='aop-section' data-section='activity' open>
+        <summary>
+          <span class='aop-section-title'>Activity</span>
+          <span class='aop-section-hint'>{{#if system.tagConfig.activityKey}}{{system.tagConfig.activityKey}}{{else}}{{system.tagConfig.activityClass}}{{/if}}{{#if system.tagConfig.activityHours}} &middot; {{system.tagConfig.activityHours}}h{{/if}}{{#if system.tagConfig.activityCost}} &middot; {{system.tagConfig.activityCost}} pts{{/if}}</span>
+        </summary>
+        <div class='aop-section-body'>
+          <p class='aop-hint'>Firing this puts a block on the downtime clock instead of
+            resolving as a combat action. Its own payload runs when the block completes.</p>
+          <div class='aop-field-grid'>
+            <div class='aop-field'>
+              <label class='resource-label'>{{localize "ASPECTSOFPOWER.TagConfig.activityKey"}}</label>
+              <select name='system.tagConfig.activityKey'>
+                <option value=''>— inline (use the fields below) —</option>
+                {{#each config.activities as |a key|}}
+                  <option value='{{key}}' {{#if (eq key ../system.tagConfig.activityKey)}}selected{{/if}}>{{a.label}}</option>
+                {{/each}}
+              </select>
+            </div>
+            <div class='aop-field'>
+              <label class='resource-label'>{{localize "ASPECTSOFPOWER.TagConfig.activityClass"}}</label>
+              <select name='system.tagConfig.activityClass'>
+                <option value='' {{#unless system.tagConfig.activityClass}}selected{{/unless}}>— infer —</option>
+                <option value='celerity' {{#if (eq system.tagConfig.activityClass "celerity")}}selected{{/if}}>Celerity (stat-paced)</option>
+                <option value='clock' {{#if (eq system.tagConfig.activityClass "clock")}}selected{{/if}}>Clock (flat)</option>
+                <option value='hybrid' {{#if (eq system.tagConfig.activityClass "hybrid")}}selected{{/if}}>Hybrid (longer of the two)</option>
+              </select>
+            </div>
+            <div class='aop-field'>
+              <label class='resource-label'>{{localize "ASPECTSOFPOWER.TagConfig.activityHours"}}</label>
+              <input type='number' step='0.25' min='0' name='system.tagConfig.activityHours'
+                     value='{{system.tagConfig.activityHours}}' />
+            </div>
+            <div class='aop-field'>
+              <label class='resource-label'>{{localize "ASPECTSOFPOWER.TagConfig.activityCost"}}</label>
+              <input type='number' step='1000' min='0' name='system.tagConfig.activityCost'
+                     value='{{system.tagConfig.activityCost}}' />
+            </div>
+          </div>
+          <label class='resource-label checkbox-label'>
+            <input type='checkbox' name='system.tagConfig.activityQualityScaled'
+                   {{#if system.tagConfig.activityQualityScaled}}checked{{/if}} />
+            {{localize "ASPECTSOFPOWER.TagConfig.activityQualityScaled"}}
+          </label>
+          <p class='aop-hint'>A named registry key WINS over the inline fields. Hours accept
+            fractions (0.5 = 30m). Celerity cost is divided by this skill's own roll ability,
+            so a better crafter finishes sooner; Hybrid takes whichever is longer.</p>
+        </div>
+      </details>
+      {{/if}}
+
+      {{! ── SECTION: Haste aura ── }}
+      {{#if show.haste}}
+      <details class='aop-section' data-section='haste' open>
+        <summary>
+          <span class='aop-section-title'>Haste Aura</span>
+          <span class='aop-section-hint'>x{{system.tagConfig.activityHasteMult}}{{#if system.tagConfig.activityHasteFor}} to {{system.tagConfig.activityHasteFor}}{{/if}}{{#if system.tagConfig.auraRadius}} &middot; {{system.tagConfig.auraRadius}}ft{{/if}}</span>
+        </summary>
+        <div class='aop-section-body'>
+          <p class='aop-hint'>Speeds up OTHER people's downtime activities inside the aura.
+            This skill is not itself an activity.</p>
+          <div class='aop-field-grid'>
+            <div class='aop-field'>
+              <label class='resource-label'>{{localize "ASPECTSOFPOWER.TagConfig.activityHasteMult"}}</label>
+              <input type='number' step='0.01' min='0' max='1' name='system.tagConfig.activityHasteMult'
+                     value='{{system.tagConfig.activityHasteMult}}' />
+            </div>
+            <div class='aop-field'>
+              <label class='resource-label'>{{localize "ASPECTSOFPOWER.TagConfig.activityHasteFor"}}</label>
+              <input type='text' name='system.tagConfig.activityHasteFor'
+                     value='{{system.tagConfig.activityHasteFor}}' placeholder='craft' />
+            </div>
+            {{#unless show.buff}}
+            <div class='aop-field'>
+              <label class='resource-label'>Aura Radius (ft)</label>
+              <input type='number' step='5' min='0' name='system.tagConfig.auraRadius'
+                     value='{{system.tagConfig.auraRadius}}' />
+            </div>
+            {{/unless}}
+            <div class='aop-field'>
+              <label class='resource-label'>{{localize "ASPECTSOFPOWER.TagConfig.activityHastePylonMult"}}</label>
+              <input type='number' step='1' min='1' name='system.tagConfig.activityHastePylonMult'
+                     value='{{system.tagConfig.activityHastePylonMult}}' />
+            </div>
+          </div>
+          <p class='aop-hint'>It is a TIME multiplier, so below 1 is faster &mdash; 0.667 is
+            "a third quicker". Leave the tag blank to hasten every activity. Radius is
+            stretched by the SOURCE's perception. The pylon multiplier applies when the aura
+            is projected from a deployable carrying the <code>pylon</code> tag.
+            {{#if show.buff}}Radius is set in the Buff section.{{/if}}</p>
+        </div>
+      </details>
+      {{/if}}
+
       {{! ── SECTION: Restoration ── }}
       {{#if show.restoration}}
       <details class='aop-section' data-section='restoration' open>
