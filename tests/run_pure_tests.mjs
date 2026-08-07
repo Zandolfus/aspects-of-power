@@ -1563,6 +1563,43 @@ eq('junk situational entries are skipped, not NaN',
      Number.isFinite(co(undefined, 'x').damageMultiplier), true);
 }
 
+// -- UNARMED STAT GRANT (ruled 2026-08-07) ----------------------------------
+// The ladder is measured off the 35 stat-carrying weapons in the live world:
+// common 27 / uncommon 36 / rare 45, split 36-34-30 across three abilities.
+// What these guard is that the TABLE IS THE CONTRACT - three independent
+// roundings of a percentage split do not reconcile to the authored total, so
+// the sum is asserted at every rung rather than trusted.
+{
+  const g = F2.unarmedStatGrant;
+  const sum = (o) => Object.values(o).reduce((a, b) => a + b, 0);
+  const CFG = { unarmedGrant: { enabled: true,
+    abilities: ['dexterity', 'strength', 'endurance'], split: [0.36, 0.34, 0.30],
+    totalByRarity: { not_proficient: 0, rusty: 18, common: 27, uncommon: 36,
+                     rare: 45, epic: 54, legendary: 63, divine: 81 } } };
+
+  eq('unarmed grant: common matches the measured weapon median',
+     g('common', CFG), { dexterity: 10, strength: 9, endurance: 8 });
+  eq('unarmed grant: rare matches the measured weapon median',
+     g('rare', CFG), { dexterity: 16, strength: 15, endurance: 14 });
+
+  for (const [r, want] of [['rusty', 18], ['common', 27], ['uncommon', 36],
+                           ['rare', 45], ['epic', 54], ['legendary', 63], ['divine', 81]]) {
+    eq(`unarmed grant: ${r} sums to exactly its authored total`, sum(g(r, CFG)), want);
+  }
+
+  // An untrained fighter gets nothing, and an unknown rarity must not invent a
+  // grant - both would be silent, since a wrong stat block looks like any other.
+  eq('unarmed grant: not_proficient grants nothing', g('not_proficient', CFG), {});
+  eq('unarmed grant: unknown rarity grants nothing', g('nonsense', CFG), {});
+  eq('unarmed grant: disabled grants nothing',
+     g('rare', { unarmedGrant: { ...CFG.unarmedGrant, enabled: false } }), {});
+
+  // Dexterity must lead - unarmed sits at weight 40, where the melee blend is
+  // 70% dex, so a str-leading grant would fight the damage formula.
+  const r = g('rare', CFG);
+  eq('unarmed grant: dexterity is the primary', r.dexterity >= r.strength, true);
+}
+
 if (failures) { console.error(`\n${failures} FAILURES`); process.exit(1); }
 console.log('\nAll pure-function tests pass.');
 

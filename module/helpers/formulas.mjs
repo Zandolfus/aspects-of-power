@@ -1446,3 +1446,43 @@ export function clashOutcome(incomingDamage, clashDamage) {
   return { winner: 'attacker', defenderTakes: inc - cls, attackerTakes: 0,
            damageMultiplier: (inc - cls) / inc };
 }
+
+/**
+ * The stat block an unarmed fighter's proficiency stands in for.
+ *
+ * Returns `{ability: points}` for the three abilities named in
+ * `unarmedGrant.abilities`, splitting the rarity's total on the measured
+ * weapon shape. See the config block for where the numbers come from.
+ *
+ * ⚠ THE REMAINDER GOES TO THE LAST ABILITY ON PURPOSE. Rounding each share
+ * independently loses or gains a point against the authored total (27 * 0.36
+ * = 9.72, and three such roundings do not reconcile), which would make the
+ * ladder disagree with itself by a point in either direction at arbitrary
+ * rungs. Distributing the remainder keeps `sum(result) === total` exactly, so
+ * the table above is the contract rather than an approximation of one.
+ *
+ * @param {string} rarity  the Unarmed Proficiency passive's rarity
+ * @param {object} [cfg]
+ * @returns {Record<string, number>} empty when the grant is off or unknown
+ */
+export function unarmedStatGrant(rarity, cfg = null) {
+  const c = (cfg ?? (globalThis.CONFIG?.ASPECTSOFPOWER ?? {})).unarmedGrant ?? {};
+  if (c.enabled === false) return {};
+  const abilities = c.abilities ?? [];
+  const split = c.split ?? [];
+  const total = Number(c.totalByRarity?.[rarity]);
+  if (!abilities.length || !Number.isFinite(total) || total <= 0) return {};
+
+  const out = {};
+  let assigned = 0;
+  for (let i = 0; i < abilities.length; i++) {
+    if (i === abilities.length - 1) {
+      out[abilities[i]] = total - assigned;      // remainder, so the sum is exact
+    } else {
+      const share = Math.round(total * (Number(split[i]) || 0));
+      out[abilities[i]] = share;
+      assigned += share;
+    }
+  }
+  return out;
+}

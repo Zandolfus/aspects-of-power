@@ -4,7 +4,8 @@
 import { proficiencyDamageMult } from '../systems/weapon-styles.mjs';
 import { carriedWeightLb, buffCapacity, abilityMod, abilityModTotal,
          abilityPostCurveFactors, abilityValues,
-         buffLoadByAbility, buffDefenceCost, kiMaxFor } from '../helpers/formulas.mjs';
+         buffLoadByAbility, buffDefenceCost, kiMaxFor,
+         unarmedStatGrant } from '../helpers/formulas.mjs';
 
 /**
  * Change keys that `prepareDerivedData` consumes BY HAND — every ability, plus
@@ -263,6 +264,23 @@ export class AspectsofPowerActor extends Actor {
         else if (e.system?.effectCategory === 'title')    contributions[k].title += val;
         else                                               contributions[k].other += val;
       }
+    }
+
+    // ── UNARMED STAT GRANT ────────────────────────────────────────────────
+    // Fists stand in for the weapon that isn't there, so the grant lands in
+    // the EQUIPMENT bucket and inherits both ceilings below (30% per stat,
+    // 20% overall) exactly as a sword's stat block would. Ruled 2026-08-07.
+    //
+    // Derived every prep rather than synced as an ActiveEffect: the value is a
+    // function of the passive's rarity, so an effect would have to be re-synced
+    // on every rarity change and would go stale silently if it ever wasn't.
+    //
+    // ⚠ SUPPRESSED WHILE ARMED. Holding a weapon means its stat block already
+    // applies; paying both would let a monk carry a dagger purely for the
+    // stats and never swing it. Shields don't count as armed — you can still
+    // punch with a shield on your other arm.
+    for (const [k, v] of Object.entries(this._unarmedGrant())) {
+      if (contributions[k]) contributions[k].equipment += v;
     }
 
     // Per-ability breakdown:
@@ -925,6 +943,42 @@ export class AspectsofPowerActor extends Actor {
    */
   hasTag(tagId) {
     return this.system.collectedTags?.has(tagId) ?? false;
+  }
+
+  /**
+   * The stat block this actor's empty hands are worth, or `{}`.
+   *
+   * Three conditions, all of them load-bearing:
+   *   1. the actor OWNS an Unarmed Proficiency passive — the same opt-in the
+   *      untrained-proficiency penalty uses, which is what keeps the 184
+   *      weaponless bestiary actors out of this entirely;
+   *   2. no weapon is actually held — a wielded weapon brings its own stats;
+   *   3. the grant is enabled and the rarity is on the ladder.
+   *
+   * ⚠ Reads `system.rarity` off the PASSIVE, not off the actor. The rarity of
+   * a proficiency passive IS the mastery ladder in this system (that is why
+   * the rarity table opens with not_proficient / neglected / rusty), so this
+   * scales with training rather than with level.
+   *
+   * @returns {Record<string, number>}
+   */
+  _unarmedGrant() {
+    const cfg = CONFIG.ASPECTSOFPOWER?.unarmedGrant;
+    if (!cfg || cfg.enabled === false) return {};
+
+    const passive = this.items.find(i => i.type === 'skill'
+      && (i.system?.tagConfig?.profFor ?? '') === 'unarmed');
+    if (!passive) return {};
+
+    // Armed? Shields excluded — the same exclusion `_resolveWeaponForSkill`
+    // makes, so "armed" means one thing across the codebase.
+    const wielding = this.items.some(i => i.type === 'item'
+      && i.system?.slot === 'weaponry'
+      && i.system?.equipped === true
+      && !(i.system?.tags ?? []).includes('shield'));
+    if (wielding) return {};
+
+    return unarmedStatGrant(passive.system?.rarity ?? 'common');
   }
 
   /**

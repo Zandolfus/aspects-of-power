@@ -2824,3 +2824,45 @@ ASPECTSOFPOWER.levelTypes = {
   class:      'ASPECTSOFPOWER.Level.class',
   profession: 'ASPECTSOFPOWER.Level.profession',
 };
+/**
+ * UNARMED STAT GRANT (ruled 2026-08-07).
+ *
+ * A fighter with empty hands forgoes whatever stat block a weapon carries, and
+ * nothing replaced it. This is that replacement: the Unarmed Proficiency
+ * passive grants stats in the weapon's place, scaled by its own rarity — which
+ * is already the mastery ladder.
+ *
+ * ⚠ THE NUMBERS ARE MEASURED, NOT CHOSEN. Across the 35 stat-carrying weapons
+ * in this world the medians run common 27, uncommon 36, rare 45 — a clean +9
+ * per rarity step — and the typical weapon spreads its total over THREE
+ * abilities in a 36/34/30 shape ([18,17,15], [16,15,13]). Both are reproduced
+ * here. Re-derive from live gear before changing them.
+ *
+ * ⚠ DELIBERATELY RANK-NEUTRAL. Weapons in this system do not scale with rank —
+ * that property is what settled the rank ladder (design-rank-ladder) — so
+ * fists must not either, or they would outpace the swords they stand in for.
+ * Proficiency rarity carries all of the progression.
+ *
+ * Gated on OWNING the Unarmed Proficiency passive, matching how the untrained
+ * proficiency penalty is scoped: own a proficiency and you opt in. That keeps
+ * the 184 weaponless bestiary actors exactly as they are.
+ */
+ASPECTSOFPOWER.unarmedGrant = {
+  enabled: true,
+  // Ordered: primary, secondary, tertiary.
+  abilities: ['dexterity', 'strength', 'endurance'],
+  split: [0.36, 0.34, 0.30],
+  totalByRarity: {
+    not_proficient: 0,
+    neglected:       9,
+    rusty:          18,
+    inferior:       22,
+    common:         27,
+    uncommon:       36,
+    rare:           45,
+    epic:           54,
+    legendary:      63,
+    mythic:         72,
+    divine:         81,
+  },
+};
