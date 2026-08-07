@@ -179,10 +179,16 @@ export class SkillData extends foundry.abstract.TypeDataModel {
         //
         //   activityClass 'celerity' — cost / the actor's stat mod, so a
         //                              better crafter genuinely finishes sooner
-        //                 'clock'    — activitySeconds flat, same for everyone
+        //                 'clock'    — activityHours flat, same for everyone
         //                 'hybrid'   — whichever of the two is LONGER, which is
         //                              what most crafts actually want: a floor
         //                              in real hours that skill can't undercut
+        //
+        // ⚠ HOURS, NOT SECONDS (user ruled 2026-08-07: "hours is the only
+        // reasonable unit"). Downtime is authored by a GM thinking in hours;
+        // nobody wants to type 21600. Fractions are fine — 0.5 is half an hour.
+        // The engine still converts to seconds at the boundary, because that is
+        // what the activity registry and the clock speak.
         //
         // ⚠ The driving STAT needs no field. `resolveStatKey` already falls
         // back to the skill's own `roll.abilities` — crafting rides its
@@ -190,8 +196,29 @@ export class SkillData extends foundry.abstract.TypeDataModel {
         activityClass:       new fields.StringField({ initial: '', blank: true,
                                choices: ['', 'celerity', 'clock', 'hybrid'] }),
         activityCost:        new fields.NumberField({ initial: 0, min: 0 }),
-        activitySeconds:     new fields.NumberField({ initial: 0, min: 0 }),
+        activityHours:       new fields.NumberField({ initial: 0, min: 0 }),
         activityQualityScaled: new fields.BooleanField({ initial: false }),
+
+        // ── ACTIVITY HASTE AURA (Gabriel's Call to Arms, ruled 2026-08-07) ──
+        // A skill that makes OTHER PEOPLE'S activities faster inside its aura.
+        // `activityHasteMult` is a TIME multiplier, so below 1 is faster:
+        // 0.667 means "a third quicker".
+        //
+        // `activityHasteFor` names the tag a skill must carry to benefit, so
+        // this hastens crafting without also hastening lockpicking. Empty
+        // means every activity.
+        //
+        // ⚠ SUBSCRIPTION SCAN, not tag dispatch — `activityHasteHours` is read
+        // by the activity system sweeping every actor, exactly like
+        // `meditationAuraBonus`. Adding a routing tag would BREAK it. Ask "who
+        // reads this field?" before assuming it needs one.
+        activityHasteMult:      new fields.NumberField({ initial: 0, min: 0 }),
+        activityHasteFor:       new fields.StringField({ initial: '' }),
+        // Radius multiplier when the aura is projected from a placed PYLON
+        // rather than from the caster. ⚠ INERT TODAY: `pylon` exists only as a
+        // ritual medium type (range 300, placement: true) marked deferred, and
+        // no pylon item exists in the world. Wired now so the content is ready.
+        activityHastePylonMult: new fields.NumberField({ initial: 1, min: 1 }),
         restorationTarget:   new fields.StringField({ initial: 'selected' }),
         restorationResource: new fields.StringField({ initial: 'health' }),
         // CAUTERISED REGENERATION (ruled 2026-08-07 for hydras): a damage type

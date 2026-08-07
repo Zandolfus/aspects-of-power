@@ -88,13 +88,23 @@ export function computeActivityTime(actor, key, opts = {}) {
   const statKey = resolveStatKey(activity, opts);
   const mod = Math.max(1, actor.system?.abilities?.[statKey]?.mod ?? 0);
   const cost = opts.costOverride ?? activity.cost ?? 0;
-  const qualityMult = (quality.mult ?? 1) * (opts.multiplier ?? 1);
+  const haste = opts.skipHaste ? { mult: 1, sources: [] }
+    : activityHasteFor(actor, opts.skill ?? null);
+  const qualityMult = (quality.mult ?? 1) * (opts.multiplier ?? 1) * haste.mult;
 
+  // ⚠⚠ HASTE MUST BE APPLIED TO THE CLOCK HALF BY HAND. `activityTicks`
+  // multiplies ONLY the celerity part by qualityMult and passes clockTicks
+  // through untouched — deliberately, because quality must not speed a clock
+  // ("glue does not cure faster for a fast smith"). Haste is the opposite
+  // case: an aura that accelerates time is precisely the thing that SHOULD
+  // beat a clock, and most crafts worth hastening are clock or hybrid. Folding
+  // it into qualityMult alone would have left Call to Arms doing NOTHING to
+  // John's clock-class Smithing — the exact skill it exists for.
   const ticks = activityTicks(cost, mod, {
     qualityMult,
     taskClass: activity.class ?? 'celerity',
-    clockTicks: secondsToTicks(activity.clockSeconds ?? 0),
-    clockFloorTicks: secondsToTicks(quality.clockFloorSeconds ?? 0),
+    clockTicks: secondsToTicks(activity.clockSeconds ?? 0) * haste.mult,
+    clockFloorTicks: secondsToTicks(quality.clockFloorSeconds ?? 0) * haste.mult,
   });
 
   const ms = ticksToMs(ticks);
@@ -108,6 +118,8 @@ export function computeActivityTime(actor, key, opts = {}) {
     qualityKey,
     qualityScaled: scaled,
     qualityMult,
+    haste: haste.mult,
+    hasteSources: haste.sources,
     ticks,
     ms,
     seconds: ms / 1000,
@@ -191,6 +203,66 @@ export function meditationAuraBonusFor(actor) {
 }
 
 /**
+ * The TIME MULTIPLIER an actor's activity gets from any haste aura they are
+ * standing in — Gabriel's Call to Arms and anything authored like it.
+ *
+ * Below 1 is faster: 0.667 is "a third quicker".
+ *
+ * Sibling of `meditationAuraBonusFor` and deliberately the same shape, down to
+ * reading token centres from the DOCUMENT rather than the placeable (the
+ * placeable's centre lags during move animation and reported a 60ft-distant
+ * token as in range) and to guarding NaN explicitly (`NaN > radiusPx` is
+ * FALSE, so a malformed position would PASS the range check and apply the aura
+ * at any distance).
+ *
+ * ⚠ THE STRONGEST AURA WINS; they do not multiply. Two nobles calling to arms
+ * should not compound into a 4/9 crafting time, and stacking multiplicative
+ * haste is how a downtime economy stops meaning anything.
+ *
+ * @param {Actor} actor        the one performing the activity
+ * @param {Item|null} skill    the skill being performed, for the tag filter
+ * @returns {{mult:number, sources:string[]}}
+ */
+export function activityHasteFor(actor, skill = null) {
+  const none = { mult: 1, sources: [] };
+  const selfDoc = actor?.getActiveTokens?.()?.[0]?.document;
+  if (!selfDoc || !canvas?.grid) return none;
+  const gridSize = canvas.grid.size;
+  const pxPerFt = gridSize / canvas.grid.distance;
+  const centreOf = (doc) => ({
+    x: doc.x + (doc.width * gridSize) / 2,
+    y: doc.y + (doc.height * gridSize) / 2,
+  });
+  const me = centreOf(selfDoc);
+  const myTags = skill?.system?.tags ?? [];
+
+  let best = 1;
+  let from = '';
+  for (const tokenDoc of (selfDoc.parent ?? canvas.scene)?.tokens ?? []) {
+    const src = tokenDoc.actor;
+    if (!src?.items) continue;
+    for (const sk of src.items) {
+      if (sk.type !== 'skill') continue;
+      const c = sk.system?.tagConfig ?? {};
+      const mult = Number(c.activityHasteMult) || 0;
+      if (mult <= 0 || mult >= 1) continue;          // 0 = off, >=1 = not haste
+      // Tag filter: '' hastens everything, otherwise the performed skill must
+      // carry it — so a crafting aura does not also speed up lockpicking.
+      const need = c.activityHasteFor ?? '';
+      if (need && !myTags.includes(need)) continue;
+      const radiusFt = auraRadiusFor(c.auraRadius,
+        src.system?.abilities?.perception?.mod ?? 0);
+      if (radiusFt <= 0) continue;
+      const them = centreOf(tokenDoc);
+      const dist = Math.hypot(me.x - them.x, me.y - them.y);
+      if (!Number.isFinite(dist) || dist > radiusFt * pxPerFt) continue;
+      if (mult < best) { best = mult; from = `${sk.name} (${src.name})`; }
+    }
+  }
+  return best < 1 ? { mult: best, sources: [from] } : none;
+}
+
+/**
  * Perform an activity: price it, post the card, spend the world time.
  *
  * @param {Actor}  actor
@@ -210,11 +282,17 @@ export async function performActivity(actor, key, opts = {}) {
   const qualityNote = result.qualityScaled && result.qualityKey !== 'standard'
     ? ` (${(CONFIG.ASPECTSOFPOWER.activityQuality ?? {})[result.qualityKey]?.label ?? result.qualityKey})`
     : '';
-  const basis = result.taskClass === 'clock'
+  // A haste aura silently shortening a craft is the sort of thing a GM
+  // discovers by wondering why the numbers moved, so it is named on the card.
+  const hasteNote = (result.haste ?? 1) < 1
+    ? ` Hastened x${result.haste.toFixed(2)} by ${result.hasteSources.join(', ')}.`
+    : '';
+  const basis = (result.taskClass === 'clock'
     ? 'Clock-bound — the same for everyone.'
     : `${result.cost} points at ${Math.round(result.mod)} ${result.statKey}`
       + (result.qualityMult !== 1 ? ` x${result.qualityMult} quality` : '')
-      + (result.taskClass === 'hybrid' ? ', or the clock, whichever is longer.' : '.');
+      + (result.taskClass === 'hybrid' ? ', or the clock, whichever is longer.' : '.'))
+    + hasteNote;
 
   // ── Resource restoration (meditation and friends) ────────────────────────
   // An activity declares `restore`, either one config or a LIST of them:

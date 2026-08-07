@@ -5070,11 +5070,15 @@ export class AspectsofPowerItem extends Item {
       const key = tc.activityKey ?? '';
       // Inline timing, for the profession skills that will not each earn a
       // registry entry. A named key still wins — see computeActivityTime.
-      const inline = (tc.activityCost > 0 || tc.activitySeconds > 0)
+      // ⚠ HOURS IN, SECONDS OUT. The field is authored in hours because that is
+      // how downtime is thought about; the registry and the clock both speak
+      // seconds, so the conversion happens here at the boundary and nowhere else.
+      const _hours = Number(tc.activityHours) || 0;
+      const inline = (tc.activityCost > 0 || _hours > 0)
         ? { label: item.name,
-            class: tc.activityClass || (tc.activitySeconds > 0 && !tc.activityCost ? 'clock' : 'celerity'),
+            class: tc.activityClass || (_hours > 0 && !tc.activityCost ? 'clock' : 'celerity'),
             cost: tc.activityCost || 0,
-            clockSeconds: tc.activitySeconds || 0,
+            clockSeconds: Math.round(_hours * 3600),
             qualityScaled: tc.activityQualityScaled === true }
         : null;
 
