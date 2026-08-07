@@ -309,6 +309,52 @@ export class AspectsofPowerItem extends Item {
     return item.system?.weight ?? 0;
   }
 
+  /** Roll types whose "weapon" is a held melee implement — and which therefore
+   *  have a meaningful answer when the hands are empty. */
+  static UNARMED_CAPABLE_TYPES = new Set(['str_weapon', 'dex_weapon']);
+
+  /**
+   * The weight a melee action actually swings at, with EMPTY HANDS RESOLVING
+   * TO FISTS rather than to nothing (ruled 2026-08-07).
+   *
+   * `unarmed` was already a fully specified weapon type — weight 40, reach 5,
+   * its own combination entry, its own proficiency fallback — and NOTHING read
+   * those numbers for damage or tempo, because `_resolveWeaponForSkill` returns
+   * null for empty hands and every consumer gates on weight > 0. The effect was
+   * two unrelated penalties on the same character:
+   *
+   *   DAMAGE — weight 0 dropped the strike to the LEGACY formula, so rarity and
+   *            stamina invest did nothing at all. A `rare` unarmed skill hit
+   *            exactly as hard as a common one.
+   *   TEMPO  — celerity fell back to BASELINE_WEIGHT, which is 100, the SWORD
+   *            reference. Fists cost sword time: 1580 ticks against the 632
+   *            they should. A 2.5x tax for holding nothing.
+   *
+   * This bit 184 of 222 actors — the bestiary's default state, not a monk's
+   * quirk. Every beast whose natural weapons carry no type tag was on it.
+   *
+   * ⚠ MELEE ONLY. An archer with no bow must stay on the legacy path: empty
+   * hands are a perfectly good club and are not a perfectly good longbow.
+   * Magic never reaches here — spells carry tier weight instead.
+   *
+   * Weight 40 is not a buff dressed as a fix. Under the magic/melee
+   * unification DPR is weight-invariant, so 40 buys speed and gives up
+   * per-hit — and low per-hit against flat armour walls is exactly the ki
+   * monk's intended weakness, the one `kiOnPierce` is built to reward beating.
+   *
+   * @param {Item|null} skill
+   * @param {Item|null} [weapon]  optional pre-resolved weapon
+   * @returns {number} weight, or 0 when there is genuinely no weapon concept
+   */
+  static resolveEffectiveWeaponWeight(skill, weapon = null) {
+    const held = weapon ?? skill?._resolveWeaponForSkill?.() ?? null;
+    const real = AspectsofPowerItem.resolveWeaponWeight(held);
+    if (real > 0) return real;
+    const type = skill?.system?.roll?.type ?? '';
+    if (!AspectsofPowerItem.UNARMED_CAPABLE_TYPES.has(type)) return 0;
+    return CONFIG.ASPECTSOFPOWER.weaponWeights?.unarmed ?? 40;
+  }
+
   /**
    * Resolve a skill's effective multiplier, cost mod, and weight mod
    * from its rarity tag + alteration list. Per design-dmgmod-multiplicative.md:
@@ -5715,7 +5761,10 @@ export class AspectsofPowerItem extends Item {
       // (highest-weight non-shield) so designers don't have to wire requiredEquipment
       // on every variant.
       const weapon = this._resolveWeaponForSkill();
-      const weaponWeight = AspectsofPowerItem.resolveWeaponWeight(weapon);
+      // Empty hands resolve to FISTS on melee roll types — see
+      // resolveEffectiveWeaponWeight. Ranged still reports 0 and falls to
+      // legacy, which is correct: no bow is no bow.
+      const weaponWeight = AspectsofPowerItem.resolveEffectiveWeaponWeight(this, weapon);
       // No weapon weight → fall back to legacy formula path. Warn the player
       // so they know the new pillar isn't being applied (Ability/Dice/Cost
       // from the schema are driving damage, not weapon weight + rarity).
@@ -5723,7 +5772,7 @@ export class AspectsofPowerItem extends Item {
         ChatMessage.create({
           speaker, rollMode, ...(whisperGM ? { whisper: whisperGM } : {}),
           flavor: label,
-          content: `<p><em>⚠️ No wielded weapon — using legacy formula. Equip a weapon to use the melee/ranged pillar (rarity-driven multiplier × stamina invest).</em></p>`,
+          content: `<p><em>⚠️ No ranged weapon — using legacy formula. Equip one to use the ranged pillar (rarity-driven multiplier × stamina invest).</em></p>`,
         });
       }
       if (weaponWeight > 0) {

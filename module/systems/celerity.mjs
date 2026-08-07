@@ -92,8 +92,14 @@ function _resolveCelerityWeight(skill, weapon = null) {
     if (castW > 0) return castW;
     return CONFIG.ASPECTSOFPOWER.spellTierWeights?.[tier] ?? sc.BASELINE_WEIGHT;
   }
-  const w = weapon ?? skill._resolveWeaponForSkill?.() ?? null;
-  return w ? AspectsofPowerItem.resolveWeaponWeight(w) : sc.BASELINE_WEIGHT;
+  // ⚠ EMPTY HANDS ARE FISTS, NOT A SWORD. This used to fall through to
+  // BASELINE_WEIGHT (100, the sword reference) whenever no weapon resolved,
+  // so every unarmed combatant in the world — 184 of 222 actors — paid sword
+  // tempo for punching. resolveEffectiveWeaponWeight answers 40 for melee
+  // roll types and 0 for everything else, so the baseline still catches the
+  // genuinely weightless cases.
+  const eff = AspectsofPowerItem.resolveEffectiveWeaponWeight(skill, weapon);
+  return eff > 0 ? eff : sc.BASELINE_WEIGHT;
 }
 
 /**
