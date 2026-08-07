@@ -1880,6 +1880,15 @@ ASPECTSOFPOWER.skillPresets = {
 ASPECTSOFPOWER.combatTags = {
   // Section-driving.
   attack:      'ASPECTSOFPOWER.Tag.attack',
+  // ACTIVITY (ruled 2026-08-07): firing this skill DECLARES a downtime
+  // activity on the clock instead of resolving as a combat action. The skill
+  // names which one in `tagConfig.activityKey`. That is what turns Meditation
+  // from a button that grants mana into an hour that has to be spent.
+  //
+  // ⚠ Nothing is restored at declaration time. The activity framework applies
+  // its `restore` block when the CLOCK reaches the end of the block, which is
+  // the entire point of the downtime barrier: you commit the hour first.
+  activity:    'ASPECTSOFPOWER.Tag.activity',
   restoration: 'ASPECTSOFPOWER.Tag.restoration',
   buff:        'ASPECTSOFPOWER.Tag.buff',
   debuff:      'ASPECTSOFPOWER.Tag.debuff',

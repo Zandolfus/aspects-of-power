@@ -163,6 +163,14 @@ export class SkillData extends foundry.abstract.TypeDataModel {
       // Per-tag configuration.
       // Attack tag reuses roll.targetDefense and roll.damageType — no extra config needed.
       tagConfig: new fields.SchemaField({
+        // ACTIVITY (ruled 2026-08-07) — a key from CONFIG.ASPECTSOFPOWER.activities.
+        // Paired with the `activity` TAG, which is what routes it; the key
+        // alone is inert, per the tag-dispatch rule.
+        //
+        // Firing such a skill DECLARES that activity on the downtime clock
+        // rather than resolving as a combat action. Meditation becomes an hour
+        // that must actually be spent instead of a button that grants mana.
+        activityKey:         new fields.StringField({ initial: '' }),
         restorationTarget:   new fields.StringField({ initial: 'selected' }),
         restorationResource: new fields.StringField({ initial: 'health' }),
         // CAUTERISED REGENERATION (ruled 2026-08-07 for hydras): a damage type

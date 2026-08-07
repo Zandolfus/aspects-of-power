@@ -151,7 +151,8 @@
       "necromantic": "Necromantic",
       "holy": "Holy",
       "arcane": "Arcane",
-      "psychic": "Psychic"
+      "psychic": "Psychic",
+      "activity": "Activity (declares downtime)"
     },
     "TagConfig": {
       "restorationTarget": "Target",

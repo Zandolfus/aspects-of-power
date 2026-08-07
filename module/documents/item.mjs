@@ -5048,6 +5048,33 @@ export class AspectsofPowerItem extends Item {
       return clashRoll;
     }
 
+    // ── ACTIVITY DECLARATION ──────────────────────────────────────────────
+    // An `activity`-tagged skill does not resolve as a combat action at all:
+    // it puts a BLOCK ON THE CLOCK and stops. The activity framework applies
+    // whatever the activity restores when the clock reaches the end of that
+    // block, which is the whole shape of the downtime barrier — commit the
+    // hour first, collect afterwards.
+    //
+    // ⚠ ROUTED BY THE TAG, not by the key. `activityKey` on its own is inert,
+    // matching every other tagConfig field in this system.
+    //
+    // ⚠ REFUSED IN COMBAT. Declaring an hour of meditation mid-fight is
+    // nonsense, and silently writing a downtime flag on a combatant would put
+    // a block on the calendar that nobody meant to start.
+    if ((item.system.tags ?? []).includes('activity')) {
+      const key = item.system.tagConfig?.activityKey ?? '';
+      if (!key) {
+        ui.notifications?.warn(`${item.name} is tagged 'activity' but names no activityKey.`);
+        return;
+      }
+      if (this.actor && isInActiveCombat(this.actor)) {
+        ui.notifications?.warn(`${item.name} is downtime — not usable in combat.`);
+        return;
+      }
+      const { DowntimeHelpers } = await import('../systems/downtime.mjs');
+      return DowntimeHelpers.declare(this.actor, key);
+    }
+
     // Passive skills → post description only (no roll).
     // EXCEPTION: when executeDeferred is true, the call originated from a
     // reaction trigger (e.g., the hp_threshold scanner firing Bloodrage).
