@@ -2486,18 +2486,18 @@ body.aop-targeting #board canvas {
 /* Base cell: nothing known. Faint enough to read as "map continues" rather
    than as a place the party has failed to find. */
 .aop-ow-cell polygon {
-  fill: rgba(255, 255, 255, 0.03);
-  stroke: rgba(255, 255, 255, 0.10);
+  fill: rgba(255, 255, 255, 0.05);
+  stroke: rgba(255, 255, 255, 0.22);
   stroke-width: 1;
 }
 .aop-ow-known polygon {
-  fill: rgba(120, 170, 210, 0.10);
-  stroke: rgba(140, 190, 230, 0.55);
-  stroke-dasharray: 3 2;
+  fill: rgba(120, 170, 210, 0.14);
+  stroke: rgba(150, 200, 240, 0.70);
+  stroke-dasharray: 4 3;
 }
 .aop-ow-explored polygon {
-  fill: rgba(120, 170, 210, 0.30);
-  stroke: rgba(160, 205, 240, 0.85);
+  fill: rgba(120, 170, 210, 0.34);
+  stroke: rgba(175, 215, 245, 0.95);
   stroke-dasharray: none;
 }
 .aop-ow-cell.is-current polygon {
@@ -2509,9 +2509,26 @@ body.aop-targeting #board canvas {
 .aop-ow-cell[data-action]:hover polygon { fill: rgba(240, 192, 96, 0.22); }
 
 .aop-ow-pin { fill: #f0c060; }
-/* Availability sits INSIDE the cell as a small mark, so it reads as an
-   annotation on the hex rather than as a change of the hex's own state. */
-.aop-ow-badge { fill: rgba(160, 205, 240, 0.75); }
+/* Availability is an ANNOTATION on the hex, not a change to the hex's own
+   state, so it is a hollow ring rather than another fill. It was a 2.5px dot
+   first: technically present, and invisible unless you already knew to look.
+   For the GM this is the normal working state of most of the map, so it has to
+   read at a glance. */
+.aop-ow-badge {
+  fill: none;
+  stroke: rgba(170, 210, 245, 0.85);
+  stroke-width: 1.6;
+  stroke-dasharray: 2.6 2.2;
+}
+.aop-ow-coord, .aop-ow-place {
+  text-anchor: middle; dominant-baseline: central;
+  fill: rgba(255, 255, 255, 0.55);
+  font-size: 9px; font-variant-numeric: tabular-nums;
+  pointer-events: none;
+}
+.aop-ow-place { font-size: 8px; fill: rgba(210, 232, 250, 0.9); }
+.aop-ow-explored .aop-ow-coord { fill: rgba(255, 255, 255, 0.8); }
+.is-current .aop-ow-coord { fill: #f0c060; font-weight: 600; }
 .aop-ow-stale {
   fill: #e0533a; font-size: 11px; font-weight: 700;
   text-anchor: middle; dominant-baseline: central;

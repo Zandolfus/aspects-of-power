@@ -192,6 +192,14 @@ export class OverworldPanel extends HandlebarsApplicationMixin(ApplicationV2) {
         x, y,
         points: verts.map(([vx, vy]) => `${(x + vx).toFixed(1)},${(y + vy).toFixed(1)}`).join(' '),
         state,
+        /* A cell with no writing on it is unreadable as a map. The GM always
+           gets coordinates; a player gets the region name only where they have
+           actually been, since the name is itself knowledge. */
+        coord: isGM ? `${c.col},${c.row}` : null,
+        placeName: !isGM && c.explored ? c.label : null,
+        labelY: y + CELL_R * 0.52,
+        /* An unbuilt destination is the GM's normal working state, so the mark
+           has to be legible at a glance rather than a dot you go looking for. */
         showBadge: isGM && c.available === true && !c.explored,
         showStale: isGM && c.stale === true,
       };

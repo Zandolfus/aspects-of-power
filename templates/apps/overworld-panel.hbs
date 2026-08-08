@@ -23,8 +23,10 @@
             <g class="aop-ow-cell aop-ow-{{state}}{{#if isCurrent}} is-current{{/if}}"
                {{#if sceneId}}data-action="viewHex" data-scene-id="{{sceneId}}"{{/if}}>
               <polygon points="{{points}}" />
-              {{#if isCurrent}}<circle cx="{{x}}" cy="{{y}}" r="4" class="aop-ow-pin" />{{/if}}
-              {{#if showBadge}}<circle cx="{{x}}" cy="{{y}}" r="2.5" class="aop-ow-badge" />{{/if}}
+              {{#if showBadge}}<circle cx="{{x}}" cy="{{y}}" r="7" class="aop-ow-badge" />{{/if}}
+              {{#if isCurrent}}<circle cx="{{x}}" cy="{{y}}" r="3.5" class="aop-ow-pin" />{{/if}}
+              {{#if coord}}<text x="{{x}}" y="{{labelY}}" class="aop-ow-coord">{{coord}}</text>{{/if}}
+              {{#if placeName}}<text x="{{x}}" y="{{labelY}}" class="aop-ow-place">{{placeName}}</text>{{/if}}
               {{#if showStale}}<text x="{{x}}" y="{{y}}" class="aop-ow-stale">!</text>{{/if}}
             </g>
           {{/each}}
