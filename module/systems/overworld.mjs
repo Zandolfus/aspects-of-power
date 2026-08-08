@@ -205,14 +205,45 @@ export async function markHexes(keys, { known = false } = {}) {
  * Walking into a hex reveals that it exists and where its neighbours are —
  * you can see the next valley from the ridge. Explored is the strong claim;
  * the six neighbours become merely KNOWN.
+ *
+ * ⚠ A HEX PROMOTED TO EXPLORED MUST LEAVE THE KNOWN SET. The first version
+ * only ever added, so a hex you had heard of and then walked into stayed in
+ * both. Nothing looked wrong — `rosette()` treats explored as implying known,
+ * so the map rendered correctly — but it quietly redefined `known` as "known
+ * OR visited", and the next reader asking "where have they heard of but not
+ * been?" would get every visited hex back. Caught by asserting the two sets
+ * are disjoint, not by looking at the map.
+ *
+ * Both sets are resolved in one pass so a visit is a single transaction
+ * rather than two writes that can disagree in between.
  */
 export async function markVisited(col, row) {
-  const changed = await markHexes([hexKey(col, row)]);
-  const ring = EDGES.map(e => neighbour(col, row, e)).filter(Boolean)
-    .map(([c, r]) => hexKey(c, r))
-    .filter(k => !exploredHexes().has(k));
-  const changedKnown = await markHexes(ring, { known: true });
-  return changed || changedKnown;
+  if (!isActingGM()) return false;
+  const key = hexKey(col, row);
+  const explored = exploredHexes();
+  const known = knownHexes();
+  const snapshot = (s) => [...s].sort().join('|');
+  const before = [snapshot(explored), snapshot(known)];
+
+  explored.add(key);
+  known.delete(key);
+  for (const edge of EDGES) {
+    const n = neighbour(col, row, edge);
+    if (!n) continue;
+    const k = hexKey(n[0], n[1]);
+    if (!explored.has(k)) known.add(k);
+  }
+
+  let changed = false;
+  if (snapshot(explored) !== before[0]) {
+    await game.settings.set(SYS, SETTING_EXPLORED, [...explored].sort());
+    changed = true;
+  }
+  if (snapshot(known) !== before[1]) {
+    await game.settings.set(SYS, SETTING_KNOWN, [...known].sort());
+    changed = true;
+  }
+  return changed;
 }
 
 /**
