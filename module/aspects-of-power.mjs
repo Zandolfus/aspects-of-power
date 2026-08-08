@@ -41,6 +41,8 @@ import * as Celerity from './systems/celerity.mjs';
 import * as Activities from './systems/activities.mjs';
 import * as Calendar from './systems/calendar.mjs';
 import { CalendarTracker, registerCalendarTracker } from './apps/calendar-tracker.mjs';
+import { OverworldPanel, registerOverworldPanel } from './apps/overworld-panel.mjs';
+import * as Overworld from './systems/overworld.mjs';
 import * as Downtime from './systems/downtime.mjs';
 import { DotHelpers } from './systems/dot.mjs';
 import * as Affinity from './systems/affinity.mjs';
@@ -84,6 +86,9 @@ Hooks.once('init', function () {
   // an explicit render({reset:true}). Registered from `ready` the hook attaches
   // correctly, REPORTS as attached, and never fires.
   registerCalendarTracker();
+
+  // Overworld panel: same build-time-hook constraint as the calendar above.
+  registerOverworldPanel();
 
   // Replace Foundry's sidebar combat tracker with our celerity-aware subclass.
   // Must happen at init, before Foundry instantiates ui.combat.
@@ -156,6 +161,11 @@ Hooks.once('init', function () {
     type: String,
     default: '0',
   });
+
+  // Overworld exploration + knowledge. Both are party-side records; availability
+  // is derived from the imported scenes and deliberately not stored.
+  Overworld.registerOverworldSettings();
+  Overworld.registerOverworldHooks();
 
   game.settings.register('aspects-of-power', 'woundedTokenThreshold', {
     name: 'Wounded Token Threshold',

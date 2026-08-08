@@ -22,6 +22,11 @@ import {
   resolveBuffLoad, auraRadiusFor, barrierStatBlend, hotTickAmount,
 } from '../module/helpers/formulas.mjs';
 import * as F2 from '../module/helpers/formulas.mjs';
+import {
+  HEX_SIZE_FT, EDGES, OPPOSITE_EDGE, hexApothemFt, hexWidthFt, hexHeightFt,
+  hexCentreWorld, hexFromWorldFt, neighbour, edgeBetween, hexDistance,
+  hexesWithin, worldFtFromPixels, offsetFromCentre, nearestEdge, verifyStampOrigin,
+} from '../module/helpers/hexgrid.mjs';
 import { moonState, moonNodeAngle, nextSyzygy, eclipseAtSyzygy, planetStates,
          meteorShowersOn, cometStates, julianDay, civilDate, worldTimeForDate } from '../module/systems/calendar.mjs';
 import { resolveDamage, durabilityDamage, applyMarkBonus } from '../module/systems/damage.mjs';
@@ -1598,6 +1603,150 @@ eq('junk situational entries are skipped, not NaN',
   // 70% dex, so a str-leading grant would fight the damage formula.
   const r = g('rare', CFG);
   eq('unarmed grant: dexterity is the primary', r.dexterity >= r.strength, true);
+}
+
+// ---------------------------------------------------------------------------
+// Overworld hex lattice
+//
+// GOLDEN NUMBERS ARE THE GENERATOR'S OWN OUTPUT: `world_origin_ft` as stored in
+// hex_16_10_1525d9.uvtt and hex_17_9_680475.uvtt (hexmap 0.4, builds 1525d9 and
+// 680475), and the neighbour tables read off those files' `x_area.exits`.
+// Nothing here is hand-derived.
+//
+// ⚠ TOLERANCE IS 0.005 ft DELIBERATELY. An earlier check used 1 ft and passed a
+// STALE BUILD whose origin was 0.38 ft out — wide enough to swallow the exact
+// defect the test existed to catch. The stale value is now a negative control
+// below, so loosening the tolerance breaks the suite.
+{
+  const near = (name, got, want, tol = 0.005) => {
+    const pass = Number.isFinite(got) && Math.abs(got - want) <= tol;
+    if (!pass) { failures++; console.error(`FAIL ${name}: got ${got}, want ${want} +/- ${tol}`); }
+    else console.log(`ok   ${name}`);
+  };
+
+  const CANVAS = [1280, 1120];                       // ft, both current builds
+  const STAMP_16_10 = { hex: [16, 10], worldOriginFt: [14360, 10351.92] };
+  const STAMP_17_9  = { hex: [17, 9],  worldOriginFt: [15260, 9832.3] };
+
+  eq('hex: size 600 ft centre to vertex', HEX_SIZE_FT, 600);
+  near('hex: width 1200 ft', hexWidthFt(), 1200);
+  near('hex: height 1039.23 ft', hexHeightFt(), 1039.2305, 0.001);
+  near('hex: apothem 519.615 ft', hexApothemFt(), 519.6152, 0.001);
+
+  // The two live builds must land on the lattice.
+  near('lattice: hex_16_10 origin drift', verifyStampOrigin(STAMP_16_10, CANVAS).driftFt, 0);
+  near('lattice: hex_17_9 origin drift',  verifyStampOrigin(STAMP_17_9,  CANVAS).driftFt, 0);
+  eq('lattice: hex_16_10 verifies', verifyStampOrigin(STAMP_16_10, CANVAS).ok, true);
+  eq('lattice: hex_17_9 verifies',  verifyStampOrigin(STAMP_17_9,  CANVAS).ok, true);
+
+  // NEGATIVE CONTROL 1 — the pre-fix build. Its stored origin is 10352.3, which
+  // is 0.38 ft high because the generator centred the hex on an unrounded
+  // 1119.23 ft canvas. This MUST be rejected; if it ever passes, the tolerance
+  // has been widened back to uselessness.
+  const stale = verifyStampOrigin({ hex: [16, 10], worldOriginFt: [14360, 10352.3] }, CANVAS);
+  eq('lattice: PRE-FIX build is rejected', stale.ok, false);
+  near('lattice: pre-fix drift is the canvas rounding', stale.driftFt, 0.38, 0.005);
+
+  // NEGATIVE CONTROL 2 — wrong parity. Half a row pitch, the classic odd-q/even-q
+  // mix-up. Large enough to catch, small enough to look plausible in a dump.
+  near('lattice: wrong row is a full row pitch out',
+       verifyStampOrigin({ hex: [16, 11], worldOriginFt: [14360, 10351.92] }, CANVAS).driftFt,
+       hexHeightFt(), 0.01);
+
+  // Column pitch and the half-row stagger, straight off the two files.
+  const c1610 = hexCentreWorld(16, 10), c179 = hexCentreWorld(17, 9);
+  near('lattice: column pitch 900 ft', c179[0] - c1610[0], 900);
+  near('lattice: odd column sits half a row higher here', c179[1] - c1610[1], -519.6152, 0.001);
+
+  // Round-trip over the lattice, negatives included: centre -> hex -> same hex.
+  let rtFail = 0;
+  for (let col = -4; col <= 24; col++) {
+    for (let row = -4; row <= 24; row++) {
+      const [x, y] = hexCentreWorld(col, row);
+      const [c, r] = hexFromWorldFt(x, y);
+      if (c !== col || r !== row) rtFail++;
+    }
+  }
+  eq('hexFromWorldFt: 841 centres round-trip', rtFail, 0);
+
+  // Off-centre round-trip. Rounding fractional axial coordinates independently
+  // fails in a band along every edge, so sampling only centres proves nothing.
+  let offFail = 0;
+  for (let col = 0; col <= 12; col++) {
+    for (let row = 0; row <= 12; row++) {
+      const [cx, cy] = hexCentreWorld(col, row);
+      for (const edge of EDGES) {
+        const n = neighbour(col, row, edge);
+        const [nx, ny] = hexCentreWorld(n[0], n[1]);
+        // 45% of the way to the neighbour: still inside, well past the middle
+        const [c, r] = hexFromWorldFt(cx + (nx - cx) * 0.45, cy + (ny - cy) * 0.45);
+        if (c !== col || r !== row) offFail++;
+      }
+    }
+  }
+  eq('hexFromWorldFt: 1014 off-centre samples stay in their hex', offFail, 0);
+
+  // Adjacency, read off x_area.exits in the two files.
+  const EXITS_16_10 = { SE: [17, 10], S: [16, 11], SW: [15, 10], NW: [15, 9], N: [16, 9], NE: [17, 9] };
+  const EXITS_17_9  = { SE: [18, 10], S: [17, 10], SW: [16, 10], NW: [16, 9], N: [17, 8], NE: [18, 9] };
+  for (const [edge, want] of Object.entries(EXITS_16_10)) {
+    eq(`neighbour: 16,10 ${edge}`, neighbour(16, 10, edge), want);
+  }
+  for (const [edge, want] of Object.entries(EXITS_17_9)) {
+    eq(`neighbour: 17,9 ${edge}`, neighbour(17, 9, edge), want);
+  }
+
+  // Stepping out and back must return home on BOTH parities, which is the only
+  // check that actually exercises the odd-q asymmetry in both directions.
+  let backFail = 0;
+  for (let col = -3; col <= 20; col++) {
+    for (let row = -3; row <= 20; row++) {
+      for (const edge of EDGES) {
+        const n = neighbour(col, row, edge);
+        const back = neighbour(n[0], n[1], OPPOSITE_EDGE[edge]);
+        if (back[0] !== col || back[1] !== row) backFail++;
+        if (edgeBetween(col, row, n[0], n[1]) !== edge) backFail++;
+      }
+    }
+  }
+  eq('neighbour: out-and-back is identity on both parities', backFail, 0);
+  eq('edgeBetween: non-adjacent is null', edgeBetween(16, 10, 19, 10), null);
+
+  eq('hexDistance: self is 0', hexDistance(16, 10, 16, 10), 0);
+  eq('hexDistance: NE neighbour is 1', hexDistance(16, 10, 17, 9), 1);
+  eq('hexDistance: two columns over', hexDistance(16, 10, 18, 10), 2);
+  eq('hexesWithin: radius 1 is 7 hexes', hexesWithin(16, 10, 1).length, 7);
+  eq('hexesWithin: radius 2 is 19 hexes', hexesWithin(16, 10, 2).length, 19);
+  eq('hexesWithin: centre first', hexesWithin(16, 10, 2)[0], { col: 16, row: 10, distance: 0 });
+
+  // Token position. Local grid (200,60) at 32 px per grid unit, 5 ft per unit,
+  // padding 0 — the worked example against hex_16_10's stored origin.
+  const anchor = { worldOriginFt: STAMP_16_10.worldOriginFt, sceneX: 0, sceneY: 0,
+                   gridSize: 32, gridDistance: 5 };
+  const wf = worldFtFromPixels(anchor, 200 * 32, 60 * 32);
+  near('token: world x', wf[0], 15360);
+  near('token: world y', wf[1], 10651.92);
+  eq('token: resolves to its own hex', hexFromWorldFt(wf[0], wf[1]), [16, 10]);
+  const off = offsetFromCentre(wf, 16, 10);
+  near('token: 360 ft east of centre', off[0], 360);
+  near('token: 260 ft north of centre', off[1], -260, 0.01);
+  const ne = nearestEdge(off[0], off[1]);
+  eq('token: heading for the NE crossing', ne.edge, 'NE');
+  near('token: 77.8 ft from that crossing', ne.distanceFt, 77.85, 0.05);
+  eq('token: NE crossing leads to hex_17_9',
+     neighbour(16, 10, ne.edge), EXITS_16_10.NE);
+
+  // At dead centre every edge is one apothem away.
+  near('nearestEdge: centre is one apothem from the border',
+       nearestEdge(0, 0).distanceFt, hexApothemFt(), 0.001);
+
+  // A missing anchor must return null, not a plausible coordinate. An off-lattice
+  // map (no world_origin_ft) is the live case, and a silent 0 would put every
+  // such scene at the top-left corner of the continent.
+  eq('worldFtFromPixels: no origin returns null',
+     worldFtFromPixels({ ...anchor, worldOriginFt: null }, 0, 0), null);
+  eq('verifyStampOrigin: no origin returns null',
+     verifyStampOrigin({ hex: [16, 10], worldOriginFt: null }, CANVAS), null);
 }
 
 if (failures) { console.error(`\n${failures} FAILURES`); process.exit(1); }

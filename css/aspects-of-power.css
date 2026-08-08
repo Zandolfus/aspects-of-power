@@ -2460,3 +2460,80 @@ body.aop-targeting #board canvas {
 
 .aop-cal-controls { display: flex; flex-wrap: wrap; gap: 4px; }
 .aop-cal-controls button { flex: 1 1 auto; white-space: nowrap; }
+
+/* ── Overworld panel ──────────────────────────────────────────────────────
+   THREE FACTS, THREE VISUAL CHANNELS. Exploration, knowledge and availability
+   are independent, so they get independent encodings and never collapse into
+   one "unexplored" grey:
+
+     fill    = explored     the party has stood there
+     outline = known of     they know it is there
+     badge   = available    a scene exists (GM ONLY — showing this to players
+                            leaks which parts of the world have been authored)
+
+   Colours are deliberately not the calendar's amber: this panel is read at a
+   glance beside it and the two should not be confusable. */
+.aop-overworld .aop-ow { display: flex; flex-direction: column; gap: 10px; }
+
+.aop-ow-none { margin: 0; font-style: italic; opacity: 0.7; }
+.aop-ow-bearing { margin: 0; font-size: 1.1em; font-weight: 600; }
+.aop-ow-beyond { margin: 2px 0 0; opacity: 0.8; font-style: italic; }
+.aop-ow-warn { margin: 4px 0 0; color: #e0a33a; }
+
+.aop-ow-map { position: relative; display: flex; justify-content: center; padding: 4px 0; }
+.aop-ow-map svg { width: 100%; max-width: 320px; height: auto; overflow: visible; }
+
+/* Base cell: nothing known. Faint enough to read as "map continues" rather
+   than as a place the party has failed to find. */
+.aop-ow-cell polygon {
+  fill: rgba(255, 255, 255, 0.03);
+  stroke: rgba(255, 255, 255, 0.10);
+  stroke-width: 1;
+}
+.aop-ow-known polygon {
+  fill: rgba(120, 170, 210, 0.10);
+  stroke: rgba(140, 190, 230, 0.55);
+  stroke-dasharray: 3 2;
+}
+.aop-ow-explored polygon {
+  fill: rgba(120, 170, 210, 0.30);
+  stroke: rgba(160, 205, 240, 0.85);
+  stroke-dasharray: none;
+}
+.aop-ow-cell.is-current polygon {
+  stroke: #f0c060;
+  stroke-width: 2.5;
+  stroke-dasharray: none;
+}
+.aop-ow-cell[data-action] { cursor: pointer; }
+.aop-ow-cell[data-action]:hover polygon { fill: rgba(240, 192, 96, 0.22); }
+
+.aop-ow-pin { fill: #f0c060; }
+/* Availability sits INSIDE the cell as a small mark, so it reads as an
+   annotation on the hex rather than as a change of the hex's own state. */
+.aop-ow-badge { fill: rgba(160, 205, 240, 0.75); }
+.aop-ow-stale {
+  fill: #e0533a; font-size: 11px; font-weight: 700;
+  text-anchor: middle; dominant-baseline: central;
+}
+
+.aop-ow-widen {
+  position: absolute; right: 0; bottom: 0;
+  width: auto; padding: 1px 8px; font-size: 0.8em; line-height: 1.6; flex: 0 0 auto;
+}
+
+.aop-ow-gm { border-top: 1px solid rgba(255, 255, 255, 0.12); padding-top: 6px; }
+.aop-ow-gm h4 { margin: 0 0 4px; font-size: 0.8em; letter-spacing: 0.08em;
+  text-transform: uppercase; opacity: 0.6; }
+.aop-ow-gm dl {
+  display: grid; grid-template-columns: 5.5em 1fr;
+  gap: 2px 8px; margin: 0; font-size: 0.9em;
+}
+.aop-ow-gm dt { opacity: 0.6; }
+.aop-ow-gm dd { margin: 0; font-variant-numeric: tabular-nums; }
+.aop-ow-flag {
+  margin-left: 6px; padding: 0 5px; border-radius: 3px; font-size: 0.85em;
+  background: rgba(224, 83, 58, 0.18); border: 1px solid rgba(224, 83, 58, 0.45);
+  font-variant-numeric: normal;
+}
+.aop-ow-hint { margin: 6px 0 0; font-size: 0.85em; font-style: italic; opacity: 0.6; }

@@ -1,0 +1,69 @@
+{{!-- Overworld panel. Players see region + bearing; GMs also see the lattice. --}}
+<div class="aop-ow">
+
+  {{#if unplaced}}
+    <p class="aop-ow-none">{{reason}} Nothing to place on the overworld.</p>
+  {{else}}
+
+    <div class="aop-ow-where">
+      {{#if placed}}
+        <p class="aop-ow-bearing">{{bearing}}</p>
+        <p class="aop-ow-beyond">{{beyond}}</p>
+      {{else if offLattice}}
+        <p class="aop-ow-bearing">{{region}}</p>
+        <p class="aop-ow-warn">This map is off-lattice: it carries no world origin,
+          so it cannot be placed relative to anything else.</p>
+      {{/if}}
+    </div>
+
+    {{#if svg}}
+      <div class="aop-ow-map">
+        <svg viewBox="{{svg.viewBox}}" role="img" aria-label="Local overworld hexes">
+          {{#each svg.cells}}
+            <g class="aop-ow-cell aop-ow-{{state}}{{#if isCurrent}} is-current{{/if}}"
+               {{#if sceneId}}data-action="viewHex" data-scene-id="{{sceneId}}"{{/if}}>
+              <polygon points="{{points}}" />
+              {{#if isCurrent}}<circle cx="{{x}}" cy="{{y}}" r="4" class="aop-ow-pin" />{{/if}}
+              {{#if showBadge}}<circle cx="{{x}}" cy="{{y}}" r="2.5" class="aop-ow-badge" />{{/if}}
+              {{#if showStale}}<text x="{{x}}" y="{{y}}" class="aop-ow-stale">!</text>{{/if}}
+            </g>
+          {{/each}}
+        </svg>
+        <button type="button" class="aop-ow-widen" data-action="widen">
+          Range {{radius}}
+        </button>
+      </div>
+    {{/if}}
+
+    {{#if isGM}}
+      <div class="aop-ow-gm">
+        <h4>GM</h4>
+        <dl>
+          <dt>Area</dt><dd>{{areaId}}{{#if hexLabel}} &middot; hex {{hexLabel}}{{/if}}</dd>
+          {{#if gm}}
+            <dt>World</dt><dd>{{gm.worldFt}} ft ({{gm.offset}} from centre)</dd>
+            <dt>Crossing</dt>
+            <dd>{{gm.crossing}} &middot; {{gm.crossingFt}} ft
+              {{#if gm.towardId}}&rarr; {{gm.towardId}}{{/if}}
+              {{#unless gm.towardBuilt}}<span class="aop-ow-flag">not built</span>{{/unless}}
+            </dd>
+            {{#if gm.outsideOwnHex}}
+              <dt>Note</dt>
+              <dd class="aop-ow-flag">Token is in the bleed margin, past this hex's border.</dd>
+            {{/if}}
+            <dt>Build</dt>
+            <dd>
+              {{#if gm.build}}{{gm.build}}{{else}}<span class="aop-ow-flag">no x_build</span>{{/if}}
+              {{#if gm.driftFt}} &middot; drift {{gm.driftFt}} ft{{/if}}
+              {{#if gm.stale}}<span class="aop-ow-flag">STALE BUILD</span>{{/if}}
+            </dd>
+          {{/if}}
+        </dl>
+        {{#unless hasToken}}
+          <p class="aop-ow-hint">No token selected — showing the centre of the map.</p>
+        {{/unless}}
+      </div>
+    {{/if}}
+
+  {{/if}}
+</div>
