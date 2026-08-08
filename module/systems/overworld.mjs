@@ -306,6 +306,97 @@ export function rosette(col, row, radius = 1, { gm = false } = {}) {
 /* Registration                                                        */
 /* ------------------------------------------------------------------ */
 
+/* ------------------------------------------------------------------ */
+/* Travel gate                                                         */
+/* ------------------------------------------------------------------ */
+
+const COMPASS = {
+  N: 'north', NE: 'north-east', SE: 'south-east',
+  S: 'south', SW: 'south-west', NW: 'north-west',
+};
+
+/**
+ * The exit region containing a point, or null.
+ *
+ * ⚠⚠ ELEVATION IS REQUIRED. `region.testPoint({x, y})` returns **false** for a
+ * point plainly inside the region — it needs `{x, y, elevation}`. Verified live
+ * 2026-08-08 with a positive control: the centroid of an exit quad tested false
+ * without elevation and true with it. Omitting it would not error; the gate
+ * would simply never fire, and a safety feature that never fires looks exactly
+ * like one nobody switched on.
+ */
+export function exitRegionAt(scene, x, y, elevation = 0) {
+  for (const region of scene?.regions ?? []) {
+    if (region.flags?.[UVTT_SCOPE]?.kind !== 'exit') continue;
+    if (region.testPoint({ x, y, elevation })) return region;
+  }
+  return null;
+}
+
+/** The started combat this token is a combatant in, or null. */
+export function combatHolding(tokenDoc) {
+  if (CONFIG.ASPECTSOFPOWER?.overworld?.blockExitDuringCombat === false) return null;
+  for (const c of game.combats ?? []) {
+    if (!c.started) continue;
+    if (c.combatants.some(cb => cb.tokenId === tokenDoc.id && cb.sceneId === tokenDoc.parent?.id)) return c;
+  }
+  return null;
+}
+
+/**
+ * A GM stopped by the gate is offered the move deliberately, since a GM does
+ * sometimes need to walk someone out mid-fight. Re-issued with the bypass flag
+ * so the gate lets it through the second time — the same cancel-then-reissue
+ * shape the no-stack movement clamp uses.
+ */
+async function offerCombatExit(tokenDoc, changes, edge) {
+  const dir = COMPASS[edge] ?? edge;
+  const ok = await foundry.applications.api.DialogV2.confirm({
+    window: { title: 'Leave the area during combat?' },
+    content: `<p><strong>${tokenDoc.name}</strong> is in combat. Moving onto the ${dir} `
+      + `edge will travel out of this area and off this scene.</p>`,
+    modal: true,
+    rejectClose: false,
+  });
+  if (!ok) return;
+  await tokenDoc.update(
+    { x: changes.x ?? tokenDoc.x, y: changes.y ?? tokenDoc.y },
+    { aopAllowCombatExit: true }
+  );
+}
+
+/**
+ * Stop a combatant wandering off the map.
+ *
+ * The CONFIRMATION on ordinary travel is core's (`teleportToken.choice`), shown
+ * to whoever moved the token. This adds the one thing core has no concept of:
+ * during a started combat, crossing an edge is almost always an accident.
+ *
+ * Runs on the client issuing the move, so the warning lands on the right screen.
+ */
+export function onPreUpdateTokenForTravel(tokenDoc, changes, options) {
+  if (!('x' in changes) && !('y' in changes)) return;
+  if (options?.aopAllowCombatExit) return;
+  const scene = tokenDoc.parent;
+  if (!areaStampFor(scene)) return;
+  if (!combatHolding(tokenDoc)) return;
+
+  const gs = scene.grid?.size ?? 100;
+  const x = (changes.x ?? tokenDoc.x) + ((tokenDoc.width ?? 1) * gs) / 2;
+  const y = (changes.y ?? tokenDoc.y) + ((tokenDoc.height ?? 1) * gs) / 2;
+  const region = exitRegionAt(scene, x, y, tokenDoc.elevation ?? 0);
+  if (!region) return;
+
+  const edge = region.flags?.[UVTT_SCOPE]?.edge ?? '';
+  if (game.user.isGM) offerCombatExit(tokenDoc, changes, edge);
+  else ui.notifications.warn(`${tokenDoc.name} cannot leave the area during combat.`);
+  return false;
+}
+
+/* ------------------------------------------------------------------ */
+/* Registration                                                        */
+/* ------------------------------------------------------------------ */
+
 export function registerOverworldSettings() {
   const reg = (key, name) => game.settings.register(SYS, key, {
     name, scope: 'world', config: false, type: Array, default: [],
@@ -317,4 +408,5 @@ export function registerOverworldSettings() {
 export function registerOverworldHooks() {
   Hooks.on('canvasReady', () => { syncExploration(canvas?.scene); });
   Hooks.on('createToken', (doc) => { syncExploration(doc?.parent); });
+  Hooks.on('preUpdateToken', onPreUpdateTokenForTravel);
 }

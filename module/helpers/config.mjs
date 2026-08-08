@@ -2877,6 +2877,19 @@ ASPECTSOFPOWER.levelTypes = {
  * proficiency penalty is scoped: own a proficiency and you opt in. That keeps
  * the 184 weaponless bestiary actors exactly as they are.
  */
+/**
+ * Overworld travel between hex areas.
+ *
+ * The confirmation prompt itself is CORE — `teleportToken.choice` asks the user
+ * who moved the token. What core has no concept of is combat, so the only thing
+ * configured here is the combat gate.
+ */
+ASPECTSOFPOWER.overworld = {
+  // Block a token that is in a STARTED combat from moving into an exit region.
+  // A GM gets a confirm instead of a hard stop; players are stopped outright.
+  blockExitDuringCombat: true,
+};
+
 ASPECTSOFPOWER.unarmedGrant = {
   enabled: true,
   // Ordered: primary, secondary, tertiary.
