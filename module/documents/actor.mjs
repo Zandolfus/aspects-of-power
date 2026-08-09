@@ -541,9 +541,16 @@ export class AspectsofPowerActor extends Actor {
     // skipped entirely and every change is summed by hand here. An AE targeting
     // a field nobody reads through `effectBonus` applies to NOTHING, silently,
     // while looking perfectly well-formed on the sheet.
-    systemData.meditation.fraction = Math.max(0,
-      (CONFIG.ASPECTSOFPOWER.meditation?.baseFraction ?? 0.10)
-      + effectBonus('system.meditation.fraction'));
+    // ⚠ CHARACTERS ONLY. `meditation` is on CharacterData and NOT on NpcData,
+    // so touching it unguarded THROWS during data preparation for every npc —
+    // which aborts the whole prepare for that actor, not just this line. Two
+    // npc actors in this world spent weeks failing to prepare because of it,
+    // visible only in the console at world load.
+    if (systemData.meditation) {
+      systemData.meditation.fraction = Math.max(0,
+        (CONFIG.ASPECTSOFPOWER.meditation?.baseFraction ?? 0.10)
+        + effectBonus('system.meditation.fraction'));
+    }
 
     // Block DR — the held weapon contributes passive flat mitigation
     // (active defense, design-active-defense.md): the str archetype's
