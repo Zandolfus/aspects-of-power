@@ -1,5 +1,5 @@
 {{!-- Overworld panel. Players see region + bearing; GMs also see the lattice. --}}
-<div class="aop-ow">
+<div class="aop-ow" data-hex-key="{{hexKey}}">
 
   {{#if unplaced}}
     <p class="aop-ow-none">{{reason}} Nothing to place on the overworld.</p>
@@ -23,11 +23,13 @@
             <g class="aop-ow-cell aop-ow-{{state}}{{#if isCurrent}} is-current{{/if}}"
                {{#if sceneId}}data-action="viewHex" data-scene-id="{{sceneId}}"{{/if}}>
               <polygon points="{{points}}" />
+              {{#if fillStyle}}<polygon points="{{points}}" class="aop-ow-tint" style="{{fillStyle}}" />{{/if}}
               {{#if showBadge}}<circle cx="{{x}}" cy="{{y}}" r="7" class="aop-ow-badge" />{{/if}}
               {{#if isCurrent}}<circle cx="{{x}}" cy="{{y}}" r="3.5" class="aop-ow-pin" />{{/if}}
               {{#if coord}}<text x="{{x}}" y="{{labelY}}" class="aop-ow-coord">{{coord}}</text>{{/if}}
               {{#if placeName}}<text x="{{x}}" y="{{labelY}}" class="aop-ow-place">{{placeName}}</text>{{/if}}
               {{#if showStale}}<text x="{{x}}" y="{{y}}" class="aop-ow-stale">!</text>{{/if}}
+              {{#if noteCount}}<text x="{{x}}" y="{{noteTagY}}" class="aop-ow-noteflag">&#9998;{{noteCount}}</text>{{/if}}
             </g>
           {{/each}}
         </svg>
@@ -36,6 +38,31 @@
         </button>
       </div>
     {{/if}}
+
+    <div class="aop-ow-notes">
+      <h4>Notes on this place</h4>
+      {{#if notes.length}}
+        <ul>
+          {{#each notes}}
+            <li class="{{#if mine}}is-mine{{/if}}">
+              <span class="aop-ow-note-text">{{text}}</span>
+              <span class="aop-ow-note-by">{{userName}}{{#if when}} &middot; {{when}}{{/if}}</span>
+              {{#if canDelete}}
+                <button type="button" class="aop-ow-note-del" data-action="deleteNote"
+                        data-note-id="{{id}}" aria-label="Delete note">&times;</button>
+              {{/if}}
+            </li>
+          {{/each}}
+        </ul>
+      {{else}}
+        <p class="aop-ow-hint">Nothing recorded here yet.</p>
+      {{/if}}
+      <div class="aop-ow-note-add">
+        <input type="text" class="aop-ow-note-input" maxlength="500"
+               placeholder="Add a note about this place" />
+        <button type="button" data-action="addNote">Add</button>
+      </div>
+    </div>
 
     {{#if isGM}}
       <div class="aop-ow-gm">

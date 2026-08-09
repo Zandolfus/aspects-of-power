@@ -16,7 +16,7 @@
 
 import {
   areaStampFor, buildStampFor, locate, locateToken, rosette, availableHexes,
-  exploredHexes, hexKey,
+  exploredHexes, hexKey, ensureTints, notesFor, submitNote,
 } from '../systems/overworld.mjs';
 import { hexCentreWorld, hexApothemFt, HEX_SIZE_FT } from '../helpers/hexgrid.mjs';
 
@@ -39,6 +39,8 @@ export class OverworldPanel extends HandlebarsApplicationMixin(ApplicationV2) {
     actions: {
       viewHex: OverworldPanel._onViewHex,
       widen: OverworldPanel._onWiden,
+      addNote: OverworldPanel._onAddNote,
+      deleteNote: OverworldPanel._onDeleteNote,
     },
   };
 
@@ -156,6 +158,25 @@ export class OverworldPanel extends HandlebarsApplicationMixin(ApplicationV2) {
     }
 
     ctx.svg = this._rosetteSvg(stamp.hex, isGM);
+
+    /* Notes for where you are standing. Everyone at the table sees the same
+       list -- it is the party's shared map, not a private journal. */
+    const key = stamp.hex ? hexKey(stamp.hex[0], stamp.hex[1]) : null;
+    ctx.hexKey = key;
+    ctx.notes = key ? notesFor(key).map(n => ({
+      ...n,
+      mine: n.userId === game.user.id,
+      canDelete: isGM || n.userId === game.user.id,
+      when: n.time != null ? OverworldPanel._stamp(n.time) : '',
+    })) : [];
+
+    /* Sampling a thumbnail is async, so the panel never waits on it: render
+       with whatever is cached, warm the rest, and refresh ONCE if anything
+       new was computed. Without the changed-check this loops forever. */
+    if (isGM && ctx.svg?.cells?.length) {
+      const keys = ctx.svg.cells.map(c => c.key);
+      ensureTints(keys).then(changed => { if (changed) OverworldPanel.refresh(); });
+    }
     return ctx;
   }
 
@@ -192,12 +213,17 @@ export class OverworldPanel extends HandlebarsApplicationMixin(ApplicationV2) {
         x, y,
         points: verts.map(([vx, vy]) => `${(x + vx).toFixed(1)},${(y + vy).toFixed(1)}`).join(' '),
         state,
+        /* The tint is the terrain speaking; the state fill stays as the
+           knowledge channel. Explored cells show it strongly, a GM previewing
+           unexplored country sees it faintly so the two never look alike. */
+        fillStyle: c.tint ? `fill:${c.tint};fill-opacity:${c.explored ? 0.72 : 0.3}` : '',
         /* A cell with no writing on it is unreadable as a map. The GM always
            gets coordinates; a player gets the region name only where they have
            actually been, since the name is itself knowledge. */
         coord: isGM ? `${c.col},${c.row}` : null,
         placeName: !isGM && c.explored ? c.label : null,
         labelY: y + CELL_R * 0.52,
+        noteTagY: y - CELL_R * 0.46,
         /* An unbuilt destination is the GM's normal working state, so the mark
            has to be legible at a glance rather than a dot you go looking for. */
         showBadge: isGM && c.available === true && !c.explored,
@@ -216,6 +242,37 @@ export class OverworldPanel extends HandlebarsApplicationMixin(ApplicationV2) {
   }
 
   /* ---------------------------------------------------------------- */
+
+  /** Short absolute date for a note, from the world clock. */
+  static _stamp(worldTime) {
+    try {
+      const d = game.aspectsofpower?.calendar?.civilDate?.(worldTime);
+      if (d) return `${d.day} ${d.monthName ?? ''} ${d.year}`.trim();
+    } catch (e) { /* calendar optional */ }
+    return '';
+  }
+
+  static async _onAddNote(event, target) {
+    const root = target.closest('.aop-ow');
+    const input = root?.querySelector('.aop-ow-note-input');
+    const text = (input?.value ?? '').trim();
+    if (!text) return;
+    const key = root?.dataset.hexKey;
+    if (!key) return;
+    input.value = '';
+    await submitNote({ op: 'add', hex: key, text });
+    /* The GM writes and the setting broadcasts; give the round trip a beat
+       before re-reading, since a player's write is not local. */
+    setTimeout(() => OverworldPanel.refresh(), 400);
+  }
+
+  static async _onDeleteNote(event, target) {
+    const key = target.closest('.aop-ow')?.dataset.hexKey;
+    const noteId = target.dataset.noteId;
+    if (!key || !noteId) return;
+    await submitNote({ op: 'remove', hex: key, noteId });
+    setTimeout(() => OverworldPanel.refresh(), 400);
+  }
 
   static async _onViewHex(event, target) {
     if (!game.user.isGM) return;
@@ -250,6 +307,11 @@ export function registerOverworldPanel() {
   });
 
   Hooks.on('canvasReady', () => OverworldPanel.refresh());
+  /* World settings broadcast to every client, so a note added by one player
+     appears for the rest without anyone reopening the panel. */
+  Hooks.on('updateSetting', (setting) => {
+    if (String(setting?.key ?? '').includes('overworld')) OverworldPanel.refresh();
+  });
   Hooks.on('controlToken', () => OverworldPanel.refresh());
   Hooks.on('updateToken', (doc, changes) => {
     if ('x' in changes || 'y' in changes) OverworldPanel.refresh();

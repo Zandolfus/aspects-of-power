@@ -2554,3 +2554,43 @@ body.aop-targeting #board canvas {
   font-variant-numeric: normal;
 }
 .aop-ow-hint { margin: 6px 0 0; font-size: 0.85em; font-style: italic; opacity: 0.6; }
+
+/* ── Overworld: terrain tint + party notes ────────────────────────────────
+   The tint is a SECOND polygon over the state fill, not a replacement for it.
+   Collapsing them would make "explored" and "what the ground looks like" the
+   same channel again, and the whole point of the three-fact split is that
+   knowledge and terrain are independent. */
+.aop-ow-tint { pointer-events: none; }
+.aop-ow-cell.is-current .aop-ow-tint { fill-opacity: 0.85; }
+
+.aop-ow-noteflag {
+  fill: #f0c060; font-size: 8px; font-weight: 600;
+  text-anchor: middle; dominant-baseline: central; pointer-events: none;
+}
+
+.aop-ow-notes { border-top: 1px solid rgba(255, 255, 255, 0.12); padding-top: 6px; }
+.aop-ow-notes h4 {
+  margin: 0 0 4px; font-size: 0.8em; letter-spacing: 0.08em;
+  text-transform: uppercase; opacity: 0.6;
+}
+.aop-ow-notes ul { list-style: none; margin: 0 0 6px; padding: 0; display: flex;
+  flex-direction: column; gap: 3px; max-height: 150px; overflow-y: auto; }
+.aop-ow-notes li {
+  display: grid; grid-template-columns: 1fr auto; align-items: baseline;
+  gap: 2px 6px; padding: 3px 6px; border-radius: 3px;
+  background: rgba(255, 255, 255, 0.04);
+}
+/* Your own notes are tinted so a shared list is still scannable for "mine". */
+.aop-ow-notes li.is-mine { background: rgba(240, 192, 96, 0.10); }
+.aop-ow-note-text { grid-column: 1; word-break: break-word; }
+.aop-ow-note-by { grid-column: 1; font-size: 0.8em; opacity: 0.55; }
+.aop-ow-note-del {
+  grid-column: 2; grid-row: 1 / span 2; width: auto; flex: 0 0 auto;
+  padding: 0 6px; line-height: 1.4; background: none; border: none;
+  opacity: 0.4; cursor: pointer; font-size: 1.1em;
+}
+.aop-ow-note-del:hover { opacity: 1; color: #e0533a; }
+
+.aop-ow-note-add { display: flex; gap: 4px; }
+.aop-ow-note-add input { flex: 1 1 auto; min-width: 0; }
+.aop-ow-note-add button { flex: 0 0 auto; width: auto; padding: 0 10px; }

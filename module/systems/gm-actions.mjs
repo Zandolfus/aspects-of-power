@@ -18,6 +18,16 @@ export async function executeGmAction(payload) {
     const msgWhisper = payload.whisperGM ? { whisper: payload.whisperGM } : {};
     switch (payload.type) {
 
+      case 'gmOverworldNote': {
+        // Party notes on the overworld. Players cannot write world settings,
+        // so their add/remove arrives here over the socket. The ownership rule
+        // (a player may delete only their own note) is enforced GM-side --
+        // enforcing it on the requester's client would be advisory only.
+        const { applyNoteAction } = await import('./overworld.mjs');
+        await applyNoteAction(payload);
+        break;
+      }
+
       case 'gmCreateAoeRegion': {
         // Companion to the player-side _gmCreateRegion helper. Creates the
         // requested Region on the named scene and emits the new region's UUID

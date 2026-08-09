@@ -283,11 +283,18 @@ export function rosette(col, row, radius = 1, { gm = false } = {}) {
     const isExplored = explored.has(key);
     const isKnown = isExplored || known.has(key);
     const [wx, wy] = hexCentreWorld(c, r);
+    /* ⚠ THE TINT IS TERRAIN INFORMATION. Showing it on a hex the party has
+       never visited would leak what the country looks like ahead of them —
+       the same leak the availability ring is GM-gated for. Explored only,
+       unless the viewer is the GM. */
+    const tint = (gm || isExplored) ? tintFor(key) : null;
     return {
       col: c, row: r, key, distance,
       isCurrent: c === col && r === row,
       explored: isExplored,
       known: isKnown,
+      tint,
+      noteCount: (isKnown || gm) ? notesFor(key).length : 0,
       /* Availability is GM-only. Handing it to players would leak which parts
          of the world have been authored. */
       available: gm ? !!a : null,
@@ -305,6 +312,171 @@ export function rosette(col, row, radius = 1, { gm = false } = {}) {
 /* ------------------------------------------------------------------ */
 /* Registration                                                        */
 /* ------------------------------------------------------------------ */
+
+/* ------------------------------------------------------------------ */
+/* Map tint — the predominant colour of each hex                       */
+/* ------------------------------------------------------------------ */
+
+export const SETTING_TINTS = 'overworldTints';
+
+/**
+ * ⚠ SAMPLE THE THUMBNAIL, NOT THE BACKGROUND. `scene.thumb` is a small data
+ * URI Foundry already generated at import; the background is an 8192x7168 PNG.
+ * Decoding 128 of those would exhaust the same canvas allocator that killed the
+ * bulk import at map 68.
+ *
+ * One reusable canvas for the same reason — a fresh one per hex is 128
+ * allocations for no benefit.
+ */
+let _tintCanvas = null;
+
+/**
+ * The predominant colour of an image, as #rrggbb.
+ *
+ * A plain average of a forest map returns mud: greens and browns cancel toward
+ * grey. This buckets colours coarsely (5 bits per channel), takes the most
+ * POPULOUS bucket, then averages only within it — so the answer is a colour
+ * actually present in the image rather than the midpoint of all of them.
+ * Near-transparent and near-black pixels are skipped as background.
+ */
+export async function dominantColour(src, sample = 64) {
+  if (!src) return null;
+  const img = await new Promise((res, rej) => {
+    const i = new Image();
+    i.onload = () => res(i);
+    i.onerror = () => rej(new Error('thumb load failed'));
+    i.src = src;
+  }).catch(() => null);
+  if (!img) return null;
+
+  _tintCanvas ??= document.createElement('canvas');
+  const w = _tintCanvas.width = sample;
+  const h = _tintCanvas.height = Math.max(1, Math.round(sample * (img.height / img.width || 1)));
+  const ctx = _tintCanvas.getContext('2d', { willReadFrequently: true });
+  ctx.clearRect(0, 0, w, h);
+  ctx.drawImage(img, 0, 0, w, h);
+
+  let data;
+  try { data = ctx.getImageData(0, 0, w, h).data; } catch (e) { return null; }
+
+  const buckets = new Map();
+  for (let i = 0; i < data.length; i += 4) {
+    const a = data[i + 3];
+    if (a < 128) continue;
+    const r = data[i], g = data[i + 1], b = data[i + 2];
+    if (r + g + b < 24) continue;                    // near-black padding
+    const key = ((r >> 3) << 10) | ((g >> 3) << 5) | (b >> 3);
+    let e = buckets.get(key);
+    if (!e) buckets.set(key, e = { n: 0, r: 0, g: 0, b: 0 });
+    e.n++; e.r += r; e.g += g; e.b += b;
+  }
+  if (!buckets.size) return null;
+  let best = null;
+  for (const e of buckets.values()) if (!best || e.n > best.n) best = e;
+  const hex = (v) => Math.round(v / best.n).toString(16).padStart(2, '0');
+  return `#${hex(best.r)}${hex(best.g)}${hex(best.b)}`;
+}
+
+const readTints = () => {
+  try { return game.settings.get(SYS, SETTING_TINTS) ?? {}; } catch (e) { return {}; }
+};
+
+/** Cached tint for a hex, or null. Stored with the build it was sampled from. */
+export function tintFor(key) {
+  return readTints()[key]?.c ?? null;
+}
+
+/**
+ * Compute and cache any missing or stale tints for the given hexes.
+ *
+ * Keyed by hex but stamped with the BUILD it was sampled from, so replacing a
+ * map re-samples instead of showing the old terrain's colour forever.
+ * GM-only, because it writes a world setting.
+ */
+export async function ensureTints(keys) {
+  if (!isActingGM()) return false;
+  const avail = availableHexes();
+  const tints = { ...readTints() };
+  let changed = false;
+  for (const key of keys) {
+    const entry = avail.get(key);
+    if (!entry) continue;
+    const build = entry.build?.image_id ?? null;
+    if (tints[key] && tints[key].b === build) continue;
+    const scene = game.scenes.get(entry.sceneId);
+    const colour = await dominantColour(scene?.thumb ?? null);
+    if (!colour) continue;
+    tints[key] = { c: colour, b: build };
+    changed = true;
+  }
+  if (changed) await game.settings.set(SYS, SETTING_TINTS, tints);
+  return changed;
+}
+
+/* ------------------------------------------------------------------ */
+/* Party notes                                                         */
+/* ------------------------------------------------------------------ */
+
+export const SETTING_NOTES = 'overworldNotes';
+
+export function notesFor(key) {
+  try { return (game.settings.get(SYS, SETTING_NOTES) ?? {})[key] ?? []; }
+  catch (e) { return []; }
+}
+
+export function allNotes() {
+  try { return game.settings.get(SYS, SETTING_NOTES) ?? {}; } catch (e) { return {}; }
+}
+
+/**
+ * Add or remove a note.
+ *
+ * ⚠ PLAYERS CANNOT WRITE WORLD SETTINGS. A player's request is routed to the
+ * acting GM over the system socket, exactly like every other player-initiated
+ * mutation here. Writing directly from a player client fails silently enough to
+ * look like the note simply did not save.
+ */
+export async function submitNote(payload) {
+  const msg = { type: 'gmOverworldNote', ...payload, userId: game.user.id, userName: game.user.name };
+  if (game.user.isGM) {
+    const { AspectsofPowerItem } = await import('../documents/item.mjs');
+    await AspectsofPowerItem.executeGmAction(msg);
+  } else {
+    game.socket.emit('system.aspects-of-power', msg);
+  }
+}
+
+/** Applied GM-side. Returns true when the stored notes changed. */
+export async function applyNoteAction(payload) {
+  if (!isActingGM()) return false;
+  const all = { ...allNotes() };
+  const key = payload.hex;
+  if (!key) return false;
+  const list = [...(all[key] ?? [])];
+
+  if (payload.op === 'add') {
+    const text = String(payload.text ?? '').trim().slice(0, 500);
+    if (!text) return false;
+    list.push({
+      id: foundry.utils.randomID(),
+      text,
+      userId: payload.userId ?? null,
+      userName: payload.userName ?? 'Unknown',
+      time: game.time.worldTime,
+    });
+  } else if (payload.op === 'remove') {
+    const note = list.find(n => n.id === payload.noteId);
+    if (!note) return false;
+    /* A player may delete only their own; the GM may delete any. */
+    const requesterIsGM = game.users.get(payload.userId)?.isGM ?? false;
+    if (!requesterIsGM && note.userId !== payload.userId) return false;
+    list.splice(list.indexOf(note), 1);
+  } else return false;
+
+  if (list.length) all[key] = list; else delete all[key];
+  await game.settings.set(SYS, SETTING_NOTES, all);
+  return true;
+}
 
 /* ------------------------------------------------------------------ */
 /* Travel gate                                                         */
@@ -403,6 +575,12 @@ export function registerOverworldSettings() {
   });
   reg(SETTING_EXPLORED, 'Overworld hexes the party has explored');
   reg(SETTING_KNOWN, 'Overworld hexes the party knows of');
+  game.settings.register(SYS, SETTING_TINTS, {
+    name: 'Overworld hex tints', scope: 'world', config: false, type: Object, default: {},
+  });
+  game.settings.register(SYS, SETTING_NOTES, {
+    name: 'Overworld party notes', scope: 'world', config: false, type: Object, default: {},
+  });
 }
 
 export function registerOverworldHooks() {
