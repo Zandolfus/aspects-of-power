@@ -1749,6 +1749,52 @@ eq('junk situational entries are skipped, not NaN',
      verifyStampOrigin({ hex: [16, 10], worldOriginFt: null }, CANVAS), null);
 }
 
+// ── Movement path + realtime clock (v14 planned-movement rework 2026-08-09) ──
+{
+  const { buildCheckpointPath, celerityAnimationSpeed, effectiveClockTick } =
+    await import('../module/helpers/movement-path.mjs');
+
+  // A 300px straight east move on a 64px spacing: ceil(300/64)=5 segments of
+  // 60px each — every waypoint a checkpoint, last one exactly the destination.
+  const p = buildCheckpointPath({ x: 1000, y: 500 }, { x: 1300, y: 500 }, 64);
+  eq('checkpointPath: 300px/64 spacing -> 5 waypoints', p.length, 5);
+  eq('checkpointPath: first at 1060', p[0], { x: 1060, y: 500, checkpoint: true });
+  eq('checkpointPath: last is exactly the destination', p[4], { x: 1300, y: 500, checkpoint: true });
+  // Even spacing: no segment exceeds the requested spacing.
+  {
+    let prev = { x: 1000, y: 500 }, maxSeg = 0;
+    for (const w of p) { maxSeg = Math.max(maxSeg, Math.hypot(w.x - prev.x, w.y - prev.y)); prev = w; }
+    eq('checkpointPath: no segment exceeds spacing', maxSeg <= 64, true);
+  }
+  // Zero-length declares still produce a single destination checkpoint.
+  eq('checkpointPath: zero distance -> single dest waypoint',
+     buildCheckpointPath({ x: 5, y: 5 }, { x: 5, y: 5 }, 64),
+     [{ x: 5, y: 5, checkpoint: true }]);
+  // Diagonal path lands exactly on the destination despite rounding.
+  const d = buildCheckpointPath({ x: 0, y: 0 }, { x: 101, y: 67 }, 32);
+  eq('checkpointPath: diagonal ends on destination', d[d.length - 1], { x: 101, y: 67, checkpoint: true });
+
+  // Speed coupling: spike-verified live 2026-08-09 — a token overridden to
+  // 1 space/s covered 31px in 1s on a 32px grid. Invariant: distance/wait at
+  // the realtime rate. 320px over 1000 ticks at 0.5 ticks/ms = 2000ms travel
+  // = 160 px/s = 5 spaces/s on a 32px grid.
+  eq('animationSpeed: 320px over 1000 ticks @0.5t/ms on 32px grid',
+     celerityAnimationSpeed(320, 1000, 0.5, 32), 5);
+  eq('animationSpeed: degenerate inputs -> 0', celerityAnimationSpeed(0, 100, 0.5, 32), 0);
+  eq('animationSpeed: floors at 0.05 so glides never stall',
+     celerityAnimationSpeed(1, 1e9, 0.5, 32), 0.05);
+
+  // Continuous clock: stored flag rules at rest; flows while running; commits
+  // are monotonic (never backwards, even with a stale/absurd start time).
+  eq('effectiveClock: not running -> stored', effectiveClockTick(null, 99999, 400), 400);
+  eq('effectiveClock: running 2000ms @0.5t/ms from 400 -> 1400',
+     effectiveClockTick({ running: true, startedAtMs: 10000, clockAtStart: 400, ticksPerMs: 0.5 }, 12000, 400), 1400);
+  eq('effectiveClock: never below stored',
+     effectiveClockTick({ running: true, startedAtMs: 10000, clockAtStart: 0, ticksPerMs: 0.5 }, 10100, 800), 800);
+  eq('effectiveClock: clock skew (now < start) falls back to stored',
+     effectiveClockTick({ running: true, startedAtMs: 20000, clockAtStart: 400, ticksPerMs: 0.5 }, 10000, 400), 400);
+}
+
 if (failures) { console.error(`\n${failures} FAILURES`); process.exit(1); }
 console.log('\nAll pure-function tests pass.');
 
