@@ -188,12 +188,13 @@ async function _onCelAdvance(event, target) {
 
   // Movement-completion branch: the action that drove this advance was a
   // movement, so there's no skill roll to dispatch. The position update +
-  // flag clear above is the entire "fire" step. Returns 'movement' so the
-  // realtime loop KEEPS RUNNING — arrivals are not decision points and must
-  // not stall the world the way an action fire (deliberately) does.
+  // flag clear above is the entire "fire" step. A PLAYER's arrival is a
+  // decision point — pause so they can declare what comes next without the
+  // clock eating their thinking time (user 2026-08-09, the kiting session).
+  // NPC arrivals keep the world running: the AI re-decides instantly.
   if (declared.itemId === MOVEMENT_ITEM_ID) {
     ui.notifications.info(`Clock → ${declared.scheduledTick}. ${c.name} arrives (${declared.label}).`);
-    return 'movement';
+    return c.actor?.hasPlayerOwner ? 'pause' : 'continue';
   }
 
   // Break-free branch: actor declared a manual break-free against a debuff.
@@ -211,7 +212,7 @@ async function _onCelAdvance(event, target) {
     const effect = declared.effectId ? actor?.effects?.get(declared.effectId) : null;
     if (!actor || !effect) {
       ui.notifications.info(`${c.name}: break-free attempt skipped (debuff already gone).`);
-      return 'action';
+      return 'pause';
     }
     ui.notifications.info(`Clock → ${declared.scheduledTick}. ${c.name} fires "${declared.label}".`);
     const isPC = !!actor.hasPlayerOwner;
@@ -220,7 +221,7 @@ async function _onCelAdvance(event, target) {
     } catch (e) {
       console.error('[celerity] break-free dispatch failed:', e);
     }
-    return 'action';
+    return 'pause';
   }
 
   // Skill-action branch (existing flow): clear the firer's flags + dispatch
@@ -247,8 +248,42 @@ async function _onCelAdvance(event, target) {
       speaker: ChatMessage.getSpeaker({ actor: c.actor }),
       content: `<p><em>${c.name}'s queued <strong>${declared.label ?? 'action'}</strong> is cancelled — the skill or item no longer exists.</em></p>`,
     });
-    return 'action';
+    return 'pause';
   }
+  // Reality wins at FIRE time for melee (user 2026-08-09: "John was very
+  // far away from the Boughbreakers but they still hit him"): a swing
+  // declared while the target stood in reach re-measures the moment it
+  // lands. Every declared target out of reach → the swing whiffs — celerity
+  // sunk, no roll, exactly like swinging at where someone used to be.
+  // Ranged/AOE/untargeted skills pass through unchanged (their fire paths
+  // carry their own targeting semantics).
+  {
+    const meleeTypes = ['str_weapon', 'dex_weapon', 'magic_melee'];
+    const targetIdsAtFire = declared.targetIds ?? [];
+    if (meleeTypes.includes(item.system?.roll?.type ?? '') && targetIdsAtFire.length && c.token) {
+      const scene = c.token.parent;
+      const gs = scene?.grid?.size ?? 100;
+      const ftPerPx = (scene?.grid?.distance ?? 5) / gs;
+      const edgeFt = (a, b) => {
+        const dx = Math.max(b.x - (a.x + (a.width ?? 1) * gs), a.x - (b.x + (b.width ?? 1) * gs), 0);
+        const dy = Math.max(b.y - (a.y + (a.height ?? 1) * gs), a.y - (b.y + (b.height ?? 1) * gs), 0);
+        return Math.hypot(dx, dy) * ftPerPx;
+      };
+      const reach = item._resolveSkillReach?.() ?? 5;
+      const anyInReach = targetIdsAtFire.some(tid => {
+        const t = scene?.tokens.get(tid);
+        return t && edgeFt(c.token, t) <= reach + 0.5;
+      });
+      if (!anyInReach) {
+        ChatMessage.create({
+          speaker: ChatMessage.getSpeaker({ actor: c.actor }),
+          content: `<p><em>${c.name}'s <strong>${declared.label}</strong> cuts empty air — the target is out of reach.</em></p>`,
+        });
+        return c.actor?.hasPlayerOwner ? 'pause' : 'continue';
+      }
+    }
+  }
+
   ui.notifications.info(`Clock → ${declared.scheduledTick}. ${c.name} fires "${declared.label}".`);
 
   // Dispatch the deferred roll to the actor's CANONICAL player — the user
@@ -325,7 +360,7 @@ async function _onCelAdvance(event, target) {
   // completes so core's _updateTurnMarkers has finished and our additions
   // aren't clobbered.
   _aopSyncTurnMarkers(combat);
-  return 'action';
+  return 'pause';
 }
 
 /**
@@ -741,17 +776,19 @@ export class CelerityCombatTracker extends ParentTracker {
     this._realtimeTimeoutId = setTimeout(async () => {
       this._realtimeTimeoutId = null;
       if (!this._realtimeRunning) return;
-      let fired = 'action';
+      let fired = 'pause';
       try {
         fired = await _onCelAdvance.call(this);
       } catch (e) { console.error('[TRIAL-REALTIME] advance failed:', e); }
-      // Auto-pause on ACTION fire per user spec — players adjust, GM
-      // resumes. Movement arrivals are not decision points: keep running —
-      // and RESTART the other glides first, because the advance's
-      // jumpMovementsTo may have stopped-and-re-planned any it slid
-      // forward (a re-planned move sits in 'planned' until started; the
-      // stranded mid-path Boughbreaker of 2026-08-09 was exactly this).
-      if (fired === 'movement' && this._realtimeRunning) {
+      // 'pause' = a decision point (any real action fire, or a PLAYER's
+      // arrival/whiff) — stop so players declare without the clock eating
+      // their thinking time. 'continue' = NPC arrivals and NPC whiffs — the
+      // AI re-decides instantly, so the world keeps flowing. On continue,
+      // RESTART the other glides first: the advance's jumpMovementsTo may
+      // have stopped-and-re-planned any it slid forward (a re-planned move
+      // sits in 'planned' until started; the stranded mid-path Boughbreaker
+      // of 2026-08-09 was exactly this).
+      if (fired === 'continue' && this._realtimeRunning) {
         runAllDeclaredMoves(combat);
         this._scheduleNextFire();
       }
