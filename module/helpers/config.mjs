@@ -2001,6 +2001,13 @@ ASPECTSOFPOWER.combatTags = {
   crush:       'ASPECTSOFPOWER.Tag.crush',
   // Concurrency (design-concurrent-actions).
   mobile:      'ASPECTSOFPOWER.Tag.mobile',
+  // Resource riders. `infused` is the MANA rider on a weapon strike (type-2
+  // fusion spellstrike). It has been read by documents/item.mjs since the
+  // spellstriker work but was never registered here, so it could not be
+  // ticked on a sheet -- the only two skills carrying it had it written
+  // straight into system.tags at authoring time. Per the multi-invest ruling
+  // it is one tag PER RESOURCE; the stamina and vitality names are unchosen.
+  infused:     'ASPECTSOFPOWER.Tag.infused',
   // Affinities.
   time:          'ASPECTSOFPOWER.Tag.time',
   karma:         'ASPECTSOFPOWER.Tag.karma',
