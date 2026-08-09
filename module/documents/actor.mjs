@@ -1484,6 +1484,13 @@ export class AspectsofPowerActor extends Actor {
    */
   async _attemptBreakRoll(effect, { whisper = false } = {}) {
     if (!effect) return null;
+    // The effect may already be gone: batched round-starts (a clock advance
+    // crossing several boundaries) roll break attempts back-to-back, and a
+    // success in round N left round N+1 rolling against a deleted document.
+    // The strict delete below then threw "ActiveEffect does not exist" and
+    // ABORTED the rest of onStartTurn — regen, sustains, everything (live
+    // 2026-08-09, Boughbreaker). Nothing to break means nothing to do.
+    if (!this.effects.has(effect.id)) return null;
     const sys = effect.system ?? {};
     const debuffType = sys.debuffType;
     const breakStat = CONFIG.ASPECTSOFPOWER.debuffBreakStats?.[debuffType];

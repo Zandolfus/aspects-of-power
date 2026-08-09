@@ -21,7 +21,7 @@ import { weaponStatBlend, perceiveGateDecision, spellCastWeight } from '../helpe
 import { effectiveClockTick, interpolateMovementPosition } from '../helpers/movement-path.mjs';
 import { heldImplementWeight } from './weapon-styles.mjs';
 import { tickDotsFor } from './dot.mjs';
-import { declarePlannedMove } from './movement.mjs';
+import { declarePlannedMove, stopDeclaredMove } from './movement.mjs';
 
 // Re-export for the existing consumers (overlay, tracker, aura-ticks,
 // engagement-halts) — the implementation moved to helpers/movement-path.mjs
@@ -615,20 +615,29 @@ export async function declareAction(actor, skill, options = {}) {
   if (!combatant) return null;
 
   // ── Concurrency gate (design-concurrent-actions, RULED 2026-07-14) ──
-  // A movement in flight (declaredMovement track) permits skill declares
-  // ONLY when it's a WALK and the skill is `mobile`-tagged (potion, pistol
-  // shot, wand bolt — no count limit; each paces by its own wait). Sprint is
-  // all-out; heavy windups demand a stance.
-  const qm = combatant.flags?.aspectsofpower?.declaredMovement;
+  // A movement in flight (declaredMovement track) COEXISTS with the declare
+  // only when it's a WALK and the skill is `mobile`-tagged (potion, pistol
+  // shot, wand bolt — no count limit; each paces by its own wait). Any other
+  // combination CANCELS the movement and declares — the change-your-mind
+  // rule extended to cross-track (2026-08-09; the old hard refusal plus
+  // `mobile` on zero content froze every walking actor out of acting). The
+  // token holds wherever its glide had reached; the celerity spent is sunk,
+  // no stamina charged, per design.
+  let qm = combatant.flags?.aspectsofpower?.declaredMovement;
   if (qm && qm.itemId) {
     const skillMobile = (skill?.system?.tags ?? []).includes('mobile');
-    if (qm.movementMode !== 'walk') {
-      ui.notifications.warn(`${actor.name} is sprinting — all-out. Cancel the sprint to act.`);
-      return null;
-    }
-    if (!skillMobile) {
-      ui.notifications.warn(`${actor.name} is moving — only mobile actions while walking. Cancel the walk for ${skill.name}.`);
-      return null;
+    const coexists = qm.movementMode === 'walk' && skillMobile;
+    if (!coexists) {
+      if (combatant.token) await stopDeclaredMove(combatant.token);
+      await _safeCombatantUpdate(combatant, {
+        'flags.aspectsofpower.declaredMovement': null,
+        'flags.aspectsofpower.nextActionTick': null,
+      }, { _aopCancelRedeclare: true });
+      ChatMessage.create({
+        speaker: ChatMessage.getSpeaker({ actor }),
+        content: `<p><em>${actor.name} halts mid-move to ready <strong>${skill.name}</strong>.</em></p>`,
+      });
+      qm = null;
     }
   }
 
@@ -1132,21 +1141,33 @@ export async function declareMovement(actor, startPos, endPos, distanceFt, stami
 
   // ── Concurrency gate (design-concurrent-actions, RULED 2026-07-14) ──
   // Movement runs on its OWN track (declaredMovement) parallel to the skill
-  // track (declaredAction). Starting a move while a skill is queued is
-  // allowed ONLY as a WALK alongside a `mobile`-tagged skill — sprinting is
-  // all-out, and a non-mobile windup demands stance.
+  // track (declaredAction). A WALK alongside a `mobile`-tagged skill keeps
+  // BOTH. Any other combination CANCELS the queued skill and moves — the
+  // change-your-mind rule (user 2026-05-11: "players can change their mind
+  // at will") extended to movement 2026-08-09: with `mobile` on zero
+  // content, the old hard refusal made every queued skill read as a frozen,
+  // rubberbanding token. Sunk celerity is the price, per design. Only an
+  // uncancellable action (leap in flight) still refuses.
   const _modeKey = resolveMovementMode(mode).key;
-  const qa = combatant.flags?.aspectsofpower?.declaredAction;
+  let qa = combatant.flags?.aspectsofpower?.declaredAction;
   if (qa && qa.itemId) {
-    if (_modeKey !== 'walk') {
-      ui.notifications.warn(`${actor.name}: cannot sprint while ${qa.label} is queued — walk, or cancel the action.`);
-      return null;
-    }
     const qaItem = actor.items?.get(qa.itemId);
     const qaMobile = (qaItem?.system?.tags ?? []).includes('mobile');
-    if (!qaMobile) {
-      ui.notifications.warn(`${actor.name}: ${qa.label} demands a stance — cancel it before moving.`);
-      return null;
+    const coexists = _modeKey === 'walk' && qaMobile;
+    if (!coexists) {
+      if (qa.uncancellable) {
+        ui.notifications.warn(`${actor.name} is mid-${qa.label} — cannot move until it resolves.`);
+        return null;
+      }
+      await _safeCombatantUpdate(combatant, {
+        'flags.aspectsofpower.declaredAction': null,
+        'flags.aspectsofpower.nextActionTick': null,
+      }, { _aopCancelRedeclare: true });
+      ChatMessage.create({
+        speaker: ChatMessage.getSpeaker({ actor }),
+        content: `<p><em>${actor.name} abandons <strong>${qa.label}</strong> to move.</em></p>`,
+      });
+      qa = null;
     }
   }
 

@@ -162,6 +162,14 @@ export async function stopDeclaredMove(tokenDoc) {
   _executing.delete(tokenDoc.id);
   try {
     if (['planned', 'pending', 'paused'].includes(tokenDoc.movement?.state)) {
+      // Core's stop broadcast is IGNORED by the driving client (the
+      // _stopMovement handler skips when movement.user.isSelf there), so a
+      // stop issued from any other client leaves the glide running at the
+      // driver — an orphan walk with no declaration behind it. Route the
+      // stop to the driver as well.
+      if (!tokenDoc.movement.user?.isSelf) {
+        game.socket.emit('system.aspects-of-power', { action: 'aopStopMove', tokenUuid: tokenDoc.uuid });
+      }
       await tokenDoc.stopMovement();
     }
   } catch (err) {
@@ -282,24 +290,42 @@ export function registerMovementHooks() {
   Hooks.on('pauseToken', (tokenDoc) => _executing.delete(tokenDoc.id));
   Hooks.on('stopToken', (tokenDoc) => _executing.delete(tokenDoc.id));
 
+  // Cross-client stop routing (see stopDeclaredMove): only the client whose
+  // user drives the movement can truly kill it.
+  game.socket.on('system.aspects-of-power', (data) => {
+    if (data?.action !== 'aopStopMove') return;
+    const doc = fromUuidSync(data.tokenUuid);
+    if (!doc?.movement?.user?.isSelf) return;
+    _executing.delete(doc.id);
+    if (['planned', 'pending', 'paused'].includes(doc.movement.state)) {
+      doc.stopMovement().catch(err => console.warn('[movement] routed stop failed:', err));
+    }
+  });
+
   // Re-plan after a reload: core movement state is in-memory only, so a
   // declared-but-unfinished movement loses its plan when the page reloads
   // while the celerity flag survives. The acting GM rebuilds plans from the
   // flags — from the token's CURRENT position to the declared endPos, so a
   // mid-flight reload resumes from wherever the last checkpoint committed.
-  Hooks.on('canvasReady', () => {
-    if (!isActingGM()) return;
-    const combat = game.combat;
-    if (!combat?.started) return;
-    for (const cm of combat.combatants) {
-      const mv = cm.flags?.[FLAG_NS]?.declaredMovement;
-      const tokenDoc = cm.token;
-      if (!mv?.endPos || !tokenDoc || tokenDoc.parent !== canvas.scene) continue;
-      const state = tokenDoc.movement?.state;
-      if (['planned', 'pending', 'paused'].includes(state)) continue; // plan survived
-      const from = { x: tokenDoc.x, y: tokenDoc.y };
-      if (Math.hypot(mv.endPos.x - from.x, mv.endPos.y - from.y) < 1) continue; // already there
-      declarePlannedMove(tokenDoc, from, mv.endPos);
-    }
-  });
+  Hooks.on('canvasReady', _rehydratePlans);
+  // The initial canvasReady fires BEFORE the ready hook that registers us —
+  // run the rehydrate once directly or the reload case (its whole reason to
+  // exist) is the one case it would miss.
+  if (canvas?.ready) _rehydratePlans();
+}
+
+function _rehydratePlans() {
+  if (!isActingGM()) return;
+  const combat = game.combat;
+  if (!combat?.started) return;
+  for (const cm of combat.combatants) {
+    const mv = cm.flags?.[FLAG_NS]?.declaredMovement;
+    const tokenDoc = cm.token;
+    if (!mv?.endPos || !tokenDoc || tokenDoc.parent !== canvas.scene) continue;
+    const state = tokenDoc.movement?.state;
+    if (['planned', 'pending', 'paused'].includes(state)) continue; // plan survived
+    const from = { x: tokenDoc.x, y: tokenDoc.y };
+    if (Math.hypot(mv.endPos.x - from.x, mv.endPos.y - from.y) < 1) continue; // already there
+    declarePlannedMove(tokenDoc, from, mv.endPos);
+  }
 }
