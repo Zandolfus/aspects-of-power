@@ -251,6 +251,19 @@ export async function jumpMovementsTo(combat, newClock) {
     const tokenDoc = cm.token;
     if (!mv?.startPos || !mv?.endPos || !tokenDoc) continue;
     const target = interpolateMovementPosition(mv, newClock);
+    // NEVER slide a token BACKWARD along its own path. A pause freezes each
+    // glide at its NEXT checkpoint — legitimately AHEAD of the clock's lerp
+    // by up to a checkpoint spacing — and yanking it back to the lerp at
+    // every subsequent fire was the "continuously rubberbanding" defect
+    // (live 2026-08-09, second Boughbreaker fight). Ahead-of-clock is legal;
+    // the clock catches up and later jumps only ever move the token onward.
+    const dx = mv.endPos.x - mv.startPos.x;
+    const dy = mv.endPos.y - mv.startPos.y;
+    const len2 = dx * dx + dy * dy;
+    if (len2 < 1) continue;
+    const tCur = ((tokenDoc.x - mv.startPos.x) * dx + (tokenDoc.y - mv.startPos.y) * dy) / len2;
+    const tTarget = ((target.x - mv.startPos.x) * dx + (target.y - mv.startPos.y) * dy) / len2;
+    if (tTarget <= tCur + 0.001) continue;
     const px = Math.hypot(target.x - tokenDoc.x, target.y - tokenDoc.y);
     if (px < 1) continue;
     await stopDeclaredMove(tokenDoc);

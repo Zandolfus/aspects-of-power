@@ -746,8 +746,15 @@ export class CelerityCombatTracker extends ParentTracker {
         fired = await _onCelAdvance.call(this);
       } catch (e) { console.error('[TRIAL-REALTIME] advance failed:', e); }
       // Auto-pause on ACTION fire per user spec — players adjust, GM
-      // resumes. Movement arrivals are not decision points: keep running.
-      if (fired === 'movement' && this._realtimeRunning) this._scheduleNextFire();
+      // resumes. Movement arrivals are not decision points: keep running —
+      // and RESTART the other glides first, because the advance's
+      // jumpMovementsTo may have stopped-and-re-planned any it slid
+      // forward (a re-planned move sits in 'planned' until started; the
+      // stranded mid-path Boughbreaker of 2026-08-09 was exactly this).
+      if (fired === 'movement' && this._realtimeRunning) {
+        runAllDeclaredMoves(combat);
+        this._scheduleNextFire();
+      }
       else this._realtimeStop(nextTick);
     }, realtimeMs);
   }
