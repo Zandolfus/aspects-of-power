@@ -70,6 +70,29 @@ export function celerityAnimationSpeed(distancePx, waitTicks, ticksPerMs, gridSi
 }
 
 /**
+ * Linear-interpolate position at the given clockTick along a declared
+ * movement. If currentTick >= scheduledTick, returns endPos; at or before
+ * declaredAtTick, startPos. (Moved verbatim from systems/celerity.mjs in the
+ * v14 rework so the execution layer can import it without a cycle —
+ * celerity.mjs re-exports it for its existing consumers.)
+ *
+ * @param {{startPos:{x,y}, endPos:{x,y}, declaredAtTick:number, scheduledTick:number}} mv
+ * @param {number} currentTick
+ * @returns {{x:number, y:number}}
+ */
+export function interpolateMovementPosition(mv, currentTick) {
+  const t0 = mv.declaredAtTick ?? 0;
+  const t1 = mv.scheduledTick ?? t0;
+  if (currentTick >= t1) return { x: mv.endPos.x, y: mv.endPos.y };
+  if (currentTick <= t0 || t1 === t0) return { x: mv.startPos.x, y: mv.startPos.y };
+  const frac = (currentTick - t0) / (t1 - t0);
+  return {
+    x: Math.round(mv.startPos.x + frac * (mv.endPos.x - mv.startPos.x)),
+    y: Math.round(mv.startPos.y + frac * (mv.endPos.y - mv.startPos.y)),
+  };
+}
+
+/**
  * The effective celerity clock tick. While the realtime loop runs, the clock
  * flows continuously between the committed flag writes:
  *

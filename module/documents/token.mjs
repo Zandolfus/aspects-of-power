@@ -1,4 +1,5 @@
-import { declareMovement, resolveMovementMode, getActiveMovementMode, clampMoveNoOverlap } from '../systems/celerity.mjs';
+import { declareMovement, resolveMovementMode, getActiveMovementMode, clampMoveNoOverlap, enemyBlocksSegment, getClockTick } from '../systems/celerity.mjs';
+import { isExecutingMove, haltDeclaredMove } from '../systems/movement.mjs';
 
 /**
  * Extended TokenDocument for Aspects of Power.
@@ -38,6 +39,35 @@ export class AspectsofPowerToken extends foundry.documents.TokenDocument {
     // Bypass the no-stacking re-issue below (avoids recursing on our own
     // clamped update).
     if (operation?._aopNoStackClamp) return;
+    // Bypass the PLANNED-movement creation (v14 rework): declareMovement
+    // stores the path via token.move({planned: true}), which re-enters this
+    // hook with nothing committed. Without the bypass, declaring would
+    // recurse into declaring.
+    if (operation?._aopPlannedDeclare) return;
+
+    // Our own glide committing a checkpoint segment (started/resumed by the
+    // clock owner — checkpoint continuations re-enter this hook on that
+    // client and carry no operation flag core would preserve). Reality wins
+    // at every checkpoint (ruling 2026-08-09): a cross-faction body that
+    // moved into the path since declare halts the walk at the last
+    // checkpoint instead of being ghosted through.
+    if (isExecutingMove(this.id)) {
+      const combatNow = game.combat;
+      if (combatNow?.started) {
+        const seg = movement.passed?.waypoints?.at?.(-1) ?? movement.destination;
+        if (seg && enemyBlocksSegment(this, { x: this.x, y: this.y }, { x: seg.x ?? this.x, y: seg.y ?? this.y })) {
+          const cm = combatNow.combatants.find(
+            c => c.tokenId === this.id && c.sceneId === this.parent?.id
+          );
+          if (cm) {
+            haltDeclaredMove(this, cm, getClockTick(combatNow))
+              .catch(err => console.error('[movement] halt failed:', err));
+            return false; // cancel this segment; the halt settles the rest
+          }
+        }
+      }
+      return; // clear segment — let core commit it
+    }
 
     const combat = game.combat;
     if (!combat?.started) {

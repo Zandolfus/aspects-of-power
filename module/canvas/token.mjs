@@ -14,9 +14,38 @@
  *
  * @extends {foundry.canvas.placeables.Token}
  */
-import { resolveMovementMode, getActiveMovementMode } from '../systems/celerity.mjs';
+import { resolveMovementMode, getActiveMovementMode, realtimeTicksPerMs } from '../systems/celerity.mjs';
+import { celerityAnimationSpeed } from '../helpers/movement-path.mjs';
 
 export class AspectsofPowerTokenObject extends foundry.canvas.placeables.Token {
+
+  /**
+   * Couple the movement-animation speed to the celerity clock: a walk
+   * declared for N ticks physically takes N ticks' worth of wall time at
+   * the combat's realtime rate. This is what makes the glide and the clock
+   * agree by construction — no interpolation writes, no drift correction.
+   * Spike-verified 2026-08-09: the override is respected to the pixel.
+   *
+   * Outside combat (or for a token with no declared movement) Foundry's
+   * default speed applies unchanged.
+   */
+  _getAnimationMovementSpeed(options) {
+    const combat = game.combat;
+    if (combat?.started) {
+      const cm = combat.combatants.find(
+        c => c.tokenId === this.document.id && c.sceneId === this.document.parent?.id
+      );
+      const mv = cm?.flags?.aspectsofpower?.declaredMovement;
+      if (mv?.wait > 0 && mv.startPos && mv.endPos) {
+        const distPx = Math.hypot(mv.endPos.x - mv.startPos.x, mv.endPos.y - mv.startPos.y);
+        const spaces = celerityAnimationSpeed(
+          distPx, mv.wait, realtimeTicksPerMs(combat), canvas.grid.size
+        );
+        if (spaces > 0) return spaces;
+      }
+    }
+    return super._getAnimationMovementSpeed(options);
+  }
 
   /**
    * Override the movement cost function so Foundry's ruler-preview shows

@@ -18,8 +18,15 @@
 
 import { AspectsofPowerItem } from '../documents/item.mjs';
 import { weaponStatBlend, perceiveGateDecision, spellCastWeight } from '../helpers/formulas.mjs';
+import { effectiveClockTick, interpolateMovementPosition } from '../helpers/movement-path.mjs';
 import { heldImplementWeight } from './weapon-styles.mjs';
 import { tickDotsFor } from './dot.mjs';
+import { declarePlannedMove } from './movement.mjs';
+
+// Re-export for the existing consumers (overlay, tracker, aura-ticks,
+// engagement-halts) — the implementation moved to helpers/movement-path.mjs
+// so the movement execution layer can import it without a module cycle.
+export { interpolateMovementPosition };
 
 const HYBRID_60_40_WIS_DEX = (a) => 0.6 * (a.wisdom?.mod ?? 0) + 0.4 * (a.dexterity?.mod ?? 0);
 const _MAGIC_TYPES_FOR_SPEED = new Set(['magic', 'magic_melee', 'magic_projectile']);
@@ -525,11 +532,47 @@ export function findCombatantForActor(actor) {
 }
 
 /**
- * Read or initialize the clock tick on the combat document.
- * Combats start at tick 0; the tracker UI advances it as actions resolve.
+ * Read the clock tick on the combat document. Combats start at tick 0.
+ *
+ * While the realtime loop runs, the clock flows CONTINUOUSLY: the stored
+ * flag is only committed at pause/fire boundaries, and between them the
+ * effective tick is clockAtStart + elapsed wall time × the realtime rate.
+ * Everything that reads the clock (declares, scramble decay, the overlay's
+ * progress dot) therefore sees time passing during play instead of a value
+ * frozen since the last fire. At rest the stored flag is the authority.
  */
 export function getClockTick(combat = game.combat) {
-  return combat?.flags?.aspectsofpower?.clockTick ?? 0;
+  const f = combat?.flags?.aspectsofpower;
+  return effectiveClockTick(f?.realtime, Date.now(), f?.clockTick ?? 0);
+}
+
+/**
+ * The shortest reference round among the combatants — the realtime anchor:
+ * this round plays out over REALTIME_FASTEST_ROUND_SECONDS of wall time.
+ */
+export function fastestReferenceRound(combat) {
+  let min = Infinity;
+  for (const cm of combat?.combatants ?? []) {
+    const rl = cm.actor?.system?.attributes?.race?.level ?? 1;
+    const len = referenceRoundLength(rl);
+    if (Number.isFinite(len) && len > 0 && len < min) min = len;
+  }
+  return Number.isFinite(min) ? min : 1000;
+}
+
+/**
+ * Celerity ticks per wall-clock millisecond for this combat. Reads the rate
+ * pinned on the running realtime flag when present (so every client computes
+ * with the same number the loop started with); otherwise derives it fresh.
+ * This single rate couples the continuous clock, the fire delays, and every
+ * glide speed — one mapping, no drift between them.
+ */
+export function realtimeTicksPerMs(combat) {
+  const pinned = combat?.flags?.aspectsofpower?.realtime?.ticksPerMs;
+  if (pinned > 0) return pinned;
+  const sc = CONFIG.ASPECTSOFPOWER.celerity;
+  const secs = sc.REALTIME_FASTEST_ROUND_SECONDS ?? 5;
+  return fastestReferenceRound(combat) / (secs * 1000);
 }
 
 /**
@@ -871,27 +914,6 @@ export function computeMovementWait(actor, distanceFt, mode) {
 }
 
 /**
- * Linear-interpolate position at the given clockTick along an active
- * movement. If currentTick >= t_arrival, returns endPos. If <= t_decl,
- * returns startPos.
- *
- * @param {{startPos:{x,y}, endPos:{x,y}, declaredAtTick:number, scheduledTick:number}} mv
- * @param {number} currentTick
- * @returns {{x:number, y:number}}
- */
-export function interpolateMovementPosition(mv, currentTick) {
-  const t0 = mv.declaredAtTick ?? 0;
-  const t1 = mv.scheduledTick ?? t0;
-  if (currentTick >= t1) return { x: mv.endPos.x, y: mv.endPos.y };
-  if (currentTick <= t0 || t1 === t0) return { x: mv.startPos.x, y: mv.startPos.y };
-  const frac = (currentTick - t0) / (t1 - t0);
-  return {
-    x: Math.round(mv.startPos.x + frac * (mv.endPos.x - mv.startPos.x)),
-    y: Math.round(mv.startPos.y + frac * (mv.endPos.y - mv.startPos.y)),
-  };
-}
-
-/**
  * Declare a movement on the celerity stack — does NOT commit the position.
  * The token sprite stays where it is until the celerity advance handler
  * reaches the movement's scheduledTick (or partway, for animate-on-pause).
@@ -988,6 +1010,48 @@ export function clampMoveNoOverlap(tokenDoc, fromPos, toPos) {
     if (!hits(p, obstacles)) return p;
   }
   return { x: fromPos.x, y: fromPos.y };
+}
+
+/**
+ * Transit-only enemy contact test for ONE checkpoint segment of an
+ * executing movement (v14 rework, "reality wins" ruling 2026-08-09).
+ *
+ * Deliberately NOT clampMoveNoOverlap: intermediate checkpoints may land
+ * mid-passthrough of an ALLY (legal — allies never block transit), so the
+ * full clamp's end-must-be-clear rule would false-halt a walk that is
+ * simply ghosting past a friend. Only a cross-faction body along the
+ * segment halts it. End-overlap hygiene stays with the declare-time clamp
+ * and the post-arrival bump.
+ *
+ * @param {TokenDocument} tokenDoc
+ * @param {{x,y}} fromPos  segment start (top-left)
+ * @param {{x,y}} toPos    segment end (top-left)
+ * @returns {boolean} true if an enemy footprint blocks the segment
+ */
+export function enemyBlocksSegment(tokenDoc, fromPos, toPos) {
+  const scene = tokenDoc?.parent;
+  if (!scene) return false;
+  const gs = scene.grid?.size ?? 100;
+  const selfW = (tokenDoc.width ?? 1) * gs, selfH = (tokenDoc.height ?? 1) * gs;
+  const g = _tokenGapPx();
+  const enemies = [];
+  for (const t of scene.tokens) {
+    if (t.id === tokenDoc.id || t.hidden) continue;
+    if (t.disposition === tokenDoc.disposition) continue;
+    enemies.push({ x: t.x, y: t.y, w: (t.width ?? 1) * gs, h: (t.height ?? 1) * gs });
+  }
+  if (!enemies.length) return false;
+  const STEPS = 16; // one segment is at most a couple of squares — 16 is dense
+  for (let i = 1; i <= STEPS; i++) {
+    const t = i / STEPS;
+    const px = fromPos.x + (toPos.x - fromPos.x) * t;
+    const py = fromPos.y + (toPos.y - fromPos.y) * t;
+    for (const o of enemies) {
+      const { ox, oy } = _boxOverlap(px, py, selfW, selfH, o.x, o.y, o.w, o.h, g);
+      if (ox > 0.5 && oy > 0.5) return true;
+    }
+  }
+  return false;
 }
 
 /**
@@ -1151,6 +1215,16 @@ export async function declareMovement(actor, startPos, endPos, distanceFt, stami
     speaker: ChatMessage.getSpeaker({ actor }),
     content: `<p><em>${actor.name} declares <strong>${label}</strong> — wait ${wait} ticks, arrives at tick ${scheduledTick}${staminaCost ? `, stamina cost ${staminaCost}` : ''}.</em></p>`,
   });
+
+  // Create the PLANNED core movement (v14 rework): the path is stored and
+  // drawn by Foundry, nothing commits, and the token holds still until the
+  // clock owner starts the glide. Awaited so callers (AI, buffer) know the
+  // plan exists before they proceed — but a failed plan does not fail the
+  // declare: the flags above are the celerity truth, and the clock-jump
+  // fallback (jumpMovementsTo) still lands the token without a plan.
+  if (combatant.token) {
+    await declarePlannedMove(combatant.token, startPos, endPos);
+  }
 
   return { wait, scheduledTick };
 }

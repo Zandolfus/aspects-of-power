@@ -52,6 +52,7 @@ import * as TemplateGrants from './systems/template-grants.mjs';
 import { SummonHelpers, registerSummonHooks } from './systems/summon.mjs';
 import { ChannelHelpers, registerChannelHooks } from './systems/channel.mjs';
 import { AIProfiles, registerAIHooks, aiSetFactionFocus } from './systems/ai.mjs';
+import { registerMovementHooks } from './systems/movement.mjs';
 import { registerSummonHud } from './canvas/summon-hud.mjs';
 import { registerMovementHud } from './canvas/movement-hud.mjs';
 import { CelerityCombatTracker, installAopTurnMarkerPatch } from './apps/celerity-combat-tracker.mjs';
@@ -949,6 +950,11 @@ Hooks.once('ready', async function () {
   // Register AI dispatch hook (fires on declared-action completion → routes
   // to the actor's `aiProfile` for next-action decision).
   registerAIHooks();
+
+  // Movement execution layer (v14 planned movements): executing-mark cleanup
+  // on pause/stop + acting-GM re-plan of declared movements after a reload
+  // (core movement state is in-memory; the celerity flag survives).
+  registerMovementHooks();
 
   // Token-HUD command buttons (Hold / Manual / Focus / Move) for owned AI units.
   registerSummonHud();

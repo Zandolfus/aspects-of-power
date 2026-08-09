@@ -580,6 +580,10 @@ ASPECTSOFPOWER.celerity = {
   // (defaulting here when the skill omits an explicit value). 1/3 mirrors
   // break-free — one action's worth of an actor's round. Build-neutral.
   GRANTED_DEFAULT_FRACTION: 1 / 3,
+  // Realtime anchor: the FASTEST combatant's reference round plays out over
+  // this many wall-clock seconds. Everything else (glide speeds, fire delays,
+  // the continuous clock) derives its ticks-per-millisecond rate from this.
+  REALTIME_FASTEST_ROUND_SECONDS: 5,
 };
 
 /**
@@ -708,6 +712,12 @@ ASPECTSOFPOWER.movement = {
   // applies on top of each token's own footprint, so it reads the same for big
   // and small tokens.
   tokenGapPx: 0,
+  // Checkpoint spacing for declared movements, in GRID SQUARES. Checkpoints
+  // are both the pause windows (a clock pause freezes each glide at its next
+  // checkpoint) and the commit granularity (one update operation each) — so
+  // smaller = crisper pauses + finer mid-flight collision checks, at the cost
+  // of more update operations per walk.
+  checkpointSpacingSquares: 2,
 };
 
 /**
