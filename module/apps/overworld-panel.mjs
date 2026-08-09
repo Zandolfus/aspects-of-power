@@ -117,7 +117,7 @@ export class OverworldPanel extends HandlebarsApplicationMixin(ApplicationV2) {
       areaId: stamp.id,
       hexLabel: stamp.hex ? `${stamp.hex[0]}, ${stamp.hex[1]}` : null,
       offLattice: !!loc?.offLattice,
-      radius: OverworldPanel._radius,
+      radius: OverworldPanel._radius || 'All',
       hasToken: !!token,
       tokenName: token?.name ?? null,
     };
@@ -189,6 +189,9 @@ export class OverworldPanel extends HandlebarsApplicationMixin(ApplicationV2) {
     if (!hex) return null;
     const [col, row] = hex;
     const cells = rosette(col, row, OverworldPanel._radius, { gm: isGM });
+    /* Past roughly forty cells the per-cell text turns to mush at panel width,
+       so the labels drop out and the map reads as terrain instead. */
+    const dense = cells.length > 40;
     const [ox, oy] = hexCentreWorld(col, row);
     const scale = CELL_R / HEX_SIZE_FT;
 
@@ -216,12 +219,12 @@ export class OverworldPanel extends HandlebarsApplicationMixin(ApplicationV2) {
         /* The tint is the terrain speaking; the state fill stays as the
            knowledge channel. Explored cells show it strongly, a GM previewing
            unexplored country sees it faintly so the two never look alike. */
-        fillStyle: c.tint ? `fill:${c.tint};fill-opacity:${c.explored ? 0.72 : 0.3}` : '',
+        fillStyle: c.tint ? `fill:${c.tint};fill-opacity:${c.explored ? 0.95 : 0.78}` : '',
         /* A cell with no writing on it is unreadable as a map. The GM always
            gets coordinates; a player gets the region name only where they have
            actually been, since the name is itself knowledge. */
-        coord: isGM ? `${c.col},${c.row}` : null,
-        placeName: !isGM && c.explored ? c.label : null,
+        coord: (isGM && !dense) ? `${c.col},${c.row}` : null,
+        placeName: (!isGM && !dense && c.explored) ? c.label : null,
         labelY: y + CELL_R * 0.52,
         noteTagY: y - CELL_R * 0.46,
         /* An unbuilt destination is the GM's normal working state, so the mark
@@ -280,8 +283,12 @@ export class OverworldPanel extends HandlebarsApplicationMixin(ApplicationV2) {
     if (scene) await scene.view();
   }
 
+  /** 0 means "every hex discovered so far", which is the end of the ladder. */
+  static RANGES = [1, 2, 3, 5, 8, 0];
+
   static async _onWiden() {
-    OverworldPanel._radius = OverworldPanel._radius >= 3 ? 1 : OverworldPanel._radius + 1;
+    const i = OverworldPanel.RANGES.indexOf(OverworldPanel._radius);
+    OverworldPanel._radius = OverworldPanel.RANGES[(i + 1) % OverworldPanel.RANGES.length];
     OverworldPanel.refresh();
   }
 }

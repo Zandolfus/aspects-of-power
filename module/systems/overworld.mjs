@@ -277,7 +277,34 @@ export function rosette(col, row, radius = 1, { gm = false } = {}) {
   const explored = exploredHexes();
   const known = knownHexes();
 
-  return hexesWithin(col, row, radius).map(({ col: c, row: r, distance }) => {
+  /**
+   * ⚠ ONLY DRAW WHAT HAS BEEN DISCOVERED. Undiscovered country is ABSENT from
+   * the map, not greyed out on it — that is what makes the map something the
+   * party builds rather than a lattice with holes.
+   *
+   * ⚠ A KNOWN NEIGHBOUR IS ONLY DRAWN IF IT HAS A MAP. Visiting a hex marks all
+   * six neighbours known, but drawing an unbuilt one would render a cell with
+   * no tint beside built ones that have colour — and that difference IS the
+   * availability leak, just wearing a different hat. Absent for players,
+   * present for the GM, who needs the operational view.
+   */
+  const shown = (key) => {
+    if (explored.has(key)) return true;
+    if (gm) return known.has(key) || avail.has(key);
+    return known.has(key) && avail.has(key);
+  };
+
+  const here = hexKey(col, row);
+  const candidates = radius > 0
+    ? hexesWithin(col, row, radius)
+    : [...new Set([here, ...explored, ...known, ...(gm ? avail.keys() : [])])]
+        .map(k => parseHexKey(k)).filter(Boolean)
+        .map(([c, r]) => ({ col: c, row: r, distance: hexDistance(col, row, c, r) }))
+        .sort((a, b) => a.distance - b.distance || a.col - b.col || a.row - b.row);
+
+  return candidates
+    .filter(({ col: c, row: r }) => c === col && r === row ? true : shown(hexKey(c, r)))
+    .map(({ col: c, row: r, distance }) => {
     const key = hexKey(c, r);
     const a = avail.get(key) ?? null;
     const isExplored = explored.has(key);
@@ -287,7 +314,9 @@ export function rosette(col, row, radius = 1, { gm = false } = {}) {
        never visited would leak what the country looks like ahead of them —
        the same leak the availability ring is GM-gated for. Explored only,
        unless the viewer is the GM. */
-    const tint = (gm || isExplored) ? tintFor(key) : null;
+    /* Colour rides along with discovery now: a neighbour you can see from here
+       shows its terrain, which is the whole point of building the map out. */
+    const tint = (gm || isExplored || isKnown) ? tintFor(key) : null;
     return {
       col: c, row: r, key, distance,
       isCurrent: c === col && r === row,

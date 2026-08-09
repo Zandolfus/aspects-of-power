@@ -2481,7 +2481,9 @@ body.aop-targeting #board canvas {
 .aop-ow-warn { margin: 4px 0 0; color: #e0a33a; }
 
 .aop-ow-map { position: relative; display: flex; justify-content: center; padding: 4px 0; }
-.aop-ow-map svg { width: 100%; max-width: 320px; height: auto; overflow: visible; }
+/* Uncapped: at Range All this is a map of everything the party has found, and
+   a 320px ceiling would shrink 100+ hexes into noise. Resize the panel. */
+.aop-ow-map svg { width: 100%; max-width: 100%; height: auto; overflow: visible; }
 
 /* Base cell: nothing known. Faint enough to read as "map continues" rather
    than as a place the party has failed to find. */
@@ -2561,7 +2563,7 @@ body.aop-targeting #board canvas {
    same channel again, and the whole point of the three-fact split is that
    knowledge and terrain are independent. */
 .aop-ow-tint { pointer-events: none; }
-.aop-ow-cell.is-current .aop-ow-tint { fill-opacity: 0.85; }
+.aop-ow-cell.is-current .aop-ow-tint { fill-opacity: 1; }
 
 .aop-ow-noteflag {
   fill: #f0c060; font-size: 8px; font-weight: 600;
