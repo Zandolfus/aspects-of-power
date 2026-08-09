@@ -196,13 +196,14 @@ function _watchMovementEnd(tokenDoc) {
 
 /**
  * Halt an executing movement because reality changed mid-flight (an enemy
- * now blocks the next segment). The declaration is truncated to what
- * actually happened — pro-rated distance and stamina, endPos = where the
- * token stopped, scheduledTick = now — so the completion sweep settles it
- * without teleporting the token to the original destination.
+ * now blocks the next segment) and settle it IMMEDIATELY: pro-rated stamina
+ * debited, movement track cleared, AI freed to re-decide. Live-verify
+ * 2026-08-09 caught the earlier truncate-for-the-sweep version leaving the
+ * flag lingering — a halt's scheduled tick is already in the past when the
+ * scheduler looks, so no future fire ever settled it.
  *
  * Runs on the driving client, which in the loop-owns-everything model is a
- * GM client, so the combatant update is direct.
+ * GM client, so both updates are direct.
  */
 export async function haltDeclaredMove(tokenDoc, combatant, nowTick) {
   await stopDeclaredMove(tokenDoc);
@@ -211,21 +212,25 @@ export async function haltDeclaredMove(tokenDoc, combatant, nowTick) {
   const cur = { x: tokenDoc.x, y: tokenDoc.y };
   const total = Math.hypot(mv.endPos.x - mv.startPos.x, mv.endPos.y - mv.startPos.y) || 1;
   const done = Math.min(1, Math.hypot(cur.x - mv.startPos.x, cur.y - mv.startPos.y) / total);
+  const doneFt = Math.round((mv.distanceFt ?? 0) * done);
+  const doneStamina = Math.max(0, Math.round((mv.staminaCost ?? 0) * done));
+  const qa = combatant.flags?.[FLAG_NS]?.declaredAction;
   await combatant.update({
-    [`flags.${FLAG_NS}.declaredMovement`]: {
-      ...mv,
-      endPos: cur,
-      distanceFt: Math.round((mv.distanceFt ?? 0) * done),
-      staminaCost: Math.max(0, Math.round((mv.staminaCost ?? 0) * done)),
-      scheduledTick: nowTick,
-      blocked: true,
-      requestedEndPos: mv.requestedEndPos ?? mv.endPos,
-    },
-  }).catch(err => console.warn('[movement] halt flag update failed:', err));
+    [`flags.${FLAG_NS}.declaredMovement`]: null,
+    [`flags.${FLAG_NS}.nextActionTick`]: (typeof qa?.scheduledTick === 'number') ? qa.scheduledTick : null,
+    [`flags.${FLAG_NS}.lastActionName`]: `${mv.label} — halted at ${doneFt}ft`,
+    [`flags.${FLAG_NS}.lastActionWait`]: mv.wait,
+    [`flags.${FLAG_NS}.lastActionAt`]: nowTick,
+  }).catch(err => console.warn('[movement] halt settlement failed:', err));
   const actor = combatant.actor;
+  if (doneStamina && actor) {
+    const before = actor.system.stamina?.value ?? 0;
+    await actor.update({ 'system.stamina.value': Math.max(0, before - doneStamina) })
+      .catch(err => console.warn('[movement] halt stamina debit failed:', err));
+  }
   ChatMessage.create({
     speaker: ChatMessage.getSpeaker({ actor }),
-    content: `<p><em>${combatant.name} pulls up short — an enemy blocks the path.</em></p>`,
+    content: `<p><em>${combatant.name} pulls up short at ${doneFt}ft — an enemy blocks the path.</em></p>`,
   });
 }
 
