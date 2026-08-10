@@ -18,8 +18,14 @@
  * caller, because they are not part of the arithmetic.
  *
  * ORDER IS LOAD-BEARING and matches the shipped pipeline exactly:
- *   mark → affinity resist → barrier → armour/veil → toughness DR →
+ *   mark → barrier → armour/veil → toughness DR → affinity resist →
  *   augment resist → DEFENCE MARGIN → overhealth → HP
+ *
+ * ⚠ Affinity resist moved BEHIND the barrier 2026-08-10. Among the flat
+ * reductions the sequence is arithmetically irrelevant, so the only thing that
+ * position decides is whether a barrier absorbs the resisted or un-resisted
+ * blow. It now absorbs the un-resisted one: a ward stands in front of you and
+ * eats the strike, so your own resistance is never tested on that portion.
  *
  * The margin lands second-to-last on purpose (RULED 2026-07-31): applying it
  * before the flat wall lets a decent defence plus any armour reach zero —
@@ -104,14 +110,6 @@ export function resolveDamage(input = {}) {
   let incoming = applyMarkBonus(rawIncoming, markBonus);
   const markAdded = incoming - rawIncoming;
 
-  // ── Per-affinity DR pre-step (caller sums the per-slice reductions). ──
-  const affinityResist = Math.max(0, n(input.affinityResist));
-  let affinityResisted = 0;
-  if (affinityResist > 0) {
-    affinityResisted = Math.min(affinityResist, incoming);
-    incoming = Math.max(0, incoming - affinityResist);
-  }
-
   let remaining = incoming;
 
   // ── 1. Barrier absorbs first. No toughness/DR on this portion. ──
@@ -141,6 +139,29 @@ export function resolveDamage(input = {}) {
     drReduced = Math.min(effectiveDR, remaining);
     remaining = Math.max(0, remaining - effectiveDR);
     if (drReduced > 0) parts.push(`DR: −${drReduced}`);
+  }
+
+  // ── 3a. Per-affinity resist (caller sums the per-slice reductions). ──
+  // MOVED HERE 2026-08-10 (user ruling). It used to be a pre-step ahead of the
+  // BARRIER, and that position was never a design decision — the caller
+  // pre-applied it because it needs the effect documents to describe the
+  // per-affinity slices, so it subtracted where it happened to be standing.
+  //
+  // Among the flat reductions the order is arithmetically irrelevant (each
+  // clamps at 0, so the result is max(0, incoming - Σ)). The ONE thing the
+  // move changes is the relationship to the barrier, which is a consumable
+  // POOL: a ward now absorbs the UN-resisted blow and depletes accordingly.
+  // That is the coherent reading — a barrier stands in front of you and
+  // intercepts the strike, so your own resistance never gets tested on the
+  // portion the ward ate.
+  const affinityResist = Math.max(0, n(input.affinityResist));
+  let affinityResisted = 0;
+  if (remaining > 0 && affinityResist > 0) {
+    affinityResisted = Math.min(affinityResist, remaining);
+    remaining = Math.max(0, remaining - affinityResist);
+    parts.push(input.affinityResistLabel
+      ? `Affinity resist (${input.affinityResistLabel})`
+      : `Affinity resist: −${affinityResisted}`);
   }
 
   // ── 3b. Augment-sourced flat resist. ──

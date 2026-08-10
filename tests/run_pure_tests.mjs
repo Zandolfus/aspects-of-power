@@ -746,6 +746,26 @@ eq('damage: oversized barrier survives', tbs.barrierBroke, false);
 eq('damage: oversized barrier keeps the remainder', tbs.barrierRemaining, 300);
 eq('damage: nothing reaches hp through a big barrier', tbs.hpLoss, 0);
 
+// ── AFFINITY RESIST SITS BEHIND THE BARRIER (moved 2026-08-10) ──
+// A ward stands in front of you and eats the strike, so your own resistance is
+// never tested on the portion it absorbed. This is the ONE thing the move
+// changes — among the flat reductions the order is arithmetically irrelevant,
+// so a barrier is the only way to observe it. Nothing covered this before the
+// move, which is why the suite stayed green through a real behaviour change.
+const tar = resolveDamage({ incoming: 500, barrier: 300, affinityResist: 100, mitigation: 50, health: 400 });
+eq('damage: barrier eats the UN-resisted blow', tar.barrierAbsorbed, 300);
+eq('damage: resist applies to what got past the ward', tar.affinityResisted, 100);
+eq('damage: post-barrier resist then wall', tar.hpLoss, 50);   // 500-300=200, -100 resist, -50 armour
+// ⚠ NEGATIVE CONTROL for the old order. Pre-barrier resist would have left
+// 400 for a 300 barrier to eat, so only 100 would reach the wall and hpLoss
+// would be 50 with the barrier SURVIVING. Pin that the ward is spent instead.
+eq('damage: the ward is spent, not spared by resistance', tar.barrierBroke, true);
+eq('damage: resistance does not protect the ward', tar.barrierRemaining, 0);
+// With no barrier in play the move is a no-op: all four reductions are flat
+// and clamp at zero, so only their SUM matters.
+const tan = resolveDamage({ incoming: 500, affinityResist: 100, mitigation: 50, drValue: 25, augDR: 25, health: 400 });
+eq('damage: order-free without a barrier', tan.hpLoss, 300);
+
 // Overhealth sits AFTER the margin, so it soaks only what actually landed.
 const to = resolveDamage({ incoming: 1000, mitigation: 200, margin: 0.5, overhealth: 300, health: 600 });
 eq('damage: margin applies before overhealth', to.overhealthAbsorbed, 300);

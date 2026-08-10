@@ -2419,7 +2419,7 @@ Hooks.on('renderChatMessageHTML', (message, html) => {
             ? (target.system.defense.armor?.value ?? 0) + (target.system.defense.blockDR ?? 0)
             : (target.system.defense.veil?.value ?? 0));
 
-      // --- Damage routing: Mark bonus → Affinity DR → Barrier → Armor/Veil → DR → Overhealth → HP ---
+      // --- Damage routing: Mark → Barrier → Armor/Veil → DR → Affinity DR → Augment DR → Margin → Overhealth → HP ---
       const updateData = {};
       const parts = [];
       let barrierAbsorbed = false;
@@ -2475,10 +2475,11 @@ Hooks.on('renderChatMessageHTML', (message, html) => {
         affinityResistTotal += reduced;
         affinityResistParts.push(`${aff}: −${reduced}`);
       }
-      if (affinityResistTotal > 0) {
-        incomingDmg = Math.max(0, incomingDmg - affinityResistTotal);
-        parts.push(`Affinity resist (${affinityResistParts.join(', ')})`);
-      }
+      // ⚠ NOT subtracted here any more (2026-08-10). The total and its
+      // per-slice description are handed to resolveDamage, which applies them
+      // AFTER the barrier and armour rather than ahead of everything — see the
+      // 3a block there for why the old position was an artifact of this loop's
+      // location rather than a ruling.
 
       // 0b. Affinity-based debuff cleanse. Each affinity slice in the
       // incoming damage that matches a debuff's cleanse-affinity strips
@@ -2520,12 +2521,15 @@ Hooks.on('renderChatMessageHTML', (message, html) => {
       // ── THE PIPELINE ──────────────────────────────────────────────────────
       // One shared implementation (systems/damage.mjs) so a balance sim and the
       // table cannot disagree — the whole reason this was extracted out of the
-      // chat hook. Mark and per-affinity resist are pre-applied above because
-      // both need the effect documents to describe themselves, so they pass 0.
+      // chat hook. MARK is still pre-applied above (it needs the effect
+      // documents to describe itself) so it passes 0. Per-affinity resist is
+      // now handed over as a TOTAL plus its per-slice label, so the resolver
+      // can place it after the barrier instead of ahead of it.
       const dmgRes = resolveDamage({
         incoming: incomingDmg,
         markBonus: 0,
-        affinityResist: 0,
+        affinityResist: affinityResistTotal,
+        affinityResistLabel: affinityResistParts.join(', '),
         barrier: barrierPool,
         mitigation,
         mitigationLabel: mitigLane === 'armor' ? 'Armor' : 'Veil',
