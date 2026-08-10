@@ -175,10 +175,11 @@ export async function recoverDeployable(claimant, tokenDoc) {
  * to Arms is authored at radius 60 with a pylon multiplier of 10, so hosted it
  * covers 600 ft and keeps covering it after he walks away.
  *
- * ⚠ GATED ON OWNING THE SKILL, not on a profession. There is no `leadership`
- * profession tag in the system — inventing one here would have created a
- * fourth orphaned reader. Owning the aura is already the real restriction:
- * exactly one actor in the world has Call to Arms.
+ * ⚠ TWO GATES: the installer must carry the `leadership` tag AND own the aura.
+ * The first pass had ownership alone, because no leadership concept existed in
+ * the system and inventing one unasked would have created another reader with
+ * no data. The user then ruled Leadership in and tagged Gabriel's profession,
+ * so it is now a real gate rather than a guess.
  *
  * @param {Actor} installer
  * @param {TokenDocument} pylonToken
@@ -194,6 +195,13 @@ export async function installAuraInPylon(installer, pylonToken, skill) {
   }
   if (!installer?.items?.get(skill.id)) {
     ui.notifications.warn(`${installer?.name ?? 'You'} does not own ${skill.name}.`);
+    return false;
+  }
+  // Command gate: installing into a pylon is a Leadership act. The tag can
+  // arrive from a profession, a class or a race — the engine does not care
+  // which, only that it is present (the tag-driven-classes principle).
+  if (!installer.hasTag?.('leadership')) {
+    ui.notifications.warn(`${installer.name} has no Leadership training — only a commander can install an aura into a pylon.`);
     return false;
   }
   if (!((skill.system?.tagConfig?.auraRadius ?? 0) > 0)) {

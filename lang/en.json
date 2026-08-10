@@ -652,6 +652,10 @@
         "label": "Ki",
         "desc": "Grants the ki resource. Earned by strikes that pierce; restored by meditation. Capped by endurance."
       },
+      "leadership": {
+        "label": "Leadership",
+        "desc": "A command profession. Its bearer may install an aura they own into a deployed pylon, which then projects it in their stead."
+      },
       "pylon": {
         "label": "Pylon",
         "desc": "A deployed structure that projects its aura further. Auras sourced from a pylon multiply their radius by the skill's pylon multiplier. Belongs on the deployed actor, not its summoner."

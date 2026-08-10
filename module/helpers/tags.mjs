@@ -185,6 +185,14 @@ export const TAG_REGISTRY = {
   // network node, unrelated.
   'pylon': { label: 'ASPECTSOFPOWER.SystemTag.pylon.label', category: 'passive', implies: [], description: 'ASPECTSOFPOWER.SystemTag.pylon.desc' },
 
+  // ── Command ──
+  // Marks a profession (or class, or race — the engine does not care which)
+  // whose bearer may INSTALL an aura into a deployed pylon. Ruled 2026-08-10:
+  // the first pass gated pylon installs on merely owning the aura, because no
+  // leadership concept existed; this is that concept, so the gate now asks for
+  // both — you must command, AND the aura must be yours.
+  'leadership': { label: 'ASPECTSOFPOWER.SystemTag.leadership.label', category: 'passive', implies: [], description: 'ASPECTSOFPOWER.SystemTag.leadership.desc' },
+
   // ── Accumulation ──
   // `stacking` marks a thing whose effect ACCUMULATES from repeated events
   // rather than applying once. It says nothing about the rate - how much is
