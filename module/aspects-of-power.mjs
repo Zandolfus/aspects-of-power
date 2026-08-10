@@ -1444,9 +1444,15 @@ Hooks.on('combatTurnChange', async (combat, _prior, current) => {
 /* -------------------------------------------- */
 
 /**
- * v14: CONFIG.ActiveEffect.expiryAction = 'delete' handles duration-based
- * deletion automatically. This hook cleans up side-effects (blind status,
- * dismembered slots) when any ActiveEffect is deleted.
+ * Cleans up side-effects (blind status, dismembered slots) when any
+ * ActiveEffect is deleted.
+ *
+ * ⚠ The old comment here claimed `CONFIG.ActiveEffect.expiryAction = 'delete'`
+ * handled duration expiry automatically. It is set to **'none'** (see the init
+ * block): under celerity, expiry is driven by the per-actor round countdown in
+ * `onStartTurn`, not by Foundry's own duration clock — the v14 casualty where
+ * NOTHING had expired since the upgrade. Do not "restore" the delete mode
+ * without re-reading design-effect-durations.
  */
 Hooks.on('deleteActiveEffect', async (effect, _options, _userId) => {
   if (!isActingGM()) return;
