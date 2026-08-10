@@ -35,6 +35,21 @@
           <input type="number" name="system.slotCost" value="{{system.slotCost}}" min="1" step="1" data-dtype="Number" style="width:60px;" />
           <span class="hint" style="font-size:11px;color:#888;">Consumes N consecutive augment slots on the host item.</span>
         </label>
+        {{! CRAFTER SCALING — the two fields that decide whether an augment's
+            listed values are literal or a baseline the crafter multiplies.
+            Both were read by crafting-skills and appeared on NO sheet, so the
+            whole "the magnitude is the crafter's skill" ruling was
+            unauthorable and every augment silently used its template value. }}
+        <label style="display:flex;align-items:center;gap:6px;margin-top:6px;">
+          <input type="checkbox" name="system.scaleWithCrafter" {{checked system.scaleWithCrafter}} />
+          <span>Scale With Crafter</span>
+          <span class="hint" style="font-size:11px;color:#888;">Magnitude comes from the RARITY of the craft skill applying this augment. Overrides the magnifier below.</span>
+        </label>
+        <label style="display:flex;align-items:center;gap:6px;margin-top:6px;">
+          <span>Magnifier:</span>
+          <input type="number" name="system.magnifierPct" value="{{system.magnifierPct}}" min="0" step="0.01" data-dtype="Number" style="width:70px;" />
+          <span class="hint" style="font-size:11px;color:#888;">0 = use the listed values verbatim. Above 0, each bonus value is a BASELINE scaled by the crafter's skill roll.</span>
+        </label>
         <label style="display:flex;align-items:center;gap:6px;margin-top:6px;">
           <span>Progress Per Kill:</span>
           <input type="number" name="system.onKillProgress" value="{{system.onKillProgress}}" min="0" step="1" data-dtype="Number" style="width:60px;" />
