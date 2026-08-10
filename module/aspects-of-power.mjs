@@ -54,6 +54,7 @@ import { ChannelHelpers, registerChannelHooks } from './systems/channel.mjs';
 import { AIProfiles, registerAIHooks, aiSetFactionFocus } from './systems/ai.mjs';
 import { registerMovementHooks } from './systems/movement.mjs';
 import { registerStrainHooks } from './systems/strain.mjs';
+import { registerDeployableHooks } from './systems/deployable.mjs';
 import { registerSummonHud } from './canvas/summon-hud.mjs';
 import { registerMovementHud } from './canvas/movement-hud.mjs';
 import { CelerityCombatTracker, installAopTurnMarkerPatch } from './apps/celerity-combat-tracker.mjs';
@@ -952,6 +953,10 @@ Hooks.once('ready', async function () {
   // meditation's 10% mana (user ruling 2026-08-10). This is what unblocks
   // resource-conversion content — until now strain was permanent.
   registerStrainHooks();
+
+  // Deployable items (pylons): deploy spawns a stub that HOLDS the item;
+  // recovery is owner-only. Both are GM-level writes, so players route here.
+  registerDeployableHooks();
 
   // Register AI dispatch hook (fires on declared-action completion → routes
   // to the actor's `aiProfile` for next-action decision).

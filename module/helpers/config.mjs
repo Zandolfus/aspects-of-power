@@ -2021,13 +2021,20 @@ ASPECTSOFPOWER.combatTags = {
   crush:       'ASPECTSOFPOWER.Tag.crush',
   // Concurrency (design-concurrent-actions).
   mobile:      'ASPECTSOFPOWER.Tag.mobile',
-  // Resource riders. `infused` is the MANA rider on a weapon strike (type-2
-  // fusion spellstrike). It has been read by documents/item.mjs since the
-  // spellstriker work but was never registered here, so it could not be
-  // ticked on a sheet -- the only two skills carrying it had it written
-  // straight into system.tags at authoring time. Per the multi-invest ruling
-  // it is one tag PER RESOURCE; the stamina and vitality names are unchosen.
+  // Resource riders — ONE TAG PER RESOURCE (multi-invest ruling; names chosen
+  // 2026-08-10). Each marks a weapon strike that also spends a second pool for
+  // an extra damage term:
+  //   infused    = MANA      (type-2 fusion spellstrike; the shipped one)
+  //   effort     = STAMINA
+  //   life-drain = VITALITY / health
+  // ⚠ Only `infused` has an ENGINE PATH today: _promptDualResourceInvest is
+  // still welded to it and hardcodes one damage term per resource. `effort`
+  // and `life-drain` are registered so the ruling is concrete and authorable,
+  // but until the dialog is generalised they are INERT — do not author content
+  // against them expecting a second slider. See pending-multi-invest.
   infused:     'ASPECTSOFPOWER.Tag.infused',
+  effort:      'ASPECTSOFPOWER.Tag.effort',
+  'life-drain': 'ASPECTSOFPOWER.Tag.lifeDrain',
   // Affinities.
   time:          'ASPECTSOFPOWER.Tag.time',
   karma:         'ASPECTSOFPOWER.Tag.karma',

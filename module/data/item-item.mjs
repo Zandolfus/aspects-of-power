@@ -185,6 +185,19 @@ export class ItemItemData extends foundry.abstract.TypeDataModel {
         value: new fields.NumberField({ initial: 0 }),
       }), { initial: [] }),
 
+      // ── Deployable (design 2026-08-10) ────────────────────────────────
+      // A rare item that is PLACED rather than used up: deploying spawns a
+      // stub actor to hold it, and the item travels ONTO that actor. That is
+      // what makes the deployed thing identifiable — an aura sourced from it
+      // is a pylon aura because the pylon ITEM is sitting in its inventory,
+      // so nothing needs a pylon tag on an actor.
+      //   deployStubActorUuid  the stub NPC cloned to stand in for the item
+      //   deployedTokenUuid    set while deployed; empty when carried
+      //   deployOwnerUuid      who may recover it — the owner, and only them
+      deployStubActorUuid: new fields.StringField({ initial: '' }),
+      deployedTokenUuid:   new fields.StringField({ initial: '' }),
+      deployOwnerUuid:     new fields.StringField({ initial: '' }),
+
       // Repair kit fields.
       isRepairKit:  new fields.BooleanField({ initial: false }),
       repairAmount: new fields.NumberField({ initial: 25, min: 0, integer: true }),

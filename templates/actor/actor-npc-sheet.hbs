@@ -77,6 +77,61 @@
           </div>
         </div>
 
+        {{!-- AI TACTICS — the faculties ai.mjs actually reads. Until 2026-08-10
+              these were flag-only: the engine consumed them but no sheet
+              offered them, so every NPC in the world ran on defaults and the
+              faculty picker existed only on the skill sheet for authoring
+              summons. Bound straight to flag dot-paths (never setFlag: the
+              scope is `aspects-of-power`, so setFlag on `aspectsofpower`
+              throws). --}}
+        <div class="resource flex-group-center" title="AI tactics — the optional smartness faculties. Without these the creature charges straight at the nearest target.">
+          <label class="resource-label">AI Tactics</label>
+          <div class="resource-content flexcol">
+            <label class="checkbox" title="A* route around movement-blocking walls instead of charging straight into them.">
+              <input type="checkbox" name="flags.aspectsofpower.aiPathfind"
+                     {{checked actor.flags.aspectsofpower.aiPathfind}} /> Pathfind
+            </label>
+            <label class="checkbox" title="Deviate around harmful AOE zones when the direct step would cross one.">
+              <input type="checkbox" name="flags.aspectsofpower.aiHazardAvoid"
+                     {{checked actor.flags.aspectsofpower.aiHazardAvoid}} /> Avoid hazards
+            </label>
+            <label class="checkbox" title="Flee when badly hurt with a threat nearby. Sticky: holds until HP recovers well past the threshold.">
+              <input type="checkbox" name="flags.aspectsofpower.aiSelfPreserve"
+                     {{checked actor.flags.aspectsofpower.aiSelfPreserve}} /> Self-preserve
+            </label>
+            <label class="checkbox" title="Weigh targets rather than simply attacking the nearest.">
+              <input type="checkbox" name="flags.aspectsofpower.aiSmartTarget"
+                     {{checked actor.flags.aspectsofpower.aiSmartTarget}} /> Smart targeting
+            </label>
+            <label class="checkbox" title="Prefer the target with the lowest HP fraction — a finisher.">
+              <input type="checkbox" name="flags.aspectsofpower.aiFocusWeakest"
+                     {{checked actor.flags.aspectsofpower.aiFocusWeakest}} /> Focus weakest
+            </label>
+          </div>
+        </div>
+
+        <div class="resource flex-group-center" title="Danger bubble in feet — how close a threat must be for self-preservation to trigger. Blank uses the system default.">
+          <label class="resource-label">Danger (ft)</label>
+          <div class="resource-content flexrow flex-center flex-between">
+            <input type="number" name="flags.aspectsofpower.aiDangerFt"
+                   value="{{actor.flags.aspectsofpower.aiDangerFt}}" min="0" step="5" placeholder="default" />
+          </div>
+        </div>
+
+        <div class="resource flex-group-center" title="Force this creature to use one specific skill as its attack, instead of picking the best affordable one.">
+          <label class="resource-label">Forced Skill</label>
+          <div class="resource-content flexrow flex-center flex-between">
+            <select name="flags.aspectsofpower.aiSkillUuid">
+              <option value="">(pick best affordable)</option>
+              {{#each actor.items as |i|}}
+                {{#if (eq i.type "skill")}}
+                <option value="{{i.uuid}}" {{#if (eq i.uuid ../actor.flags.aspectsofpower.aiSkillUuid)}}selected{{/if}}>{{i.name}}</option>
+                {{/if}}
+              {{/each}}
+            </select>
+          </div>
+        </div>
+
         {{!-- Barrier --}}
         {{#if (gt system.barrier.max 0)}}
         <div class="resource flex-group-center resource-barrier">

@@ -1795,6 +1795,25 @@ eq('junk situational entries are skipped, not NaN',
      effectiveClockTick({ running: true, startedAtMs: 20000, clockAtStart: 400, ticksPerMs: 0.5 }, 10000, 400), 400);
 }
 
+// ── Tag registration has a LABEL (the orphaned-reader guard) ──
+// `pylon` sat unregistered for days while activities.mjs read it, so the
+// radius branch could never fire. `mobile` is the same shape and is STILL
+// unpopulated by design. A registered tag whose label key is missing from
+// en.json renders as a raw i18n path in the picker, which is how these rot.
+{
+  const { readFileSync } = await import('node:fs');
+  const en = JSON.parse(readFileSync(new URL('../lang/en.json', import.meta.url), 'utf8'));
+  const A = en.ASPECTSOFPOWER ?? {};
+  const dig = (path) => path.split('.').reduce((o, k) => (o ?? {})[k], A);
+  // Positive control: a tag known to be registered and labelled for months.
+  eq('lang control: ki system tag is labelled', typeof dig('SystemTag.ki.label'), 'string');
+  eq('lang: pylon system tag is labelled', typeof dig('SystemTag.pylon.label'), 'string');
+  eq('lang: pylon system tag has a description', typeof dig('SystemTag.pylon.desc'), 'string');
+  eq('lang control: infused combat tag is labelled', typeof dig('Tag.infused'), 'string');
+  eq('lang: effort combat tag is labelled', typeof dig('Tag.effort'), 'string');
+  eq('lang: life-drain combat tag is labelled', typeof dig('Tag.lifeDrain'), 'string');
+}
+
 // ── Strain recovery rate (world clock, ruled 2026-08-10: HALF meditation) ──
 {
   const { readFileSync } = await import('node:fs');

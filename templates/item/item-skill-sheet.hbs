@@ -1053,6 +1053,62 @@
           </div>
           {{/if}}
 
+          {{#if show.stacks}}
+          {{!-- STACKS: the subsystem shipped 2026-08-03 with no authoring
+                surface at all, so the `stacks` tag was tickable and
+                configured nothing. Producer fields and spender fields are
+                split because one skill legally does both. --}}
+          <div class='aop-subblock'>
+            <span class='aop-subblock-title'>Stacks</span>
+            <div class='aop-field-grid'>
+              <div class='aop-field'>
+                <label class='resource-label' title='The named pool this skill produces into or spends from. Producer and spender MUST use the same name to talk to each other.'>Pool Name</label>
+                <input type='text' name='system.tagConfig.stackPool'
+                       value='{{system.tagConfig.stackPool}}' placeholder='e.g. embers' />
+              </div>
+              <div class='aop-field'>
+                <label class='resource-label' title='Stacks created per cast. 0 = this skill is not a producer.'>Produces</label>
+                <input type='number' name='system.tagConfig.stackProduces'
+                       value='{{system.tagConfig.stackProduces}}' min='0' step='1' />
+              </div>
+              <div class='aop-field'>
+                <label class='resource-label' title='Pool ceiling the producer fills to. Overridden by Cap Stat when that is set.'>Cap</label>
+                <input type='number' name='system.tagConfig.stackCap'
+                       value='{{system.tagConfig.stackCap}}' min='0' step='1' />
+              </div>
+              <div class='aop-field'>
+                <label class='resource-label' title='Ability whose MOD sets the cap instead of the flat Cap. Empty = use the flat Cap. When set, the flat Cap becomes the FLOOR.'>Cap Stat</label>
+                <select name='system.tagConfig.stackCapStat'>
+                  <option value='' {{#unless system.tagConfig.stackCapStat}}selected{{/unless}}>(flat cap)</option>
+                  {{#each config.abilities as |label key|}}
+                    <option value='{{key}}' {{#if (eq key ../system.tagConfig.stackCapStat)}}selected{{/if}}>{{localize label}}</option>
+                  {{/each}}
+                </select>
+              </div>
+              <div class='aop-field'>
+                <label class='resource-label' title='Minimum stacks spent per activation. 0 = this skill is not a spender.'>Cost</label>
+                <input type='number' name='system.tagConfig.stackCost'
+                       value='{{system.tagConfig.stackCost}}' min='0' step='1' />
+              </div>
+              <div class='aop-field'>
+                <label class='resource-label' title='Ceiling on a single activation. 0 = spend everything the pool has.'>Max Spend</label>
+                <input type='number' name='system.tagConfig.stackMaxSpend'
+                       value='{{system.tagConfig.stackMaxSpend}}' min='0' step='1' />
+              </div>
+              <div class='aop-field'>
+                <label class='resource-label' title='EXPONENT on the spend, not a per-stack factor: multiplier = spent ** scaling. 1.0 = linear, below 1 = diminishing, above 1 = accelerating.'>Scaling Exponent</label>
+                <input type='number' name='system.tagConfig.stackScaling'
+                       value='{{system.tagConfig.stackScaling}}' min='0' step='0.05' />
+              </div>
+              <div class='aop-field'>
+                <label class='resource-label' title='Budget for splitting a spend across targets: fields + targets must not exceed this. 6 gives 5-at-one or 4-at-two. 0 = single target only.'>Spread Budget</label>
+                <input type='number' name='system.tagConfig.stackSpreadBudget'
+                       value='{{system.tagConfig.stackSpreadBudget}}' min='0' step='1' />
+              </div>
+            </div>
+          </div>
+          {{/if}}
+
           {{#if (eq system.reactionType "guardian")}}
           <div class='aop-subblock'>
             <span class='aop-subblock-title'>Guardian</span>

@@ -223,6 +223,23 @@ export function meditationAuraBonusFor(actor) {
  * @param {Item|null} skill    the skill being performed, for the tag filter
  * @returns {{mult:number, sources:string[]}}
  */
+/**
+ * Is this actor a deployed pylon — i.e. does it CARRY a pylon item?
+ *
+ * The pylon-ness lives on the item so that recovering the item takes the
+ * extended reach with it. Exported so the deployable subsystem and any
+ * future consumer ask the question exactly one way.
+ *
+ * @param {Actor} actor
+ * @returns {boolean}
+ */
+export function isPylonSource(actor) {
+  for (const item of actor?.items ?? []) {
+    if ((item.system?.tags ?? []).includes('pylon')) return true;
+  }
+  return false;
+}
+
 export function activityHasteFor(actor, skill = null) {
   const none = { mult: 1, sources: [] };
   const selfDoc = actor?.getActiveTokens?.()?.[0]?.document;
@@ -266,7 +283,11 @@ export function activityHasteFor(actor, skill = null) {
       // the caster, reaching very much further. The scan needs no special case
       // for "is this an object" — it already walks every token on the scene —
       // so this is only the radius multiplier.
-      if (src.hasTag?.('pylon')) radiusFt *= (Number(c.activityHastePylonMult) || 1);
+      // ⚠ Asks what the source HOLDS, not what it IS (ruled 2026-08-10): a
+      // pylon is a rare ITEM, and deploying it moves that item onto the stub
+      // actor that stands in for it. Keyed on the actor instead, the aura
+      // would keep its extended reach after the item was recovered.
+      if (isPylonSource(src)) radiusFt *= (Number(c.activityHastePylonMult) || 1);
       if (radiusFt <= 0) continue;
       const them = centreOf(tokenDoc);
       const dist = Math.hypot(me.x - them.x, me.y - them.y);

@@ -174,6 +174,17 @@ export const TAG_REGISTRY = {
   // the engine knows what a 'monk' is — see playbook-tag-driven-classes.
   'ki': { label: 'ASPECTSOFPOWER.SystemTag.ki.label', category: 'resource', implies: [], description: 'ASPECTSOFPOWER.SystemTag.ki.desc' },
 
+  // ── Deployables ──
+  // ⚠ AN ITEM TAG. A pylon is a RARE ITEM you place, not a kind of creature —
+  // deploying it spawns a stub actor and moves the ITEM onto that actor, so
+  // the deployed thing is recognised by what it CARRIES. activityHasteFor()
+  // therefore asks "does this aura's source hold a pylon item?", never "is
+  // this actor a pylon". Putting it on an actor would make the pylon-ness
+  // survive the item being recovered.
+  // ⚠ NOT the `pylon` ritual mediumType in config — a deferred long-range
+  // network node, unrelated.
+  'pylon': { label: 'ASPECTSOFPOWER.SystemTag.pylon.label', category: 'passive', implies: [], description: 'ASPECTSOFPOWER.SystemTag.pylon.desc' },
+
   // ── Accumulation ──
   // `stacking` marks a thing whose effect ACCUMULATES from repeated events
   // rather than applying once. It says nothing about the rate - how much is

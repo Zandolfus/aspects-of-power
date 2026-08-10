@@ -243,6 +243,16 @@
               <option value="manual" {{#if (eq actor.flags.aspectsofpower.aiDefense "manual")}}selected{{/if}}>Manual Def</option>
             </select>
           </div>
+          {{!-- The same faculties the NPC sheet exposes: relevant here for
+                summons and allied units that are character-type actors. --}}
+          <div class="identity-row ai-row" title="AI tactics — optional smartness faculties. Without these the unit charges straight at the nearest target.">
+            <label>Tactics</label>
+            <label class="checkbox" title="A* route around movement-blocking walls."><input type="checkbox" name="flags.aspectsofpower.aiPathfind" {{checked actor.flags.aspectsofpower.aiPathfind}} /> Path</label>
+            <label class="checkbox" title="Deviate around harmful AOE zones."><input type="checkbox" name="flags.aspectsofpower.aiHazardAvoid" {{checked actor.flags.aspectsofpower.aiHazardAvoid}} /> Hazard</label>
+            <label class="checkbox" title="Flee when badly hurt with a threat nearby."><input type="checkbox" name="flags.aspectsofpower.aiSelfPreserve" {{checked actor.flags.aspectsofpower.aiSelfPreserve}} /> Flee</label>
+            <label class="checkbox" title="Weigh targets rather than attacking the nearest."><input type="checkbox" name="flags.aspectsofpower.aiSmartTarget" {{checked actor.flags.aspectsofpower.aiSmartTarget}} /> Smart</label>
+            <label class="checkbox" title="Prefer the lowest-HP-fraction target."><input type="checkbox" name="flags.aspectsofpower.aiFocusWeakest" {{checked actor.flags.aspectsofpower.aiFocusWeakest}} /> Finish</label>
+          </div>
           {{/if}}
           <div class="identity-row identity-actions">
             <button type="button" class="level-up-btn">
