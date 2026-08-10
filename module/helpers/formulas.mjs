@@ -1512,3 +1512,42 @@ export function debuffBuildupTriggered(total, statMod, flatFloor = 0) {
   if (threshold <= 0) return false;
   return t >= threshold;
 }
+
+/**
+ * Spatial storage rows for a collection of items. PURE — golden-tested.
+ *
+ * ⚠ THE ONE COPY OF THIS MATH. It lived twice: once in
+ * systems/spatial-storage `storagesOf` and once inlined in
+ * actor.prepareDerivedData — and the copies had ALREADY DRIFTED, since only
+ * the actor's produced the `over` flag. spatial-storage.mjs even carries a
+ * header warning that a second copy "would be exactly the kind of drift this
+ * codebase keeps paying for". It lives here rather than in the system module
+ * because actor.mjs must not import systems/spatial-storage: that reaches
+ * celerity, which imports item.mjs, and actor -> item is the cycle the code
+ * standards forbid.
+ *
+ * Contents weigh `weight x quantity`. Capacity is in POUNDS.
+ *
+ * @param {Iterable<{id: string, name: string, system: object}>} items
+ * @returns {Array<{id,name,equipped,capacity,used,free,over}>}
+ */
+export function spatialStorageRows(items) {
+  const all = [...(items ?? [])];
+  const round1 = (n) => Math.round(n * 10) / 10;
+  const out = [];
+  for (const item of all) {
+    const capacity = item?.system?.spatialCapacity ?? 0;
+    if (!(capacity > 0)) continue;
+    let used = 0;
+    for (const inner of all) {
+      if (inner?.system?.storedIn !== item.id) continue;
+      used += (inner.system.weight ?? 0) * (inner.system.quantity ?? 1);
+    }
+    out.push({
+      id: item.id, name: item.name, equipped: !!item.system.equipped,
+      capacity, used: round1(used), free: round1(capacity - used),
+      over: used > capacity,
+    });
+  }
+  return out;
+}

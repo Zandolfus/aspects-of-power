@@ -1805,6 +1805,40 @@ eq('junk situational entries are skipped, not NaN',
      effectiveClockTick({ running: true, startedAtMs: 20000, clockAtStart: 400, ticksPerMs: 0.5 }, 10000, 400), 400);
 }
 
+// ── Spatial storage rows (the de-duplicated capacity math) ──
+{
+  const { spatialStorageRows: rows } = F2;
+  const mk = (id, name, cap, opts = {}) => ({ id, name, system: {
+    spatialCapacity: cap, equipped: opts.equipped ?? false,
+    storedIn: opts.storedIn ?? '', weight: opts.weight ?? 0,
+    quantity: opts.quantity ?? 1 } });
+  // Control: an ordinary item is not a storage, so it produces no row.
+  eq('spatial: a non-storage yields no row', rows([mk('a', 'Sword', 0)]).length, 0);
+  const ring = mk('r', 'Ring', 100, { equipped: true });
+  const armour = mk('x', 'Plate', 0, { storedIn: 'r', weight: 30 });
+  const arrows = mk('y', 'Arrows', 0, { storedIn: 'r', weight: 0.5, quantity: 20 });
+  const loose  = mk('z', 'Rope', 0, { weight: 5 });
+  const out = rows([ring, armour, arrows, loose]);
+  eq('spatial: one storage row', out.length, 1);
+  // 30 + (0.5 x 20) = 40 used. QUANTITY MUST COUNT - twenty arrows are not one.
+  eq('spatial: used counts weight x quantity', out[0].used, 40);
+  eq('spatial: free is capacity minus used', out[0].free, 60);
+  eq('spatial: not over at 40 of 100', out[0].over, false);
+  eq('spatial: equipped flag carried', out[0].equipped, true);
+  // Loose items never count against a storage.
+  eq('spatial: unstored items are ignored', rows([ring, loose])[0].used, 0);
+  // Over-capacity must be detectable - a shrunk capacity strands contents.
+  const small = mk('s', 'Thimble', 10, {});
+  eq('spatial: over flag when contents exceed capacity',
+     rows([small, mk('big', 'Anvil', 0, { storedIn: 's', weight: 50 })])[0].over, true);
+  eq('spatial: free goes negative when over', 
+     rows([small, mk('big', 'Anvil', 0, { storedIn: 's', weight: 50 })])[0].free, -40);
+  // Contents of ANOTHER storage do not leak into this one.
+  const r2 = mk('r2', 'Ring2', 100, {});
+  eq('spatial: storages do not share contents',
+     rows([ring, r2, armour])[1].used, 0);
+}
+
 // ── Debuff build-up threshold (generalised from Chilled -> Frozen) ──
 {
   const { debuffBuildupTriggered: bt } = F2;

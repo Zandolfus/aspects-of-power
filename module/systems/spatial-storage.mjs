@@ -27,6 +27,7 @@
  */
 
 import { chargeActionCost, isInActiveCombat } from './celerity.mjs';
+import { spatialStorageRows } from '../helpers/formulas.mjs';
 
 /** Is this item a spatial storage? */
 export function isStorage(item) {
@@ -46,21 +47,17 @@ export function isStorage(item) {
  * would be exactly the kind of drift this codebase keeps paying for.
  */
 
-/** Every storage the actor owns, with live usage. */
+/**
+ * Every storage the actor owns, with live usage.
+ *
+ * Thin wrapper over the ONE copy of the math (helpers/formulas
+ * `spatialStorageRows`), which actor.prepareDerivedData also uses. The two
+ * used to be separate loops that had already drifted — only the actor's
+ * produced the `over` flag — which is precisely the duplication this file's
+ * own header warns against.
+ */
 export function storagesOf(actor) {
-  const out = [];
-  for (const item of (actor?.items ?? [])) {
-    if (!isStorage(item)) continue;
-    let used = 0;
-    for (const inner of actor.items) {
-      if (inner.system?.storedIn === item.id) used += (inner.system.weight ?? 0) * (inner.system.quantity ?? 1);
-    }
-    const capacity = item.system.spatialCapacity;
-    out.push({ id: item.id, name: item.name, equipped: !!item.system.equipped,
-               capacity, used: Math.round(used * 10) / 10,
-               free: Math.round((capacity - used) * 10) / 10 });
-  }
-  return out;
+  return spatialStorageRows(actor?.items ?? []);
 }
 
 /** Contents of one storage. */

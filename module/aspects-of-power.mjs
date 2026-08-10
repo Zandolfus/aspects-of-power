@@ -764,6 +764,16 @@ Hooks.once('init', function () {
     if (!locked.has('augmentSlots')  && cs.augmentSlots === undefined)  cs.augmentSlots = derived.augmentSlots;
     if (!locked.has('reach')         && cs.reach === undefined)         cs.reach = derived.reach;
     if (!locked.has('damageBonus')   && cs.damageBonus === undefined)   cs.damageBonus = derived.damageBonus;
+    // Spatial storage capacity — the augment-granted field that makes an item
+    // a storage at all. deriveItemStats has always COMPUTED and returned this,
+    // and spatial-storage.mjs documents it as "written onto the host by
+    // deriveItemStats", but the write-back never assigned it: the only
+    // storages in the world are system-authored ones carrying a hand-set
+    // value. A CRAFTED spatial ring got nothing, so the crafter-scaled
+    // magnitude the design calls for never reached the host.
+    if (!locked.has('spatialCapacity') && cs.spatialCapacity === undefined) {
+      cs.spatialCapacity = derived.spatialCapacity;
+    }
     if (!locked.has('damageReduction') && cs.damageReduction === undefined) {
       cs.damageReduction = {
         physical: derived.damageReductionPhysical,

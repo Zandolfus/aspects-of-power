@@ -223,4 +223,4 @@ export function deriveItemStats(itemOrPatch) {
 }
 
 /** Fields the derivation can touch (what the lock UI shows toggles for). */
-export const DERIVABLE_FIELDS = ['statBonuses', 'armorBonus', 'veilBonus', 'augmentSlots', 'durabilityMax', 'reach', 'damageBonus', 'damageReduction'];
+export const DERIVABLE_FIELDS = ['statBonuses', 'armorBonus', 'veilBonus', 'augmentSlots', 'durabilityMax', 'reach', 'damageBonus', 'damageReduction', 'spatialCapacity'];

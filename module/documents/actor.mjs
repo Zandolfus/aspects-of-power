@@ -5,7 +5,7 @@ import { proficiencyDamageMult } from '../systems/weapon-styles.mjs';
 import { carriedWeightLb, buffCapacity, abilityMod, abilityModTotal,
          abilityPostCurveFactors, abilityValues,
          buffLoadByAbility, buffDefenceCost, kiMaxFor,
-         unarmedStatGrant } from '../helpers/formulas.mjs';
+         unarmedStatGrant, spatialStorageRows } from '../helpers/formulas.mjs';
 
 /**
  * Change keys that `prepareDerivedData` consumes BY HAND — every ability, plus
@@ -662,23 +662,10 @@ export class AspectsofPowerActor extends Actor {
     for (const item of this.items) {
       if ((item.system?.spatialCapacity ?? 0) > 0 && item.system?.equipped) equippedStorages.add(item.id);
     }
-    systemData.spatialStorages = [];
-    for (const item of this.items) {
-      if ((item.system?.spatialCapacity ?? 0) <= 0) continue;
-      let used = 0;
-      for (const inner of this.items) {
-        if (inner.system?.storedIn === item.id) {
-          used += (inner.system.weight ?? 0) * (inner.system.quantity ?? 1);
-        }
-      }
-      systemData.spatialStorages.push({
-        id: item.id, name: item.name, equipped: !!item.system.equipped,
-        capacity: item.system.spatialCapacity,
-        used: Math.round(used * 10) / 10,
-        free: Math.round((item.system.spatialCapacity - used) * 10) / 10,
-        over: used > item.system.spatialCapacity,
-      });
-    }
+    // ONE copy of the capacity math (systems/spatial-storage storagesOf).
+    // This block used to duplicate those two loops, and the copies had already
+    // drifted — only this one produced the `over` flag.
+    systemData.spatialStorages = spatialStorageRows(this.items);
     systemData.carryWeight = carriedWeightLb(
       this.items.map(i => ({
         id: i.id, weight: i.system?.weight ?? 0,
