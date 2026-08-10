@@ -5,7 +5,7 @@ import { proficiencyDamageMult } from '../systems/weapon-styles.mjs';
 import { carriedWeightLb, buffCapacity, abilityMod, abilityModTotal,
          abilityPostCurveFactors, abilityValues,
          buffLoadByAbility, buffDefenceCost, kiMaxFor,
-         unarmedStatGrant, spatialStorageRows } from '../helpers/formulas.mjs';
+         unarmedStatGrant, spatialStorageRows, defenceValue } from '../helpers/formulas.mjs';
 
 /**
  * Change keys that `prepareDerivedData` consumes BY HAND — every ability, plus
@@ -603,10 +603,15 @@ export class AspectsofPowerActor extends Actor {
     // reading it early (per) — whichever you're better at. Substitutes,
     // never stacks; melee specialists unchanged, per-primaries (rangers,
     // magic marksmen) get melee-defense return on their main stat.
-    let meleeVal  = Math.round((effectiveDex + Math.max(strMod, effectivePer) * 0.3) * 1.1) + effectBonus('system.defense.melee.value');
-    let rangedVal = Math.round((effectiveDex * 0.3 + effectivePer) * 1.1) + effectBonus('system.defense.ranged.value');
-    let mindVal   = Math.round((intMod + wisMod * 0.3) * 1.1) + effectBonus('system.defense.mind.value');
-    let soulVal   = Math.round((wisMod + wilMod * 0.3) * 1.1) + effectBonus('system.defense.soul.value');
+    //
+    // ⚠ Weights NORMALISED 2026-08-10 (helpers/formulas defenceValue): the
+    // attack blend splits ONE unit between its two stats, so defence must too.
+    // It used to be primary 1.0 + secondary 0.3 = 1.3, a flat 30% edge over
+    // offence against a roll that only bridges 1.307x.
+    let meleeVal  = defenceValue(effectiveDex, Math.max(strMod, effectivePer)) + effectBonus('system.defense.melee.value');
+    let rangedVal = defenceValue(effectivePer, effectiveDex)                   + effectBonus('system.defense.ranged.value');
+    let mindVal   = defenceValue(intMod, wisMod)                               + effectBonus('system.defense.mind.value');
+    let soulVal   = defenceValue(wisMod, wilMod)                               + effectBonus('system.defense.soul.value');
 
     // Enraged: reduce melee/ranged by percentage.
     if (meleeRangedPctReduction > 0) {

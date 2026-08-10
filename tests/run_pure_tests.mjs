@@ -766,6 +766,33 @@ eq('damage: resistance does not protect the ward', tar.barrierRemaining, 0);
 const tan = resolveDamage({ incoming: 500, affinityResist: 100, mitigation: 50, drValue: 25, augDR: 25, health: 400 });
 eq('damage: order-free without a barrier', tan.hpLoss, 300);
 
+// ── DEFENCE WEIGHTS MUST SUM TO ONE, LIKE THE ATTACK BLEND'S ──
+// The property, not the arithmetic: a character with perfectly FLAT stats must
+// have a dodge basis equal to their own attack blend, so a mirror match sits at
+// 1.0x. Before normalising it sat at 1.30x against a roll that bridges 1.307x
+// — flat stats were one thousandth from self-immunity.
+{
+  const DT = { secondaryWeight: 0.3, defenceInflation: 1.1 };
+  const FLAT = 1000;
+  const dodgeBasis = F2.defenceValue(FLAT, FLAT, DT) / 1.1;   // dodgeBasisDiv
+  const attackBlend = weaponStatBlend(100, { str: FLAT, dex: FLAT, per: FLAT }, false, CFG).blend;
+  eq('defence: flat stats give a 1.0 mirror', Math.round(dodgeBasis), attackBlend);
+  // ⚠ NEGATIVE CONTROL — the un-normalised form is what we are moving away
+  // from. Pin the old number so nobody "restores" it without seeing the ratio.
+  const oldWay = Math.round((FLAT + FLAT * 0.3) * 1.1) / 1.1;
+  eq('defence: the OLD weights summed to 1.30', +(oldWay / attackBlend).toFixed(2), 1.30);
+  // A pure specialist still beats a balanced attacker - normalising bounds the
+  // edge, it does not remove it.
+  eq('defence: specialists still gain', F2.defenceValue(1200, 400, DT) > F2.defenceValue(1000, 1000, DT), true);
+  // The normaliser is DERIVED from secondaryWeight, so changing one knob keeps
+  // the sum at 1. A hardcoded 1.3 would silently break here.
+  const DT2 = { secondaryWeight: 0.5, defenceInflation: 1.1 };
+  eq('defence: normaliser tracks secondaryWeight',
+    Math.round(F2.defenceValue(FLAT, FLAT, DT2) / 1.1), FLAT);
+  eq('defence: zero secondary is the primary alone',
+    Math.round(F2.defenceValue(FLAT, 0, { secondaryWeight: 0, defenceInflation: 1 })), FLAT);
+}
+
 // Overhealth sits AFTER the margin, so it soaks only what actually landed.
 const to = resolveDamage({ incoming: 1000, mitigation: 200, margin: 0.5, overhealth: 300, health: 600 });
 eq('damage: margin applies before overhealth', to.overhealthAbsorbed, 300);

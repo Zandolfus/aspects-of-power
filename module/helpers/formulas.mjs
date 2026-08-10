@@ -323,6 +323,38 @@ export function investSelfDamage(potency, invested, baseCost, safeInvest) {
 }
 
 /**
+ * A defence lane's value from its two stats.
+ *
+ *   (primary + secondary × secW) / (1 + secW) × inflation
+ *
+ * ⚠⚠ THE `/ (1 + secW)` IS THE WHOLE POINT (normalised 2026-08-10). The attack
+ * side's weights SUM TO 1 by construction — `weaponStatBlend` splits one unit
+ * between str and dex — while defence used to add a 0.3 secondary on top of a
+ * full-weight primary, summing to 1.3. Defence therefore beat offence by 30%
+ * for identical stats, and the roll can only bridge 1.307x, so a character
+ * with perfectly flat stats sat one thousandth under being immune to
+ * themselves. Measured on the live party: 4 of 14 could not land a blow on a
+ * copy of themselves, and 29 of 182 matchups were absolutely immune.
+ *
+ * Normalising takes that to 1 of 14 and 10 of 182, drops the 10+ round slogs,
+ * and leaves median time-to-kill unchanged (1.5 -> 1.6 rounds).
+ *
+ * The STAT CHOICES are untouched — those are ruled and diegetic (melee reads
+ * str-or-per, projectiles are dodged with per and dex). Only the total weight
+ * changed, so no lane changes character.
+ *
+ * @param {number} primaryMod
+ * @param {number} secondaryMod
+ * @param {object} [cfg]  defenseTuning override, for tests.
+ */
+export function defenceValue(primaryMod, secondaryMod, cfg = null) {
+  const t = cfg ?? (globalThis.CONFIG?.ASPECTSOFPOWER?.defenseTuning ?? {});
+  const secW = t.secondaryWeight ?? 0.3;
+  return Math.round(((Number(primaryMod) || 0) + (Number(secondaryMod) || 0) * secW)
+    / (1 + secW) * (t.defenceInflation ?? 1.1));
+}
+
+/**
  * Effective dodge value: defense.value ÷ dodgeBasisDiv, scramble-penalized.
  * THE number the dodge roll, the defense prompt preview, and the AI
  * auto-policy must all agree on (it was computed inline in all three).

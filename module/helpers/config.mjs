@@ -733,6 +733,25 @@ ASPECTSOFPOWER.defenseTuning = {
   // parity dodge sits at 91% and mirror fights never resolve (sim
   // 2026-06-12); stripped, parity is a 54% coin flip and fights conclude.
   dodgeBasisDiv: 1.1,
+  // ── Defence lane weights (helpers/formulas defenceValue) ──
+  // Every lane is `primary + secondary x secondaryWeight`, then divided by
+  // their SUM so the pair carries one unit of stat — exactly like the attack
+  // blend, which splits one unit between str and dex.
+  //
+  // ⚠⚠ THE DIVISION IS LOAD-BEARING. Without it the weights summed to 1.3
+  // while the attack side summed to 1.0, so defence beat offence by 30% on
+  // identical stats. The hit roll only bridges 1.307x, which put a character
+  // with perfectly flat stats one thousandth away from being immune to
+  // themselves. Live party before normalising: 4 of 14 could not hit a copy of
+  // themselves and 29 of 182 matchups were absolutely immune; after, 1 and 10,
+  // with median time-to-kill unmoved (1.5 -> 1.6 rounds).
+  //
+  // Change `secondaryWeight` and the normaliser follows it automatically —
+  // that is why it is derived rather than written as a second constant.
+  secondaryWeight: 0.3,
+  // Legacy inflation kept so displayed defence values stay in their old range;
+  // `dodgeBasisDiv` divides it straight back out for the opposed roll.
+  defenceInflation: 1.1,
   // Windup: damage multiplier = clamp(weight × skillMult / 100, min, max).
   // UNCLAMPED-linear per 2026-06-11 ruling — dagger 0.6×, sword 1.0×,
   // greatsword 2.0×. Heavy = anti-armor burst, light = on-hit frequency.
