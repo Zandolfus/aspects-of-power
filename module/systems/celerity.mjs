@@ -21,7 +21,7 @@ import { weaponStatBlend, perceiveGateDecision, spellCastWeight } from '../helpe
 import { effectiveClockTick, interpolateMovementPosition } from '../helpers/movement-path.mjs';
 import { heldImplementWeight } from './weapon-styles.mjs';
 import { tickDotsFor } from './dot.mjs';
-import { declarePlannedMove, stopDeclaredMove } from './movement.mjs';
+import { declarePlannedMove, stopDeclaredMove, priceMovementPath } from './movement.mjs';
 
 // Re-export for the existing consumers (overlay, tracker, aura-ticks,
 // engagement-halts) — the implementation moved to helpers/movement-path.mjs
@@ -613,6 +613,11 @@ export async function recordActionFired(actor, skill) {
 export async function declareAction(actor, skill, options = {}) {
   const combatant = findCombatantForActor(actor);
   if (!combatant) return null;
+  // A corpse can't act — mirror of the declareMovement guard.
+  if ((actor.system?.health?.value ?? 1) <= 0) {
+    ui.notifications.warn(`${actor.name} is incapacitated.`);
+    return null;
+  }
 
   // ── Concurrency gate (design-concurrent-actions, RULED 2026-07-14) ──
   // A movement in flight (declaredMovement track) COEXISTS with the declare
@@ -913,13 +918,17 @@ export function computeMovementStamina(actor, distanceFt, modeKey) {
  * @param {string} [mode]  Movement mode key ('walk' | 'sprint'); defaults to walk.
  * @returns {number} wait in ticks (min 1)
  */
-export function computeMovementWait(actor, distanceFt, mode) {
+export function computeMovementWait(actor, distanceFt, mode, pricedFt = null) {
   const sc = CONFIG.ASPECTSOFPOWER.celerity;
   const moveBaseWeight = sc.MOVEMENT_BASE_WEIGHT_PER_5FT ?? 10;
   const dexMod = Math.max(1, actor.system.abilities?.dexterity?.mod ?? 0);
   const m = resolveMovementMode(mode);
   const speedMult = Math.max(0.01, actor.system.movementSpeedMultiplier ?? 1);
-  return Math.max(1, Math.round((distanceFt / 5) * moveBaseWeight * m.celerityMult * sc.SCALE / (dexMod * speedMult)));
+  // TIME prices the EFFECTIVE distance (threatened ground + slowing terrain,
+  // priceMovementPath); STAMINA stays on the real feet walked — moving
+  // carefully through a guard's reach is slow, not tiring.
+  const timeFt = pricedFt ?? distanceFt;
+  return Math.max(1, Math.round((timeFt / 5) * moveBaseWeight * m.celerityMult * sc.SCALE / (dexMod * speedMult)));
 }
 
 /**
@@ -1138,6 +1147,12 @@ export async function declareMovement(actor, startPos, endPos, distanceFt, stami
   const combatant = findCombatantForActor(actor);
   if (!combatant) return null;
   if (distanceFt <= 0) return null;
+  // A corpse can't walk. Incapacitation already unqueues both tracks; this
+  // stops NEW declares (a drag of a downed token, a stale AI decision).
+  if ((actor.system?.health?.value ?? 1) <= 0) {
+    ui.notifications.warn(`${actor.name} is incapacitated.`);
+    return null;
+  }
 
   // ── Concurrency gate (design-concurrent-actions, RULED 2026-07-14) ──
   // Movement runs on its OWN track (declaredMovement) parallel to the skill
@@ -1203,10 +1218,18 @@ export async function declareMovement(actor, startPos, endPos, distanceFt, stami
   }
 
   const m = resolveMovementMode(mode);
-  const wait = computeMovementWait(actor, distanceFt, m.key);
+  // Price the path against the live battlefield: threatened ground and
+  // slowing terrain cost extra TIME (stamina stays on real feet). The
+  // checkpoint reprice recomputes the remainder with the same ticks-per-
+  // effective-foot rate, so a flood conjured mid-walk changes the price too.
+  const pricing = combatant.token
+    ? priceMovementPath(combatant.token, startPos, endPos, distanceFt)
+    : { effectiveFt: distanceFt, mult: 1 };
+  const wait = computeMovementWait(actor, distanceFt, m.key, pricing.effectiveFt);
   const clockTick = getClockTick(combatant.combat);
   const scheduledTick = clockTick + wait;
-  const label = `Move ${distanceFt}ft (${m.label})`;
+  const impeded = pricing.mult > 1.05;
+  const label = `Move ${distanceFt}ft (${m.label}${impeded ? `, impeded ×${pricing.mult.toFixed(1)}` : ''})`;
 
   // PARALLEL TRACK: movement lives on declaredMovement (2026-07-14), beside —
   // not instead of — any queued skill. nextActionTick = the SOONER of the two
@@ -1226,6 +1249,11 @@ export async function declareMovement(actor, startPos, endPos, distanceFt, stami
       movementMode: m.key,
       blocked,
       requestedEndPos,
+      priceMult: pricing.mult,
+      // Declare-formula rate, stored so the checkpoint reprice can extend or
+      // shrink the remainder with EXACTLY this declare's math (wait per
+      // effective foot) without re-deriving stats mid-flight.
+      ticksPerEffFt: pricing.effectiveFt > 0 ? wait / pricing.effectiveFt : 0,
     },
     'flags.aspectsofpower.nextActionTick': Math.min(scheduledTick, _qaTick),
     'flags.aspectsofpower.lastActionWait': wait,

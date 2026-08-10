@@ -1052,6 +1052,7 @@ export function registerAIHooks() {
 
     const actor = combatantDoc.actor;
     if (!actor) return;
+    if ((actor.system?.health?.value ?? 1) <= 0) return; // downed AI stays down
     const profileName = actor.flags?.aspectsofpower?.aiProfile;
     if (!profileName) return;
     const profile = AIProfiles.get(profileName);
@@ -1081,6 +1082,7 @@ export function registerAIHooks() {
     if (combatantDoc.flags?.aspectsofpower?.declaredAction) return;
     if (combatantDoc.flags?.aspectsofpower?.declaredMovement) return;
     const actor = combatantDoc.actor;
+    if ((actor?.system?.health?.value ?? 1) <= 0) return; // downed AI stays down
     const profileName = actor?.flags?.aspectsofpower?.aiProfile;
     if (!profileName) return;
     const profile = AIProfiles.get(profileName);
@@ -1127,6 +1129,7 @@ export function registerAIHooks() {
     if (combatantDoc.flags?.aspectsofpower?.declaredAction) return;   // not inert
     if (combatantDoc.flags?.aspectsofpower?.declaredMovement) return; // still moving
     const actor = combatantDoc.actor;
+    if ((actor?.system?.health?.value ?? 1) <= 0) return; // downed AI stays down
     const profileName = actor?.flags?.aspectsofpower?.aiProfile;
     if (!profileName) return;
     const profile = AIProfiles.get(profileName);

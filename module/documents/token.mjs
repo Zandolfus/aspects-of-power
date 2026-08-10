@@ -1,5 +1,5 @@
 import { declareMovement, resolveMovementMode, getActiveMovementMode, clampMoveNoOverlap, enemyBlocksSegment, getClockTick } from '../systems/celerity.mjs';
-import { isExecutingMove, haltDeclaredMove } from '../systems/movement.mjs';
+import { isExecutingMove, haltDeclaredMove, repriceRemainder } from '../systems/movement.mjs';
 
 /**
  * Extended TokenDocument for Aspects of Power.
@@ -54,17 +54,21 @@ export class AspectsofPowerToken extends foundry.documents.TokenDocument {
     if (isExecutingMove(this.id)) {
       const combatNow = game.combat;
       if (combatNow?.started) {
+        const cm = combatNow.combatants.find(
+          c => c.tokenId === this.id && c.sceneId === this.parent?.id
+        );
         const seg = movement.passed?.waypoints?.at?.(-1) ?? movement.destination;
-        if (seg && enemyBlocksSegment(this, { x: this.x, y: this.y }, { x: seg.x ?? this.x, y: seg.y ?? this.y })) {
-          const cm = combatNow.combatants.find(
-            c => c.tokenId === this.id && c.sceneId === this.parent?.id
-          );
-          if (cm) {
-            haltDeclaredMove(this, cm, getClockTick(combatNow))
-              .catch(err => console.error('[movement] halt failed:', err));
-            return false; // cancel this segment; the halt settles the rest
-          }
+        if (cm && seg && enemyBlocksSegment(this, { x: this.x, y: this.y }, { x: seg.x ?? this.x, y: seg.y ?? this.y })) {
+          haltDeclaredMove(this, cm, getClockTick(combatNow))
+            .catch(err => console.error('[movement] halt failed:', err));
+          return false; // cancel this segment; the halt settles the rest
         }
+        // Re-price the remainder against the live battlefield: a flood
+        // conjured mid-charge, a guard who stepped into the lane, a threat
+        // that left — the remaining schedule stretches or shrinks here, at
+        // the same checkpoints where collision is already reality-checked.
+        // Fire-and-forget: pricing must never delay the segment commit.
+        if (cm) setTimeout(() => repriceRemainder(this, cm), 0);
       }
       return; // clear segment — let core commit it
     }

@@ -718,6 +718,16 @@ ASPECTSOFPOWER.movement = {
   // smaller = crisper pauses + finer mid-flight collision checks, at the cost
   // of more update operations per walk.
   checkpointSpacingSquares: 2,
+  // THREATENED movement (ruled 2026-08-09): each foot of a path inside a
+  // living hostile's melee threat costs this multiple of celerity time.
+  // Derived from the LIVE melee roster, not theory: at 3x, walking out of a
+  // declared peer swing fails for every current front-liner (George's axe
+  // winds up in ~1,365 ticks; even Gabriel at dex 819 needs ~1,465 to walk
+  // clear of a reach-10 band) — disengaging an engaged melee demands a
+  // SPRINT (3x stamina, all-out). Hit-and-run stays alive: Gabriel WALKS
+  // out of a giant's ultraheavy windup (~2,500+ ticks) with room to spare.
+  // At 2x, walking escapes were still free for most of the roster.
+  threatenedMoveMult: 3,
 };
 
 /**

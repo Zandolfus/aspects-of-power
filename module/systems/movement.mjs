@@ -26,8 +26,9 @@
  * of truth for waits, costs, and scheduling; this module only executes.
  */
 
-import { buildCheckpointPath, interpolateMovementPosition } from '../helpers/movement-path.mjs';
+import { buildCheckpointPath, interpolateMovementPosition, effectiveClockTick } from '../helpers/movement-path.mjs';
 import { isActingGM } from '../helpers/gm.mjs';
+import { getThreatRadiusFt } from './engagement-halts.mjs';
 
 const FLAG_NS = 'aspectsofpower';
 
@@ -199,7 +200,161 @@ export function pauseAllDeclaredMoves(combat) {
  */
 function _watchMovementEnd(tokenDoc) {
   const finished = tokenDoc.movement?.finished;
-  if (finished?.then) finished.then(() => _executing.delete(tokenDoc.id));
+  if (!finished?.then) return;
+  finished.then((completed) => {
+    _executing.delete(tokenDoc.id);
+    if (completed) return;
+    // CONSTRAINED stop: core halted the glide against something physical —
+    // spike-verified 2026-08-09 that a wall conjured mid-flight stops the
+    // movement with movement.constrained === true. Our own cancels and
+    // re-plans are never `constrained`, so this discriminates cleanly.
+    // Settle the declaration at the wall (pro-rated, per the halt rules).
+    if (!tokenDoc.movement?.constrained) return;
+    const combat = game.combat;
+    if (!combat?.started) return;
+    const cm = combat.combatants.find(
+      c => c.tokenId === tokenDoc.id && c.sceneId === tokenDoc.parent?.id
+    );
+    const mv = cm?.flags?.[FLAG_NS]?.declaredMovement;
+    if (!mv?.endPos) return;
+    if (Math.hypot(mv.endPos.x - tokenDoc.x, mv.endPos.y - tokenDoc.y) < 2) return;
+    const cf = combat.flags?.[FLAG_NS] ?? {};
+    const nowTick = effectiveClockTick(cf.realtime, Date.now(), cf.clockTick ?? 0);
+    haltDeclaredMove(tokenDoc, cm, nowTick, 'the way is blocked')
+      .catch(err => console.error('[movement] constrained settlement failed:', err));
+  });
+}
+
+/**
+ * Price a movement path against the world as it stands RIGHT NOW.
+ *
+ * Two things make ground expensive (ruled 2026-08-09):
+ *  - THREATENED ground: within a living hostile's melee threat radius
+ *    (their reach, edge-to-edge — getThreatRadiusFt), each foot costs
+ *    `movement.threatenedMoveMult` × celerity time. You can cross a guard's
+ *    reach; you cross it carefully. Incapacitated bodies threaten nothing.
+ *  - SLOWING TERRAIN: regions with an enabled `modifyMovementCost` behavior
+ *    multiply time by their difficulty. This is the first time terrain has
+ *    cost celerity TIME at all — it always cost stamina, never seconds — so
+ *    a conjured flood now actually impedes the charge through it.
+ *
+ * Sampled at 24 points along the straight path; returns the effective
+ * distance for the wait formula plus the aggregate multiplier for display.
+ * Called at declare AND per checkpoint on the remainder (repriceRemainder),
+ * so the price tracks a changing battlefield instead of a declare snapshot.
+ *
+ * @param {TokenDocument} tokenDoc
+ * @param {{x,y}} fromPos  top-left
+ * @param {{x,y}} toPos    top-left
+ * @param {number} distanceFt  the real distance being priced
+ * @returns {{effectiveFt: number, mult: number}}
+ */
+export function priceMovementPath(tokenDoc, fromPos, toPos, distanceFt) {
+  const scene = tokenDoc?.parent;
+  if (!scene || !(distanceFt > 0)) return { effectiveFt: distanceFt, mult: 1 };
+  const gs = scene.grid?.size ?? 100;
+  const ftPerPx = (scene.grid?.distance ?? 5) / gs;
+  const threatMult = Math.max(1, CONFIG.ASPECTSOFPOWER?.movement?.threatenedMoveMult ?? 3);
+  const selfW = (tokenDoc.width ?? 1) * gs, selfH = (tokenDoc.height ?? 1) * gs;
+
+  // Living hostiles and their threat radii, in px from their box edge.
+  const threats = [];
+  for (const t of scene.tokens) {
+    if (t.id === tokenDoc.id || t.hidden) continue;
+    if (t.disposition === tokenDoc.disposition) continue;
+    if ((t.actor?.system?.health?.value ?? 1) <= 0) continue; // a corpse guards nothing
+    threats.push({
+      x: t.x, y: t.y, w: (t.width ?? 1) * gs, h: (t.height ?? 1) * gs,
+      reachPx: Math.max(0, getThreatRadiusFt(t)) / ftPerPx,
+    });
+  }
+
+  // Slowing-terrain regions (enabled modifyMovementCost behaviors).
+  const terrains = [];
+  for (const region of scene.regions ?? []) {
+    for (const b of region.behaviors ?? []) {
+      if (b.disabled || b.type !== 'modifyMovementCost') continue;
+      const diffs = b.system?.difficulties;
+      let d = 1;
+      if (diffs && typeof diffs === 'object') {
+        const vals = Object.values(diffs).filter(v => Number.isFinite(v) && v > 0);
+        if (vals.length) d = Math.max(...vals);
+      } else if (Number.isFinite(diffs)) d = diffs;
+      if (d > 1) terrains.push({ region, difficulty: Math.min(d, 10) });
+      break;
+    }
+  }
+
+  if (!threats.length && !terrains.length) return { effectiveFt: distanceFt, mult: 1 };
+
+  const SAMPLES = 24;
+  let total = 0;
+  for (let i = 1; i <= SAMPLES; i++) {
+    const t = (i - 0.5) / SAMPLES;
+    const px = fromPos.x + (toPos.x - fromPos.x) * t;
+    const py = fromPos.y + (toPos.y - fromPos.y) * t;
+    let m = 1;
+    for (const th of threats) {
+      // Edge-to-edge: the mover's box at this sample vs the threat's box.
+      const dx = Math.max(th.x - (px + selfW), px - (th.x + th.w), 0);
+      const dy = Math.max(th.y - (py + selfH), py - (th.y + th.h), 0);
+      if (Math.hypot(dx, dy) <= th.reachPx) { m = threatMult; break; }
+    }
+    const cx = px + selfW / 2, cy = py + selfH / 2;
+    const elevation = tokenDoc.elevation ?? 0;
+    for (const tr of terrains) {
+      try {
+        if (tr.region.testPoint({ x: cx, y: cy, elevation })) m *= tr.difficulty;
+      } catch { /* region on another level etc. — skip */ }
+    }
+    total += m;
+  }
+  const mult = total / SAMPLES;
+  return { effectiveFt: distanceFt * mult, mult };
+}
+
+/**
+ * Re-price the REMAINDER of an executing movement at a checkpoint. The
+ * declare stored ticksPerEffFt (its own wait ÷ its own priced distance), so
+ * the remainder reprices with EXACTLY the declare formula and no import
+ * cycle. Only material changes commit (>2% and >25 ticks) — the schedule
+ * breathes when the battlefield changed, not from rounding noise.
+ *
+ * Runs on the driving client (a GM), so the combatant update is direct.
+ * The glide speed self-corrects: the canvas speed override reads remaining
+ * distance over remaining ticks each segment.
+ */
+export function repriceRemainder(tokenDoc, combatant) {
+  const mv = combatant?.flags?.[FLAG_NS]?.declaredMovement;
+  if (!mv?.endPos || !(mv.ticksPerEffFt > 0) || typeof mv.scheduledTick !== 'number') return;
+  const scene = tokenDoc.parent;
+  const gs = scene?.grid?.size ?? 100;
+  const ftPerPx = (scene?.grid?.distance ?? 5) / gs;
+  const from = { x: tokenDoc.x, y: tokenDoc.y };
+  const remFt = Math.hypot(mv.endPos.x - from.x, mv.endPos.y - from.y) * ftPerPx;
+  if (!(remFt > 0)) return;
+  const pricing = priceMovementPath(tokenDoc, from, mv.endPos, remFt);
+  const combat = combatant.combat;
+  const cf = combat?.flags?.[FLAG_NS] ?? {};
+  const nowTick = effectiveClockTick(cf.realtime, Date.now(), cf.clockTick ?? 0);
+  const newSched = Math.round(nowTick + pricing.effectiveFt * mv.ticksPerEffFt);
+  const delta = newSched - mv.scheduledTick;
+  if (Math.abs(delta) <= Math.max(25, 0.02 * Math.max(0, mv.scheduledTick - nowTick))) return;
+  const qa = combatant.flags?.[FLAG_NS]?.declaredAction;
+  combatant.update({
+    [`flags.${FLAG_NS}.declaredMovement.scheduledTick`]: newSched,
+    [`flags.${FLAG_NS}.declaredMovement.wait`]: newSched - (mv.declaredAtTick ?? 0),
+    [`flags.${FLAG_NS}.declaredMovement.priceMult`]: pricing.mult,
+    [`flags.${FLAG_NS}.nextActionTick`]: Math.min(
+      newSched, (typeof qa?.scheduledTick === 'number') ? qa.scheduledTick : Infinity),
+  }).catch(err => console.warn('[movement] reprice failed:', err));
+  if (Math.abs(delta) > 100) {
+    ChatMessage.create({
+      speaker: ChatMessage.getSpeaker({ actor: combatant.actor }),
+      content: `<p><em>${combatant.name}'s path ${delta > 0 ? 'grows harder' : 'clears'} — arrival now tick ${newSched}.</em></p>`,
+      whisper: combatant.actor?.hasPlayerOwner ? [] : ChatMessage.getWhisperRecipients('GM'),
+    });
+  }
 }
 
 /**
@@ -213,7 +368,7 @@ function _watchMovementEnd(tokenDoc) {
  * Runs on the driving client, which in the loop-owns-everything model is a
  * GM client, so both updates are direct.
  */
-export async function haltDeclaredMove(tokenDoc, combatant, nowTick) {
+export async function haltDeclaredMove(tokenDoc, combatant, nowTick, reason = 'an enemy blocks the path') {
   await stopDeclaredMove(tokenDoc);
   const mv = combatant?.flags?.[FLAG_NS]?.declaredMovement;
   if (!mv?.startPos || !mv?.endPos) return;
@@ -238,7 +393,7 @@ export async function haltDeclaredMove(tokenDoc, combatant, nowTick) {
   }
   ChatMessage.create({
     speaker: ChatMessage.getSpeaker({ actor }),
-    content: `<p><em>${combatant.name} pulls up short at ${doneFt}ft — an enemy blocks the path.</em></p>`,
+    content: `<p><em>${combatant.name} pulls up short at ${doneFt}ft — ${reason}.</em></p>`,
   });
 }
 

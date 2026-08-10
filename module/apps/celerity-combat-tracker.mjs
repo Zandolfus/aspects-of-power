@@ -257,10 +257,25 @@ async function _onCelAdvance(event, target) {
   // sunk, no roll, exactly like swinging at where someone used to be.
   // Ranged/AOE/untargeted skills pass through unchanged (their fire paths
   // carry their own targeting semantics).
+  // A corpse can't fire. Incapacitation unqueues both tracks when damage
+  // lands, but a fire already in this advance's hands (or a race with the
+  // unqueue write) still needs the gate.
+  if ((c.actor?.system?.health?.value ?? 1) <= 0) {
+    ChatMessage.create({
+      speaker: ChatMessage.getSpeaker({ actor: c.actor }),
+      content: `<p><em>${c.name}'s <strong>${declared.label}</strong> dies with them.</em></p>`,
+    });
+    return 'continue';
+  }
+
   {
     const meleeTypes = ['str_weapon', 'dex_weapon', 'magic_melee'];
+    const rangedTypes = ['phys_ranged', 'magic_projectile'];
+    const rollType = item.system?.roll?.type ?? '';
     const targetIdsAtFire = declared.targetIds ?? [];
-    if (meleeTypes.includes(item.system?.roll?.type ?? '') && targetIdsAtFire.length && c.token) {
+    const isMelee = meleeTypes.includes(rollType);
+    const isRanged = rangedTypes.includes(rollType);
+    if ((isMelee || isRanged) && targetIdsAtFire.length && c.token) {
       const scene = c.token.parent;
       const gs = scene?.grid?.size ?? 100;
       const ftPerPx = (scene?.grid?.distance ?? 5) / gs;
@@ -269,15 +284,22 @@ async function _onCelAdvance(event, target) {
         const dy = Math.max(b.y - (a.y + (a.height ?? 1) * gs), a.y - (b.y + (b.height ?? 1) * gs), 0);
         return Math.hypot(dx, dy) * ftPerPx;
       };
-      const reach = item._resolveSkillReach?.() ?? 5;
-      const anyInReach = targetIdsAtFire.some(tid => {
+      // Melee: skill reach + a hair of slack. Ranged: the caster's throw
+      // range (castingRange, same source the destination prompts use) + a
+      // 5 ft grace so boundary jitter doesn't eat honest shots.
+      const limitFt = isMelee
+        ? (item._resolveSkillReach?.() ?? 5) + 0.5
+        : Math.max(5, Math.round(c.actor?.system?.castingRange ?? 30)) + 5;
+      const anyInRange = targetIdsAtFire.some(tid => {
         const t = scene?.tokens.get(tid);
-        return t && edgeFt(c.token, t) <= reach + 0.5;
+        return t && edgeFt(c.token, t) <= limitFt;
       });
-      if (!anyInReach) {
+      if (!anyInRange) {
         ChatMessage.create({
           speaker: ChatMessage.getSpeaker({ actor: c.actor }),
-          content: `<p><em>${c.name}'s <strong>${declared.label}</strong> cuts empty air — the target is out of reach.</em></p>`,
+          content: isMelee
+            ? `<p><em>${c.name}'s <strong>${declared.label}</strong> cuts empty air — the target is out of reach.</em></p>`
+            : `<p><em>${c.name}'s <strong>${declared.label}</strong> falls short — the target is beyond range.</em></p>`,
         });
         return c.actor?.hasPlayerOwner ? 'pause' : 'continue';
       }

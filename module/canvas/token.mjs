@@ -14,7 +14,7 @@
  *
  * @extends {foundry.canvas.placeables.Token}
  */
-import { resolveMovementMode, getActiveMovementMode, realtimeTicksPerMs } from '../systems/celerity.mjs';
+import { resolveMovementMode, getActiveMovementMode, realtimeTicksPerMs, getClockTick } from '../systems/celerity.mjs';
 import { celerityAnimationSpeed } from '../helpers/movement-path.mjs';
 
 export class AspectsofPowerTokenObject extends foundry.canvas.placeables.Token {
@@ -36,12 +36,18 @@ export class AspectsofPowerTokenObject extends foundry.canvas.placeables.Token {
         c => c.tokenId === this.document.id && c.sceneId === this.document.parent?.id
       );
       const mv = cm?.flags?.aspectsofpower?.declaredMovement;
-      if (mv?.wait > 0 && mv.startPos && mv.endPos) {
-        const distPx = Math.hypot(mv.endPos.x - mv.startPos.x, mv.endPos.y - mv.startPos.y);
-        const spaces = celerityAnimationSpeed(
-          distPx, mv.wait, realtimeTicksPerMs(combat), canvas.grid.size
-        );
-        if (spaces > 0) return spaces;
+      if (mv?.endPos && typeof mv.scheduledTick === 'number') {
+        // REMAINING distance over REMAINING ticks — self-correcting: a
+        // checkpoint reprice (flood, threat) or any accumulated drift is
+        // absorbed by the next segment's speed instead of compounding.
+        const remPx = Math.hypot(mv.endPos.x - this.document.x, mv.endPos.y - this.document.y);
+        const remTicks = mv.scheduledTick - getClockTick(combat);
+        if (remPx > 1 && remTicks > 0) {
+          const spaces = celerityAnimationSpeed(
+            remPx, remTicks, realtimeTicksPerMs(combat), canvas.grid.size
+          );
+          if (spaces > 0) return spaces;
+        }
       }
     }
     return super._getAnimationMovementSpeed(options);
