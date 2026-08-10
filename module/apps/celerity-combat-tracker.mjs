@@ -413,18 +413,13 @@ function _aopSyncTurnMarkers(combat) {
 function _aopIsInTurnMarkerSet(token, combat) {
   const cm = combat.combatants.find(c => c.tokenId === token.id);
   if (!cm) return false;
-  const declared = cm.flags?.[FLAG_NS]?.declaredAction;
-  const nextTick = declared?.scheduledTick ?? null;
-  if (nextTick == null) return true;
-  const clockTick = getClockTick(combat);
-  let soonestTokenId = null;
-  let soonestTick = Infinity;
-  for (const c2 of combat.combatants) {
-    const t = c2.flags?.[FLAG_NS]?.declaredAction?.scheduledTick ?? null;
-    if (t === null || t <= clockTick) continue;
-    if (t < soonestTick) { soonestTick = t; soonestTokenId = c2.tokenId; }
-  }
-  return soonestTokenId === token.id;
+  // READY MEANS BOTH TRACKS ARE EMPTY (user 2026-08-10). This used to read
+  // only declaredAction, so a token doing nothing BUT walking wore a "your
+  // move" ring for the whole walk; and it separately ringed the soonest
+  // queued actor, which made the marker mean two different things at once.
+  // The ring now has exactly one meaning: this combatant needs a decision.
+  const f = cm.flags?.[FLAG_NS] ?? {};
+  return !f.declaredAction && !f.declaredMovement;
 }
 
 function _aopCelerityActive() {
@@ -505,7 +500,10 @@ export function installAopTurnMarkerPatch() {
     if (!_aopCelerityActive()) return;
     const combat = combatant.parent;
     if (!combat?.started) return;
-    if (foundry.utils.hasProperty(changes, `flags.${FLAG_NS}.declaredAction`)) {
+    // BOTH tracks drive the ring now (it means "needs a decision"), so a
+    // movement declare or arrival has to repaint it too.
+    if (foundry.utils.hasProperty(changes, `flags.${FLAG_NS}.declaredAction`)
+      || foundry.utils.hasProperty(changes, `flags.${FLAG_NS}.declaredMovement`)) {
       _aopSyncTurnMarkers(combat);
     }
   });

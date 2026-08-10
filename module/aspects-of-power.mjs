@@ -1365,19 +1365,47 @@ Hooks.on('combatTurnChange', async (combat, _prior, current) => {
 /**
  * Initialize defense pools and reactions when combat starts.
  */
+async function _refreshCombatantForEncounter(combatant) {
+  const actor = combatant?.actor;
+  if (!actor) return;
+  const updateData = {};
+  // armor + veil carry a `pool` in the schema but NO derived poolMax, so
+  // there is nothing to refill them to; the four with a real ceiling
+  // (poolMax = 2x value, actor.prepareDerivedData) are the ones that reset.
+  for (const defKey of ['melee', 'ranged', 'mind', 'soul']) {
+    const poolMax = actor.system.defense[defKey]?.poolMax ?? 0;
+    updateData[`system.defense.${defKey}.pool`] = poolMax;
+  }
+  updateData['system.reactions.value'] = actor.system.reactions?.max ?? 1;
+  await actor.update(updateData);
+}
+
 Hooks.on('combatStart', async (combat) => {
   if (!isActingGM()) return;
-  for (const combatant of combat.combatants) {
-    if (!combatant.actor) continue;
-    const actor = combatant.actor;
-    const updateData = {};
-    for (const defKey of ['melee', 'ranged', 'mind', 'soul']) {
-      const poolMax = actor.system.defense[defKey]?.poolMax ?? 0;
-      updateData[`system.defense.${defKey}.pool`] = poolMax;
-    }
-    updateData['system.reactions.value'] = actor.system.reactions?.max ?? 1;
-    await actor.update(updateData);
-  }
+  for (const combatant of combat.combatants) await _refreshCombatantForEncounter(combatant);
+});
+
+// Reinforcements: a combatant added to an ALREADY-RUNNING fight never went
+// through combatStart, so it arrived with whatever pools the last fight left
+// it and — worse — with lastRoundEndAt at 0 while the clock stands at
+// thousands of ticks. The next advance then tried to run every round it
+// "missed" since tick zero (capped at MAX_ROUND_BOUNDARIES_PER_ADVANCE,
+// silently dropping the rest): a burst of regen, DoTs and sustain upkeep for
+// a creature that was not even present. Anchor its round clock to NOW and
+// give it the same encounter refresh the starting roster got.
+Hooks.on('createCombatant', async (combatant) => {
+  if (!isActingGM()) return;
+  const combat = combatant.parent;
+  if (!combat?.started) return;
+  const clock = combat.flags?.aspectsofpower?.clockTick ?? 0;
+  const rl = combatant.actor?.system?.attributes?.race?.level ?? 1;
+  const roundLen = Celerity.referenceRoundLength(rl);
+  // Floor to a whole round boundary so the first partial round is not
+  // charged twice; the actor's next boundary lands one full round out.
+  await combatant.update({
+    'flags.aspectsofpower.lastRoundEndAt': roundLen > 0 ? Math.floor(clock / roundLen) * roundLen : clock,
+  });
+  await _refreshCombatantForEncounter(combatant);
 });
 
 /* -------------------------------------------- */

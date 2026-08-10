@@ -5934,7 +5934,16 @@ export class AspectsofPowerItem extends Item {
         let intMod = 0;
         let useInfused = false;
         if (isInfused) {
-          const tierFactor  = sc.spellTierFactors?.[spellTier];
+          // INFUSION IS A MANA INJECTION, NOT AN AUTHORED SPELL (user ruling
+          // 2026-08-10: "I thought this worked just as a mana injection as
+          // for spellstrikers"). An untiered weapon skill carrying `infused`
+          // injects at BASIC tier; authoring a higher tier is how a designer
+          // makes the infusion bigger. Grade already auto-derives from the
+          // actor's race rank, so nothing here needs per-skill authoring.
+          // Before this, `spellTierFactors['']` was undefined and EVERY
+          // untiered infused skill silently fell through to a plain swing.
+          const infusedTier = spellTier || 'basic';
+          const tierFactor  = sc.spellTierFactors?.[infusedTier];
           const gradeFactor = sc.spellGradeFactors?.[spellGrade];
           if (tierFactor && gradeFactor) {
             infusedBaseMana = Math.round(tierFactor * gradeFactor);
@@ -5950,7 +5959,7 @@ export class AspectsofPowerItem extends Item {
             // dedicated caster could into the same-tier spell (design-spellstriker
             // fusion balance, 2026-07-03). Burst size grows by authoring a
             // higher-tier spellstrike, gated by wis — consistent with casting.
-            const aboveBaseFactor = sc.spellMaxInvestAboveBase?.[spellTier]
+            const aboveBaseFactor = sc.spellMaxInvestAboveBase?.[infusedTier]
               ?? sc.spellMaxInvestAboveBase?.['']
               ?? 0.1;
             const wisModForCap = this.actor.system.abilities?.wisdom?.mod ?? 0;
@@ -5961,7 +5970,7 @@ export class AspectsofPowerItem extends Item {
             ChatMessage.create({
               speaker, rollMode, ...(whisperGM ? { whisper: whisperGM } : {}),
               flavor: label,
-              content: `<p><em>⚠️ Infused skill missing prerequisites (need spell tier/grade and ${infusedBaseMana || '?'} mana). Striking without infusion.</em></p>`,
+              content: `<p><em>Not enough mana to infuse (needs ${infusedBaseMana || '?'}, has ${infusedManaPool}). Striking without infusion.</em></p>`,
             });
           }
         }
