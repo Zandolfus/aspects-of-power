@@ -456,17 +456,21 @@ ASPECTSOFPOWER.coInvest = {
     potencyLabel: 'Int',
   },
   // ⚠ `potencyStat: HOST_POTENCY` — scales by whatever stat the ATTACK it
-  // rides on already scales by, not by a stat of its own (ruled 2026-08-10:
-  // "stamina should just use the same stat scaling as the attack, as that's
-  // where the effort is going"). So a dagger's exertion is dex-weighted and a
-  // greathammer's is str-weighted, because `weaponStatBlend` already weights
-  // them that way for the swing itself — and on a spell it is int, because
-  // that is what the spell's own output scales by.
+  // rides on already scales by (ruled 2026-08-10: "stamina should just use the
+  // same stat scaling as the attack, as that's where the effort is going").
+  // A dagger's exertion is dex-weighted and a greathammer's is str-weighted
+  // because `weaponStatBlend` already weights them that way for the swing
+  // itself; on a spell it is int, because that is what the spell converts by.
   //
-  // This is the DIFFERENCE between mana and the physical pools. Mana adds a
-  // kind of output you were not otherwise producing (that is the whole
-  // spellstrike fusion, and why `infused` keeps its own int term). Effort
-  // just adds MORE OF WHAT YOU ARE ALREADY DOING, so it inherits.
+  // ⚠ WHY MANA DOESN'T INHERIT AND THESE TWO DO — and it is NOT that mana
+  // "adds a different kind of damage". I argued that and it was wrong: the
+  // mana in an infused strike is exactly what deals the extra damage, the same
+  // way the life in a life-drain strike is. Every resource works the same way.
+  // The difference is only that MANA HAS A DEDICATED CONVERSION STAT and the
+  // other two do not. Intelligence governs turning mana into effect no matter
+  // what the mana is poured into. Nothing in the nine stats governs turning
+  // raw exertion or raw life force into damage, so they convert through
+  // whatever the attack itself converts by.
   effort: {
     resource: 'stamina',
     potencyStat: HOST_POTENCY,
@@ -476,14 +480,36 @@ ASPECTSOFPOWER.coInvest = {
     label: 'Exertion',
     potencyLabel: 'Attack',
   },
+  // Inherits for the same reason effort does (ruled 2026-08-10). Life force has
+  // no dedicated conversion stat either, so a blood WARRIOR converts through
+  // the weapon blend and a blood MAGE through int — one rule, both fantasies.
+  //
+  // ⚠ Intelligence was measured and REJECTED: it handed casters a strictly
+  // better infusion (Olivia 874 from 9% of her HP against 753 from 9% of her
+  // mana) while giving the blood warrior 35% of his strike — backwards from
+  // the character the tag exists for.
+  //
+  // ⚠⚠ VITALITY IS STILL IN THIS, THROUGH THE POOL RATHER THAN THE STAT, and
+  // that is what makes the flat cap correct rather than lazy. One co-invest at
+  // cap is a fixed absolute number, so it costs George (hp 1294) 3% of his
+  // life and Aiden (hp 390) 9% of his: the blood-rich character affords it
+  // more often, the frail one pays dearly for the same swing. The attack
+  // decides how HARD, vitality decides how OFTEN — the same split mana gets
+  // from int and willpower.
+  //
+  // ⚠ coef 1.0 against effort's 0.5, because stamina comes back at 5%/round
+  // and this does not. Uses-to-death at cap across the live roster: Aiden 10,
+  // Olivia 11, John 16, Willy 22, GEORGE 33. George is the outlier to watch in
+  // play — 33 swings is effectively unlimited in a real fight, and if it needs
+  // trimming this coefficient is the one line to move.
   'life-drain': {
     resource: 'health',
-    potencyStat: 'intelligence',
-    capStat: 'wisdom',
+    potencyStat: HOST_POTENCY,
+    capStat: 'toughness',
     coef: 1.0,
     channelled: false,
     label: 'Life-Drain',
-    potencyLabel: 'Int',
+    potencyLabel: 'Attack',
   },
 };
 

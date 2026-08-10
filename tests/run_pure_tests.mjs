@@ -2037,11 +2037,23 @@ eq('junk situational entries are skipped, not NaN',
       { primaryResource: 'mana', tier: '', grade: 'D', hostPotency: 761 }).potency, 761);
   eq('resolve: effort with no host potency is 0',
     r(['effort'], 'mana').potency, 0);
-  // ...while infused does NOT inherit — mana adds a kind of output the attack
-  // was not producing, which is the whole spellstrike fusion.
+  // life-drain inherits too (ruled 2026-08-10) — life force has no dedicated
+  // conversion stat, so a blood warrior converts through the weapon blend and
+  // a blood mage through int.
+  eq('resolve: life-drain inherits the host potency',
+    resolveCoInvest(actor, skill(['life-drain']),
+      { primaryResource: 'stamina', tier: '', grade: 'D', hostPotency: 761 }).potency, 761);
+  // ...while infused does NOT, because intelligence IS mana's conversion stat
+  // whatever the mana is poured into. Pass a host potency and it must be
+  // ignored, or the spellstriker fusion quietly becomes a second effort.
   eq('resolve: infused ignores host potency',
     resolveCoInvest(actor, skill(['infused']),
       { primaryResource: 'stamina', tier: '', grade: 'D', hostPotency: 761 }).potency, 759);
+  // Exactly one pool keeps a dedicated conversion stat. If a second ever
+  // does, that is a design change and should have to announce itself here.
+  eq('co-invest: only mana has its own conversion stat',
+    Object.entries(cfg.coInvest).filter(([, d]) => d.potencyStat !== cfg.HOST_POTENCY)
+      .map(([t]) => t), ['infused']);
   eq('resolve: life-drain beside a stamina strike', r(['life-drain'], 'stamina')?.resource, 'health');
   eq('resolve: no co-invest tag at all', r(['attack', 'melee'], 'stamina'), null);
 
