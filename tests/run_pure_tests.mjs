@@ -1960,7 +1960,11 @@ eq('junk situational entries are skipped, not NaN',
   for (const [tag, def] of Object.entries(registry)) {
     eq(`co-invest ${tag}: tag is a registered combat tag`, typeof cfg.combatTags?.[tag], 'string');
     eq(`co-invest ${tag}: resource is a real pool`, RESOURCES.includes(def.resource), true);
-    eq(`co-invest ${tag}: potencyStat is a real ability`, typeof cfg.abilities?.[def.potencyStat], 'string');
+    // Either a real ability, or the HOST_POTENCY sentinel meaning "scale by
+    // whatever the attack already scales by". Anything else reads
+    // `undefined?.mod ?? 0` and prices the whole co-invest at ZERO damage.
+    eq(`co-invest ${tag}: potencyStat resolves`,
+      def.potencyStat === cfg.HOST_POTENCY || typeof cfg.abilities?.[def.potencyStat] === 'string', true);
     eq(`co-invest ${tag}: capStat is a real ability`, typeof cfg.abilities?.[def.capStat], 'string');
     eq(`co-invest ${tag}: coef is a positive number`, def.coef > 0, true);
   }
@@ -2024,6 +2028,20 @@ eq('junk situational entries are skipped, not NaN',
   eq('resolve: life-drain on a health cast is IGNORED', r(['life-drain'], 'health'), null);
   // ...but each is live the moment the primary is a different pool.
   eq('resolve: effort beside a mana cast', r(['effort'], 'mana')?.resource, 'stamina');
+  // HOST_POTENCY: effort scales by the ATTACK's stat, not one of its own
+  // (ruled 2026-08-10 — "that's where the effort is going"). Pass the swing's
+  // blend and it must come straight back out; pass none and it must be 0
+  // rather than silently falling back to some ability.
+  eq('resolve: effort inherits the host potency',
+    resolveCoInvest(actor, skill(['effort']),
+      { primaryResource: 'mana', tier: '', grade: 'D', hostPotency: 761 }).potency, 761);
+  eq('resolve: effort with no host potency is 0',
+    r(['effort'], 'mana').potency, 0);
+  // ...while infused does NOT inherit — mana adds a kind of output the attack
+  // was not producing, which is the whole spellstrike fusion.
+  eq('resolve: infused ignores host potency',
+    resolveCoInvest(actor, skill(['infused']),
+      { primaryResource: 'stamina', tier: '', grade: 'D', hostPotency: 761 }).potency, 759);
   eq('resolve: life-drain beside a stamina strike', r(['life-drain'], 'stamina')?.resource, 'health');
   eq('resolve: no co-invest tag at all', r(['attack', 'melee'], 'stamina'), null);
 

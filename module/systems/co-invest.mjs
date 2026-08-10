@@ -35,6 +35,10 @@ import { coInvestCap, spellDamageRef } from '../helpers/formulas.mjs';
  * @param {string} opts.primaryResource  the resource the skill already invests
  * @param {string} [opts.tier]           skill's spell tier ('' -> basic)
  * @param {string} opts.grade            the caster's race rank
+ * @param {number} [opts.hostPotency]    the ATTACK's own potency term — the
+ *   weapon's str/dex blend on a strike, int on a spell. Used by any pool whose
+ *   `potencyStat` is HOST_POTENCY (see the config block for why effort does
+ *   and infused does not).
  * @returns {null|{
  *   tag:string, resource:string, label:string, potencyLabel:string,
  *   potency:number, coef:number, channelled:boolean,
@@ -42,7 +46,7 @@ import { coInvestCap, spellDamageRef } from '../helpers/formulas.mjs';
  *   affordable:boolean
  * }}
  */
-export function resolveCoInvest(actor, skill, { primaryResource, tier = '', grade = '' } = {}) {
+export function resolveCoInvest(actor, skill, { primaryResource, tier = '', grade = '', hostPotency = 0 } = {}) {
   const sc = CONFIG.ASPECTSOFPOWER;
   const registry = sc.coInvest ?? {};
   const tags = skill?.system?.tags ?? [];
@@ -84,7 +88,11 @@ export function resolveCoInvest(actor, skill, { primaryResource, tier = '', grad
     resource: def.resource,
     label: def.label ?? tag,
     potencyLabel: def.potencyLabel ?? '',
-    potency: actor.system.abilities?.[def.potencyStat]?.mod ?? 0,
+    // HOST_POTENCY pools amplify the attack rather than adding a second kind
+    // of output, so they scale by whatever the attack already scales by.
+    potency: (def.potencyStat === sc.HOST_POTENCY)
+      ? (Number(hostPotency) || 0)
+      : (actor.system.abilities?.[def.potencyStat]?.mod ?? 0),
     coef: def.coef ?? 1,
     channelled: def.channelled === true,
     baseCost,

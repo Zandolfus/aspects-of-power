@@ -5674,7 +5674,13 @@ export class AspectsofPowerItem extends Item {
       const _coEligible = !orbDischarging && !options.ritualActivation
         && tags.includes('attack') && !_isHeal && !_isBarrier;
       const coInvest = _coEligible
-        ? resolveCoInvest(this.actor, this, { primaryResource: _resKey, tier: spellTier, grade: spellGrade })
+        ? resolveCoInvest(this.actor, this, {
+            primaryResource: _resKey, tier: spellTier, grade: spellGrade,
+            // On a cast, the attack's own potency IS int — so straining
+            // physically to push a spell harder makes a bigger SPELL, which is
+            // the same "the effort goes where the attack goes" rule.
+            hostPotency: intMod,
+          })
         : null;
       const useCoInvest = !!coInvest?.affordable;
       if (coInvest && !useCoInvest) {
@@ -6027,6 +6033,10 @@ export class AspectsofPowerItem extends Item {
         // tiers scale up instead of down.
         const coInvest = resolveCoInvest(this.actor, this, {
           primaryResource: rollData.roll.resource, tier: spellTier, grade: spellGrade,
+          // A HOST_POTENCY pool (effort) scales by the swing's OWN blend, so a
+          // dagger's exertion is dex-weighted and a greathammer's is
+          // str-weighted — `weaponStatBlend` already did that weighting.
+          hostPotency: statBlend,
         });
         const useCoInvest = !!coInvest?.affordable;
         if (coInvest && !useCoInvest) {

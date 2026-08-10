@@ -397,6 +397,9 @@ ASPECTSOFPOWER.spellstrike = {
   infusionCoef: 0.7,
 };
 
+/** @see ASPECTSOFPOWER.HOST_POTENCY */
+const HOST_POTENCY = 'host';
+
 /**
  * CO-INVEST — one tag per second pool (the multi-invest ruling; the two new
  * names were chosen 2026-08-10).
@@ -434,6 +437,14 @@ ASPECTSOFPOWER.spellstrike = {
  * difference between them. `channelled` gates celerity channel time: only a
  * MANA co-invest slows the swing, because channelling is a magic act.
  */
+/**
+ * Sentinel for `potencyStat`: scale by the HOST attack's own potency (the
+ * weapon's str/dex blend on a strike, int on a spell) instead of by a fixed
+ * ability. Exported so systems/co-invest.mjs compares against the constant
+ * rather than a magic string that a typo could silently turn into 0 damage.
+ */
+ASPECTSOFPOWER.HOST_POTENCY = HOST_POTENCY;
+
 ASPECTSOFPOWER.coInvest = {
   infused: {
     resource: 'mana',
@@ -444,14 +455,26 @@ ASPECTSOFPOWER.coInvest = {
     label: 'Infusion',
     potencyLabel: 'Int',
   },
+  // ⚠ `potencyStat: HOST_POTENCY` — scales by whatever stat the ATTACK it
+  // rides on already scales by, not by a stat of its own (ruled 2026-08-10:
+  // "stamina should just use the same stat scaling as the attack, as that's
+  // where the effort is going"). So a dagger's exertion is dex-weighted and a
+  // greathammer's is str-weighted, because `weaponStatBlend` already weights
+  // them that way for the swing itself — and on a spell it is int, because
+  // that is what the spell's own output scales by.
+  //
+  // This is the DIFFERENCE between mana and the physical pools. Mana adds a
+  // kind of output you were not otherwise producing (that is the whole
+  // spellstrike fusion, and why `infused` keeps its own int term). Effort
+  // just adds MORE OF WHAT YOU ARE ALREADY DOING, so it inherits.
   effort: {
     resource: 'stamina',
-    potencyStat: 'strength',
+    potencyStat: HOST_POTENCY,
     capStat: 'toughness',
     coef: 0.5,
     channelled: false,
     label: 'Exertion',
-    potencyLabel: 'Str',
+    potencyLabel: 'Attack',
   },
   'life-drain': {
     resource: 'health',
