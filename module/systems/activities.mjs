@@ -233,6 +233,33 @@ export function meditationAuraBonusFor(actor) {
  * @param {Actor} actor
  * @returns {boolean}
  */
+/**
+ * Whose perception sets this aura's reach.
+ *
+ * Normally the source actor's own. But an aura INSTALLED into a pylon
+ * (systems/deployable stamps `installedBy`) belongs to the commander who put
+ * it there, so it reaches as far as THEY would carry it — the pylon is a
+ * relay, not the speaker. Without this the radius would be decided by
+ * whatever perception the stub actor happened to be authored with, which is
+ * an implementation detail leaking into a game number.
+ *
+ * Falls back to the source when there is no installer, or the installer has
+ * since been deleted.
+ *
+ * @param {Item} skill  the aura skill, as it sits on the source
+ * @param {Actor} src   the actor sourcing the aura
+ * @returns {number} perception mod
+ */
+export function auraPerceptionMod(skill, src) {
+  const installedBy = skill?.flags?.['aspects-of-power']?.installedBy;
+  if (installedBy) {
+    const commander = fromUuidSync(installedBy);
+    const mod = commander?.system?.abilities?.perception?.mod;
+    if (mod > 0) return mod;
+  }
+  return src?.system?.abilities?.perception?.mod ?? 0;
+}
+
 export function isPylonSource(actor) {
   for (const item of actor?.items ?? []) {
     if ((item.system?.tags ?? []).includes('pylon')) return true;
@@ -282,8 +309,13 @@ export function activityHasteFor(actor, skill = null) {
       // carry it — so a crafting aura does not also speed up lockpicking.
       const need = c.activityHasteFor ?? '';
       if (need && !myTags.includes(need)) continue;
-      let radiusFt = auraRadiusFor(c.auraRadius,
-        src.system?.abilities?.perception?.mod ?? 0);
+      // Perception stretches the authored radius, and for an INSTALLED aura
+      // that perception is the COMMANDER'S, not the pylon's (ruled
+      // 2026-08-10: "the pylon should inherit Gabriel's perception"). The
+      // aura is still theirs — the pylon only carries it — so its reach must
+      // follow the person, or the radius would be an artifact of whatever
+      // stats the stub happened to be authored with.
+      let radiusFt = auraRadiusFor(c.auraRadius, auraPerceptionMod(sk, src));
       // DEPLOYED ON A PYLON: a rare deployable projecting the aura instead of
       // the caster, reaching very much further. The scan needs no special case
       // for "is this an object" — it already walks every token on the scene —
