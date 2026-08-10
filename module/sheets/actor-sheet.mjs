@@ -1070,7 +1070,7 @@ export class AspectsofPowerActorSheet extends foundry.applications.api.Handlebar
     const rl = system.attributes?.race?.level ?? 1;
     const refMod = (sc.ROUND_K ?? 3000000) / Math.max(1, referenceRoundLength(rl));
     const refRating = Math.round(celerityRating(refMod));
-    const R = dt.perceiveGateRatio ?? 0;
+    const R = dt.perceiveGateRatio ?? 2.5;
     this._celerity = {
       rating,
       swing: formatTicksAsTime(swingTicks),

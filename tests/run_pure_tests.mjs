@@ -834,19 +834,29 @@ eq('spread: four targets cannot coexist at budget 6',
    spread([1, 1, 1, 1], 6, 5).length, 3);
 
 /* ── THE INVEST CURVE (config invest.curveExponent) ────────────────────── */
-// One exponent behind every commit-more-for-more in the game. Shipped at 0.2;
-// these pin BOTH that the default is unchanged and that the knob works, so a
-// whole-economy sim can be run without forking the formula.
+// One exponent behind every commit-more-for-more in the game. SHIPPED AT 0.5
+// (sqrt), ruled 2026-08-03. These pin BOTH that the fallback tracks config and
+// that the knob works, so a whole-economy sim can be run without forking the
+// formula.
+//
+// ⚠⚠ THESE ASSERTED 0.2 UNTIL 2026-08-10 — the pre-ruling value. The config
+// moved to 0.5 and neither the inline fallback in formulas.mjs nor this block
+// followed, so the suite was GREEN WHILE ASSERTING HISTORY: it certified a
+// default the game had stopped using. Found by the orphaned-reader sweep,
+// which flagged the fallback/config mismatch; realigning the fallback is what
+// made these fail. If the exponent is ever re-ruled, THREE things move
+// together — config.mjs, the formulas.mjs fallback, and this block.
 const C05 = { invest: { curveExponent: 0.5 } };
 const C02 = { invest: { curveExponent: 0.2 } };
-eq('curve: default is 0.2', investCurve({}), 0.2);
+eq('curve: default is 0.5 (sqrt), matching config', investCurve({}), 0.5);
 eq('curve: config drives it', investCurve(C05), 0.5);
-eq('curve: a broken value falls back rather than zeroing damage', investCurve({ invest: { curveExponent: 0 } }), 0.2);
-// Explicit 0.2 must equal the shipped default exactly — this is the off-switch.
-eq('curve: explicit 0.2 == shipped default (strike)',
-   strikeInvestDamage(500, 1, 2, 160, 20, C02), strikeInvestDamage(500, 1, 2, 160, 20));
-eq('curve: explicit 0.2 == shipped default (spell)',
-   spellInvestDamage(500, 1, 160, 20, C02), spellInvestDamage(500, 1, 160, 20));
+eq('curve: an explicit 0.2 still works as a knob', investCurve(C02), 0.2);
+eq('curve: a broken value falls back rather than zeroing damage', investCurve({ invest: { curveExponent: 0 } }), 0.5);
+// Explicit 0.5 must equal the shipped default exactly — this is the off-switch.
+eq('curve: explicit 0.5 == shipped default (strike)',
+   strikeInvestDamage(500, 1, 2, 160, 20, C05), strikeInvestDamage(500, 1, 2, 160, 20));
+eq('curve: explicit 0.5 == shipped default (spell)',
+   spellInvestDamage(500, 1, 160, 20, C05), spellInvestDamage(500, 1, 160, 20));
 // 8x the commitment: 1.52x at 0.2, 2.83x at sqrt.
 eq('curve: 0.2 gives 8x invest -> 1.52x', strikeInvestDamage(1000, 1, 1, 160, 20, C02), 1516);
 eq('curve: sqrt gives 8x invest -> 2.83x', strikeInvestDamage(1000, 1, 1, 160, 20, C05), 2828);

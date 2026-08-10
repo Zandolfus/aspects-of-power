@@ -111,7 +111,7 @@ export async function sweepAuraTicks(combat, newClock) {
       if (!moments.length) continue;
 
       const n = Math.max(1, Math.round(
-        Number(CONFIG.ASPECTSOFPOWER.auras?.ticksPerReferenceRound) || 1));
+        Number(CONFIG.ASPECTSOFPOWER.auras?.ticksPerReferenceRound) || 3));
       // Split, then round. Rounding each third of a heal is a sub-1-point
       // difference; a floor would quietly shave throughput every tick.
       const perTick = Math.round(total / n);

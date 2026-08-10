@@ -406,7 +406,7 @@ export class AspectsofPowerActor extends Actor {
     // with active defense — windup-amplified bursts must not one-shot
     // same-rank actors now that pools no longer absorb them (gap-analysis
     // Family D, sim-validated 2026-06-11). Revert = set hpScale to 1.
-    const hpScale = CONFIG.ASPECTSOFPOWER.defenseTuning?.hpScale ?? 1;
+    const hpScale = CONFIG.ASPECTSOFPOWER.defenseTuning?.hpScale ?? 1.5;
     systemData.health.trueMax = Math.round(systemData.abilities.vitality.mod * 1.25 * hpScale * sizeMultipliers.hp);
     // STRAIN eats into max HP. Floored so a character can never strain below
     // half their true maximum — the mechanic is meant to make you fragile,
@@ -561,7 +561,7 @@ export class AspectsofPowerActor extends Actor {
     // tag table (inlined — no lbs fallback; untagged weapons guard nothing).
     {
       const dt = CONFIG.ASPECTSOFPOWER.defenseTuning ?? {};
-      const coef = dt.blockDRCoef ?? 0;
+      const coef = dt.blockDRCoef ?? 80;
       let bestWeight = 0;
       let bestItem = null;
       if (coef > 0) {

@@ -2708,7 +2708,7 @@ Hooks.on('renderChatMessageHTML', (message, html) => {
         // heavy kit in 5 rounds; at 10% they need 10 and a solo axe never does.
         const _aaCfg = CONFIG.ASPECTSOFPOWER.armorAnswer ?? {};
         let wearRate = 0;
-        if ((_aaCfg.axeWearRate ?? 0) > 0 && damageType === 'physical' && attackerActorUuid) {
+        if ((_aaCfg.axeWearRate ?? 0.10) > 0 && damageType === 'physical' && attackerActorUuid) {
           try {
             const atkActor = await fromUuid(attackerActorUuid);
             const { weaponTypesOf } = await import('./systems/weapon-styles.mjs');

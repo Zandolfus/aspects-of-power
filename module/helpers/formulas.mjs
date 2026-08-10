@@ -90,7 +90,7 @@ export function weaponStatBlend(weight, mods, isRanged, cfg = null) {
  */
 export function spellCastWeight(tier, implementWeight = 0, cfg = null) {
   const sc = cfg ?? (globalThis.CONFIG?.ASPECTSOFPOWER ?? {});
-  const model = sc.spellWeight?.model ?? 'none';
+  const model = sc.spellWeight?.model ?? 'implement';
   if (model === 'none') return 0;
   const tierW = sc.spellTierWeights?.[tier];
   if (!tierW) return 0;
@@ -262,7 +262,7 @@ export function barrierStatBlend(abilities, cfg = null) {
 export function investCurve(cfg = null) {
   const sc = cfg ?? (globalThis.CONFIG?.ASPECTSOFPOWER ?? {});
   const v = Number(sc.invest?.curveExponent);
-  return Number.isFinite(v) && v > 0 ? v : 0.2;
+  return Number.isFinite(v) && v > 0 ? v : 0.5;
 }
 
 /**
@@ -306,7 +306,7 @@ export function investSelfDamage(potency, invested, baseCost, safeInvest) {
  */
 export function effectiveDodgeValue(targetActor, defKey, stacks, dt = null) {
   const t = dt ?? (globalThis.CONFIG?.ASPECTSOFPOWER?.defenseTuning ?? {});
-  const defVal = (targetActor.system.defense[defKey]?.value ?? 0) / (t.dodgeBasisDiv ?? 1);
+  const defVal = (targetActor.system.defense[defKey]?.value ?? 0) / (t.dodgeBasisDiv ?? 1.1);
   return defVal * Math.max(0, 1 - (t.scrambleStackPct ?? 0.15) * stacks);
 }
 
@@ -630,7 +630,7 @@ export function lunarPhaseMultiplier(ritualPhaseIndex, currentElongation, amp = 
   // Amplitude lives with the phase list in CONFIG.celestial, so there is one
   // source of truth for the moon rather than two.
   const C = globalThis.CONFIG?.ASPECTSOFPOWER?.celestial ?? {};
-  const a = amp ?? C.lunarAmplitude ?? 0;
+  const a = amp ?? C.lunarAmplitude ?? 0.40;
   if (!(a > 0)) return 1;
   if (!Number.isFinite(ritualPhaseIndex) || !Number.isFinite(currentElongation)) return 1;
   const centre = ((ritualPhaseIndex % 8) + 8) % 8 * 45;
@@ -980,7 +980,7 @@ export function auraTickMoments(lastTick, newClock, period, cfg = null) {
  */
 export function kiMaxFor(enduranceMod, cfg = null) {
   const sc = cfg ?? (globalThis.CONFIG?.ASPECTSOFPOWER ?? {});
-  const div = Number(sc.ki?.capDivisor) > 0 ? Number(sc.ki.capDivisor) : 150;
+  const div = Number(sc.ki?.capDivisor) > 0 ? Number(sc.ki.capDivisor) : 60;
   const hardMax = Math.max(0, Math.round(Number(sc.ki?.capMax ?? 10)));
   const mod = Number(enduranceMod);
   if (!Number.isFinite(mod) || mod <= 0) return 0;

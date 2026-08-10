@@ -1812,7 +1812,7 @@ export class AspectsofPowerItem extends Item {
       const meltFlat  = this._getArmorMeltFlat(targetActor);
       const _wpnTags = this._resolveWeaponForSkill?.()?.system?.tags ?? [];
       const hasPierce = (this.system.tags ?? []).includes('pierce')
-        || (_aa.pierceWeaponTypes ?? ['hammer', 'mace']).some(t => _wpnTags.includes(t));
+        || (_aa.pierceWeaponTypes ?? ['hammer', 'greathammer', 'mace']).some(t => _wpnTags.includes(t));
       const pierceFlat = hasPierce ? Math.round((_aa.pierceHitFrac ?? 0.23) * _hit) : 0;
       mitigation = Math.max(0, armorLayer - pierceFlat - crushFlat - meltFlat);
     } else {
@@ -3899,7 +3899,7 @@ export class AspectsofPowerItem extends Item {
     // (same override the DoT tick takes), so leaning on the proc buys more
     // armour off. Identical at base invest — see crushFlatAmount.
     const _crushFrac = CONFIG.ASPECTSOFPOWER.armorAnswer?.crushDamageFrac
-                    ?? CONFIG.ASPECTSOFPOWER.armorAnswer?.crushHitFrac ?? 0.10;
+                    ?? CONFIG.ASPECTSOFPOWER.armorAnswer?.crushDamageFrac ?? 0.05;
     const armorCrushFlat = crushFlatAmount({
       enabled: armorCrushVal > 0,
       hasInvestTag: _hasInvestTag,
@@ -5807,7 +5807,7 @@ export class AspectsofPowerItem extends Item {
         // blend: the blend answers "who heals well", the coefficient answers
         // "how much is a heal worth". Keeping them separate means retuning heal
         // size never disturbs which stats a healer wants.
-        const _healCoef = _isHeal ? (sc.healing?.coefficient ?? 1) : 1;
+        const _healCoef = _isHeal ? (sc.healing?.coefficient ?? 0.25) : 1;
         // ⚠ A BARRIER TAKES NO COEFFICIENT AND NO barrierMultiplier — TIER IS
         // THE DIAL (ruled 2026-08-03 after measuring). Both were removed for
         // the same reason: measured in the RIGHT UNIT they were correcting a
@@ -6366,7 +6366,7 @@ export class AspectsofPowerItem extends Item {
     // healer class AND a healer profession still read as one tag, which is
     // exactly the no-stacking rule the design asks for.
     if (tags.includes('attack') && this.actor?.hasTag?.('healer')) {
-      const _sig = Math.max(0, Math.min(1, sc.healerSignature ?? 0));
+      const _sig = Math.max(0, Math.min(1, sc.healerSignature ?? 0.25));
       if (_sig > 0) dmgFormula = `(${dmgFormula}) * ${1 - _sig}`;
     }
 
