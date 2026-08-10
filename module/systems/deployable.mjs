@@ -164,6 +164,94 @@ export async function recoverDeployable(claimant, tokenDoc) {
   return true;
 }
 
+/**
+ * Install an aura skill into a deployed pylon (user, 2026-08-10: "a pylon is
+ * also a place for Leadership professions to deploy specific auras").
+ *
+ * The pylon does not own an aura of its own. A commander installs one, and
+ * from then on the PYLON is the aura's source — which is the whole point,
+ * because `activityHasteFor` multiplies an aura's radius by the skill's
+ * `activityHastePylonMult` when its source holds a pylon item. Gabriel's Call
+ * to Arms is authored at radius 60 with a pylon multiplier of 10, so hosted it
+ * covers 600 ft and keeps covering it after he walks away.
+ *
+ * ⚠ GATED ON OWNING THE SKILL, not on a profession. There is no `leadership`
+ * profession tag in the system — inventing one here would have created a
+ * fourth orphaned reader. Owning the aura is already the real restriction:
+ * exactly one actor in the world has Call to Arms.
+ *
+ * @param {Actor} installer
+ * @param {TokenDocument} pylonToken
+ * @param {Item} skill  an aura skill the installer owns
+ * @returns {Promise<boolean>}
+ */
+export async function installAuraInPylon(installer, pylonToken, skill) {
+  const pylon = pylonToken?.actor;
+  if (!pylon || !skill) return false;
+  if (!isPylonActor(pylon)) {
+    ui.notifications.warn(`${pylonToken?.name ?? 'That'} is not a deployed pylon.`);
+    return false;
+  }
+  if (!installer?.items?.get(skill.id)) {
+    ui.notifications.warn(`${installer?.name ?? 'You'} does not own ${skill.name}.`);
+    return false;
+  }
+  if (!((skill.system?.tagConfig?.auraRadius ?? 0) > 0)) {
+    ui.notifications.warn(`${skill.name} has no aura radius to project.`);
+    return false;
+  }
+  if (pylon.items.some(i => i.name === skill.name)) {
+    ui.notifications.warn(`${skill.name} is already installed in this pylon.`);
+    return false;
+  }
+  if (!isActingGM()) {
+    game.socket.emit('system.aspects-of-power', {
+      action: 'aopInstallPylonAura',
+      installerUuid: installer.uuid, skillId: skill.id, tokenUuid: pylonToken.uuid,
+    });
+    return true;
+  }
+
+  const data = skill.toObject();
+  delete data._id;
+  foundry.utils.setProperty(data, `flags.${FLAG_SCOPE}.installedBy`, installer.uuid);
+  await pylon.createEmbeddedDocuments('Item', [data]);
+  ChatMessage.create({
+    speaker: ChatMessage.getSpeaker({ actor: installer }),
+    content: `<p><em>${installer.name} installs <strong>${skill.name}</strong> into ${pylonToken.name}.</em></p>`,
+  });
+  return true;
+}
+
+/** Remove an installed aura from a pylon. Only the installer may take it back. */
+export async function uninstallAuraFromPylon(claimant, pylonToken, skillName) {
+  const pylon = pylonToken?.actor;
+  const installed = pylon?.items?.find(i => i.name === skillName
+    && i.flags?.[FLAG_SCOPE]?.installedBy);
+  if (!installed) return false;
+  if (installed.flags[FLAG_SCOPE].installedBy !== claimant?.uuid) {
+    ui.notifications.warn(`Only whoever installed ${skillName} can remove it.`);
+    return false;
+  }
+  if (!isActingGM()) {
+    game.socket.emit('system.aspects-of-power', {
+      action: 'aopUninstallPylonAura',
+      claimantUuid: claimant.uuid, tokenUuid: pylonToken.uuid, skillName,
+    });
+    return true;
+  }
+  await installed.delete();
+  return true;
+}
+
+/** Does this actor carry a pylon item — i.e. is it a deployed pylon? */
+export function isPylonActor(actor) {
+  for (const item of actor?.items ?? []) {
+    if ((item.system?.tags ?? []).includes('pylon')) return true;
+  }
+  return false;
+}
+
 export function registerDeployableHooks() {
   game.socket.on('system.aspects-of-power', async (data) => {
     if (!isActingGM()) return;
@@ -177,6 +265,15 @@ export function registerDeployableHooks() {
         const claimant = await fromUuid(data.claimantUuid);
         const tokenDoc = await fromUuid(data.tokenUuid);
         if (claimant && tokenDoc) await recoverDeployable(claimant, tokenDoc);
+      } else if (data?.action === 'aopInstallPylonAura') {
+        const installer = await fromUuid(data.installerUuid);
+        const tokenDoc = await fromUuid(data.tokenUuid);
+        const skill = installer?.items?.get(data.skillId);
+        if (installer && tokenDoc && skill) await installAuraInPylon(installer, tokenDoc, skill);
+      } else if (data?.action === 'aopUninstallPylonAura') {
+        const claimant = await fromUuid(data.claimantUuid);
+        const tokenDoc = await fromUuid(data.tokenUuid);
+        if (claimant && tokenDoc) await uninstallAuraFromPylon(claimant, tokenDoc, data.skillName);
       }
     } catch (err) {
       console.error('Aspects of Power | deployable socket handler failed', err);

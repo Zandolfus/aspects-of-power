@@ -240,6 +240,11 @@ export function isPylonSource(actor) {
   return false;
 }
 
+// ⚠ A pylon has NO aura of its own. A commander INSTALLS one into it
+// (systems/deployable installAuraInPylon), which copies the aura skill onto
+// the pylon actor — so this scan finds it here with no special case, and the
+// multiplier above applies because the pylon holds the pylon item.
+
 export function activityHasteFor(actor, skill = null) {
   const none = { mult: 1, sources: [] };
   const selfDoc = actor?.getActiveTokens?.()?.[0]?.document;
