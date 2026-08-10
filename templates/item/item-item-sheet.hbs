@@ -109,6 +109,29 @@
           </select>
         </div>
 
+        {{!-- Deployable: a rare item that is PLACED rather than used up.
+              Deploying spawns the stub and moves this item onto it; only the
+              owner can pick it back up. --}}
+        <div class="equip-field">
+          <label title="UUID of the stub actor this unfolds into when deployed. Empty = not a deployable.">Deploy Stub</label>
+          <input type="text" name="system.deployStubActorUuid"
+                 value="{{system.deployStubActorUuid}}" placeholder="Actor.xxxxxxxx" />
+        </div>
+        {{#if system.deployStubActorUuid}}
+        <div class="equip-field">
+          <label>Deployment</label>
+          {{#if system.deployedTokenUuid}}
+            <button type="button" class="deployable-recover-btn" title="Return this to its owner's inventory and remove the placed token.">
+              <i class="fas fa-hand-back-fist"></i> Recover
+            </button>
+          {{else}}
+            <button type="button" class="deployable-deploy-btn" title="Place this on the canvas. You will be asked to pick a spot.">
+              <i class="fas fa-map-pin"></i> Deploy
+            </button>
+          {{/if}}
+        </div>
+        {{/if}}
+
         {{!-- Material Type --}}
         <div class="equip-field">
           <label>{{localize "ASPECTSOFPOWER.Material.label"}}</label>

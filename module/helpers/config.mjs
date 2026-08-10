@@ -1337,6 +1337,17 @@ ASPECTSOFPOWER.meditation = {
  */
 ASPECTSOFPOWER.healerSignature = 0.25;
 
+/**
+ * Deployable items (design-deployable-items). A deployable is a rare item that
+ * is PLACED rather than consumed — deploying spawns a stub actor and moves the
+ * item onto it, so the deployed thing is identified by what it carries.
+ */
+ASPECTSOFPOWER.deployable = {
+  // How far from the deployer a deployable may be placed, in feet. You set a
+  // pylon down near yourself; you do not lob it across the battlefield.
+  placeRangeFt: 30,
+};
+
 ASPECTSOFPOWER.strain = {
   // Hard floor: strain can never take more than this fraction of true max HP.
   maxFrac: 0.5,

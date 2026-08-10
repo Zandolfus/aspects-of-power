@@ -55,6 +55,7 @@ import { AIProfiles, registerAIHooks, aiSetFactionFocus } from './systems/ai.mjs
 import { registerMovementHooks } from './systems/movement.mjs';
 import { registerStrainHooks } from './systems/strain.mjs';
 import { registerDeployableHooks } from './systems/deployable.mjs';
+import { registerDeployableHud } from './canvas/deployable-hud.mjs';
 import { registerSummonHud } from './canvas/summon-hud.mjs';
 import { registerMovementHud } from './canvas/movement-hud.mjs';
 import { CelerityCombatTracker, installAopTurnMarkerPatch } from './apps/celerity-combat-tracker.mjs';
@@ -969,6 +970,7 @@ Hooks.once('ready', async function () {
 
   // Token-HUD command buttons (Hold / Manual / Focus / Move) for owned AI units.
   registerSummonHud();
+  registerDeployableHud();
   registerMovementHud();
   Activities.registerActivityHud();
 
