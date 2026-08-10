@@ -11,6 +11,7 @@
 import { getClockTick, referenceRoundLength, runRoundStart, MOVEMENT_ITEM_ID, BREAK_FREE_ITEM_ID, separateOverlappingTokens, formatTicksAsTime, fastestReferenceRound, realtimeTicksPerMs } from '../systems/celerity.mjs';
 import { jumpMovementsTo, stopDeclaredMove, runAllDeclaredMoves, pauseAllDeclaredMoves, runDeclaredMove } from '../systems/movement.mjs';
 import { isActingGM } from '../helpers/gm.mjs';
+import { isAiDriven } from '../systems/ai.mjs';
 // TRIAL-REALTIME: engagement-halts disabled for the real-time-advance trial.
 // If trial reverts, restore this import + the checkEngagementHalts call in
 // _onCelAdvance (search "TRIAL-REALTIME" for both sites). If trial succeeds,
@@ -194,7 +195,7 @@ async function _onCelAdvance(event, target) {
   // NPC arrivals keep the world running: the AI re-decides instantly.
   if (declared.itemId === MOVEMENT_ITEM_ID) {
     ui.notifications.info(`Clock → ${declared.scheduledTick}. ${c.name} arrives (${declared.label}).`);
-    return c.actor?.hasPlayerOwner ? 'pause' : 'continue';
+    return isAiDriven(c.actor) ? 'continue' : 'pause';
   }
 
   // Break-free branch: actor declared a manual break-free against a debuff.
@@ -301,7 +302,7 @@ async function _onCelAdvance(event, target) {
             ? `<p><em>${c.name}'s <strong>${declared.label}</strong> cuts empty air — the target is out of reach.</em></p>`
             : `<p><em>${c.name}'s <strong>${declared.label}</strong> falls short — the target is beyond range.</em></p>`,
         });
-        return c.actor?.hasPlayerOwner ? 'pause' : 'continue';
+        return isAiDriven(c.actor) ? 'continue' : 'pause';
       }
     }
   }
@@ -875,6 +876,11 @@ export class CelerityCombatTracker extends ParentTracker {
     // (shared across clients) so player trackers reflect the GM's loop
     // state without needing their own local _realtimeRunning instance.
     context.celerityRealtimeRunning = !!combat?.flags?.[FLAG_NS]?.realtimeRunning;
+    // Play/pause is EVERYONE's (players route it to the GM over the socket —
+    // anyone at the table can stop the world to think). Advance and Reset are
+    // GM-only: both write the combat document directly, so a player clicking
+    // them only ever produced a permission error.
+    context.isGM = game.user.isGM;
     if (Array.isArray(context.turns)) {
       // Player visibility: per design-celerity.md "Public allies, opaque
       // enemies", non-GM users only see PC-owned combatants in the tracker.

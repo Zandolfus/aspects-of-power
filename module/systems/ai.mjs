@@ -1028,6 +1028,25 @@ export async function aiCommandMove(actor, destCenter) {
  * (action fired), look up the actor's aiProfile flag and dispatch.
  * GM-only so we don't double-fire in multiplayer.
  */
+/**
+ * Is this actor currently driven by the AI, rather than by a human?
+ *
+ * The single definition of "the machine decides for this one", used both by
+ * the AI dispatch hooks and by the combat tracker's pause rule (a
+ * human-driven combatant's arrival must PAUSE the world so its controller
+ * can act; an AI's must not, since the AI decides instantly).
+ *
+ * Manual command (a summoner driving their thrall directly) and death both
+ * hand control back to a human — or to nobody.
+ */
+export function isAiDriven(actor) {
+  const f = actor?.flags?.aspectsofpower;
+  if (!f?.aiProfile) return false;
+  if (f.aiCommand === 'manual') return false;
+  if ((actor.system?.health?.value ?? 1) <= 0) return false;
+  return true;
+}
+
 export function registerAIHooks() {
   Hooks.on('updateCombatant', async (combatantDoc, changes, _options, _userId) => {
     if (!isActingGM()) return;
@@ -1052,13 +1071,11 @@ export function registerAIHooks() {
 
     const actor = combatantDoc.actor;
     if (!actor) return;
-    if ((actor.system?.health?.value ?? 1) <= 0) return; // downed AI stays down
-    const profileName = actor.flags?.aspectsofpower?.aiProfile;
-    if (!profileName) return;
+    if (!isAiDriven(actor)) return;
+    const profileName = actor.flags.aspectsofpower.aiProfile;
     const profile = AIProfiles.get(profileName);
     if (!profile?.onActionReady) return;
     // MANUAL command (summoner driving it directly): the AI stands down.
-    if (actor.flags?.aspectsofpower?.aiCommand === 'manual') return;
 
     // Once-per-tick guard: refuse to re-decide while the clock is stuck.
     const clk = combatantDoc.combat ? getClockTick(combatantDoc.combat) : 0;
@@ -1082,12 +1099,10 @@ export function registerAIHooks() {
     if (combatantDoc.flags?.aspectsofpower?.declaredAction) return;
     if (combatantDoc.flags?.aspectsofpower?.declaredMovement) return;
     const actor = combatantDoc.actor;
-    if ((actor?.system?.health?.value ?? 1) <= 0) return; // downed AI stays down
-    const profileName = actor?.flags?.aspectsofpower?.aiProfile;
-    if (!profileName) return;
+    if (!isAiDriven(actor)) return;
+    const profileName = actor.flags.aspectsofpower.aiProfile;
     const profile = AIProfiles.get(profileName);
     if (!profile?.onActionReady) return;
-    if (actor.flags?.aspectsofpower?.aiCommand === 'manual') return; // owner-driven
     // Once-per-tick guard (shared with the dispatch hook).
     const clk = combatantDoc.combat ? getClockTick(combatantDoc.combat) : 0;
     if (_aiActedAtTick.get(combatantDoc.id) === clk) return;
@@ -1129,12 +1144,10 @@ export function registerAIHooks() {
     if (combatantDoc.flags?.aspectsofpower?.declaredAction) return;   // not inert
     if (combatantDoc.flags?.aspectsofpower?.declaredMovement) return; // still moving
     const actor = combatantDoc.actor;
-    if ((actor?.system?.health?.value ?? 1) <= 0) return; // downed AI stays down
-    const profileName = actor?.flags?.aspectsofpower?.aiProfile;
-    if (!profileName) return;
+    if (!isAiDriven(actor)) return;
+    const profileName = actor.flags.aspectsofpower.aiProfile;
     const profile = AIProfiles.get(profileName);
     if (!profile?.onActionReady) return;
-    if (actor.flags?.aspectsofpower?.aiCommand === 'manual') return; // owner-driven
     // Share the once-per-tick guard so we never stack with a same-tick dispatch.
     const clk = combatantDoc.combat ? getClockTick(combatantDoc.combat) : 0;
     if (_aiActedAtTick.get(combatantDoc.id) === clk) return;
