@@ -1795,6 +1795,29 @@ eq('junk situational entries are skipped, not NaN',
      effectiveClockTick({ running: true, startedAtMs: 20000, clockAtStart: 400, ticksPerMs: 0.5 }, 10000, 400), 400);
 }
 
+// ── Debuff build-up threshold (generalised from Chilled -> Frozen) ──
+{
+  const { debuffBuildupTriggered: bt } = F2;
+  eq('buildup control: parses as a function', typeof bt, 'function');
+  // Chilled's shipped rule: total chill >= dexterity mod.
+  eq('buildup: below the stat mod does not trigger', bt(400, 485, 0), false);
+  eq('buildup: exactly the stat mod triggers',       bt(485, 485, 0), true);
+  eq('buildup: above the stat mod triggers',         bt(600, 485, 0), true);
+  // A zero total must NEVER trigger, even against a zero threshold - a target
+  // already drained to 0 dex would otherwise transform on a no-op stack.
+  eq('buildup: zero total never triggers',           bt(0, 0, 0), false);
+  eq('buildup: zero threshold with real total is inert', bt(50, 0, 0), false);
+  // Flat floor is a floor UNDER the stat, not an override.
+  eq('buildup: flat floor used when higher than stat', bt(100, 20, 100), true);
+  eq('buildup: stat wins when higher than flat floor', bt(100, 200, 50), false);
+  // The live registry entry must stay coherent with the helper.
+  const { readFileSync } = await import('node:fs');
+  const cfgSrc = readFileSync(new URL('../module/helpers/config.mjs', import.meta.url), 'utf8');
+  eq('buildup: chilled entry exists in config', /debuffBuildup\s*=\s*\{[\s\S]*?chilled:/.test(cfgSrc), true);
+  eq('buildup: chilled transforms into frozen', /chilled:\s*\{[\s\S]*?into:\s*'frozen'/.test(cfgSrc), true);
+  eq('buildup: chilled keys off dexterity', /chilled:\s*\{[\s\S]*?thresholdStat:\s*'dexterity'/.test(cfgSrc), true);
+}
+
 // ── Tag registration has a LABEL (the orphaned-reader guard) ──
 // `pylon` sat unregistered for days while activities.mjs read it, so the
 // radius branch could never fire. `mobile` is the same shape and is STILL

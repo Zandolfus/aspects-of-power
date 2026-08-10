@@ -1486,3 +1486,29 @@ export function unarmedStatGrant(rarity, cfg = null) {
   }
   return out;
 }
+
+/**
+ * DEBUFF BUILD-UP threshold test. PURE — golden-tested.
+ *
+ * A stacking debuff transforms into a worse one once the accumulated
+ * `debuffDamage` across its live stacks reaches a threshold. The threshold is
+ * an ABILITY MOD when the entry names one — chilled freezes you at exactly the
+ * point it would have drained all your dexterity — with an optional flat floor
+ * for debuffs that answer to no stat.
+ *
+ * ⚠ A zero total NEVER triggers, even against a zero threshold. Otherwise a
+ * target whose stat had already been reduced to nothing would transform on a
+ * stack that contributed literally no accumulation.
+ *
+ * @param {number} total          summed debuffDamage across live stacks
+ * @param {number} statMod        the threshold ability's mod (0 when none)
+ * @param {number} [flatFloor=0]  flat threshold, used as a floor under the stat
+ * @returns {boolean}
+ */
+export function debuffBuildupTriggered(total, statMod, flatFloor = 0) {
+  const t = Number(total) || 0;
+  if (t <= 0) return false;
+  const threshold = Math.max(Number(statMod) || 0, Number(flatFloor) || 0);
+  if (threshold <= 0) return false;
+  return t >= threshold;
+}

@@ -13,6 +13,7 @@ import { buffCapacity, buffModCost, buffLoadByAbility, buffDefenceCost,
          abilityModTotal, abilityPostCurveFactors, abilityValues,
          gradeMultiplierFor, solveBuffScale,
          resolveBuffLoad } from '../helpers/formulas.mjs';
+import { applyDebuffBuildup } from './debuff-buildup.mjs';
 
 export async function executeGmAction(payload) {
     const msgWhisper = payload.whisperGM ? { whisper: payload.whisperGM } : {};
@@ -759,56 +760,20 @@ export async function executeGmAction(payload) {
           });
         }
 
-        // ── Chilled → Frozen threshold transformation ──
-        // After applying a chilled stack, sum debuffDamage across all
-        // active chilled effects. If the total meets or exceeds the
-        // target's dexterity mod (i.e. would drive effectiveDex to 0),
-        // transform: delete all chilled stacks, spawn Frozen. Per
-        // design-player-augments.md — confirmed UX: replace, don't layer.
-        const applyDType = payload.effectData?.system?.debuffType;
-        if (applyDType === 'chilled') {
-          const chillStacks = target.effects.filter(e =>
-            !e.disabled && e.system?.debuffType === 'chilled'
-          );
-          const chillTotal = chillStacks.reduce(
-            (s, e) => s + (Number(e.system?.debuffDamage) || 0), 0
-          );
-          const dexMod = target.system.abilities?.dexterity?.mod ?? 0;
-          if (chillTotal >= dexMod && chillTotal > 0) {
-            // Delete chilled stacks.
-            await target.deleteEmbeddedDocuments('ActiveEffect',
-              chillStacks.map(e => e.id));
-            // Spawn Frozen if not already frozen.
-            const existingFrozen = target.effects.find(e =>
-              !e.disabled && e.system?.debuffType === 'frozen'
-            );
-            const frozenDuration = 2;
-            if (existingFrozen) {
-              await existingFrozen.update({
-                'system.roundsRemaining': frozenDuration,
-                'duration.startRound': startRound,
-                'duration.startTurn':  startTurn,
-              });
-            } else {
-              await target.createEmbeddedDocuments('ActiveEffect', [{
-                name: 'Frozen',
-                img:  'icons/magic/water/snowflake-ice-blue.webp',
-                origin: payload.effectData?.origin ?? '',
-                duration: { rounds: frozenDuration, startRound, startTurn },
-                system: {
-                  debuffType:       'frozen',
-                  debuffDamage:     0,
-                  casterActorUuid:  payload.effectData?.system?.casterActorUuid ?? '',
-                  tags:             ['ice', 'frozen'],
-                },
-              }]);
-            }
-            ChatMessage.create({ speaker: payload.speaker, ...msgWhisper,
-              content: `<p><strong>${target.name}</strong> is <strong>Frozen</strong>! `
-                     + `(${chillStacks.length} chill stacks × ${Math.round(chillTotal/chillStacks.length)} dex ≥ ${dexMod} dex mod)</p>`,
-            });
-          }
-        }
+        // ── Debuff BUILD-UP: a stacking debuff becomes a worse one ──
+        // Was a hand-wired Chilled → Frozen block here; now driven by
+        // CONFIG.debuffBuildup so a second pair is a config entry rather
+        // than another branch in this switch. Behaviour is unchanged for
+        // chilled: sum the live stacks, and at the dexterity mod replace
+        // them all with Frozen.
+        await applyDebuffBuildup(target, payload.effectData?.system?.debuffType, {
+          startRound, startTurn,
+          origin: payload.effectData?.origin ?? '',
+          casterActorUuid: payload.effectData?.system?.casterActorUuid ?? '',
+          speaker: payload.speaker,
+          whisper: msgWhisper,
+        });
+
         break;
       }
 

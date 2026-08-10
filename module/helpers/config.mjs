@@ -2247,6 +2247,42 @@ ASPECTSOFPOWER.debuffTypes = {
 };
 
 /**
+ * DEBUFF BUILD-UP — a debuff that accumulates until it becomes a worse one.
+ *
+ * Generalised 2026-08-10 from the hand-wired Chilled → Frozen check that had
+ * been living inside the gmApplyDebuff switch. The design was always that most
+ * caps are GATEWAYS rather than ceilings (see CAP_BEHAVIOURS in helpers/tags:
+ * `transform` was declared and unimplemented) — chilled freezes you solid,
+ * Sinner's Remorse eventually costs you your actions, armour below a tenth
+ * shatters. This registry is the `transform` half made real.
+ *
+ * Per entry, keyed by the ACCUMULATING debuff type:
+ *   into           the debuff type it becomes
+ *   name / img     display for the spawned effect
+ *   thresholdStat  ability whose MOD the accumulated total must reach. Chilled
+ *                  uses dexterity because that is the stat it drains: it
+ *                  freezes you exactly when it would have taken all of it.
+ *   thresholdFlat  flat total instead of (or as a floor under) the stat
+ *   duration       rounds of the resulting debuff
+ *   tags           tags stamped on the spawned effect
+ *
+ * ⚠ REPLACE, DON'T LAYER (confirmed UX, design-player-augments): crossing the
+ * threshold DELETES every accumulated stack and spawns the successor. Already
+ * suffering the successor refreshes its duration instead of stacking a second.
+ */
+ASPECTSOFPOWER.debuffBuildup = {
+  chilled: {
+    into:          'frozen',
+    name:          'Frozen',
+    img:           'icons/magic/water/snowflake-ice-blue.webp',
+    thresholdStat: 'dexterity',
+    thresholdFlat: 0,
+    duration:      2,
+    tags:          ['ice', 'frozen'],
+  },
+};
+
+/**
  * Zone effects for persistent AOE regions.
  */
 ASPECTSOFPOWER.zoneEffects = {
