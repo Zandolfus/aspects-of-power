@@ -1795,6 +1795,28 @@ eq('junk situational entries are skipped, not NaN',
      effectiveClockTick({ running: true, startedAtMs: 20000, clockAtStart: 400, ticksPerMs: 0.5 }, 10000, 400), 400);
 }
 
+// ── Strain recovery rate (world clock, ruled 2026-08-10: HALF meditation) ──
+{
+  const { readFileSync } = await import('node:fs');
+  const cfgSrc = readFileSync(new URL('../module/helpers/config.mjs', import.meta.url), 'utf8');
+  const strainRate = Number(/recoveryPerHour:\s*([\d.]+)/.exec(cfgSrc)?.[1]);
+  const medRate = Number(/ASPECTSOFPOWER\.meditation\s*=\s*\{[\s\S]*?baseFraction:\s*([\d.]+)/.exec(cfgSrc)?.[1]);
+  // Positive control: both must actually parse, or the ratio below is a lie
+  // told by two NaNs. (A probe that fails soft is a lie — house rule.)
+  eq('strain: recoveryPerHour parses', Number.isFinite(strainRate), true);
+  eq('strain: meditation baseFraction parses', Number.isFinite(medRate), true);
+  eq('strain: recovery is 5% per hour', strainRate, 0.05);
+  eq('strain: recovery is exactly HALF meditation', strainRate * 2, medRate);
+  // The conversion divisor is solved so that one hour of meditation's worth of
+  // mana costs one hour of strain — the time-neutrality anchor. Harvey, live:
+  // mana 678, tough 201 -> 10% of mana = 68 gained; 68 / (201 * 7) = 0.0483.
+  const divisor = Number(/conversionDivisor:\s*(\d+)/.exec(cfgSrc)?.[1]);
+  eq('strain: conversionDivisor parses', Number.isFinite(divisor), true);
+  const harveyStrain = 68 / (201 * divisor);
+  eq('strain: Harvey conversion is time-neutral (~1 hour of strain)',
+     Math.abs(harveyStrain - strainRate) < 0.005, true);
+}
+
 if (failures) { console.error(`\n${failures} FAILURES`); process.exit(1); }
 console.log('\nAll pure-function tests pass.');
 

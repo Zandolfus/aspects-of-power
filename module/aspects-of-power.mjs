@@ -53,6 +53,7 @@ import { SummonHelpers, registerSummonHooks } from './systems/summon.mjs';
 import { ChannelHelpers, registerChannelHooks } from './systems/channel.mjs';
 import { AIProfiles, registerAIHooks, aiSetFactionFocus } from './systems/ai.mjs';
 import { registerMovementHooks } from './systems/movement.mjs';
+import { registerStrainHooks } from './systems/strain.mjs';
 import { registerSummonHud } from './canvas/summon-hud.mjs';
 import { registerMovementHud } from './canvas/movement-hud.mjs';
 import { CelerityCombatTracker, installAopTurnMarkerPatch } from './apps/celerity-combat-tracker.mjs';
@@ -946,6 +947,11 @@ Hooks.once('ready', async function () {
       console.error('Aspects of Power | celestial day-change report failed', err);
     }
   });
+
+  // Strain decays on the same clock: 5% of true max HP per hour, half of
+  // meditation's 10% mana (user ruling 2026-08-10). This is what unblocks
+  // resource-conversion content — until now strain was permanent.
+  registerStrainHooks();
 
   // Register AI dispatch hook (fires on declared-action completion → routes
   // to the actor's `aiProfile` for next-action decision).
