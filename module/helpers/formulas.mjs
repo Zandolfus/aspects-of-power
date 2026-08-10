@@ -275,12 +275,41 @@ export function strikeInvestDamage(statBlend, multiplier, windup, invested, base
 }
 
 /**
- * Spellstrike fusion infusion: int × coef × (mana/ref)^0.2 (dac55a5 —
- * wis-capped upstream; ref = spellDamageRef, NOT the skill's own baseMana).
+ * CO-INVEST damage: the extra term a skill buys by draining a SECOND pool on
+ * top of its primary invest.
+ *
+ *   potency × coef × (invested / ref)^curve
+ *
+ * Shipped as the spellstrike fusion infusion (dac55a5 — wis-capped upstream;
+ * ref = spellDamageRef, NOT the skill's own baseMana), which is the mana case
+ * of exactly this. `coef` is the per-pool price — see config.coInvest.
+ *
+ * ⚠ NOT the `rider` subsystem (riderDamageBase / riderMaxInvest). That is a
+ * proc on a pierced TARGET; this is a second slider on the caster's own
+ * invest dialog.
  */
-export function infusionDamage(intMod, coef, manaInvested, ref, cfg = null) {
-  return Math.round(intMod * coef
-    * Math.pow(Math.max(manaInvested, 1) / Math.max(ref, 1), investCurve(cfg)));
+export function coInvestDamage(potency, coef, invested, ref, cfg = null) {
+  return Math.round(potency * coef
+    * Math.pow(Math.max(invested, 1) / Math.max(ref, 1), investCurve(cfg)));
+}
+
+/**
+ * @deprecated The mana-only name for {@link coInvestDamage}. Kept delegating
+ * because content macros and the golden tests call it (standard 15).
+ */
+export const infusionDamage = coInvestDamage;
+
+/**
+ * The co-invest slider's ceiling: baseCost + capStat × aboveBaseFactor, never
+ * above what the pool actually holds.
+ *
+ * ONE copy so the dialog's `max` and the real path's clamp cannot drift —
+ * the preview-parity rule that 8de305b was written to enforce.
+ */
+export function coInvestCap(baseCost, capStatMod, aboveBaseFactor, pool) {
+  return Math.max(0, Math.min(
+    Math.floor(Math.max(0, pool)),
+    Math.round(baseCost + Math.max(0, capStatMod) * aboveBaseFactor)));
 }
 
 /**

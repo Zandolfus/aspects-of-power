@@ -1,6 +1,6 @@
 import { EquipmentSystem } from '../systems/equipment.mjs';
 import { getPositionalTags } from '../helpers/positioning.mjs';
-import { houseHitFormula, hybridAbilityMod, weaponStatBlend, healStatBlend, spellDamageRef, spellInvestDamage, spellWindupMultiplier, spellCastWeight, strikeInvestDamage, infusionDamage, investSelfDamage as computeInvestSelfDamage, effectiveDodgeValue, splitEvenlyWithRemainder, parryMassMultiplier, bracedParryWeight, bracedMaxUsefulInvest, defenceMarginMultiplier, dotTickDamage, procStaminaCost, crushFlatAmount, riderMaxInvest, auraRadiusFor, barrierStatBlend, hotTickAmount, effectiveDamageMultiplier, clashOutcome } from '../helpers/formulas.mjs';
+import { houseHitFormula, hybridAbilityMod, weaponStatBlend, healStatBlend, spellDamageRef, spellInvestDamage, spellWindupMultiplier, spellCastWeight, strikeInvestDamage, coInvestDamage, investSelfDamage as computeInvestSelfDamage, effectiveDodgeValue, splitEvenlyWithRemainder, parryMassMultiplier, bracedParryWeight, bracedMaxUsefulInvest, defenceMarginMultiplier, dotTickDamage, procStaminaCost, crushFlatAmount, riderMaxInvest, auraRadiusFor, barrierStatBlend, hotTickAmount, effectiveDamageMultiplier, clashOutcome } from '../helpers/formulas.mjs';
 import { resolveSituationalMods } from '../systems/situational-mods.mjs';
 import { recordActionFired, declareAction, isInActiveCombat, computeActionWait, referenceRoundLength, computeWindupMultiplier, getScrambleStacks, addScrambleStack, applyDodgeCost, findCombatantForActor, perceiveGate } from '../systems/celerity.mjs';
 import { getThreatRadiusFt, actorIsDashing } from '../systems/engagement-halts.mjs';
@@ -10,6 +10,7 @@ import { CraftingSkillsMixin } from '../systems/crafting-skills.mjs';
 import { executeGmAction as executeGmActionImpl } from '../systems/gm-actions.mjs';
 import { proficiencyDamageMult, proficiencyHitMult, heldWeaponWeight, heldImplementWeight } from '../systems/weapon-styles.mjs';
 import { stackDamageMultiplier, spendableRange, clampSpread, getStackCount, getStackPayload, addStacks, spendStacks, resolveStackCap } from '../systems/stacks.mjs';
+import { resolveCoInvest } from '../systems/co-invest.mjs';
 
 /**
  * Check if an actor is an assigned player character (not just owned).
@@ -654,78 +655,87 @@ export class AspectsofPowerItem extends Item {
   }
 
   /**
-   * Dual-resource invest dialog for the `infused` melee tag.
+   * Two-slider invest dialog: the skill's PRIMARY resource plus one CO-INVEST
+   * pool (systems/co-invest.mjs — `infused` mana, `effort` stamina,
+   * `life-drain` health).
    *
-   * Two stacked sliders — mana on top (no self-damage), stamina below
-   * (full safe-ceiling/excess/self-damage logic). Live readout shows
-   * Strike + Infusion as separate lines plus the sum.
+   * Generalised 2026-08-10. It used to take parameters literally named
+   * `stamina` and `mana`, which is why the one-tag-per-resource ruling could
+   * be recorded but never used. Both sides are now described by the caller, so
+   * this serves the weapon path (stamina primary) and the spell path (mana or
+   * health primary) with the same code.
    *
-   * Damage:
-   *   strike   = statBlend × multiplier × (stamina_invest / baseStamina)^0.2
-   *   infusion = intMod × (mana_invest / baseMana)^0.2
+   *   primary = potency × multiplier × windup × (invest / damageRef)^curve
+   *   co      = potency × coef       ×          (invest / dmgRef)^curve
    *
-   * @returns {Promise<{stamina:number, mana:number}|null>}
+   * Only the primary carries a safe ceiling and over-invest self-damage, and
+   * only when the caller supplies a `safeInvest` band — a spell's hard wis-cap
+   * passes 0 and the row disappears.
+   *
+   * @returns {Promise<{primary:number, co:number}|null>}
    */
-  async _promptDualResourceInvest({ stamina, mana, multiplier, label, potencyLabel, channelStat = null, channelFactor = null, baseWait = 0, windup = 1, flatBonus = 0 }) {
-    const safeCeiling = stamina.baseCost + stamina.safeInvest;
-    const startStam = stamina.baseCost;
-    const startMana = mana.baseCost;
+  async _promptCoInvest({ primary, co, multiplier, label, potencyLabel, channelStat = null, channelFactor = null, baseWait = 0, windup = 1, flatBonus = 0 }) {
+    const safeCeiling = primary.baseCost + primary.safeInvest;
+    const hasSafeBand = primary.safeInvest > 0;
+    const startPrimary = primary.baseCost;
+    const startCo = co.baseCost;
+    const pLabel = primary.resourceLabel ?? 'primary';
+    const cLabel = co.resource;
+    const cap = (s) => s.charAt(0).toUpperCase() + s.slice(1);
 
-    // Windup was hardcoded to 1 here, same preview-drift bug as the single
-    // dialog — an infused strike is still a weapon swing and carries the
-    // weight term (2026-07-30, [[playbook-damage-measurement]]).
+    // Windup was hardcoded to 1 here once, the same preview-drift bug as the
+    // single dialog — an infused strike is still a weapon swing and carries
+    // the weight term (2026-07-30, [[playbook-damage-measurement]]).
     const _flat = Math.max(0, Math.round(flatBonus));
-    const computeStrike = (sv) => strikeInvestDamage(stamina.potency, multiplier, windup, sv, Math.max(stamina.baseCost, 1)) + _flat;
-    // Infusion preview must mirror the real formula: Int × coef × (mana/dmgRef)^0.2
-    // (fusion penalty coef + grade-relative fixed ref). Fall back to legacy
-    // (coef 1, baseCost denom) if the caller didn't supply the new fields.
-    const infCoef = mana.coef ?? 1;
-    const infRef = mana.dmgRef ?? mana.baseCost;
-    const computeInfusion = (mv) => infusionDamage(mana.potency, infCoef, mv, infRef);
-    const computeSelfDmg = (sv) => computeInvestSelfDamage(stamina.potency, sv, stamina.baseCost, stamina.safeInvest);
-    // Channel time on the mana side — Wis controls rate, mirrors the spell
-    // path so heavy infusion adds the same celerity wait penalty as channeling
-    // a spell of equivalent mana cost.
+    // Both previews call the SAME helpers the real paths call. That is the one
+    // non-negotiable rule in this file (8de305b).
+    const computePrimary = (v) => strikeInvestDamage(primary.potency, multiplier, windup, v, Math.max(primary.damageRef ?? primary.baseCost, 1)) + _flat;
+    const computeCo = (v) => coInvestDamage(co.potency, co.coef, v, co.dmgRef);
+    const computeSelfDmg = (v) => computeInvestSelfDamage(primary.potency, v, primary.baseCost, primary.safeInvest);
+    // Channel time on a MANA co-invest only — Wis controls the rate, mirroring
+    // the spell path so heavy infusion adds the same celerity wait penalty as
+    // channelling a spell of equivalent mana cost. Physical exertion and blood
+    // are not channelled, so those riders pass no channelStat.
     const computeChannel = (channelStat && channelFactor)
-      ? (mv) => Math.round(mv * channelFactor / Math.max(1, channelStat))
+      ? (v) => Math.round(v * channelFactor / Math.max(1, channelStat))
       : null;
 
     const content = `
       <div class="resource-invest dual-resource">
         <div class="invest-meta" style="display:grid;grid-template-columns:1fr 1fr;gap:4px;margin-bottom:8px;font-size:12px;">
-          <div>Strike base (stamina): <strong>${stamina.baseCost}</strong></div>
-          <div>Infusion base (mana): <strong>${mana.baseCost}</strong></div>
-          <div>${potencyLabel} × Mult: <strong>${stamina.potency} × ${multiplier}</strong></div>
-          <div>Int mod: <strong>${mana.potency}</strong></div>
+          <div>Base (${pLabel}): <strong>${primary.baseCost}</strong></div>
+          <div>${co.label} base (${cLabel}): <strong>${co.baseCost}</strong></div>
+          <div>${potencyLabel} × Mult: <strong>${primary.potency} × ${multiplier}</strong></div>
+          <div>${co.potencyLabel} mod: <strong>${co.potency}</strong></div>
           ${windup !== 1 ? `<div>Windup: <strong>${windup.toFixed(2)}×</strong></div>` : ''}
           ${_flat > 0 ? `<div>Weapon buff: <strong>+${_flat}</strong></div>` : ''}
         </div>
 
         <div class="form-group" style="margin-top:6px;">
-          <label>Mana invest: <span class="mana-display">${startMana}</span> / pool ${mana.maxPool}</label>
-          <input type="range" name="mana" min="${mana.baseCost}" max="${mana.maxPool}" value="${startMana}" step="1" style="width:100%;" />
-          <div style="font-size:11px;color:#9cf;">Infusion damage: <strong class="infusion-display">${computeInfusion(startMana)}</strong></div>
-          ${computeChannel ? `<div class="channel-row" style="font-size:11px;color:#fc6;display:${computeChannel(startMana) > baseWait ? 'block' : 'none'};">Channel time: <strong class="channel-display">${computeChannel(startMana)}</strong> ticks <span style="font-size:11px;color:#888;">(exceeds base wait ${baseWait} — celerity wait increases)</span></div>` : ''}
+          <label>${cap(cLabel)} invest: <span class="co-display">${startCo}</span> / pool ${co.maxPool}</label>
+          <input type="range" name="co" min="${co.baseCost}" max="${co.maxPool}" value="${startCo}" step="1" style="width:100%;" />
+          <div style="font-size:11px;color:#9cf;">${co.label} damage: <strong class="co-dmg-display">${computeCo(startCo)}</strong></div>
+          ${computeChannel ? `<div class="channel-row" style="font-size:11px;color:#fc6;display:${computeChannel(startCo) > baseWait ? 'block' : 'none'};">Channel time: <strong class="channel-display">${computeChannel(startCo)}</strong> ticks <span style="font-size:11px;color:#888;">(exceeds base wait ${baseWait} — celerity wait increases)</span></div>` : ''}
         </div>
 
         <div class="form-group" style="margin-top:10px;">
-          <label>Stamina invest: <span class="stamina-display">${startStam}</span> / pool ${stamina.maxPool}</label>
-          <input type="range" name="stamina" min="${stamina.baseCost}" max="${stamina.maxPool}" value="${startStam}" step="1" style="width:100%;" />
-          <div style="font-size:11px;color:#9cf;">Strike damage: <strong class="strike-display">${computeStrike(startStam)}</strong></div>
-          <div class="self-dmg-row" style="font-size:11px;color:#888;">Self-damage: <strong class="self-dmg-display">${computeSelfDmg(startStam)}</strong> <span style="font-size:11px;color:#888;">(over-invest past safe ceiling ${safeCeiling})</span></div>
+          <label>${cap(pLabel)} invest: <span class="primary-display">${startPrimary}</span> / pool ${primary.maxPool}</label>
+          <input type="range" name="primary" min="${primary.baseCost}" max="${primary.maxPool}" value="${startPrimary}" step="1" style="width:100%;" />
+          <div style="font-size:11px;color:#9cf;">${primary.damageLabel ?? 'Strike'} damage: <strong class="primary-dmg-display">${computePrimary(startPrimary)}</strong></div>
+          ${hasSafeBand ? `<div class="self-dmg-row" style="font-size:11px;color:#888;">Self-damage: <strong class="self-dmg-display">${computeSelfDmg(startPrimary)}</strong> <span style="font-size:11px;color:#888;">(over-invest past safe ceiling ${safeCeiling})</span></div>` : ''}
         </div>
 
         <div class="invest-readouts" style="display:grid;grid-template-columns:1fr;gap:4px;margin-top:10px;border-top:1px solid #444;padding-top:6px;">
-          <div style="font-size:14px;">Total damage: <strong class="total-display">${computeStrike(startStam) + computeInfusion(startMana)}</strong></div>
+          <div style="font-size:14px;">Total damage: <strong class="total-display">${computePrimary(startPrimary) + computeCo(startCo)}</strong></div>
         </div>
 
-        <p class="hint" style="font-size:11px;margin-top:8px;">Strike = ${potencyLabel} × multiplier${windup !== 1 ? ' × windup' : ''} × (stamina/base)^0.2. Infusion = Int × ${infCoef} × (mana/ref)^0.2 (fusion penalty; mana wis-capped like a spell). Stamina excess past safe ceiling deals self-damage; mana has no self-damage.</p>
+        <p class="hint" style="font-size:11px;margin-top:8px;">${primary.damageLabel ?? 'Strike'} = ${potencyLabel} × multiplier${windup !== 1 ? ' × windup' : ''} × (${pLabel}/base)^curve. ${co.label} = ${co.potencyLabel} × ${co.coef} × (${cLabel}/ref)^curve, capped by wisdom like a spell of this tier.${hasSafeBand ? ` ${cap(pLabel)} excess past the safe ceiling deals self-damage;` : ''} ${cLabel} has no self-damage${cLabel === 'health' ? ' beyond the cost itself' : ''}.</p>
       </div>`;
 
     // Same uniformity rule as the single-resource invest above: static helper
     // + `render` hook, so one stub can drive every dialog in the system.
     return foundry.applications.api.DialogV2.wait({
-      window: { title: `${label} — Infused (Mana + Stamina)` },
+      window: { title: `${label} — ${co.label} (${cap(pLabel)} + ${cap(cLabel)})` },
       content,
       buttons: [
         {
@@ -733,11 +743,11 @@ export class AspectsofPowerItem extends Item {
           label: 'Use',
           default: true,
           callback: (event, button) => {
-            const sv = parseInt(button.form.elements.stamina?.value, 10);
-            const mv = parseInt(button.form.elements.mana?.value, 10);
-            const sClamped = Math.min(Math.max(stamina.baseCost, sv || stamina.baseCost), stamina.maxPool);
-            const mClamped = Math.min(Math.max(mana.baseCost,    mv || mana.baseCost),    mana.maxPool);
-            return { stamina: sClamped, mana: mClamped };
+            const pv = parseInt(button.form.elements.primary?.value, 10);
+            const cv = parseInt(button.form.elements.co?.value, 10);
+            const pClamped = Math.min(Math.max(primary.baseCost, pv || primary.baseCost), primary.maxPool);
+            const cClamped = Math.min(Math.max(co.baseCost,      cv || co.baseCost),      co.maxPool);
+            return { primary: pClamped, co: cClamped };
           },
         },
         { action: 'cancel', label: 'Cancel', callback: () => null },
@@ -746,28 +756,28 @@ export class AspectsofPowerItem extends Item {
       render: (event, dialog) => {
         const root = dialog?.element ?? dialog;
         if (!root) return;
-        const manaSlider   = root.querySelector('input[name="mana"]');
-        const stamSlider   = root.querySelector('input[name="stamina"]');
-        const manaDisplay  = root.querySelector('.mana-display');
-        const stamDisplay  = root.querySelector('.stamina-display');
-        const strikeDisplay   = root.querySelector('.strike-display');
-        const infusionDisplay = root.querySelector('.infusion-display');
-        const totalDisplay    = root.querySelector('.total-display');
-        const selfDmgDisplay  = root.querySelector('.self-dmg-display');
-        const selfDmgRowEl    = root.querySelector('.self-dmg-row');
+        const coSlider      = root.querySelector('input[name="co"]');
+        const primarySlider = root.querySelector('input[name="primary"]');
+        const coDisplay      = root.querySelector('.co-display');
+        const primaryDisplay = root.querySelector('.primary-display');
+        const primaryDmgDisplay = root.querySelector('.primary-dmg-display');
+        const coDmgDisplay      = root.querySelector('.co-dmg-display');
+        const totalDisplay      = root.querySelector('.total-display');
+        const selfDmgDisplay    = root.querySelector('.self-dmg-display');
+        const selfDmgRowEl      = root.querySelector('.self-dmg-row');
 
         const refreshTotal = () => {
-          const sv = parseInt(stamSlider?.value, 10) || stamina.baseCost;
-          const mv = parseInt(manaSlider?.value, 10) || mana.baseCost;
-          totalDisplay.textContent = computeStrike(sv) + computeInfusion(mv);
+          const pv = parseInt(primarySlider?.value, 10) || primary.baseCost;
+          const cv = parseInt(coSlider?.value, 10) || co.baseCost;
+          totalDisplay.textContent = computePrimary(pv) + computeCo(cv);
         };
         const channelDisplay = root.querySelector('.channel-display');
         const channelRowEl = root.querySelector('.channel-row');
-        if (manaSlider) {
-          manaSlider.addEventListener('input', () => {
-            const v = parseInt(manaSlider.value, 10);
-            manaDisplay.textContent = v;
-            infusionDisplay.textContent = computeInfusion(v);
+        if (coSlider) {
+          coSlider.addEventListener('input', () => {
+            const v = parseInt(coSlider.value, 10);
+            coDisplay.textContent = v;
+            coDmgDisplay.textContent = computeCo(v);
             if (channelDisplay && computeChannel) {
               const ch = computeChannel(v);
               channelDisplay.textContent = ch;
@@ -778,11 +788,11 @@ export class AspectsofPowerItem extends Item {
             refreshTotal();
           });
         }
-        if (stamSlider) {
-          stamSlider.addEventListener('input', () => {
-            const v = parseInt(stamSlider.value, 10);
-            stamDisplay.textContent = v;
-            strikeDisplay.textContent = computeStrike(v);
+        if (primarySlider) {
+          primarySlider.addEventListener('input', () => {
+            const v = parseInt(primarySlider.value, 10);
+            primaryDisplay.textContent = v;
+            primaryDmgDisplay.textContent = computePrimary(v);
             if (selfDmgDisplay && selfDmgRowEl) {
               const selfDmg = computeSelfDmg(v);
               selfDmgDisplay.textContent = selfDmg;
@@ -5373,17 +5383,20 @@ export class AspectsofPowerItem extends Item {
     let investSelfDamage = 0;
     let investSelfDamageFlavor = ''; // "over-channeling" / "over-exerting"
     let investedAmount = null;       // captured for declareAction
-    // Infused-melee: extra mana spend on top of stamina invest. _commitCastCost
-    // deducts this from the actor's mana pool independently of the primary
-    // resource cost. Stays 0 unless the skill carries the `infused` tag and
-    // the actor has enough mana to meet the spell-tier baseMana floor.
-    let infusedManaCost = 0;
+    // CO-INVEST (systems/co-invest.mjs): a second pool spent on top of the
+    // primary invest, for an extra damage term. `_commitCastCost` deducts it
+    // independently of the primary resource cost. All three stay inert unless
+    // the skill carries a co-invest tag naming a pool it does NOT already
+    // invest, and the actor can meet that pool's tier floor.
+    let coInvestCost = 0;
+    let coInvestResource = '';
+    let coInvestLabel = '';
     // Orb implement state captured for _commitCastCost. orbBanked: weight to add
     // on a normal qualifying cast. orbDischargedThisCast: true when the cast
     // consumed accumulated charge (resets to 0 after commit).
     let orbBanked = 0;
     let orbDischargedThisCast = false;
-    let infusedInfusionDmg = 0;     // for chat breakdown
+    let coInvestDmg = 0;            // for chat breakdown
     // Per-cast AOE context for spells with the `aoe` alteration. Captured at
     // invest-commit time, consumed after AOE template placement to recompute
     // damage based on the actually-placed size. Null when not in play.
@@ -5650,11 +5663,68 @@ export class AspectsofPowerItem extends Item {
         ?? (isOrbQualifying && hasOrbEquipped
             && orbCharge >= (sc.celerity?.ORB_DISCHARGE_THRESHOLD ?? 400));
 
+      // CO-INVEST on the cast path (systems/co-invest.mjs): `effort` (stamina)
+      // or `life-drain` (health) beside a mana cast, `infused` beside a blood
+      // cast. The resolver drops any tag naming this cast's OWN resource, so
+      // the common cases resolve to null and this costs nothing.
+      //
+      // ⚠ ATTACKS ONLY. The co-invest term is added to `dmgFormula`, and on a
+      // heal or a barrier that string IS the heal/absorb amount — a rider
+      // there would silently inflate healing rather than damage.
+      const _coEligible = !orbDischarging && !options.ritualActivation
+        && tags.includes('attack') && !_isHeal && !_isBarrier;
+      const coInvest = _coEligible
+        ? resolveCoInvest(this.actor, this, { primaryResource: _resKey, tier: spellTier, grade: spellGrade })
+        : null;
+      const useCoInvest = !!coInvest?.affordable;
+      if (coInvest && !useCoInvest) {
+        ChatMessage.create({
+          speaker, rollMode, ...(whisperGM ? { whisper: whisperGM } : {}),
+          flavor: label,
+          content: `<p><em>Not enough ${coInvest.resource} for ${coInvest.label} (needs ${coInvest.baseCost || '?'}, has ${coInvest.pool}). Casting without it.</em></p>`,
+        });
+      }
+
       let invested;
+      let coInvested = 0;
       if (orbDischarging) {
         // Discharge path: no dialog, base damage, zero cost.
         invested = baseMana;
+      } else if (useCoInvest && options.preInvestAmount == null && !options.aiAutoInvest) {
+        // Two sliders: the cast's own resource plus the co-invest pool. Only a
+        // MANA co-invest is channelled — and when the cast itself is mana, the
+        // primary invest already drives channel time, so the second slider
+        // never adds any.
+        //
+        // ⚠ windup 1 deliberately, matching the single-slider spell dialog
+        // beside it: `spellWindupMultiplier` is resolved below and returns 1
+        // while config.spellWeight is off (the default). Both spell previews
+        // agree with each other, which matters more here than agreeing with a
+        // model nothing has switched on.
+        const result = await this._promptCoInvest({
+          primary: {
+            baseCost: baseMana, safeInvest: 0, maxPool: maxInvest, potency: intMod,
+            damageRef: spellDamageRef(gradeFactor), resourceLabel: _resKey,
+            damageLabel: 'Spell',
+          },
+          co: coInvest,
+          multiplier, label, potencyLabel: 'Int',
+          channelStat: coInvest.channelled ? wisMod : null,
+          channelFactor: coInvest.channelled ? (sc.celerity?.CHANNEL_FACTOR ?? 3000) : null,
+          baseWait: computeActionWait(this.actor, this, null, null, null),
+          windup: 1,
+        });
+        if (result === null) {
+          if (preplacedTemplateDoc) await this._gmDeleteRegion(canvas.scene, preplacedTemplateDoc.id);
+          return;
+        }
+        invested = result.primary;
+        coInvested = result.co;
       } else {
+        // Deferred fire re-spends the co-invest captured at declare time so the
+        // damage and cost match what the player committed to.
+        const _preCo = options.preCoInvestAmount ?? options.preManaInvestAmount;
+        if (useCoInvest && _preCo != null) coInvested = Math.min(_preCo, coInvest.maxPool);
         invested = (options.preInvestAmount != null)
           // Ritual activation bypasses the wis-derived invest cap (F1, ruled
           // 2026-06-13): prep already wisdom-weighted AND rarity-capped the
@@ -5701,6 +5771,16 @@ export class AspectsofPowerItem extends Item {
           if (preplacedTemplateDoc) await this._gmDeleteRegion(canvas.scene, preplacedTemplateDoc.id);
           return;
         }
+      }
+
+      // Record the co-invest for the spend + the chat breakdown. Same helper
+      // the dialog previewed with, so the number the player committed against
+      // is the number they get.
+      if (useCoInvest && coInvested > 0) {
+        coInvestCost = coInvested;
+        coInvestResource = coInvest.resource;
+        coInvestLabel = coInvest.label;
+        coInvestDmg = coInvestDamage(coInvest.potency, coInvest.coef, coInvested, coInvest.dmgRef);
       }
 
       investedAmount = invested;
@@ -5820,8 +5900,11 @@ export class AspectsofPowerItem extends Item {
         // The multiplier went with it because rarity is the identity lever
         // every other spell already uses; keeping a second, unbalanced power
         // axis in a single field is what let a x3 hide inside a `common`.
+        // + coInvestDmg: the second pool's term. Zero unless this cast carries
+        // a co-invest tag for a pool it does not already spend, and gated to
+        // attacks upstream so it can never inflate a heal or a barrier.
         dmgFormula = String(strikeInvestDamage(_potency, multiplier * _healCoef,
-          _spellWindup, effectiveInvested, spellDmgRef));
+          _spellWindup, effectiveInvested, spellDmgRef) + coInvestDmg);
       }
 
       // Hand off to the AOE block below: store the pre-placed template +
@@ -5922,94 +6005,75 @@ export class AspectsofPowerItem extends Item {
           return;
         }
 
-        // Infused tag: melee strike that also consumes mana for an Int-scaled
-        // damage adder. Detected here so the dual-resource dialog replaces the
-        // single-slider one. Falls back to the regular strike (with a chat
-        // warning) when mana, spell tier, or spell grade are missing.
-        const isInfused = tags.includes('infused');
-        let infusedBaseMana = 0;
-        let infusedManaPool = 0;   // actual mana pool (affordability check)
-        let infusedManaCap = 0;    // wis-capped invest ceiling (like a real spell)
-        let infusedDmgRef = 1;     // grade-relative FIXED damage reference
-        let intMod = 0;
-        let useInfused = false;
-        if (isInfused) {
-          // INFUSION IS A MANA INJECTION, NOT AN AUTHORED SPELL (user ruling
-          // 2026-08-10: "I thought this worked just as a mana injection as
-          // for spellstrikers"). An untiered weapon skill carrying `infused`
-          // injects at BASIC tier; authoring a higher tier is how a designer
-          // makes the infusion bigger. Grade already auto-derives from the
-          // actor's race rank, so nothing here needs per-skill authoring.
-          // Before this, `spellTierFactors['']` was undefined and EVERY
-          // untiered infused skill silently fell through to a plain swing.
-          const infusedTier = spellTier || 'basic';
-          const tierFactor  = sc.spellTierFactors?.[infusedTier];
-          const gradeFactor = sc.spellGradeFactors?.[spellGrade];
-          if (tierFactor && gradeFactor) {
-            infusedBaseMana = Math.round(tierFactor * gradeFactor);
-            intMod = this.actor.system.abilities?.intelligence?.mod ?? 0;
-            infusedManaPool = Math.round(this.actor.system.mana?.value ?? 0);
-            // Grade-relative FIXED reference (basic-tier baseMana) — same fix as
-            // the spell path (65f8a42). Normalizing infusion by the skill's OWN
-            // tier baseMana inverted tier (higher tiers did LESS at equal mana);
-            // the fixed ref makes absolute mana drive damage so tier scales up.
-            infusedDmgRef = spellDamageRef(gradeFactor);
-            // Wis-cap the infusion invest exactly like a real spell of this tier,
-            // so a spellstrike can't pump more mana into its spell portion than a
-            // dedicated caster could into the same-tier spell (design-spellstriker
-            // fusion balance, 2026-07-03). Burst size grows by authoring a
-            // higher-tier spellstrike, gated by wis — consistent with casting.
-            const aboveBaseFactor = sc.spellMaxInvestAboveBase?.[infusedTier]
-              ?? sc.spellMaxInvestAboveBase?.['']
-              ?? 0.1;
-            const wisModForCap = this.actor.system.abilities?.wisdom?.mod ?? 0;
-            infusedManaCap = Math.min(infusedManaPool, Math.round(infusedBaseMana + wisModForCap * aboveBaseFactor));
-            useInfused = infusedManaPool >= infusedBaseMana && infusedBaseMana > 0;
-          }
-          if (!useInfused) {
-            ChatMessage.create({
-              speaker, rollMode, ...(whisperGM ? { whisper: whisperGM } : {}),
-              flavor: label,
-              content: `<p><em>Not enough mana to infuse (needs ${infusedBaseMana || '?'}, has ${infusedManaPool}). Striking without infusion.</em></p>`,
-            });
-          }
+        // CO-INVEST: a strike that also drains a second pool for an extra
+        // damage term. `infused` (mana) is the shipped spellstriker fusion;
+        // `life-drain` (health) is the same shape paid in blood. `effort` is
+        // resolved away here because stamina is already this path's primary —
+        // the resolver refuses to double-dip one pool.
+        //
+        // A CO-INVEST IS A RESOURCE INJECTION, NOT AN AUTHORED SPELL (user
+        // ruling 2026-08-10: "I thought this worked just as a mana injection
+        // as for spellstrikers"). An untiered weapon skill injects at BASIC
+        // tier; authoring a higher tier is how a designer makes it bigger, and
+        // grade auto-derives from the actor's race rank. Before that ruling,
+        // `spellTierFactors['']` was undefined and EVERY untiered infused
+        // skill silently fell through to a plain swing.
+        //
+        // The invest is wis-capped exactly like a real spell of this tier, so
+        // a spellstrike can't pump more into its magical half than a dedicated
+        // caster could into the same-tier spell (design-spellstriker fusion
+        // balance, 2026-07-03), and damage is normalised by a grade-relative
+        // FIXED reference rather than the skill's own base (65f8a42) so higher
+        // tiers scale up instead of down.
+        const coInvest = resolveCoInvest(this.actor, this, {
+          primaryResource: rollData.roll.resource, tier: spellTier, grade: spellGrade,
+        });
+        const useCoInvest = !!coInvest?.affordable;
+        if (coInvest && !useCoInvest) {
+          ChatMessage.create({
+            speaker, rollMode, ...(whisperGM ? { whisper: whisperGM } : {}),
+            flavor: label,
+            content: `<p><em>Not enough ${coInvest.resource} for ${coInvest.label} (needs ${coInvest.baseCost || '?'}, has ${coInvest.pool}). Striking without it.</em></p>`,
+          });
         }
 
         // Same pre-capture pattern as the spell path.
         let invested = null;
-        let manaInvested = 0;
+        let coInvested = 0;
         if (options.preInvestAmount != null) {
           // Same floor as the spell path: a swing cannot cost less than its
           // own base stamina. Deferred re-spend passes a dialog-approved
           // value which is already >= base, so this is a no-op there and a
           // guard against scripted/AI callers.
           invested = Math.min(Math.max(baseStamina, options.preInvestAmount), maxPool);
-          // Deferred-fire: re-spend the mana invest captured at declare time
-          // so the infusion damage/cost matches what the player committed to.
-          if (useInfused && options.preManaInvestAmount != null) {
-            manaInvested = Math.min(options.preManaInvestAmount, infusedManaCap);
+          // Deferred-fire: re-spend the co-invest captured at declare time so
+          // the damage and cost match what the player committed to.
+          const _preCo = options.preCoInvestAmount ?? options.preManaInvestAmount;
+          if (useCoInvest && _preCo != null) {
+            coInvested = Math.min(_preCo, coInvest.maxPool);
           }
         } else if (options.aiAutoInvest) {
           // AI: minimum swing (base stamina, no over-exertion/self-damage),
-          // skip infusion (no mana gamble), no prompt.
+          // and no co-invest — an NPC does not gamble a second pool.
           invested = Math.min(baseStamina, maxPool);
-        } else if (useInfused) {
+        } else if (useCoInvest) {
+          // Only a MANA co-invest is channelled, so only that one gets the
+          // wisdom rate and the channel-time readout. Pre-compute the strike's
+          // base wait (no invest, no co-invest) so the dialog can hide the row
+          // when the chosen amount would not actually slow the swing.
           const wisMod = this.actor.system.abilities?.wisdom?.mod ?? 0;
-          // Pre-compute the strike's base wait (no invest, no infusion) so the
-          // dialog can hide the channel-time readout when the chosen mana
-          // amount wouldn't actually slow the cast.
           const baseWait = computeActionWait(this.actor, this, weapon, null, null);
-          const result = await this._promptDualResourceInvest({
-            stamina: { baseCost: baseStamina, safeInvest, maxPool, potency: statBlend },
-            mana:    { baseCost: infusedBaseMana, maxPool: infusedManaCap, potency: intMod, dmgRef: infusedDmgRef, coef: sc.spellstrike?.infusionCoef ?? 0.7 },
+          const result = await this._promptCoInvest({
+            primary: { baseCost: baseStamina, safeInvest, maxPool, potency: statBlend, damageRef: baseStamina, resourceLabel: 'stamina', damageLabel: 'Strike' },
+            co: coInvest,
             multiplier, label, potencyLabel,
-            channelStat: wisMod,
-            channelFactor: sc.celerity?.CHANNEL_FACTOR ?? null,
+            channelStat: coInvest.channelled ? wisMod : null,
+            channelFactor: coInvest.channelled ? (sc.celerity?.CHANNEL_FACTOR ?? 3000) : null,
             baseWait, windup, flatBonus: weaponBuffDmg,
           });
           if (result === null) return; // cancelled
-          invested = result.stamina;
-          manaInvested = result.mana;
+          invested = result.primary;
+          coInvested = result.co;
         } else {
           invested = await this._promptResourceInvest({
             baseCost: baseStamina, safeInvest, maxPool,
@@ -6029,11 +6093,13 @@ export class AspectsofPowerItem extends Item {
         // (one big dodge vs many scrambling dodges) provides the archetype RPS.
         // Resolved above the invest dialog so the preview shows the same number.
         const strikeDmg = strikeInvestDamage(statBlend, multiplier, windup, invested, baseStamina);
-        if (useInfused && manaInvested > 0) {
-          infusedManaCost = manaInvested;
-          // Fusion penalty coef + grade-relative fixed ref (see isInfused block).
-          const infusionCoef = sc.spellstrike?.infusionCoef ?? 0.7;
-          infusedInfusionDmg = infusionDamage(intMod, infusionCoef, manaInvested, infusedDmgRef);
+        if (useCoInvest && coInvested > 0) {
+          coInvestCost = coInvested;
+          coInvestResource = coInvest.resource;
+          coInvestLabel = coInvest.label;
+          // Fusion-penalty coef + grade-relative fixed ref (see the co-invest
+          // block above). Same helper the dialog previewed with.
+          coInvestDmg = coInvestDamage(coInvest.potency, coInvest.coef, coInvested, coInvest.dmgRef);
         }
         // Weapon buff (Flameblade — design-spellstriker.md): flat affinity
         // damage added to WEAPON strikes while a weapon-buff effect is active
@@ -6048,7 +6114,7 @@ export class AspectsofPowerItem extends Item {
           rollData.roll.weaponBuffDamage = weaponBuffDmg;
           rollData.roll.weaponBuffAffinities = [...(weaponBuff.affinities ?? [])];
         }
-        dmgFormula = String(strikeDmg + infusedInfusionDmg + weaponBuffDmg);
+        dmgFormula = String(strikeDmg + coInvestDmg + weaponBuffDmg);
 
         // Linear self-damage per design-skill-rarity-system.md: scales 1:1
         // with how far past the safe ceiling you push (shared helper — same
@@ -6203,7 +6269,12 @@ export class AspectsofPowerItem extends Item {
         : [...game.user.targets].map(t => t.id);
       const declared = await declareAction(this.actor, this, {
         investAmount: investedAmount,
-        manaInvestAmount: infusedManaCost > 0 ? infusedManaCost : null,
+        coInvestAmount: coInvestCost > 0 ? coInvestCost : null,
+        coInvestResource,
+        // Kept alongside, MANA ONLY: celerity charges channel time for a mana
+        // co-invest and the power-sense overlay reads it as magical output. A
+        // stamina or blood co-invest is neither, so it must not appear here.
+        manaInvestAmount: (coInvestResource === 'mana' && coInvestCost > 0) ? coInvestCost : null,
         aoeRegionId: aoePerCastContext?.preplacedTemplateDoc?.id ?? null,
         // Persist the orb-discharge decision so the deferred fire honors it
         // even if the actor's spellCharge changes between declare and fire.
@@ -6324,13 +6395,13 @@ export class AspectsofPowerItem extends Item {
     if (_secRes && _secCost > 0) {
       const livePool = this.actor.system[_secRes];
       // ⚠ CHECK THE COMBINED DEMAND ON THIS POOL, not just this cost. A
-      // spellstriker's `infused` path already spends mana; a skill that is both
-      // infused AND declares a flat mana secondary must afford BOTH, or the
+      // co-invest already spends a second pool; a skill that co-invests AND
+      // declares a flat secondary into the SAME pool must afford BOTH, or the
       // gate passes and the deduction floors at 0 — a partial spend that looks
       // like a successful cast.
-      const _alsoInfused = (_secRes === 'mana' && rollData.roll.resource !== 'mana')
-        ? Math.max(0, Math.round(infusedManaCost || 0)) : 0;
-      const _need = _secCost + _alsoInfused;
+      const _alsoCoInvest = (_secRes === coInvestResource && rollData.roll.resource !== coInvestResource)
+        ? Math.max(0, Math.round(coInvestCost || 0)) : 0;
+      const _need = _secCost + _alsoCoInvest;
       // ⚠ A missing pool is a REFUSAL, not a free pass. An actor without the
       // `ki` tag has ki.max 0, and letting the cast through because the pool
       // "isn't there" would hand every untagged actor free ki abilities.
@@ -6339,7 +6410,7 @@ export class AspectsofPowerItem extends Item {
         ChatMessage.create({
           speaker, rollMode, flavor: label,
           content: `Not enough ${_secRes} (need ${_need}`
-            + (_alsoInfused ? ` — ${_secCost} cost + ${_alsoInfused} infusion` : '')
+            + (_alsoCoInvest ? ` — ${_secCost} cost + ${_alsoCoInvest} ${coInvestLabel.toLowerCase()}` : '')
             + `, have ${liveSec}).`,
         });
         return;
@@ -6416,10 +6487,6 @@ export class AspectsofPowerItem extends Item {
     const _commitCastCost = async () => {
       if (isBarrier) return;
       const updates = {};
-      if (investSelfDamage > 0) {
-        const curHp = this.actor.system.health?.value ?? 0;
-        updates['system.health.value'] = Math.max(0, curHp - investSelfDamage);
-      }
 
       // ── ACCUMULATE SPENDS, THEN WRITE ONCE ─────────────────────────────
       // ⚠ TWO CONTRIBUTORS TO THE SAME POOL MUST SUM, NOT OVERWRITE. A
@@ -6439,14 +6506,21 @@ export class AspectsofPowerItem extends Item {
         _spend.set(res, (_spend.get(res) ?? 0) + n);
       };
       _addSpend(resource, rollData.roll.cost);
-      // Infused-melee: mana on top of the stamina invest. The `resource !==
-      // 'mana'` guard is PRESERVED from the original — when the primary already
-      // IS mana, roll.cost is taken to cover it.
-      if (resource !== 'mana') _addSpend('mana', infusedManaCost);
+      // Co-invest: a second pool on top of the primary invest. The
+      // same-resource guard is PRESERVED from the original — when the primary
+      // already IS that pool, roll.cost is taken to cover it. (The resolver
+      // refuses that case upstream too, so this is belt and braces.)
+      if (resource !== coInvestResource) _addSpend(coInvestResource, coInvestCost);
       // Flat secondary (ki). Same guard, same reason.
       const _sr = rollData.roll.secondaryResource;
       const _sc2 = Math.max(0, Math.round(rollData.roll.secondaryCost ?? 0));
       if (_sr !== resource) _addSpend(_sr, _sc2);
+      // ⚠ OVER-INVEST SELF-DAMAGE IS A SPEND ON HEALTH, not its own write.
+      // It used to go straight into `updates`, which was only safe while the
+      // co-invest pool was always mana. A `life-drain` strike that ALSO
+      // over-exerts now targets system.health.value twice and the last write
+      // wins — precisely the defect this accumulator exists to prevent.
+      if (investSelfDamage > 0) _addSpend('health', investSelfDamage);
 
       for (const [res, amt] of _spend) {
         const live = this.actor.system[res]?.value ?? 0;
@@ -6484,11 +6558,11 @@ export class AspectsofPowerItem extends Item {
           content: `<p><em>Orb charge:</em> ${newCharge} / ${threshold}${ready}</p>`,
         });
       }
-      if (infusedManaCost > 0 && infusedInfusionDmg > 0) {
+      if (coInvestCost > 0 && coInvestDmg > 0) {
         ChatMessage.create({
           speaker, rollMode, ...(whisperGM ? { whisper: whisperGM } : {}),
           flavor: label,
-          content: `<p><em>Infusion:</em> spent <strong>${infusedManaCost}</strong> mana for <strong>+${infusedInfusionDmg}</strong> damage.</p>`,
+          content: `<p><em>${coInvestLabel}:</em> spent <strong>${coInvestCost}</strong> ${coInvestResource} for <strong>+${coInvestDmg}</strong> damage.</p>`,
         });
       }
       // Celerity recording: in deferred-fire mode the tracker has already

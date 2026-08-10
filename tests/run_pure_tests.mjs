@@ -81,6 +81,29 @@ eq('spellDamageRef E', spellDamageRef(10, CFG), 20);
 eq('infusion Aiden 32', infusionDamage(759, 0.7, 32, 20, CURVE_02), 584);
 // Pre-fix reproduction: coef 1, 120 mana vs own-base 20 â†’ 1086 (the original live fire).
 eq('infusion legacy repro', infusionDamage(759, 1.0, 120, 20, CURVE_02), 1086);
+// CO-INVEST is the general form of that same term, so the generalisation is
+// only honest if the mana case is BYTE-IDENTICAL to the golden infusion above.
+eq('co-invest == infusion (mana, Aiden)', F2.coInvestDamage(759, 0.7, 32, 20, CURVE_02), 584);
+eq('co-invest alias is the same function', F2.infusionDamage === F2.coInvestDamage, true);
+// The other two pools, same live actor set (golden_baseline): the coefficient
+// is the ONLY difference, which is what makes it the balance dial.
+//   effort  = George str888 x 0.5, 39 stamina, ref 25 (grade D basic)
+//   drain   = Willy  int672 x 1.0, 57 health,  ref 25
+eq('co-invest effort George', F2.coInvestDamage(888, 0.5, 39, 25), 555);
+eq('co-invest life-drain Willy', F2.coInvestDamage(672, 1.0, 57, 25), 1015);
+// A pool that cannot pay the base still floors at 1 rather than dividing by 0.
+eq('co-invest zero invest floors', F2.coInvestDamage(500, 1.0, 0, 25), 100);
+
+// Co-invest cap: baseCost + capStat x aboveBaseFactor, clamped by the pool.
+// Aiden, basic tier: base 25 + wis238 x 0.05 = 36.9 -> 37, pool 418 doesn't bite.
+eq('coInvestCap Aiden basic', F2.coInvestCap(25, 238, 0.05, 418), 37);
+// â šThe POOL is the binding constraint far more often than the wis cap â€” a
+// nearly-dry actor must never be offered a slider they cannot pay.
+eq('coInvestCap pool binds', F2.coInvestCap(25, 238, 0.05, 12), 12);
+eq('coInvestCap empty pool', F2.coInvestCap(25, 238, 0.05, 0), 0);
+// Negative pool (health already below the floor) must clamp to 0, not go
+// negative and hand the slider a backwards range.
+eq('coInvestCap negative pool', F2.coInvestCap(25, 238, 0.05, -5), 0);
 
 // Strike invest â€” live-verified Cross Wind strike: blend321 Ã—0.9 mult Ã—1.0 windup, 9 stam / 1 base â†’ 448.
 eq('strike Aiden CW', strikeInvestDamage(321, 0.9, 1.0, 9, 1, CURVE_02), 448);
@@ -1918,6 +1941,109 @@ eq('junk situational entries are skipped, not NaN',
   eq('lang control: infused combat tag is labelled', typeof dig('Tag.infused'), 'string');
   eq('lang: effort combat tag is labelled', typeof dig('Tag.effort'), 'string');
   eq('lang: life-drain combat tag is labelled', typeof dig('Tag.lifeDrain'), 'string');
+}
+
+// ── CO-INVEST registry integrity (the orphaned-reader guard, applied to the
+// thing that just STOPPED being one) ──
+// `effort` and `life-drain` were registered tags with no reader for four days.
+// The registry is now the reader, so every field it promises has to resolve:
+// a typo'd potencyStat reads `undefined?.mod ?? 0` and silently prices the
+// whole co-invest at ZERO damage, which looks exactly like "the tag does
+// nothing" — the original defect wearing a new hat.
+{
+  const cfg = (await import('../module/helpers/config.mjs')).ASPECTSOFPOWER;
+  const registry = cfg.coInvest ?? {};
+  // Positive control: the registry has to be non-empty, or every eq() below
+  // passes vacuously by iterating nothing.
+  eq('co-invest: registry is populated', Object.keys(registry).length, 3);
+  const RESOURCES = ['mana', 'stamina', 'health'];
+  for (const [tag, def] of Object.entries(registry)) {
+    eq(`co-invest ${tag}: tag is a registered combat tag`, typeof cfg.combatTags?.[tag], 'string');
+    eq(`co-invest ${tag}: resource is a real pool`, RESOURCES.includes(def.resource), true);
+    eq(`co-invest ${tag}: potencyStat is a real ability`, typeof cfg.abilities?.[def.potencyStat], 'string');
+    eq(`co-invest ${tag}: capStat is a real ability`, typeof cfg.abilities?.[def.capStat], 'string');
+    eq(`co-invest ${tag}: coef is a positive number`, def.coef > 0, true);
+  }
+  // One tag per pool — the whole ruling. Two tags naming the same resource
+  // would make the resolver's "first registered match" arbitrary.
+  eq('co-invest: one tag per resource',
+    new Set(Object.values(registry).map(d => d.resource)).size, Object.keys(registry).length);
+  // â šThe mana coefficient is NOT a copy of the spellstrike one, it IS it.
+  // A copy would let the shipped fusion drift from this table on the next edit.
+  eq('co-invest: infused coef is the spellstrike coef',
+    registry.infused.coef, cfg.spellstrike.infusionCoef);
+  // The measured renewability ladder (5 real actors, golden_baseline): stamina
+  // regenerates in combat, mana does not, health is the death clock. Anything
+  // that reorders these has changed the design, not tuned it.
+  eq('co-invest: stamina is cheapest per point', registry.effort.coef < registry.infused.coef, true);
+  eq('co-invest: health pays most per point', registry['life-drain'].coef > registry.infused.coef, true);
+  // Channelling is a MAGIC act: only the mana pool buys damage at the cost of
+  // celerity tempo. If a second tag ever claims it, computeActionWait will
+  // charge channel time against a pool that never fed manaInvestAmount.
+  eq('co-invest: only mana is channelled',
+    Object.values(registry).filter(d => d.channelled).map(d => d.resource), ['mana']);
+}
+
+// ── resolveCoInvest: the dispatch, against the REAL config ──
+// The rule that makes all three tags safe to author anywhere is "a tag naming
+// the skill's own primary resource is IGNORED". Pin the negative controls, not
+// just the positive one â€” a resolver that returned a descriptor for `effort`
+// on a stamina strike would charge the pool twice and show a slider whose two
+// ends fight each other.
+{
+  const cfg = (await import('../module/helpers/config.mjs')).ASPECTSOFPOWER;
+  const prevConfig = globalThis.CONFIG;
+  globalThis.CONFIG = { ASPECTSOFPOWER: cfg };
+  const { resolveCoInvest } = await import('../module/systems/co-invest.mjs');
+  // Aiden Fig, golden_baseline: int 759, wis 238, mana 418, hp 390, stam 161.
+  const actor = {
+    system: {
+      mana: { value: 418 }, stamina: { value: 161 }, health: { value: 390 },
+      abilities: {
+        intelligence: { mod: 759 }, wisdom: { mod: 238 }, strength: { mod: 149 },
+        toughness: { mod: 223 }, vitality: { mod: 208 }, endurance: { mod: 161 },
+      },
+    },
+  };
+  const skill = (tags) => ({ system: { tags } });
+  const r = (tags, primaryResource) =>
+    resolveCoInvest(actor, skill(tags), { primaryResource, tier: '', grade: 'D' });
+
+  // Positive control: the shipped case, and it must reproduce the sim exactly
+  // (grade D basic -> base 25, ref 25, cap 25 + 238x0.05 = 37).
+  const infused = r(['infused'], 'stamina');
+  eq('resolve: infused on a stamina strike resolves', infused?.resource, 'mana');
+  eq('resolve: base cost is tier x grade', infused.baseCost, 25);
+  eq('resolve: damage ref is grade-relative', infused.dmgRef, 25);
+  eq('resolve: cap is wis-derived', infused.maxPool, 37);
+  eq('resolve: potency is the int mod', infused.potency, 759);
+
+  // â šNEGATIVE CONTROLS â€” no double-dipping one pool.
+  eq('resolve: effort on a stamina strike is IGNORED', r(['effort'], 'stamina'), null);
+  eq('resolve: infused on a mana cast is IGNORED', r(['infused'], 'mana'), null);
+  eq('resolve: life-drain on a health cast is IGNORED', r(['life-drain'], 'health'), null);
+  // ...but each is live the moment the primary is a different pool.
+  eq('resolve: effort beside a mana cast', r(['effort'], 'mana')?.resource, 'stamina');
+  eq('resolve: life-drain beside a stamina strike', r(['life-drain'], 'stamina')?.resource, 'health');
+  eq('resolve: no co-invest tag at all', r(['attack', 'melee'], 'stamina'), null);
+
+  // Health holds back invest.healthFloor so the slider can never offer a
+  // lethal commit â€” _commitCastCost clamps at 0, not 1.
+  eq('resolve: health pool holds back the floor',
+    r(['life-drain'], 'stamina').pool, 390 - cfg.invest.healthFloor);
+
+  // An actor with no such pool is a refusal, not a free ride.
+  const poorless = { system: { abilities: actor.system.abilities, stamina: { value: 10 } } };
+  eq('resolve: missing pool refuses', resolveCoInvest(poorless, skill(['infused']),
+    { primaryResource: 'stamina', tier: '', grade: 'D' }), null);
+  // Too poor to meet the base is resolved-but-unaffordable, so the caller can
+  // say so in chat rather than silently dropping the tag.
+  const broke = { system: { ...actor.system, mana: { value: 3 } } };
+  const b = resolveCoInvest(broke, skill(['infused']), { primaryResource: 'stamina', tier: '', grade: 'D' });
+  eq('resolve: unaffordable still resolves', b?.resource, 'mana');
+  eq('resolve: unaffordable is flagged', b.affordable, false);
+
+  globalThis.CONFIG = prevConfig;
 }
 
 // ── Strain recovery rate (world clock, ruled 2026-08-10: HALF meditation) ──

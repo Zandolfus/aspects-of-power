@@ -315,7 +315,10 @@ async function _onCelAdvance(event, target) {
   // user), fall back to running locally on the GM's client. Never picks
   // a co-owner (e.g., another PC who happens to have OWNER permission).
   const investAmount = declared.investAmount ?? null;
-  const manaInvestAmount = declared.manaInvestAmount ?? null;
+  // Co-invest: fall back to the old mana-only field so an action declared
+  // before this shipped still re-spends what the player committed to, rather
+  // than firing free.
+  const coInvestAmount = declared.coInvestAmount ?? declared.manaInvestAmount ?? null;
   const aoeRegionId = declared.aoeRegionId ?? null;
   const orbDischarging = declared.orbDischarging ?? false;
   const targetIds = declared.targetIds ?? [];
@@ -332,7 +335,7 @@ async function _onCelAdvance(event, target) {
       itemId: item.id,
       targetUserId: linkedPlayer.id,
       preInvestAmount: investAmount,
-      preManaInvestAmount: manaInvestAmount,
+      preCoInvestAmount: coInvestAmount,
       preAoeRegionId: aoeRegionId,
       preOrbDischarging: orbDischarging,
       preTargetIds: targetIds,
@@ -345,7 +348,7 @@ async function _onCelAdvance(event, target) {
   } else {
     // No linked player online — GM (or whoever clicked Advance) runs it.
     try {
-      await item.roll({ executeDeferred: true, preInvestAmount: investAmount, preManaInvestAmount: manaInvestAmount, preAoeRegionId: aoeRegionId, preOrbDischarging: orbDischarging, preTargetIds: targetIds, preTeleportDestination: teleportDestination, preLeapDestination: leapDestination, preLeapApexFt: leapApexFt, ritualActivation, aiAutoInvest });
+      await item.roll({ executeDeferred: true, preInvestAmount: investAmount, preCoInvestAmount: coInvestAmount, preAoeRegionId: aoeRegionId, preOrbDischarging: orbDischarging, preTargetIds: targetIds, preTeleportDestination: teleportDestination, preLeapDestination: leapDestination, preLeapApexFt: leapApexFt, ritualActivation, aiAutoInvest });
     } finally {
       // Ritual temp-skill cleanup: a Medium-fired skill cloned onto the
       // activator (compendium-sourced activation) survives the declare→fire

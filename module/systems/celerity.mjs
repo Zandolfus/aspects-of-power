@@ -201,12 +201,19 @@ export function computeActionWait(actor, skill, weapon = null, investAmount = nu
   }
 
   // Channel wait sources: (a) magic spell with mana invest (investAmount IS
-  // mana), or (b) infused melee with a separate manaInvestAmount on top of
-  // the stamina invest. Wisdom controls channel rate the same way for both.
-  const isInfused = (skill?.system?.tags ?? []).includes('infused');
+  // mana), or (b) a CHANNELLED co-invest — mana spent on top of some other
+  // primary pool. Wisdom controls the rate the same way for both.
+  //
+  // Only mana is channelled (config.coInvest), because channelling is a magic
+  // act: an `effort` or `life-drain` co-invest buys its damage without costing
+  // any tempo. Read from the registry rather than hardcoding `infused`, so a
+  // fourth pool inherits the right answer by declaring it.
+  const _coCfg = CONFIG.ASPECTSOFPOWER?.coInvest ?? {};
+  const hasChannelledCoInvest = (skill?.system?.tags ?? [])
+    .some(t => _coCfg[t]?.channelled === true);
   const channelMana = isMagic
     ? (investAmount ?? 0)
-    : (isInfused ? (manaInvestAmount ?? 0) : 0);
+    : (hasChannelledCoInvest ? (manaInvestAmount ?? 0) : 0);
   if (channelMana > 0) {
     const wisMod = Math.max(1, actor.system.abilities?.wisdom?.mod ?? 0);
     // Fallback matches config.mjs (was 1000 — a stale fallback that would
@@ -676,9 +683,17 @@ export async function declareAction(actor, skill, options = {}) {
   }
 
   const investAmount = options.investAmount ?? null;
-  // Infused-melee dual invest: secondary mana cost captured at declare time
-  // so the deferred fire can re-spend it without re-prompting the player.
-  const manaInvestAmount = options.manaInvestAmount ?? null;
+  // CO-INVEST (systems/co-invest.mjs): the second pool's commitment, captured
+  // at declare time so the deferred fire re-spends it without re-prompting.
+  // The RESOURCE travels with the amount — `infused` mana, `effort` stamina
+  // and `life-drain` health all land in this one field, and the fire path has
+  // no other way to know which pool the number refers to.
+  const coInvestAmount = options.coInvestAmount ?? options.manaInvestAmount ?? null;
+  const coInvestResource = options.coInvestResource ?? (options.manaInvestAmount != null ? 'mana' : '');
+  // Kept MANA-ONLY beside it: computeActionWait charges channel time from this
+  // and the power-sense overlay reads it as magical output. Exertion and blood
+  // are neither channelled nor magical, so they must not appear here.
+  const manaInvestAmount = (coInvestResource === 'mana') ? coInvestAmount : null;
   // Static AOE: the region the player placed at declare time persists on the
   // scene during the wait. Stored here so the fire-time path can look it up
   // and skip re-prompting for placement (per design — AOE is a strategic
@@ -741,6 +756,8 @@ export async function declareAction(actor, skill, options = {}) {
       scheduledTick,
       declaredAtTick: clockTick,
       investAmount,
+      coInvestAmount,
+      coInvestResource,
       manaInvestAmount,
       aoeRegionId,
       orbDischarging,
@@ -766,7 +783,7 @@ export async function declareAction(actor, skill, options = {}) {
   });
 
   const investNote = investAmount ? ` — invest ${investAmount}` : '';
-  const infusedNote = manaInvestAmount ? ` (+${manaInvestAmount} mana infusion)` : '';
+  const infusedNote = coInvestAmount ? ` (+${coInvestAmount} ${coInvestResource || 'mana'})` : '';
   const aoeNote = aoeRegionId ? ' [AOE placed]' : '';
   const orbNote = orbDischarging ? ' [orb discharge]' : '';
   ChatMessage.create({
@@ -774,7 +791,7 @@ export async function declareAction(actor, skill, options = {}) {
     content: `<p><strong>${actor.name}</strong> declares <strong>${skill.name}</strong>${investNote}${infusedNote}${aoeNote}${orbNote} — scheduled for tick <strong>${scheduledTick}</strong> (wait ${wait}).</p>`,
   });
 
-  return { wait, scheduledTick, investAmount, manaInvestAmount, aoeRegionId, orbDischarging, targetIds };
+  return { wait, scheduledTick, investAmount, coInvestAmount, coInvestResource, manaInvestAmount, aoeRegionId, orbDischarging, targetIds };
 }
 
 /**

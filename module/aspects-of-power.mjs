@@ -1069,7 +1069,7 @@ Hooks.once('ready', async function () {
     item.roll({
       executeDeferred: true,
       preInvestAmount: data.preInvestAmount ?? null,
-      preManaInvestAmount: data.preManaInvestAmount ?? null,
+      preCoInvestAmount: data.preCoInvestAmount ?? data.preManaInvestAmount ?? null,
       preAoeRegionId: data.preAoeRegionId ?? null,
       preOrbDischarging: data.preOrbDischarging ?? false,
       preTargetIds: data.preTargetIds ?? [],

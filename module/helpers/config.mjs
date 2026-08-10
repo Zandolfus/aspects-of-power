@@ -398,6 +398,73 @@ ASPECTSOFPOWER.spellstrike = {
 };
 
 /**
+ * CO-INVEST — one tag per second pool (the multi-invest ruling; the two new
+ * names were chosen 2026-08-10).
+ *
+ * A skill carrying one of these tags opens a SECOND slider on its invest
+ * dialog and buys an extra damage term by draining that pool on top of its
+ * primary resource:
+ *
+ *   damage = potencyStat.mod × coef × (invested / spellDamageRef)^investCurve
+ *   cap    = baseCost + capStat.mod × spellMaxInvestAboveBase[tier]
+ *   base   = spellTierFactors[tier] × spellGradeFactors[grade]
+ *
+ * ⚠ A TAG WHOSE `resource` IS ALREADY THE PRIMARY IS IGNORED. You cannot
+ * double-dip one pool: an `effort` weapon strike already invests stamina, an
+ * `infused` spell already invests mana. That rule is what lets all three tags
+ * be authored freely without anyone having to remember which path they land on.
+ *
+ * ⚠⚠ `coef` IS THE WHOLE BALANCE DIAL and it prices RENEWABILITY. Measured on
+ * the live roster (5 real actors, basic tier, grades D-B), damage bought per
+ * 1% of the pool drained:
+ *
+ *   stamina 0.5 — regenerates 5%/round, so it is the cheap pool. Str-gated,
+ *                 which keeps it near-worthless for casters (Willy +50) and
+ *                 real for strength builds (George +555, 77% of his strike).
+ *   mana    0.7 — no combat regen. UNCHANGED — this IS the shipped
+ *                 spellstrike infusion coefficient, read from it rather than
+ *                 copied, so `infused` behaviour cannot drift from this table.
+ *   health  1.0 — no combat regen AND it is the death clock, so it has to pay
+ *                 MORE per point or no one would ever choose it: 1.43× mana
+ *                 for the same commitment. Same potency and cap stats as mana
+ *                 because blood magic is still magic, paid with the body.
+ *
+ * At cap, mana and health both cost ~8% of their pool, so both support ~12
+ * uses in a fight — which is why the COEFFICIENT and not the cap carries the
+ * difference between them. `channelled` gates celerity channel time: only a
+ * MANA co-invest slows the swing, because channelling is a magic act.
+ */
+ASPECTSOFPOWER.coInvest = {
+  infused: {
+    resource: 'mana',
+    potencyStat: 'intelligence',
+    capStat: 'wisdom',
+    coef: ASPECTSOFPOWER.spellstrike.infusionCoef,
+    channelled: true,
+    label: 'Infusion',
+    potencyLabel: 'Int',
+  },
+  effort: {
+    resource: 'stamina',
+    potencyStat: 'strength',
+    capStat: 'toughness',
+    coef: 0.5,
+    channelled: false,
+    label: 'Exertion',
+    potencyLabel: 'Str',
+  },
+  'life-drain': {
+    resource: 'health',
+    potencyStat: 'intelligence',
+    capStat: 'wisdom',
+    coef: 1.0,
+    channelled: false,
+    label: 'Life-Drain',
+    potencyLabel: 'Int',
+  },
+};
+
+/**
  * Armor-answer system (design-armor-answer-system.md; FLAT/absolute rework
  * 2026-07-18, design-burn-status.md). The physical ARMOR layer (armor+blockDR)
  * is reduced by three FLAT reductions that SUM and are anchored to the
@@ -2057,11 +2124,11 @@ ASPECTSOFPOWER.combatTags = {
   //   infused    = MANA      (type-2 fusion spellstrike; the shipped one)
   //   effort     = STAMINA
   //   life-drain = VITALITY / health
-  // ⚠ Only `infused` has an ENGINE PATH today: _promptDualResourceInvest is
-  // still welded to it and hardcodes one damage term per resource. `effort`
-  // and `life-drain` are registered so the ruling is concrete and authorable,
-  // but until the dialog is generalised they are INERT — do not author content
-  // against them expecting a second slider. See pending-multi-invest.
+  // All three are LIVE — systems/co-invest.mjs resolves whichever one a skill
+  // carries and the invest dialog grows a second slider for it, on both the
+  // weapon and the spell path. The per-pool price lives in
+  // `ASPECTSOFPOWER.coInvest` above; a tag naming the skill's OWN primary
+  // resource is ignored rather than double-dipping it.
   infused:     'ASPECTSOFPOWER.Tag.infused',
   effort:      'ASPECTSOFPOWER.Tag.effort',
   'life-drain': 'ASPECTSOFPOWER.Tag.lifeDrain',
