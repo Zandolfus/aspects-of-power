@@ -1805,6 +1805,45 @@ eq('junk situational entries are skipped, not NaN',
      effectiveClockTick({ running: true, startedAtMs: 20000, clockAtStart: 400, ticksPerMs: 0.5 }, 10000, 400), 400);
 }
 
+// ── Crafted spatial capacity: DIMINISHING, not linear (ruled 2026-08-10) ──
+{
+  const cap = F2.spatialCapacityFromCraft;
+  const CFG = { spatialStorage: { capacityExponent: 0.5, capacityScale: 20 } };
+  // Anchor: a divine craft (0.8) by the live jeweller Amina Wright — int mod
+  // 314, so an average roll of ~345 — must land near the 300 lb the two
+  // hand-authored rings carry. That is what capacityScale was solved for.
+  eq('spatial cap: divine craft at the current jeweller ~297 lb',
+     cap(345, 0.8, CFG), 297);
+  eq('spatial cap: common craft at the same jeweller is a satchel',
+     cap(345, 0.1, CFG), 37);
+  // THE POINT OF THE RULING: a ~100x stat gap must NOT be a 100x capacity gap.
+  // Amina 314 -> S-grade ~34,483 is 110x of mod; capacity grows ~10x.
+  {
+    const amina = cap(345, 0.8, CFG);
+    const sGrade = cap(37900, 0.8, CFG);
+    eq('spatial cap: 110x stat becomes ~10x capacity, not 110x',
+       sGrade < amina * 12 && sGrade > amina * 8, true);
+  }
+  // Degenerate inputs must yield 0 so the caller falls back to the template
+  // value rather than writing a zero-capacity "storage".
+  eq('spatial cap: no roll yields 0', cap(0, 0.8, CFG), 0);
+  eq('spatial cap: no magnifier yields 0', cap(345, 0, CFG), 0);
+  eq('spatial cap: negative roll yields 0', cap(-50, 0.8, CFG), 0);
+  // Monotonic in both arguments.
+  eq('spatial cap: rarer craft always holds more',
+     cap(345, 0.8, CFG) > cap(345, 0.4, CFG), true);
+  eq('spatial cap: better roll always holds more',
+     cap(700, 0.4, CFG) > cap(345, 0.4, CFG), true);
+  // The shipped config must agree with the exponent this block reasons about.
+  const { readFileSync } = await import('node:fs');
+  const cfgSrc = readFileSync(new URL('../module/helpers/config.mjs', import.meta.url), 'utf8');
+  const exp = Number(/capacityExponent:\s*([\d.]+)/.exec(cfgSrc)?.[1]);
+  const scl = Number(/capacityScale:\s*([\d.]+)/.exec(cfgSrc)?.[1]);
+  eq('spatial cap: shipped exponent parses', Number.isFinite(exp), true);
+  eq('spatial cap: shipped exponent is the sqrt curve', exp, 0.5);
+  eq('spatial cap: shipped scale is 20', scl, 20);
+}
+
 // ── Spatial storage rows (the de-duplicated capacity math) ──
 {
   const { spatialStorageRows: rows } = F2;

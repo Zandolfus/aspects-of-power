@@ -1551,3 +1551,31 @@ export function spatialStorageRows(items) {
   }
   return out;
 }
+
+/**
+ * Crafted spatial-storage capacity, in POUNDS. PURE — golden-tested.
+ *
+ *   capacity = floor(craftRoll ^ exponent x magnifier x scale)
+ *
+ * DIMINISHING BY RULING (2026-08-10). Every other augment field scales
+ * linearly with the crafter's roll, which is fine when the field is a damage
+ * or armour number competing against inflated enemy stats. Capacity is not:
+ * it is an absolute quantity of goods, so a linear curve makes a high-level
+ * jeweller's ring hold a warehouse. The rarity ladder spans 16x while the
+ * stat curve spans 100x+, so under a linear rule the crafter's LEVEL decides
+ * capacity and mastery barely matters. The square root inverts that.
+ *
+ * @param {number} craftRoll  the crafting skill's roll total
+ * @param {number} magnifier  rarity magnifier (augmentRarityMagnifiers)
+ * @param {object} [cfg]      CONFIG.ASPECTSOFPOWER (injectable for tests)
+ * @returns {number} whole pounds, never negative
+ */
+export function spatialCapacityFromCraft(craftRoll, magnifier, cfg = null) {
+  const c = (cfg ?? (globalThis.CONFIG?.ASPECTSOFPOWER ?? {})).spatialStorage ?? {};
+  const exp = Number(c.capacityExponent) > 0 ? Number(c.capacityExponent) : 0.5;
+  const scale = Number(c.capacityScale) > 0 ? Number(c.capacityScale) : 20;
+  const roll = Math.max(0, Number(craftRoll) || 0);
+  const mag = Math.max(0, Number(magnifier) || 0);
+  if (roll <= 0 || mag <= 0) return 0;
+  return Math.floor(Math.pow(roll, exp) * mag * scale);
+}

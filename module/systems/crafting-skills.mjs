@@ -10,6 +10,7 @@
  * surgery); the export collects the prototype methods into a plain mixin.
  */
 import { hybridAbilityMod, itemWeightLb } from '../helpers/formulas.mjs';
+import { spatialCapacityFromCraft } from '../helpers/formulas.mjs';
 
 class CraftingSkills {
   /**
@@ -1282,6 +1283,17 @@ class CraftingSkills {
       return Number(sys[field] ?? 0); // damageBonus / armorBonus / veilBonus
     };
     const resolveBonusValue = (b) => {
+      // SPATIAL CAPACITY IS DIMINISHING, not linear (ruled 2026-08-10). Every
+      // other field multiplies the crafter's roll straight, which is right for
+      // numbers that compete against inflated enemy stats. Capacity is an
+      // absolute quantity of goods, so linear scaling would let a high-level
+      // jeweller fold a warehouse into a ring. See spatialCapacityFromCraft.
+      if (b.field === 'spatialCapacity') {
+        const scaled = spatialCapacityFromCraft(skillRollTotal, magnifierPct);
+        // No magnifier configured (or no roll) means the template value is
+        // meant literally — same escape hatch scaleValue gives every field.
+        return { value: scaled > 0 ? scaled : Number(b.value) || 0, mode: 'flat' };
+      }
       if (b.mode === 'percentage') {
         const pct = Number(b.value) || 0;
         return { value: Math.floor(hostValueForField(b.field) * pct / 100), mode: 'flat', pctOfHost: pct };

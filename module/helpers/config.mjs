@@ -1664,6 +1664,25 @@ ASPECTSOFPOWER.volumelessMaterials = ['jewelry'];
  * 2026-07-25 ruling that augment magnitude comes from the crafter.
  */
 ASPECTSOFPOWER.spatialStorage = {
+  // CRAFTED CAPACITY IS DIMINISHING (ruled 2026-08-10: "I don't want people
+  // carrying infinite goodies in a ring").
+  //
+  //   capacity = floor(craftRoll ^ capacityExponent x rarityMagnifier x capacityScale)
+  //
+  // The rarity ladder only spans 16x (0.05 -> 0.8) but the stat curve spans
+  // 100x+ across grades, so a LINEAR capacity would be decided by the
+  // crafter's level, not their mastery, and would grow without limit. Under
+  // the square root a 100x stat gap becomes roughly a 10x capacity gap:
+  //
+  //   Amina (int mod 314), divine craft   ->  ~297 lb
+  //   C-grade crafter,     divine craft   -> ~1,380 lb
+  //   S-grade crafter,     divine craft   -> ~3,100 lb
+  //
+  // capacityScale is solved so a divine craft at the CURRENT jeweller's power
+  // lands at ~300 lb, the number the two hand-authored rings carry.
+  // Exponent 0.5 matches invest.curveExponent — same shape, same reasoning.
+  capacityExponent: 0.5,
+  capacityScale: 20,
   // Retrieving from folded space costs an action. Expressed as a fraction of
   // the actor's own baseline action wait, so it scales with celerity like
   // every other timing in the system rather than being a flat tick count.
