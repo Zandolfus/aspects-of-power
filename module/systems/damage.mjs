@@ -156,7 +156,12 @@ export function resolveDamage(input = {}) {
       remaining = armourRatioApplied(remaining, wall, _dt);
       mitigated = before - remaining;
       const lane = input.mitigationLabel === 'Veil' ? 'Veil' : 'Armor';
-      parts.push(`${lane} (wall ${wall}): −${mitigated} (${Math.round(mitigated / before * 100)}% absorbed)`);
+      // ⚠ SHOW THE BLOW IT WAS TAKEN FROM. Writing only `-1120` reads as a flat
+      // subtraction, and on the anchor hit the absorbed amount coincidentally
+      // EQUALS the wall (1498 -> 378 absorbs exactly 1120), so the old wording
+      // looked like the model we just replaced. On a 3000 hit it would have
+      // said `-1790` against a wall of 1120 and simply looked broken.
+      parts.push(`${lane}: −${mitigated} of ${before} (${Math.round(mitigated / before * 100)}% absorbed, wall ${wall})`);
       if (affinityResist > 0) {
         affinityResisted = affinityResist;   // its share of the wall, for reporting
         parts.push(input.affinityResistLabel

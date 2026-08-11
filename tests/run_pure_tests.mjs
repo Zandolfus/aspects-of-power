@@ -876,6 +876,15 @@ eq('damage: order-free without a barrier', tan.hpLoss, 300);
   const rr = resolveDamage({ incoming: 1498, mitigation: 912, drValue: 208, health: 2000 });
   eq('damage: ratio model sums the layers into one wall', rr.hpLoss, 378);
   eq('damage: absorbed is reported as one figure', rr.mitigated, 1498 - 378);
+  // ⚠ THE CARD MUST NOT READ AS A FLAT SUBTRACTION. On the anchor hit the
+  // absorbed amount coincidentally equals the wall (1498 -> 378 absorbs exactly
+  // 1120), so a bare "-1120" looked identical to the model we replaced. The
+  // line has to name the blow it came out of.
+  const line = rr.parts.find(x => x.startsWith('Armor'));
+  eq('damage: card shows the blow, not just the cut', /of 1498/.test(line), true);
+  eq('damage: card shows the absorbed share', /75% absorbed/.test(line), true);
+  eq('damage: card names the wall', /wall 1120/.test(line), true);
+
   // The barrier still goes FIRST - proportional armour did not disturb that.
   const rb = resolveDamage({ incoming: 1000, barrier: 400, mitigation: 500, drValue: 0, health: 900 });
   eq('damage: barrier still absorbs before the wall', rb.barrierAbsorbed, 400);
