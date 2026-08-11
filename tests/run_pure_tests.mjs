@@ -69,6 +69,40 @@ eq('blend ranged bow', weaponStatBlend(130, { dex: 518, per: 236 }, true, CFG).b
 // Weight clamping: below offset â†’ floor weights.
 eq('blend clamp low', weaponStatBlend(10, { str: 100, dex: 200 }, false, CFG).blend, Math.round(100 * 0.30 + 200 * 0.70));
 
+// ── RANGED BLEND: perception must be an OFFENCE stat (slope 0.95, 2026-08-10) ──
+// It used to top out at 0.57 attacking against 0.77 defending, so an archer got
+// more from perception by dodging than by shooting. Melee never had that: str
+// runs to 1.00 attacking against 0.23 defending.
+{
+  const CFGLIVE = (await import('../module/helpers/config.mjs')).ASPECTSOFPOWER;
+  const rb = CFGLIVE.rangedBlend;
+  // Positive control: read the real object, not a regex over source, and prove
+  // it actually arrived before asserting anything about its contents.
+  eq('ranged blend: config loads', Number.isFinite(rb?.perFloor) && Number.isFinite(rb?.slope), true);
+  const floor = rb.perFloor, slope = rb.slope;
+  eq('ranged blend: floor stays low for the dex skirmisher', floor, 0.05);
+  eq('ranged blend: reaches melee\'s ceiling', +(floor + slope).toFixed(2), 1.00);
+  const R = { rangedBlend: { perFloor: floor, slope, weightOffset: 50, weightSpan: 200 } };
+  const M = { str: 0, dex: 1000, per: 0 };   // pure dex reads back the dex share
+  // Light thrown/pistol weight stays DEX-led - this is what keeps the Treewalker
+  // and the Harrier buildable rather than taxed 7-11%.
+  eq('ranged: throwing weight is 95% dex', weaponStatBlend(50, M, true, R).blend, 950);
+  eq('ranged: shortbow is still dex-led', weaponStatBlend(70, M, true, R).blend, 855);
+  // Heavy precision weapons finally lean on aim, which the old spec claimed
+  // and the old numbers did not deliver (longbow was 46% per).
+  // 238 and 47, not the 240/50 the rounded display table suggests — the
+  // 0.05 + 0.95 sum lands a hair under 1 in floating point.
+  eq('ranged: longbow is per-led', weaponStatBlend(200, M, true, R).blend, 238);
+  eq('ranged: rifle is nearly all aim', weaponStatBlend(240, M, true, R).blend, 47);
+  // ⚠ A weapon type is only real if it is in BOTH registries — weaponWeights
+  // for the maths and craftItemTypes for the tag autocomplete. `orb` was in
+  // neither-enough and its whole mechanic never ran.
+  eq('throwing: has a weight', CFGLIVE.weaponWeights.throwing, 50);
+  eq('throwing: is authorable', typeof CFGLIVE.craftItemTypes.throwing, 'object');
+  eq('throwing: carries its own tag', CFGLIVE.craftItemTypes.throwing.tags.includes('throwing'), true);
+  eq('throwing: sits in the weaponry slot', CFGLIVE.craftItemTypes.throwing.slot, 'weaponry');
+}
+
 // Hybrid ability mod (item.mjs _buildRollFormulas 710-717 semantics).
 const abilities = { intelligence: { mod: 759 }, dexterity: { mod: 518 } };
 eq('hybrid pure', hybridAbilityMod(abilities, { abilities: 'intelligence', statType: 'pure' }), 759);

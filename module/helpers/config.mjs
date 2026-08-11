@@ -325,10 +325,29 @@ ASPECTSOFPOWER.meleeBlend = {
  *   stat_blend = Dex_mod × dexWeight + Per_mod × perWeight
  */
 ASPECTSOFPOWER.rangedBlend = {
+  // ⚠⚠ SLOPE RAISED 0.55 -> 0.95 (2026-08-10). Perception was the archer's
+  // signature stat and pointed the WRONG WAY: measured across the ladder it
+  // was worth 0.05-0.57 attacking and 0.77 defending, so a bow specialist got
+  // MORE from perception by dodging than by shooting. Frieda (per 1029) was
+  // the proof — 1.33x on the mirror test, unable to land a blow on a copy of
+  // herself. Melee never had this problem: strength runs 0.30-1.00 attacking
+  // against 0.23 defending, 4.3x the other way.
+  //
+  // The ceiling now matches melee's (1.00 at the top of the ladder) so a
+  // rifle is 95% aim, the way a greataxe is 100% muscle.
+  //
+  // ⚠ THE FLOOR STAYS AT 0.05 DELIBERATELY. Mirroring melee exactly (floor
+  // 0.30) would have made perception mandatory for every ranged build and
+  // taxed the DEX SKIRMISHER 7-11% — Alda's Treewalker and the Harrier are
+  // both stealth/throwing archers who build dex for reasons that have nothing
+  // to do with aim. Keeping the floor low makes WEAPON WEIGHT the archetype
+  // dial instead of a tax: shortbow 0.15 stays dex-led, longbow 0.76 is aim.
+  // Measured: the skirmisher's cost drops from 7% to 1% while the marksman
+  // keeps ~85% of the gain (Frieda +12% on a longbow).
   perFloor:     0.05,
-  slope:        0.55,
+  slope:        0.95,
   weightOffset: 50,
-  weightSpan:   200,  // weight 50 → perWeight 0.05; weight 250 → perWeight 0.60
+  weightSpan:   200,  // weight 50 → perWeight 0.05; weight 250 → perWeight 1.00
 };
 
 /**
@@ -1871,6 +1890,14 @@ ASPECTSOFPOWER.weaponWeights = {
   // dagger, because the weight is the armour and not a blade.
   gauntlet:   50,
   // Ranged
+  // Thrown weapons had NO type of their own, so knives and darts borrowed
+  // `bow` and blended as archery — Felicia's throwing knives were weight 130,
+  // 27% perception, and would have become 43% under the new slope. A thrown
+  // blade is the lightest ranged action there is: it sits at the bottom of the
+  // ladder with the pistol, which puts it at the `perFloor` and makes it 95%
+  // DEXTERITY. That is the point — throwing is a dex discipline, and this type
+  // is what lets the skirmisher archetype exist separately from archery.
+  throwing:   50,
   pistol:     50,
   shortbow:   70,
   bow:       130,
@@ -2598,6 +2625,11 @@ ASPECTSOFPOWER.craftItemTypes = {
   staff:        { category: 'armaments', tags: ['weapon', '2H', 'staff'],                       slot: 'weaponry' },
   wand:         { category: 'armaments', tags: ['weapon', '1H', 'wand'],                        slot: 'weaponry' },
   bow:          { category: 'armaments', tags: ['weapon', '2H', 'bow'],                         slot: 'weaponry' },
+  // ⚠ MUST be here as well as in weaponWeights. craftItemTypes is what the
+  // item tag autocomplete offers, so a type absent from it can never be
+  // authored — the `orb` failure mode, where a whole mechanic waited on a tag
+  // no sheet could produce.
+  throwing:     { category: 'armaments', tags: ['weapon', '1H', 'throwing'],                    slot: 'weaponry' },
   buckler:      { category: 'armaments', tags: ['weapon', '1H', 'shield', 'buckler'],           slot: 'weaponry' },
   shield:       { category: 'armaments', tags: ['weapon', '1H', 'shield'],                      slot: 'weaponry' },
   greatshield:  { category: 'armaments', tags: ['weapon', '1H', 'shield', 'greatshield'],       slot: 'weaponry' },
