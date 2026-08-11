@@ -752,6 +752,29 @@ ASPECTSOFPOWER.defenseTuning = {
   // parity dodge sits at 91% and mirror fights never resolve (sim
   // 2026-06-12); stripped, parity is a 54% coin flip and fights conclude.
   dodgeBasisDiv: 1.1,
+  // ── ARMOUR MODEL (ruled 2026-08-10) ──
+  // 'ratio' : applied = raw^2 / (raw + armourRatioCoef x wall). Scale-free.
+  // 'flat'  : the legacy subtraction chain, kept intact and revertable.
+  //
+  // ⚠ WHY: a flat subtraction makes everything under the wall do EXACTLY zero
+  // forever, and levers everything above it — raw spanning 1.80x across the
+  // rarity ladder became 8.8x applied. Live on the allied party it left 15 of
+  // 182 matchups at zero; the ratio model leaves none, moves 22 matchups out
+  // of the one-round bucket, and grows the healthy 2-6 round band 52 -> 82.
+  //
+  // ⚠⚠ THE SHAPE IS SCALE-INVARIANT ON PURPOSE. Double raw and wall and the
+  // result exactly doubles, so no grade or level term is needed. A fixed
+  // absorption constant `raw x K/(wall+K)` was tried and COLLAPSES: armour
+  // goes from absorbing 25% to 90% by S-rank because K is absolute in a world
+  // where nothing else is. Verified live too — absorbed sits at 51-67% across
+  // RL 1-130 with no trend, because the median actor's whole wall IS toughness
+  // DR (round(tough x 0.5)), a stat, so it scales with damage by construction.
+  //
+  // coef solved from the live anchor: George 1498 into Phil's 1120 wall lands
+  // on 378 applied, exactly where flat armour puts it, so the reference
+  // matchup does not move.
+  armourModel:     'ratio',
+  armourRatioCoef: 3.96,
   // ── Defence lane weights (helpers/formulas defenceValue) ──
   // Every lane is `primary + secondary x secondaryWeight`, then divided by
   // their SUM so the pair carries one unit of stat — exactly like the attack

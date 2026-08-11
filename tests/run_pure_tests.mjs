@@ -737,6 +737,16 @@ eq('carried: empty inventory', carriedWeightLb([], [RING]), 0);
 /* ---------------------------------------------------------------- */
 /*  systems/damage.mjs - the resolution pipeline                     */
 /* ---------------------------------------------------------------- */
+// ⚠⚠ THE GOLDEN CARDS BELOW ARE FLAT-ARMOUR MEASUREMENTS. Armour became
+// PROPORTIONAL on 2026-08-10 (defenseTuning.armourModel = 'ratio'), so these
+// are pinned EXPLICITLY to the legacy model rather than left to ride whatever
+// the default happens to be. They remain true statements about the flat chain,
+// which still ships and is still revertable - and pinning them is the lesson
+// from the invest exponent, where a green suite quietly asserted a superseded
+// value for weeks. Ratio-model goldens follow in their own block.
+globalThis.CONFIG = globalThis.CONFIG ?? {};
+globalThis.CONFIG.ASPECTSOFPOWER = globalThis.CONFIG.ASPECTSOFPOWER ?? {};
+globalThis.CONFIG.ASPECTSOFPOWER.defenseTuning = { armourModel: 'flat' };
 // GOLDEN: the five live margin-rule verifications of 2026-07-31, hand-checked
 // against the chat cards at the time (design-defense-rework-2026-07). These are
 // the numbers the table actually produced, so any drift in the chain breaks
@@ -825,6 +835,53 @@ eq('damage: order-free without a barrier', tan.hpLoss, 300);
     Math.round(F2.defenceValue(FLAT, FLAT, DT2) / 1.1), FLAT);
   eq('defence: zero secondary is the primary alone',
     Math.round(F2.defenceValue(FLAT, 0, { secondaryWeight: 0, defenceInflation: 1 })), FLAT);
+}
+
+// ── PROPORTIONAL ARMOUR (ruled 2026-08-10) ──
+// Runs on the LIVE default, not the pinned flat block above.
+{
+  const prevDT = globalThis.CONFIG.ASPECTSOFPOWER.defenseTuning;
+  globalThis.CONFIG.ASPECTSOFPOWER.defenseTuning = { armourModel: 'ratio', armourRatioCoef: 3.96 };
+  const RT = { armourModel: 'ratio', armourRatioCoef: 3.96 };
+
+  // THE ANCHOR: George 1498 into Phil's wall of 1120 must land where FLAT
+  // armour already puts it, or the matchup used to judge the game by feel
+  // moves under everyone's feet.
+  // 378 - IDENTICAL to what flat armour gives on this matchup, which is what
+  // solving the coefficient against it was for.
+  eq('armour ratio: the live anchor is preserved', F2.armourRatioApplied(1498, 1120, RT), 378);
+  eq('armour ratio: anchor equals the FLAT result exactly', F2.armourRatioApplied(1498, 1120, RT), Math.max(0, 1498 - 1120));
+  // ⚠⚠ SCALE INVARIANCE - the entire reason for this shape. Double both sides
+  // and the result doubles, so an E-vs-E fight and an S-vs-S fight are the
+  // same fight. A fixed-K absorption model CANNOT do this.
+  eq('armour ratio: doubling both doubles the result',
+    F2.armourRatioApplied(2996, 2240, RT), 2 * F2.armourRatioApplied(1498, 1120, RT));
+  eq('armour ratio: x3.05 (E->S grade jump) holds',
+    F2.armourRatioApplied(Math.round(1498 * 3.05), Math.round(1120 * 3.05), RT),
+    Math.round(3.05 * F2.armourRatioApplied(1498, 1120, RT)) + 1);   // +1 = rounding
+  // NO ZEROES. This is the defect it exists to remove: under flat armour a 487
+  // hit on a 1120 wall was exactly nothing, forever.
+  eq('armour ratio: a weak hit still chips', F2.armourRatioApplied(487, 1120, RT) > 0, true);
+  eq('armour ratio: flat control - the same hit was ZERO', Math.max(0, 487 - 1120), 0);
+  // Degenerate ends must not blow up.
+  eq('armour ratio: no armour means full damage', F2.armourRatioApplied(900, 0, RT), 900);
+  eq('armour ratio: no damage stays none', F2.armourRatioApplied(0, 1120, RT), 0);
+  // Absorbed share falls as the blow grows - plate turns a knife, not an axe.
+  const share = (r) => 1 - F2.armourRatioApplied(r, 1120, RT) / r;
+  eq('armour ratio: a knife is mostly stopped', share(400) > 0.9, true);
+  eq('armour ratio: a heavy blow overwhelms it', share(8000) < 0.4, true);
+  eq('armour ratio: absorption is monotonic in blow size', share(400) > share(8000), true);
+
+  // And through the real pipeline: the wall is the SUM of the flat layers.
+  const rr = resolveDamage({ incoming: 1498, mitigation: 912, drValue: 208, health: 2000 });
+  eq('damage: ratio model sums the layers into one wall', rr.hpLoss, 378);
+  eq('damage: absorbed is reported as one figure', rr.mitigated, 1498 - 378);
+  // The barrier still goes FIRST - proportional armour did not disturb that.
+  const rb = resolveDamage({ incoming: 1000, barrier: 400, mitigation: 500, drValue: 0, health: 900 });
+  eq('damage: barrier still absorbs before the wall', rb.barrierAbsorbed, 400);
+  eq('damage: the wall only sees what the ward left', rb.hpLoss, F2.armourRatioApplied(600, 500, RT));
+
+  globalThis.CONFIG.ASPECTSOFPOWER.defenseTuning = prevDT;
 }
 
 // Overhealth sits AFTER the margin, so it soaks only what actually landed.

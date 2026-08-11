@@ -323,6 +323,47 @@ export function investSelfDamage(potency, invested, baseCost, safeInvest) {
 }
 
 /**
+ * ARMOUR AS A PROPORTIONAL REDUCTION (ruled 2026-08-10).
+ *
+ *   applied = raw² / (raw + coef × wall)
+ *
+ * ⚠⚠ SCALE-INVARIANT BY CONSTRUCTION, which is the entire reason for this
+ * shape. Double both raw and wall and `applied` exactly doubles, so an E-vs-E
+ * fight and an S-vs-S fight have identical character with NO grade or level
+ * term to maintain. The obvious alternative — a fixed absorption constant
+ * `raw × K/(wall+K)` — collapses as the game inflates: measured across the
+ * grade ladder it took armour from absorbing 25% to 90% of everything by
+ * S-rank, because K is an absolute number in a world where nothing else is.
+ *
+ * Why proportional at all: a flat subtraction produces ABSOLUTE IMMUNITY below
+ * the wall and enormous leverage above it (raw spanning 1.80x across the
+ * rarity ladder became 8.8x applied). Live on the allied party, flat armour
+ * left 15 of 182 matchups at exactly zero damage; this leaves none.
+ *
+ * The curve is also the more honest reading of armour: absorbed share is
+ * `coef × wall / (raw + coef × wall)`, so plate turns a knife aside (92%) and
+ * barely inconveniences a greataxe (36%). Same armour, different answer
+ * depending on what hits it.
+ *
+ * ⚠ `coef` is solved from the live anchor — George's 1498 into Phil's 1120
+ * wall lands on 378 applied, exactly where flat armour puts it — so the
+ * matchup you would sanity-check the game against does not move.
+ *
+ * @param {number} raw   Damage arriving at the wall (post-barrier).
+ * @param {number} wall  armour/veil + effective DR + augment resist + affinity.
+ * @param {object} [cfg] defenseTuning override, for tests.
+ */
+export function armourRatioApplied(raw, wall, cfg = null) {
+  const r = Math.max(0, Number(raw) || 0);
+  const w = Math.max(0, Number(wall) || 0);
+  if (r <= 0) return 0;
+  if (w <= 0) return Math.round(r);           // no armour, nothing absorbed
+  const t = cfg ?? (globalThis.CONFIG?.ASPECTSOFPOWER?.defenseTuning ?? {});
+  const c = t.armourRatioCoef ?? 3.96;
+  return Math.round(r * r / (r + c * w));
+}
+
+/**
  * A defence lane's value from its two stats.
  *
  *   (primary + secondary × secW) / (1 + secW) × inflation

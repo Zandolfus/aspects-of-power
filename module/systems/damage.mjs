@@ -30,7 +30,15 @@
  * The margin lands second-to-last on purpose (RULED 2026-07-31): applying it
  * before the flat wall lets a decent defence plus any armour reach zero —
  * measured at 25 of 40 live matchups immune. See design-defense-rework-2026-07.
+ *
+ * ⚠⚠ ARMOUR IS PROPORTIONAL as of 2026-08-10 (defenseTuning.armourModel). The
+ * four flat reductions sum into one WALL and absorb a SHARE, not an absolute
+ * amount — see helpers/formulas `armourRatioApplied` for why the shape is
+ * scale-free and what a flat subtraction was doing to the roster. Set
+ * `armourModel: 'flat'` to restore the legacy subtraction chain, which is kept
+ * intact in the else branch rather than deleted.
  */
+import { armourRatioApplied } from '../helpers/formulas.mjs';
 
 /**
  * @typedef {object} DamageInput
@@ -123,9 +131,41 @@ export function resolveDamage(input = {}) {
   const barrierBroke = barrier > 0 && barrierRemaining === 0;
   const postBarrier = barrier > 0 ? Math.max(0, incoming - barrier) : incoming;
 
-  // ── 2. Armour / veil. ──
   const mitigation = Math.max(0, n(input.mitigation));
-  let mitigated = 0;
+  const effectiveDR = Math.max(0, n(input.drValue) - n(input.affinityDR));
+  const augDR = Math.max(0, n(input.augDR));
+  const affinityResist = Math.max(0, n(input.affinityResist));
+  const _dt = globalThis.CONFIG?.ASPECTSOFPOWER?.defenseTuning ?? {};
+  const _ratio = (_dt.armourModel ?? 'ratio') === 'ratio';
+
+  let mitigated = 0, drReduced = 0, affinityResisted = 0, augReduced = 0;
+
+  if (_ratio) {
+    // ── 2. THE WALL, PROPORTIONALLY (ruled 2026-08-10) ──
+    // Every flat reduction sums into one wall and absorbs a SHARE rather than
+    // an absolute amount. Order within the wall is irrelevant by construction,
+    // which is why the four layers collapse into a single step here — but they
+    // still sit AFTER the barrier, so a ward absorbs the un-resisted blow.
+    //
+    // Reported as one absorbed figure because that is what actually happened:
+    // under this model there is no meaningful "armour took 599 of it, then DR
+    // took 208". The wall took a fraction, together.
+    const wall = mitigation + effectiveDR + augDR + affinityResist;
+    if (remaining > 0 && wall > 0) {
+      const before = remaining;
+      remaining = armourRatioApplied(remaining, wall, _dt);
+      mitigated = before - remaining;
+      const lane = input.mitigationLabel === 'Veil' ? 'Veil' : 'Armor';
+      parts.push(`${lane} (wall ${wall}): −${mitigated} (${Math.round(mitigated / before * 100)}% absorbed)`);
+      if (affinityResist > 0) {
+        affinityResisted = affinityResist;   // its share of the wall, for reporting
+        parts.push(input.affinityResistLabel
+          ? `  incl. affinity resist (${input.affinityResistLabel})`
+          : `  incl. affinity resist ${affinityResist}`);
+      }
+    }
+  } else {
+  // ── 2. Armour / veil. FLAT (legacy model, defenseTuning.armourModel) ──
   if (remaining > 0 && mitigation > 0) {
     mitigated = Math.min(mitigation, remaining);
     remaining = Math.max(0, remaining - mitigation);
@@ -133,8 +173,6 @@ export function resolveDamage(input = {}) {
   }
 
   // ── 3. Toughness DR, less any affinity strip. ──
-  const effectiveDR = Math.max(0, n(input.drValue) - n(input.affinityDR));
-  let drReduced = 0;
   if (remaining > 0) {
     drReduced = Math.min(effectiveDR, remaining);
     remaining = Math.max(0, remaining - effectiveDR);
@@ -154,8 +192,6 @@ export function resolveDamage(input = {}) {
   // That is the coherent reading — a barrier stands in front of you and
   // intercepts the strike, so your own resistance never gets tested on the
   // portion the ward ate.
-  const affinityResist = Math.max(0, n(input.affinityResist));
-  let affinityResisted = 0;
   if (remaining > 0 && affinityResist > 0) {
     affinityResisted = Math.min(affinityResist, remaining);
     remaining = Math.max(0, remaining - affinityResist);
@@ -165,12 +201,11 @@ export function resolveDamage(input = {}) {
   }
 
   // ── 3b. Augment-sourced flat resist. ──
-  const augDR = Math.max(0, n(input.augDR));
-  let augReduced = 0;
   if (remaining > 0 && augDR > 0) {
     augReduced = Math.min(augDR, remaining);
     remaining = Math.max(0, remaining - augDR);
     parts.push(`${input.augLabel ?? 'Phys'} Resist: −${augReduced}`);
+  }
   }
 
   // ── 3c. THE MARGIN RULE — how badly the defender lost scales what survives
