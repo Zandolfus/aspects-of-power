@@ -146,22 +146,30 @@ export function onPreUpdateTokenForResidency(tokenDoc, changes, options) {
   const region = exitRegionAt(scene, x, y, tokenDoc.elevation ?? 0);
   if (!region) return;
 
-  const dest = [...region.behaviors]
-    .find(b => b.type === 'teleportToken' && !b.disabled)?.system?.destination;
-  const destSceneId = sceneIdFromRegionUuid(dest);
-  /* No teleport on this exit, or the destination is already resident: core
+  /* v14 stores `destinations` (a set — hex exits carry exactly one, but the
+     schema allows more). The singular `destination` is a deprecation shim
+     that dies in v16 — do not read it. */
+  const sys = [...region.behaviors]
+    .find(b => b.type === 'teleportToken' && !b.disabled)?.system;
+  const missing = [...(sys?.destinations ?? [])]
+    .map(sceneIdFromRegionUuid)
+    .filter(id => id && !game.scenes.get(id));
+  /* No teleport on this exit, or every destination is already resident: core
      owns the rest of the journey. */
-  if (!destSceneId || game.scenes.get(destSceneId)) return;
+  if (!missing.length) return;
 
-  repairAndReissue(tokenDoc, changes, destSceneId);
+  repairAndReissue(tokenDoc, changes, missing);
   return false;
 }
 
-async function repairAndReissue(tokenDoc, changes, destSceneId) {
+async function repairAndReissue(tokenDoc, changes, missingSceneIds) {
   ui.notifications.info('Preparing the next area…');
-  const ok = game.user.isGM
-    ? ['resident', 'imported'].includes(await ensureHexResident(destSceneId))
-    : await requestHexResident(destSceneId);
+  let ok = true;
+  for (const destSceneId of missingSceneIds) {
+    ok = (game.user.isGM
+      ? ['resident', 'imported'].includes(await ensureHexResident(destSceneId))
+      : await requestHexResident(destSceneId)) && ok;
+  }
   if (!ok) {
     ui.notifications.warn(game.users.activeGM
       ? 'The next area could not be loaded.'
