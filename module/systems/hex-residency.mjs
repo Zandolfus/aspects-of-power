@@ -31,7 +31,7 @@
 import { isActingGM } from '../helpers/gm.mjs';
 import { EDGES, neighbour, sceneIdFromRegionUuid } from '../helpers/hexgrid.mjs';
 import {
-  HEX_PACK, areaStampFor, availableHexes, exitRegionAt, hexKey,
+  HEX_PACK, areaStampFor, availableHexes, exitRegionAt, hexKey, loadHexPackIndex,
 } from './overworld.mjs';
 
 const SYS = 'aspects-of-power';
@@ -39,6 +39,78 @@ const SYS = 'aspects-of-power';
 /** Is this scene in the world right now? (Pack copies do not count.) */
 export function isHexResident(sceneId) {
   return !!game.scenes.get(sceneId);
+}
+
+/* ------------------------------------------------------------------ */
+/* World <-> pack comparison                                           */
+/* ------------------------------------------------------------------ */
+
+/**
+ * Keys compendium export normalises away. They are WORLD STATE, not content:
+ * two copies differing only here are the same map. Validated live 2026-08-12
+ * — the first pristine check compared four of these and every candidate
+ * failed on `active`.
+ */
+export const EXPORT_NORMALISED_KEYS =
+  ['_stats', 'sort', 'navigation', 'navOrder', 'active', 'ownership', 'folder'];
+
+/** Canonical comparison string for a Scene document, world or pack. */
+export function comparableScene(doc) {
+  return JSON.stringify(doc.toObject(), (k, v) =>
+    EXPORT_NORMALISED_KEYS.includes(k) ? undefined : v);
+}
+
+/* ------------------------------------------------------------------ */
+/* Sync: the map-building ritual, mechanised                           */
+/* ------------------------------------------------------------------ */
+
+/**
+ * Bring the pack up to date with the world — THE step to run after building
+ * new hexes. Importing a hex also rewires its neighbours' exit behaviours,
+ * so a build session dirties scenes nobody opened; this finds both:
+ *
+ *  - world hexes MISSING from the pack (newly built) -> exported;
+ *  - world hexes whose content DIFFERS from their pack copy (neighbours the
+ *    linker touched, or deliberate map edits) -> re-exported.
+ *
+ * Direction is strictly world -> pack: for a resident scene the world is the
+ * truth, so overwriting the pack copy here is the intended replace. Nothing
+ * is ever written world-ward, which is what makes this safe to run blind.
+ *
+ * `dryRun: true` reports what would happen without writing. Returns
+ * { missing, changed, unchanged, exported } as name lists / a count.
+ */
+export async function syncHexesToPack({ dryRun = false } = {}) {
+  if (!game.user.isGM) return null;
+  const pack = game.packs.get(HEX_PACK);
+  if (!pack) return null;
+  await pack.getIndex();
+
+  const worldHexes = game.scenes.filter(s => !!s.flags?.['uvtt-plus']?.area?.id);
+  const missing = [], changed = [], unchanged = [];
+  for (const scene of worldHexes) {
+    if (!pack.index.has(scene.id)) { missing.push(scene); continue; }
+    const packCopy = await pack.getDocument(scene.id);
+    if (comparableScene(scene) !== comparableScene(packCopy)) changed.push(scene);
+    else unchanged.push(scene.name);
+  }
+
+  let exported = 0;
+  if (!dryRun) {
+    for (const scene of [...missing, ...changed]) {
+      await pack.importDocument(scene, { keepId: true });
+      exported++;
+    }
+    /* New entries must reach availability without a reload. */
+    if (exported) await loadHexPackIndex();
+  }
+  return {
+    missing: missing.map(s => s.name),
+    changed: changed.map(s => s.name),
+    unchanged: unchanged.length,
+    exported,
+    dryRun,
+  };
 }
 
 /* One import per scene at a time. Two rapid calls both passing the residency
