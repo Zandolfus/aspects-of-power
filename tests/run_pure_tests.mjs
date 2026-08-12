@@ -26,6 +26,7 @@ import {
   HEX_SIZE_FT, EDGES, OPPOSITE_EDGE, hexApothemFt, hexWidthFt, hexHeightFt,
   hexCentreWorld, hexFromWorldFt, neighbour, edgeBetween, hexDistance,
   hexesWithin, worldFtFromPixels, offsetFromCentre, nearestEdge, verifyStampOrigin,
+  sceneIdFromRegionUuid,
 } from '../module/helpers/hexgrid.mjs';
 import { moonState, moonNodeAngle, nextSyzygy, eclipseAtSyzygy, planetStates,
          meteorShowersOn, cometStates, julianDay, civilDate, worldTimeForDate } from '../module/systems/calendar.mjs';
@@ -1848,6 +1849,25 @@ eq('junk situational entries are skipped, not NaN',
     }
   }
   eq('hexFromWorldFt: 841 centres round-trip', rtFail, 0);
+
+  // Travel destination parsing. The two positives are REAL destination UUIDs:
+  // the first read off a live hex-exit behaviour in the 2026-08-10 payload
+  // audit, the second from the Phase 0 keepId round-trip fixture.
+  eq('sceneIdFromRegionUuid: live hex exit',
+     sceneIdFromRegionUuid('Scene.0FBnx8apvuA3Xx2W.Region.v9Q6L6bY3BqiLfRn'), '0FBnx8apvuA3Xx2W');
+  eq('sceneIdFromRegionUuid: phase-0 fixture',
+     sceneIdFromRegionUuid('Scene.xWiFdQMqoRVsXplI.Region.ddnuJfrCkff2ty0m'), 'xWiFdQMqoRVsXplI');
+  // Anything that is not exactly Scene.<id>.Region.<id> is NOT a hex exit.
+  eq('sceneIdFromRegionUuid: null in, null out', sceneIdFromRegionUuid(null), null);
+  eq('sceneIdFromRegionUuid: empty string', sceneIdFromRegionUuid(''), null);
+  eq('sceneIdFromRegionUuid: bare scene uuid',
+     sceneIdFromRegionUuid('Scene.0FBnx8apvuA3Xx2W'), null);
+  eq('sceneIdFromRegionUuid: compendium-scoped uuid rejected',
+     sceneIdFromRegionUuid('Compendium.world.hexes.Scene.0FBnx8apvuA3Xx2W.Region.v9Q6L6bY3BqiLfRn'), null);
+  eq('sceneIdFromRegionUuid: deeper embedded path rejected',
+     sceneIdFromRegionUuid('Scene.0FBnx8apvuA3Xx2W.Region.v9Q6L6bY3BqiLfRn.RegionBehavior.aaaabbbbccccdddd'), null);
+  eq('sceneIdFromRegionUuid: short id rejected',
+     sceneIdFromRegionUuid('Scene.abc.Region.v9Q6L6bY3BqiLfRn'), null);
 
   // Off-centre round-trip. Rounding fractional axial coordinates independently
   // fails in a band along every edge, so sampling only centres proves nothing.

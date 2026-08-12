@@ -251,3 +251,21 @@ export function verifyStampOrigin(stamp, canvasFt, size = HEX_SIZE_FT) {
     ok: Math.hypot(drift[0], drift[1]) < 0.01
   };
 }
+
+/* ------------------------------------------------------------------ */
+/* Travel UUID parsing                                                 */
+/* ------------------------------------------------------------------ */
+
+/**
+ * The Scene id inside a `Scene.<id>.Region.<id>` destination UUID, or null.
+ *
+ * Travel needs the SCENE id before it can ask whether the destination is
+ * resident — `fromUuidSync` on a non-resident hex returns null, which is the
+ * very condition being tested for, so the id has to come from the string
+ * itself. Strict shape on purpose: an embedded-document UUID of any other
+ * form is not a hex exit and must not be treated as one.
+ */
+export function sceneIdFromRegionUuid(uuid) {
+  const m = /^Scene\.([A-Za-z0-9]{16})\.Region\.[A-Za-z0-9]{16}$/.exec(String(uuid ?? ''));
+  return m ? m[1] : null;
+}

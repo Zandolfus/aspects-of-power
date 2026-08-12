@@ -43,6 +43,7 @@ import * as Calendar from './systems/calendar.mjs';
 import { CalendarTracker, registerCalendarTracker } from './apps/calendar-tracker.mjs';
 import { OverworldPanel, registerOverworldPanel } from './apps/overworld-panel.mjs';
 import * as Overworld from './systems/overworld.mjs';
+import * as HexResidency from './systems/hex-residency.mjs';
 import * as Downtime from './systems/downtime.mjs';
 import { DotHelpers } from './systems/dot.mjs';
 import * as Affinity from './systems/affinity.mjs';
@@ -170,6 +171,7 @@ Hooks.once('init', function () {
   // is derived from the imported scenes and deliberately not stored.
   Overworld.registerOverworldSettings();
   Overworld.registerOverworldHooks();
+  HexResidency.registerHexResidencyHooks();
 
   game.settings.register('aspects-of-power', 'woundedTokenThreshold', {
     name: 'Wounded Token Threshold',
@@ -1295,7 +1297,7 @@ Hooks.once('ready', async function () {
         whisper: ChatMessage.getWhisperRecipients('GM'),
         content: payload.content,
       });
-    } else if (['gmApplyBuff', 'gmApplyDebuff', 'gmApplyRestoration', 'gmApplyRepair', 'gmApplyCleanse', 'gmUpdateDefensePool', 'gmConsumeReaction', 'gmExecuteTrade', 'gmCreateAoeRegion', 'gmDeleteAoeRegion', 'gmOverworldNote'].includes(payload.type)) {
+    } else if (['gmApplyBuff', 'gmApplyDebuff', 'gmApplyRestoration', 'gmApplyRepair', 'gmApplyCleanse', 'gmUpdateDefensePool', 'gmConsumeReaction', 'gmExecuteTrade', 'gmCreateAoeRegion', 'gmDeleteAoeRegion', 'gmOverworldNote', 'gmEnsureHexResident'].includes(payload.type)) {
       await AspectsofPowerItem.executeGmAction(payload);
     } else if (payload.type === 'gmCelerityRealtimeToggle') {
       // TRIAL-REALTIME: player clicked the play/pause button. The real loop

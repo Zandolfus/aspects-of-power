@@ -19,6 +19,16 @@ export async function executeGmAction(payload) {
     const msgWhisper = payload.whisperGM ? { whisper: payload.whisperGM } : {};
     switch (payload.type) {
 
+      case 'gmEnsureHexResident': {
+        // Travel backstop: a player is walking into a hex whose scene is not
+        // in the world, and players cannot create scenes. Import it from the
+        // hex pack; the scene-create broadcast is the reply the requesting
+        // client is waiting on, so there is nothing to emit back.
+        const { ensureHexResident } = await import('./hex-residency.mjs');
+        await ensureHexResident(payload.sceneId);
+        break;
+      }
+
       case 'gmOverworldNote': {
         // Party notes on the overworld. Players cannot write world settings,
         // so their add/remove arrives here over the socket. The ownership rule

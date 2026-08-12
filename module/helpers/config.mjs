@@ -3178,6 +3178,17 @@ ASPECTSOFPOWER.overworld = {
   // Block a token that is in a STARTED combat from moving into an exit region.
   // A GM gets a confirm instead of a hard stop; players are stopped outright.
   blockExitDuringCombat: true,
+  // Hex scene residency (systems/hex-residency.mjs): the hex maps live in the
+  // world.hexes compendium and are imported into the world as the party
+  // travels, grow-only.
+  residency: {
+    // Import the six neighbouring hex maps when the party arrives on a hex,
+    // so an ordinary edge-crossing never waits on an import.
+    neighbourPrefetch: true,
+    // How long a player client waits for the acting GM to import a travel
+    // destination before giving up on the move.
+    requestTimeoutMs: 15000,
+  },
 };
 
 ASPECTSOFPOWER.unarmedGrant = {
