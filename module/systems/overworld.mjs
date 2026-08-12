@@ -145,7 +145,45 @@ export function locateToken(token) {
 /* ------------------------------------------------------------------ */
 
 /**
- * Every hex that has an imported scene, keyed "col,row".
+ * The hex map library. Scenes live canonically in this compendium (built
+ * 2026-08-12, ids preserved — see migration/local/phase1_*.js); the world
+ * holds only the hexes the party has actually visited. The INDEX, a few
+ * hundred KB against the pack's 150 MB, is what lets every client know which
+ * hexes have maps without being shipped the maps.
+ */
+export const HEX_PACK = 'world.hexes';
+
+/**
+ * What the index must carry for availableHexes() to read an index entry the
+ * same way it reads a live scene: the stamp, the build, and enough grid to
+ * compute canvas feet. ⚠ `thumb` is deliberately ABSENT — tints fetch the
+ * full pack document once instead of fattening every client's index.
+ */
+export const HEX_PACK_INDEX_FIELDS = [
+  'flags.uvtt-plus.area', 'flags.uvtt-plus.build', 'width', 'height', 'grid',
+];
+
+let hexPackIndex = null;
+
+/**
+ * Load (or reload) the hex pack index. Called at `ready` on every client;
+ * everything downstream degrades to world-scenes-only until it lands, and a
+ * world without the pack (fresh installs, other worlds on this system) just
+ * stays in that mode forever.
+ */
+export async function loadHexPackIndex() {
+  const pack = game.packs.get(HEX_PACK);
+  hexPackIndex = pack ? await pack.getIndex({ fields: HEX_PACK_INDEX_FIELDS }) : null;
+  return hexPackIndex;
+}
+
+/**
+ * Every hex that has a map, keyed "col,row" — resident world scenes plus
+ * pack-only entries. An index entry carries the same fields availableHexes
+ * reads off a live scene (areaStampFor and sceneCanvasFt only touch plain
+ * data), so both sources produce the same entry shape; `resident` is the
+ * one honest difference, and consumers that need the actual Scene document
+ * (tints, travel) must check it rather than assume `game.scenes.get` works.
  *
  * Also reports build drift, because a scene imported from a pre-fix map sits
  * 0.38 ft off its neighbours and nothing else will ever tell you. That is too
@@ -154,22 +192,27 @@ export function locateToken(token) {
  */
 export function availableHexes() {
   const out = new Map();
-  for (const scene of game.scenes ?? []) {
-    const stamp = areaStampFor(scene);
-    if (!stamp?.hex) continue;
-    const canvasFt = sceneCanvasFt(scene);
+  const put = (source, id, name, resident) => {
+    const stamp = areaStampFor(source);
+    if (!stamp?.hex) return;
+    const canvasFt = sceneCanvasFt(source);
     const check = canvasFt ? verifyStampOrigin(stamp, canvasFt) : null;
     out.set(hexKey(stamp.hex[0], stamp.hex[1]), {
-      sceneId: scene.id,
-      sceneName: scene.name,
+      sceneId: id,
+      sceneName: name,
       areaId: stamp.id,
       region: stamp.region,
-      build: buildStampFor(scene),
+      build: buildStampFor(source),
       offLattice: !stamp.worldOriginFt,
       driftFt: check?.driftFt ?? null,
       stale: check ? !check.ok : null,
+      resident,
     });
-  }
+  };
+  /* Pack entries first so a resident copy of the same hex OVERWRITES its
+     pack entry — world state is always the truth for anything resident. */
+  for (const entry of hexPackIndex?.values() ?? []) put(entry, entry._id, entry.name, false);
+  for (const scene of game.scenes ?? []) put(scene, scene.id, scene.name, true);
   return out;
 }
 
@@ -432,7 +475,13 @@ export async function ensureTints(keys) {
     if (!entry) continue;
     const build = entry.build?.image_id ?? null;
     if (tints[key] && tints[key].b === build) continue;
-    const scene = game.scenes.get(entry.sceneId);
+    /* A non-resident hex has no world scene to sample. Fetch the pack copy —
+       one full-document read per hex, once, cached in the setting; cheaper
+       than carrying every thumb in every client's index. */
+    const scene = game.scenes.get(entry.sceneId)
+      ?? (entry.resident === false
+        ? await game.packs.get(HEX_PACK)?.getDocument(entry.sceneId).catch(() => null)
+        : null);
     const colour = await dominantColour(scene?.thumb ?? null);
     if (!colour) continue;
     tints[key] = { c: colour, b: build };
@@ -616,4 +665,6 @@ export function registerOverworldHooks() {
   Hooks.on('canvasReady', () => { syncExploration(canvas?.scene); });
   Hooks.on('createToken', (doc) => { syncExploration(doc?.parent); });
   Hooks.on('preUpdateToken', onPreUpdateTokenForTravel);
+  /* Availability needs the pack index; packs do not exist before ready. */
+  Hooks.once('ready', () => { loadHexPackIndex(); });
 }
