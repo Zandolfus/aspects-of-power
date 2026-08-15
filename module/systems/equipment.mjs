@@ -518,16 +518,21 @@ export class EquipmentSystem {
 
   /**
    * Degrade a weapon's durability when raw damage exceeds its damage limit.
-   * Damage limit = 3 × weapon progress. Durability loss = rawDamage − limit.
+   * Limit = limitPerProgress × progress × (weight / referenceWeight) —
+   * mass tolerates force, so a claymore shrugs off a blow that would shatter
+   * a dagger channeling the same power (config.weaponWear; sim 2026-08-15,
+   * anchor ruled 140). Durability loss = rawDamage − limit.
    * @param {Item} weapon      The weapon item (must be in the 'weaponry' slot).
    * @param {number} rawDamage The unmitigated damage dealt by the attack.
+   * @param {number} weight    Effective weapon weight (0 falls back to weight-blind).
    */
-  static async degradeWeaponOnAttack(weapon, rawDamage) {
+  static async degradeWeaponOnAttack(weapon, rawDamage, weight = 0) {
     if (!weapon || weapon.type !== 'item') return;
     if (weapon.system.slot !== 'weaponry') return;
     if (weapon.system.durability.max <= 0 || weapon.system.durability.value <= 0) return;
 
-    const damageLimit = 3 * (weapon.system.progress ?? 0);
+    const { weaponDamageLimit } = await import('../helpers/formulas.mjs');
+    const damageLimit = weaponDamageLimit(weapon.system.progress ?? 0, weight);
     if (rawDamage <= damageLimit) return;
 
     const excess = Math.round(rawDamage - damageLimit);

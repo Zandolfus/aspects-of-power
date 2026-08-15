@@ -3192,6 +3192,19 @@ ASPECTSOFPOWER.overworld = {
 };
 
 /**
+ * Weapon wear. A weapon degrades when one hit's raw damage exceeds what its
+ * craftsmanship AND mass tolerate: limit = limitPerProgress × progress ×
+ * (weight / referenceWeight). Anchored at 140 (staff/spear class unchanged
+ * from the old weight-blind limit) per the 2026-08-15 sim: ordinary fighting
+ * wears nothing; sustained max-invest overdrive costs the blade. Set
+ * referenceWeight to 0 to revert to the weight-blind legacy limit.
+ */
+ASPECTSOFPOWER.weaponWear = {
+  limitPerProgress: 3,
+  referenceWeight: 140,
+};
+
+/**
  * Equipment summons — conjured gear whose stats derive from the summoner,
  * not from crafting (exemplar: Threadcutter, Gabriel's soulbound dagger).
  *

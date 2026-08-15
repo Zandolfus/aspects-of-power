@@ -6629,10 +6629,19 @@ export class AspectsofPowerItem extends Item {
     };
 
     // ── Weapon durability: degrade if raw damage exceeds the weapon's limit ──
-    if (tags.includes('attack') && this.system.requiredEquipment) {
-      const weapon = this.actor.items.get(this.system.requiredEquipment);
+    // Wears the weapon the attack RESOLVES with — the same resolution the
+    // damage math uses — not the requiredEquipment link. The old gate left
+    // 26 of the party's 27 weapon attack skills unable to wear anything
+    // (measured 2026-08-15); requiredEquipment is a loadout constraint, not
+    // a wear channel. Weapon-typed attacks only: casting through a wand is
+    // not swinging it. Unarmed resolves to no item and wears nothing.
+    if (tags.includes('attack')
+      && ['str_weapon', 'dex_weapon', 'phys_ranged'].includes(this.system.roll?.type ?? '')) {
+      const weapon = this._resolveWeaponForSkill?.()
+        ?? (this.system.requiredEquipment ? this.actor.items.get(this.system.requiredEquipment) : null);
       if (weapon) {
-        await EquipmentSystem.degradeWeaponOnAttack(weapon, dmgRoll.total);
+        const weight = AspectsofPowerItem.resolveEffectiveWeaponWeight(this, weapon);
+        await EquipmentSystem.degradeWeaponOnAttack(weapon, dmgRoll.total, weight);
       }
     }
 

@@ -517,6 +517,22 @@ export function splitEvenlyWithRemainder(total, keys) {
 }
 
 /**
+ * Damage a weapon tolerates before wearing (config.weaponWear). Mass
+ * tolerates force: the limit scales with the weapon's weight, so the same
+ * blow that a claymore shrugs off shatters a dagger channeling it. A zero
+ * weight (or a zeroed referenceWeight knob) falls back to the weight-blind
+ * legacy limit, which keeps the dial revertable.
+ */
+export function weaponDamageLimit(progress, weight, cfg = null) {
+  const t = cfg ?? (globalThis.CONFIG?.ASPECTSOFPOWER?.weaponWear ?? {});
+  const per = t.limitPerProgress ?? 3;
+  const ref = t.referenceWeight ?? 140;
+  const base = per * Math.max(0, Number(progress) || 0);
+  if (!ref || !(Number(weight) > 0)) return base;
+  return base * (Number(weight) / ref);
+}
+
+/**
  * Stat-point budget of a summoned equipment item (config.summonEquipment).
  * Budget = class level × the rate the summon skill's rarity earns. Floored:
  * a partial point is not a point, and flooring keeps level-ups feeling like

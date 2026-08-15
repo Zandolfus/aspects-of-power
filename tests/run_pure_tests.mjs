@@ -2266,6 +2266,37 @@ eq('junk situational entries are skipped, not NaN',
      Math.abs(harveyStrain - strainRate) < 0.005, true);
 }
 
+/* ── Weapon wear: weight-scaled damage limit ───────────────────────────── */
+{
+  // GOLDEN NUMBERS from the live party (wear_dump 2026-08-15) at the ruled
+  // anchor 140. limit = 3 x progress x weight/140.
+  const cfg = { limitPerProgress: 3, referenceWeight: 140 };
+  const lim = (p, w) => F2.weaponDamageLimit(p, w, cfg);
+  const near = (name, got, want, tol = 0.005) => {
+    if (Math.abs(got - want) > tol) { console.error('FAIL ' + name + ': got ' + got + ' want ' + want); failures++; }
+    else console.log('ok   ' + name);
+  };
+  near('weaponWear: Phil claymore 306/200 -> 1311.4', lim(306, 200), 1311.43, 0.01);
+  near('weaponWear: Gabriel dagger 352/60 -> 452.6', lim(352, 60), 452.57, 0.01);
+  near('weaponWear: George axe 400/220 -> 1885.7', lim(400, 220), 1885.71, 0.01);
+  eq('weaponWear: Faye staff 330/140 unchanged from legacy', lim(330, 140), 3 * 330);
+  // Revert dials: zero weight or zero reference -> the weight-blind limit.
+  eq('weaponWear: zero weight falls back to legacy', lim(352, 0), 1056);
+  eq('weaponWear: referenceWeight 0 reverts to legacy',
+     F2.weaponDamageLimit(352, 200, { limitPerProgress: 3, referenceWeight: 0 }), 1056);
+  // Direction pin: mass tolerates force — heavier tolerates strictly more.
+  eq('weaponWear: heavier tolerates more', lim(352, 200) > lim(352, 60), true);
+  // Shipped knobs must match the ruling.
+  {
+    const { readFileSync } = await import('node:fs');
+    const src = readFileSync(new URL('../module/helpers/config.mjs', import.meta.url), 'utf8');
+    const ref = Number(/weaponWear[\s\S]*?referenceWeight:\s*(\d+)/.exec(src)?.[1]);
+    const per = Number(/weaponWear[\s\S]*?limitPerProgress:\s*(\d+)/.exec(src)?.[1]);
+    eq('weaponWear: shipped referenceWeight is the ruled 140', ref, 140);
+    eq('weaponWear: shipped limitPerProgress keeps the legacy 3', per, 3);
+  }
+}
+
 /* ── Equipment summons (Threadcutter exemplar) ─────────────────────────── */
 {
   // GOLDEN ANCHOR from the 2026-08-15 ruling: Gabriel, class level 78,
