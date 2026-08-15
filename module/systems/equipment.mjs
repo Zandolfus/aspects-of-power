@@ -702,10 +702,18 @@ export class EquipmentSystem {
   static _onItemCreate(item, _options, _userId) {
     if (game.userId !== _userId) return;
     if (item.type !== 'item') return;
+
+    // Respect lockedFields exactly like the preUpdateItem auto-derive does.
+    // Items whose stats do not come from crafting (summoned equipment is the
+    // exemplar) are authored WITH their final values and lock them; this
+    // normaliser overwriting them at creation was measured live — the first
+    // conjured Threadcutter got rare's 3 sockets and tracked durability.
+    const locked = new Set(item.system.lockedFields ?? []);
+
     const updates = {};
     const progress = item.system.progress ?? 0;
     const durMax = progress * 2;
-    if (item.system.durability.max !== durMax) {
+    if (!locked.has('durabilityMax') && item.system.durability.max !== durMax) {
       updates['system.durability.max'] = durMax;
       updates['system.durability.value'] = durMax;
     }
@@ -714,13 +722,14 @@ export class EquipmentSystem {
 
     // Profession gear: 0 regular slots, profession slots = rarity + 1 extra.
     // Combat gear: rarity slots, 0 profession slots.
+    // One lock covers both: they are the same dial split by gear type.
     const augSlots = isProfGear ? 0 : rarityAugments;
     const profAugSlots = isProfGear ? rarityAugments + 1 : 0;
 
-    if (item.system.augmentSlots !== augSlots) {
+    if (!locked.has('augmentSlots') && item.system.augmentSlots !== augSlots) {
       updates['system.augmentSlots'] = augSlots;
     }
-    if (item.system.profAugmentSlots !== profAugSlots) {
+    if (!locked.has('augmentSlots') && item.system.profAugmentSlots !== profAugSlots) {
       updates['system.profAugmentSlots'] = profAugSlots;
     }
     if (Object.keys(updates).length > 0) item.update(updates);
