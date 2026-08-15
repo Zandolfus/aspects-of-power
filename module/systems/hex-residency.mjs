@@ -98,6 +98,15 @@ export async function syncHexesToPack({ dryRun = false } = {}) {
   let exported = 0;
   if (!dryRun) {
     for (const scene of [...missing, ...changed]) {
+      /* ⚠⚠ NEVER the same-id REPLACE path here. On 2026-08-15 a 40-scene
+         replace batch reported success, read back correct in-session, and
+         had persisted NOTHING after a reload — the pack-write class of the
+         multi-write defect. DELETE + CREATE both persisted 100% the same
+         day (74 creates, 33 + 55 deletes, all reload-verified). */
+      if (pack.index.has(scene.id)) {
+        const stale = await pack.getDocument(scene.id);
+        await stale.delete();
+      }
       await pack.importDocument(scene, { keepId: true });
       exported++;
     }
