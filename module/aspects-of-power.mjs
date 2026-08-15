@@ -51,6 +51,7 @@ import * as WeaponStyles from './systems/weapon-styles.mjs';
 import * as SpatialStorage from './systems/spatial-storage.mjs';
 import * as TemplateGrants from './systems/template-grants.mjs';
 import { SummonHelpers, registerSummonHooks } from './systems/summon.mjs';
+import { registerSummonEquipmentHooks } from './systems/summon-equipment.mjs';
 import { ChannelHelpers, registerChannelHooks } from './systems/channel.mjs';
 import { AIProfiles, registerAIHooks, aiSetFactionFocus } from './systems/ai.mjs';
 import { registerMovementHooks } from './systems/movement.mjs';
@@ -927,6 +928,7 @@ Hooks.once('ready', async function () {
   // Register summon-subsystem deleteToken hook (cleans up cloned actor
   // when its token is removed). Idempotent.
   registerSummonHooks();
+  registerSummonEquipmentHooks();
 
   // Register channel-subsystem updateCombat hook (sub-turn tick scheduler).
   registerChannelHooks();

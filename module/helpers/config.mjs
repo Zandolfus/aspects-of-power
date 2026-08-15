@@ -3191,6 +3191,41 @@ ASPECTSOFPOWER.overworld = {
   },
 };
 
+/**
+ * Equipment summons — conjured gear whose stats derive from the summoner,
+ * not from crafting (exemplar: Threadcutter, Gabriel's soulbound dagger).
+ *
+ * Budget = class level × ratePerLevelByRarity[skill rarity], so the item
+ * grows continuously with its summoner and jumps when the summon skill
+ * ranks up. The ladder keeps the unarmedGrant rarity PROPORTIONS (that
+ * table's totals ÷ its rare value 45, × the 0.70 anchor), so the two
+ * granted-gear systems stay on one curve. Anchor: rare × level 78 = 54,
+ * the ruled epic-band landing for Threadcutter at authoring time.
+ *
+ * Summoned equipment is soul-bound BY TYPE, not per item: it reforms fresh
+ * on every resummon (durability and stats re-derived) and returns to the
+ * summoner's soul when unequipped or dismissed — deleted, never stored,
+ * never lootable. That is what distinguishes a summon from crafting.
+ */
+ASPECTSOFPOWER.summonEquipment = {
+  ratePerLevelByRarity: {
+    not_proficient: 0,
+    neglected:      0.14,
+    rusty:          0.28,
+    inferior:       0.34,
+    common:         0.42,
+    uncommon:       0.56,
+    rare:           0.70,
+    epic:           0.84,
+    legendary:      0.98,
+    mythic:         1.12,
+    divine:         1.26,
+  },
+  // Durability of the conjured item per class level. It reforms on
+  // resummon anyway; this just keeps it from shattering mid-fight.
+  durabilityPerLevel: 10,
+};
+
 ASPECTSOFPOWER.unarmedGrant = {
   enabled: true,
   // Ordered: primary, secondary, tertiary.

@@ -22,6 +22,7 @@ import {
   resolveBuffLoad, auraRadiusFor, barrierStatBlend, hotTickAmount,
 } from '../module/helpers/formulas.mjs';
 import * as F2 from '../module/helpers/formulas.mjs';
+import { summonEquipmentBudget, parseStatSplit, distributeStatBudget } from '../module/helpers/formulas.mjs';
 import {
   HEX_SIZE_FT, EDGES, OPPOSITE_EDGE, hexApothemFt, hexWidthFt, hexHeightFt,
   hexCentreWorld, hexFromWorldFt, neighbour, edgeBetween, hexDistance,
@@ -2263,6 +2264,53 @@ eq('junk situational entries are skipped, not NaN',
   const harveyStrain = 68 / (201 * divisor);
   eq('strain: Harvey conversion is time-neutral (~1 hour of strain)',
      Math.abs(harveyStrain - strainRate) < 0.005, true);
+}
+
+/* ── Equipment summons (Threadcutter exemplar) ─────────────────────────── */
+{
+  // GOLDEN ANCHOR from the 2026-08-15 ruling: Gabriel, class level 78,
+  // rare summon skill, lands the epic-band 54 total. The whole ladder is
+  // the unarmedGrant proportions (÷45 × 0.70), so spot-check the ends too.
+  const cfg = { ratePerLevelByRarity: {
+    not_proficient: 0, neglected: 0.14, rusty: 0.28, inferior: 0.34, common: 0.42,
+    uncommon: 0.56, rare: 0.70, epic: 0.84, legendary: 0.98, mythic: 1.12, divine: 1.26,
+  } };
+  eq('summonEquip: Gabriel anchor 78 x rare = 54', summonEquipmentBudget(78, 'rare', cfg), 54);
+  eq('summonEquip: 78 x epic = 65', summonEquipmentBudget(78, 'epic', cfg), 65);
+  eq('summonEquip: 78 x inferior = 26', summonEquipmentBudget(78, 'inferior', cfg), 26);
+  eq('summonEquip: unknown rarity earns nothing', summonEquipmentBudget(78, 'artifact', cfg), 0);
+  eq('summonEquip: level 0 earns nothing', summonEquipmentBudget(0, 'rare', cfg), 0);
+  // Ladder proportions match unarmedGrant's (both ÷ their rare value).
+  eq('summonEquip: epic/rare ratio matches unarmedGrant (54/45)',
+     Math.abs(cfg.ratePerLevelByRarity.epic / cfg.ratePerLevelByRarity.rare - 54 / 45) < 1e-9, true);
+
+  // Threadcutter's split: dex-heavy, per for seeing the threads, str for
+  // the driving cut. 54 -> 22/16/16, summing exactly.
+  const split = parseStatSplit('dexterity:0.4,perception:0.3,strength:0.3');
+  eq('summonEquip: split parses to 3 entries', split.length, 3);
+  const parts = distributeStatBudget(54, split);
+  eq('summonEquip: 54 splits 22/16/16',
+     JSON.stringify(parts.map(p => p.value)), JSON.stringify([22, 16, 16]));
+  eq('summonEquip: parts sum to budget', parts.reduce((s, p) => s + p.value, 0), 54);
+  // Largest-remainder tie goes to the EARLIER-listed ability.
+  const tie = distributeStatBudget(55, split);
+  eq('summonEquip: 55 tie-break favours listing order (22/17/16)',
+     JSON.stringify(tie.map(p => p.value)), JSON.stringify([22, 17, 16]));
+  // Relative weights normalise: 2:1 is two-thirds / one-third.
+  const rel = distributeStatBudget(30, parseStatSplit('dexterity:2,strength:1'));
+  eq('summonEquip: relative weights 2:1 over 30 = 20/10',
+     JSON.stringify(rel.map(p => p.value)), JSON.stringify([20, 10]));
+  // Junk in, refusal out — never a statless blade.
+  eq('summonEquip: junk split parses empty', parseStatSplit('sharpness:very').length, 0);
+  eq('summonEquip: empty split parses empty', parseStatSplit('').length, 0);
+
+  // The shipped config must carry the golden ladder — a drifted knob would
+  // silently re-price the blade while these numbers kept passing.
+  const { readFileSync } = await import('node:fs');
+  const cfgSrc = readFileSync(new URL('../module/helpers/config.mjs', import.meta.url), 'utf8');
+  const liveRare = Number(/summonEquipment[\s\S]*?rare:\s*([\d.]+)/.exec(cfgSrc)?.[1]);
+  eq('summonEquip: shipped rare rate parses', Number.isFinite(liveRare), true);
+  eq('summonEquip: shipped rare rate is the 0.70 anchor', liveRare, 0.70);
 }
 
 if (failures) { console.error(`\n${failures} FAILURES`); process.exit(1); }

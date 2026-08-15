@@ -699,6 +699,22 @@ export class SkillData extends foundry.abstract.TypeDataModel {
         summonCapacity:     new fields.NumberField({ initial: 1, min: 1, max: 10, integer: true }),
         summonSwapOnRecast: new fields.BooleanField({ initial: false }),
 
+        // ── Equipment summons (systems/summon-equipment.mjs) ──────────────
+        // Conjured GEAR rather than a creature; exemplar: Threadcutter,
+        // Gabriel's soulbound dagger. Gated on summonItemName being
+        // non-empty — a skill is a creature summon OR an equipment summon,
+        // and the equipment branch exits before the creature gate.
+        //   summonItemName:   name of the conjured item. Non-empty = gate.
+        //   summonItemTags:   csv item tags ('weapon,1H,dagger') — the
+        //                     weight tag drives the strike stat blend.
+        //   summonStatSplit:  csv weighted split of the stat budget, e.g.
+        //                     'dexterity:0.4,perception:0.3,strength:0.3'.
+        //                     Budget itself = class level × rarity rate
+        //                     (config.summonEquipment) — never authored.
+        summonItemName:  new fields.StringField({ initial: '' }),
+        summonItemTags:  new fields.StringField({ initial: 'weapon,1H,dagger' }),
+        summonStatSplit: new fields.StringField({ initial: '' }),
+
         // ── Tower variant (per [design-channel-and-tower.md] / plan
         //    pure-gathering-ullman.md, 2026-05-29). When `summonAsTower`
         //    is true, _handleSummonTag routes through SummonHelpers.spawnTower

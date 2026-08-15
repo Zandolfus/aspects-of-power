@@ -2482,6 +2482,14 @@ export class AspectsofPowerItem extends Item {
   async _handleSummonTag(item, rollData, speaker, rollMode, label, preInvestAmount = 0, summonRoll = null) {
     if (!this.actor) return;
     const tc = item.system.tagConfig ?? {};
+    // Equipment summon — conjured gear, not a creature. Gated on its own
+    // field and handled before the creature gate: a skill is one or the
+    // other, and equipment needs no token, no destination, no capacity.
+    if (tc.summonItemName) {
+      const { executeEquipmentSummon } = await import('../systems/summon-equipment.mjs');
+      await executeEquipmentSummon(this, speaker, rollMode);
+      return;
+    }
     if (!tc.summonType) return;
     const { SummonHelpers } = await import('../systems/summon.mjs');
 

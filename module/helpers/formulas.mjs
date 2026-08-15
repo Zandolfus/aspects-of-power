@@ -517,6 +517,55 @@ export function splitEvenlyWithRemainder(total, keys) {
 }
 
 /**
+ * Stat-point budget of a summoned equipment item (config.summonEquipment).
+ * Budget = class level × the rate the summon skill's rarity earns. Floored:
+ * a partial point is not a point, and flooring keeps level-ups feeling like
+ * gains rather than rounding noise.
+ */
+export function summonEquipmentBudget(level, rarity, cfg = null) {
+  const t = cfg ?? (globalThis.CONFIG?.ASPECTSOFPOWER?.summonEquipment ?? {});
+  const rate = t.ratePerLevelByRarity?.[rarity] ?? 0;
+  return Math.floor(Math.max(0, Number(level) || 0) * rate);
+}
+
+/**
+ * Parse a stat-split spec — 'dexterity:0.4,perception:0.3,strength:0.3' —
+ * into normalised weights. Weights are relative, not required to sum to 1:
+ * 'dexterity:2,strength:1' means two-thirds / one-third. Unparseable or
+ * non-positive entries are dropped; an empty result means the spec was junk
+ * and the caller should refuse rather than guess.
+ * @returns {Array<{ability: string, weight: number}>}
+ */
+export function parseStatSplit(spec) {
+  const entries = [];
+  for (const part of String(spec ?? '').split(',')) {
+    const [ability, w] = part.split(':').map(s => s.trim());
+    const weight = Number(w);
+    if (!ability || !Number.isFinite(weight) || weight <= 0) continue;
+    entries.push({ ability, weight });
+  }
+  const sum = entries.reduce((s, e) => s + e.weight, 0);
+  return sum > 0 ? entries.map(e => ({ ability: e.ability, weight: e.weight / sum })) : [];
+}
+
+/**
+ * Distribute an integer budget across weighted abilities by largest
+ * remainder, so the parts always sum exactly to the budget. Ties go to the
+ * earlier-listed ability — the spec's order is the author's priority.
+ * @returns {Array<{ability: string, value: number}>}
+ */
+export function distributeStatBudget(total, split) {
+  const t = Math.max(0, Math.floor(Number(total) || 0));
+  if (!split.length || !t) return split.map(s => ({ ability: s.ability, value: 0 }));
+  const exact = split.map(s => ({ ability: s.ability, raw: t * s.weight }));
+  const out = exact.map(e => ({ ability: e.ability, value: Math.floor(e.raw), frac: e.raw - Math.floor(e.raw) }));
+  let remainder = t - out.reduce((s, e) => s + e.value, 0);
+  const order = [...out].sort((a, b) => b.frac - a.frac || out.indexOf(a) - out.indexOf(b));
+  for (let i = 0; remainder > 0; i = (i + 1) % order.length, remainder--) order[i].value++;
+  return out.map(e => ({ ability: e.ability, value: e.value }));
+}
+
+/**
  * Weapon-proficiency damage multiplier (design-weapon-proficiencies.md,
  * RULED 2026-07-27: "attach damage of attacks using weapons to weapon
  * proficiency").

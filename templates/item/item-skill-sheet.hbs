@@ -1201,6 +1201,27 @@
           </div>
 
           <div class='aop-subblock'>
+            <span class='aop-subblock-title'>Equipment</span>
+            <div class='aop-field-grid'>
+              <div class='aop-field'>
+                <label class='resource-label' title='Conjure an ITEM instead of a creature. Non-empty makes this an equipment summon; the creature fields above are then ignored. Recast dismisses; unequipping banishes; stats re-derive from class level x skill rarity on every summon.'>Item Name</label>
+                <input type='text' name='system.tagConfig.summonItemName'
+                       value='{{system.tagConfig.summonItemName}}' />
+              </div>
+              <div class='aop-field'>
+                <label class='resource-label' title='Item tags for the conjured gear, comma-separated. The weapon weight tag (dagger, longsword...) drives the strike stat blend.'>Item Tags</label>
+                <input type='text' name='system.tagConfig.summonItemTags'
+                       value='{{system.tagConfig.summonItemTags}}' />
+              </div>
+              <div class='aop-field'>
+                <label class='resource-label' title='Weighted split of the stat budget, e.g. dexterity:0.4,perception:0.3,strength:0.3. Weights are relative; order breaks rounding ties.'>Stat Split</label>
+                <input type='text' name='system.tagConfig.summonStatSplit'
+                       value='{{system.tagConfig.summonStatSplit}}' />
+              </div>
+            </div>
+          </div>
+
+          <div class='aop-subblock'>
             <span class='aop-subblock-title'>Tower / Stub Actor</span>
             <p class='hint aop-hint'>Stat distribution and extra tag lists remain script-authored (object-valued fields).</p>
             <div class='aop-field-grid'>
