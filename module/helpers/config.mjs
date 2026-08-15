@@ -3221,9 +3221,8 @@ ASPECTSOFPOWER.summonEquipment = {
     mythic:         1.12,
     divine:         1.26,
   },
-  // Durability of the conjured item per class level. It reforms on
-  // resummon anyway; this just keeps it from shattering mid-fight.
-  durabilityPerLevel: 10,
+  // No durability knob: conjured gear keeps durability 0/0, the system's
+  // untracked-durability convention — soul-stuff does not wear, it reforms.
 };
 
 ASPECTSOFPOWER.unarmedGrant = {

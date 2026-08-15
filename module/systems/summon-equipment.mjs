@@ -56,8 +56,6 @@ export function buildSummonedItemData(actor, skill) {
   }
   const budget = summonEquipmentBudget(level, rarity);
   const parts = new Map(distributeStatBudget(budget, split).map(p => [p.ability, p.value]));
-  const cfg = CONFIG.ASPECTSOFPOWER?.summonEquipment ?? {};
-  const durability = Math.max(1, Math.round(level * (cfg.durabilityPerLevel ?? 10)));
 
   return {
     name: tc.summonItemName,
@@ -72,10 +70,21 @@ export function buildSummonedItemData(actor, skill) {
       weight: 1,
       tags: String(tc.summonItemTags ?? '').split(',').map(s => s.trim()).filter(Boolean),
       statBonuses: ABILITY_KEYS.map(a => ({ ability: a, value: parts.get(a) ?? 0 })),
-      durability: { value: durability, max: durability },
+      /* durability stays 0/0 — the system's own convention for UNTRACKED
+         durability (equipment.mjs treats max 0 as never-broken). Soul-stuff
+         does not wear; it reforms. */
       /* Soul-stuff takes no sockets: its power is intrinsic, and an augment
          seated in a banishable item would be destroyed with it. */
       augmentSlots: 0,
+      /* The item auto-derive (preUpdateItem in the entry file) recomputes
+         statBonuses / augmentSlots / durabilityMax from progress + rarity on
+         ANY triggering update — the post-create equip sync included. This
+         item's stats come from its SUMMONER, not from crafting inputs, so
+         every derivable output is locked. Measured, not theoretical: the
+         first live conjure came out with rare's 3 sockets and 0/0 tracked-
+         and-broken durability before these locks existed. */
+      lockedFields: ['statBonuses', 'augmentSlots', 'durabilityMax',
+        'damageBonus', 'armorBonus', 'veilBonus', 'spatialCapacity', 'damageReduction'],
     },
     flags: { [SYS]: { summonedEquipment: {
       sourceSkillId: skill.id,
