@@ -2344,6 +2344,37 @@ eq('junk situational entries are skipped, not NaN',
   eq('summonEquip: shipped rare rate is the 0.70 anchor', liveRare, 0.70);
 }
 
+// ── Defence-time budget (design-defense-time-budget, ruled 2026-08-16) ──
+// B=0.25 x k=0.25, swept on the live party 2026-08-16: heavy dodge rate
+// binds at 63% (triage), chips rationally eaten, 3v1 in 1.2r.
+{
+  const F3 = await import('../module/helpers/formulas.mjs');
+  const near = (label, got, want, tol = 0.01) => {
+    if (Math.abs(got - want) <= tol) { console.log(`ok   ${label}`); }
+    else { console.error(`FAIL ${label}: got ${got}, want ${want}`); failures++; }
+  };
+  const cfg = { defenseTimeBudgetFraction: 0.25, defenseTimeCostFraction: 0.25 };
+  // Live anchors: Phil roundLen 4338, his greatsword swing 2725; Gabriel
+  // dagger swing 733 (403 at the legendary dual floor 0.55).
+  near('defBudget: Phil round 4338 -> budget 1084.5', F3.defenseTimeBudgetMax(4338, cfg), 1084.5);
+  eq('defBudget: dodging a claymore arc (2725) costs 681', F3.defenseTimeCost(2725, cfg), 681);
+  eq('defBudget: dodging a dagger flick (733) costs 183', F3.defenseTimeCost(733, cfg), 183);
+  eq('defBudget: dual-floor flick (403) costs 101', F3.defenseTimeCost(403, cfg), 101);
+  // The invariance that IS the redesign: N swings of the same committed time
+  // cost the same total defence however the time is diced.
+  eq('defBudget: 2725 diced into 5 flicks costs within rounding of one arc',
+     Math.abs(5 * F3.defenseTimeCost(545, cfg) - F3.defenseTimeCost(2725, cfg)) <= 5, true);
+  // Never free, zero-safe.
+  eq('defBudget: cost floors at 1', F3.defenseTimeCost(0.5, cfg), 1);
+  eq('defBudget: zero round -> zero budget', F3.defenseTimeBudgetMax(0, cfg), 0);
+  // Shipped knobs must carry the ruled values.
+  const { readFileSync: rfs } = await import('node:fs');
+  const src = rfs(new URL('../module/helpers/config.mjs', import.meta.url), 'utf8');
+  eq('defBudget: shipped model is budget', /defenseEconModel:\s*'budget'/.test(src), true);
+  eq('defBudget: shipped B is 0.25', Number(/defenseTimeBudgetFraction:\s*([\d.]+)/.exec(src)?.[1]), 0.25);
+  eq('defBudget: shipped k is 0.25', Number(/defenseTimeCostFraction:\s*([\d.]+)/.exec(src)?.[1]), 0.25);
+}
+
 if (failures) { console.error(`\n${failures} FAILURES`); process.exit(1); }
 console.log('\nAll pure-function tests pass.');
 

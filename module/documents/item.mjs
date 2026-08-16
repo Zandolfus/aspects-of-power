@@ -1,8 +1,8 @@
 import { EquipmentSystem } from '../systems/equipment.mjs';
 import { getPositionalTags } from '../helpers/positioning.mjs';
-import { houseHitFormula, hybridAbilityMod, weaponStatBlend, healStatBlend, spellDamageRef, spellInvestDamage, spellWindupMultiplier, spellCastWeight, strikeInvestDamage, coInvestDamage, investSelfDamage as computeInvestSelfDamage, effectiveDodgeValue, splitEvenlyWithRemainder, parryMassMultiplier, bracedParryWeight, bracedMaxUsefulInvest, defenceMarginMultiplier, dotTickDamage, procStaminaCost, crushFlatAmount, riderMaxInvest, auraRadiusFor, barrierStatBlend, hotTickAmount, effectiveDamageMultiplier, clashOutcome } from '../helpers/formulas.mjs';
+import { houseHitFormula, hybridAbilityMod, weaponStatBlend, healStatBlend, spellDamageRef, spellInvestDamage, spellWindupMultiplier, spellCastWeight, strikeInvestDamage, coInvestDamage, investSelfDamage as computeInvestSelfDamage, effectiveDodgeValue, splitEvenlyWithRemainder, parryMassMultiplier, bracedParryWeight, bracedMaxUsefulInvest, defenceMarginMultiplier, defenseTimeCost, dotTickDamage, procStaminaCost, crushFlatAmount, riderMaxInvest, auraRadiusFor, barrierStatBlend, hotTickAmount, effectiveDamageMultiplier, clashOutcome } from '../helpers/formulas.mjs';
 import { resolveSituationalMods } from '../systems/situational-mods.mjs';
-import { recordActionFired, declareAction, isInActiveCombat, computeActionWait, referenceRoundLength, computeWindupMultiplier, getScrambleStacks, addScrambleStack, applyDodgeCost, findCombatantForActor, perceiveGate } from '../systems/celerity.mjs';
+import { recordActionFired, declareAction, isInActiveCombat, computeActionWait, referenceRoundLength, computeWindupMultiplier, getScrambleStacks, addScrambleStack, applyDodgeCost, findCombatantForActor, perceiveGate, getDefenseBudget, spendDefenseBudget } from '../systems/celerity.mjs';
 import { getThreatRadiusFt, actorIsDashing } from '../systems/engagement-halts.mjs';
 import { selectTargetOnCanvas, selectTargetsOnCanvas, skillNeedsTargetPrompt, skillTargetsAtFire, selectMarkerOnCanvas } from '../canvas/target-prompt.mjs';
 import { regionTokenOverlap, segmentIntersect } from '../helpers/geometry.mjs';
@@ -1403,7 +1403,12 @@ export class AspectsofPowerItem extends Item {
       // mitigation smoothing the old pools provided. No pool is touched.
       if (defenseResult.defend) {
         const dt = CONFIG.ASPECTSOFPOWER.defenseTuning ?? {};
-        const stacks = getScrambleStacks(targetActor);
+        // DEFENCE-TIME BUDGET (design-defense-time-budget, ruled 2026-08-16):
+        // the dodge spends defence time proportional to the INCOMING swing's
+        // commitment instead of stacking scramble + delaying the next action.
+        // No scramble under this model — the budget IS the fatigue.
+        const econBudget = (dt.defenseEconModel ?? 'budget') === 'budget';
+        const stacks = econBudget ? 0 : getScrambleStacks(targetActor);
         const dv = effectiveDodgeValue(targetActor, defKey, stacks, dt);
         const die = await new Roll('1d20').evaluate();
         let droll = dv * (1 + die.total / 100);
@@ -1412,9 +1417,19 @@ export class AspectsofPowerItem extends Item {
         if (shrapnelMult > 1) droll *= (1 - (dt.shrapnelDodgePenalty ?? 0.25));
         droll = Math.round(droll);
 
-        await addScrambleStack(targetActor);
-        const cost = await applyDodgeCost(targetActor);
-        const costNote = cost > 0 ? ` — next action +${cost} ticks` : '';
+        let costNote = '';
+        if (econBudget) {
+          let swingTicks = 0;
+          try { swingTicks = computeActionWait(this.actor, item, null, null, null); } catch (e) { /* no actor context */ }
+          const cost = defenseTimeCost(swingTicks, dt);
+          await spendDefenseBudget(targetActor, cost);
+          const after = getDefenseBudget(targetActor);
+          costNote = ` — ${cost} defence time spent (${after.remaining}/${after.max} left this round)`;
+        } else {
+          await addScrambleStack(targetActor);
+          const cost = await applyDodgeCost(targetActor);
+          costNote = cost > 0 ? ` — next action +${cost} ticks` : '';
+        }
         const speaker = ChatMessage.getSpeaker({ actor: targetActor });
 
         // THE MARGIN RULE (RULED 2026-07-31): how badly you lost decides what
@@ -2727,23 +2742,39 @@ export class AspectsofPowerItem extends Item {
     if (!gate.canReact) reactionList.length = 0;
 
     let hasDefend, defendLabel, defenseText;
+    // DEFENCE-TIME BUDGET: cost of dodging THIS swing, and what is left.
+    // `this` is the attacking item, so the swing's committed ticks come from
+    // the same computeActionWait the attacker paid.
+    const _econBudget = (dt.defenseEconModel ?? 'budget') === 'budget';
+    let _budget = null, _dodgeCost = 0;
+    if (isPhysicalLane && _econBudget) {
+      let swingTicks = 0;
+      try { swingTicks = computeActionWait(this.actor, this, null, null, null); } catch (e) { /* no combat context */ }
+      _dodgeCost = defenseTimeCost(swingTicks, dt);
+      _budget = getDefenseBudget(targetActor);
+    }
     if (isPhysicalLane) {
       // Perception gate: you can't dodge what you can't see.
       const blinded = targetActor.effects.some(e => !e.disabled && e.system?.debuffType === 'blind');
-      const stacks = getScrambleStacks(targetActor);
+      const stacks = _econBudget ? 0 : getScrambleStacks(targetActor);
       const dv = Math.round(effectiveDodgeValue(targetActor, defKey, stacks, dt));
-      hasDefend = !blinded && dv > 0 && gate.canReact;
+      const affordable = !_econBudget || _budget.remaining >= _dodgeCost;
+      hasDefend = !blinded && dv > 0 && gate.canReact && affordable;
       defendLabel = 'Dodge';
-      const scrambleNote = stacks >= 1
+      const scrambleNote = (!_econBudget && stacks >= 1)
         ? ` (scramble −${Math.round((dt.scrambleStackPct ?? 0.15) * stacks * 100)}%)`
         : '';
+      const econNote = _econBudget
+        ? `<p><em>Costs ${_dodgeCost} defence time (${_budget.remaining}/${_budget.max} left this round).</em></p>`
+        : `<p><em>Dodging delays your next action and adds a scramble stack — win or lose.</em></p>`;
       defenseText = hasDefend
-        ? `<p>Dodge value: <strong>${dv}</strong>${scrambleNote} vs to-hit ${hitTotal}.</p>`
-          + `<p><em>Dodging delays your next action and adds a scramble stack — win or lose.</em></p>`
+        ? `<p>Dodge value: <strong>${dv}</strong>${scrambleNote} vs to-hit ${hitTotal}.</p>` + econNote
         : (blinded ? `<p><em>Blinded — you cannot dodge what you cannot see.</em></p>`
           : (!gate.canReact
             ? `<p><em>Too fast to react — the blow lands before you can move (${gate.ratio.toFixed(1)}x your Celerity).</em></p>`
-            : ''));
+            : (_econBudget && _budget && _budget.remaining < _dodgeCost
+              ? `<p><em>Out of defence time — this dodge needs ${_dodgeCost}, ${_budget.remaining} left until your round.</em></p>`
+              : '')));
     } else {
       hasDefend = pool > 0;
       defendLabel = 'Defend';
@@ -2768,7 +2799,9 @@ export class AspectsofPowerItem extends Item {
       let defend = false;
       let note = gate.canReact ? 'takes the hit' : 'cannot react — too fast to see';
       if (isPhysicalLane && hasDefend) {
-        const aiStacks = getScrambleStacks(targetActor);
+        // hasDefend already carries the budget-affordability gate under the
+        // budget economy, so the AI cannot overdraw defence time.
+        const aiStacks = _econBudget ? 0 : getScrambleStacks(targetActor);
         const aiDv = effectiveDodgeValue(targetActor, defKey, aiStacks, dt);
         // Under THE MARGIN RULE defending is never wasted — any dodge basis
         // turns aside a proportional share — so the old "35% chance of TOTAL

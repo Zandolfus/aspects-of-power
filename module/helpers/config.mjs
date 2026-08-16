@@ -728,9 +728,22 @@ ASPECTSOFPOWER.celerity = {
  * numbers can't survive the curve).
  */
 ASPECTSOFPOWER.defenseTuning = {
-  // Dodge: each dodge delays the defender's next action by this fraction
-  // of their own action wait (declared action's wait when queued, else
-  // last wait, else a baseline-weight dex step).
+  // ── DEFENCE-TIME BUDGET (design-defense-time-budget, RULED 2026-08-16) ──
+  // The dodge economy. 'budget': one pool of defence TIME per personal round
+  // (fraction of the defender's own round); each dodge spends
+  // costFraction x the INCOMING swing's committed ticks. Attack-rate-
+  // invariant by construction — ten dagger flicks cost what they physically
+  // are; the old scramble/debt model charged per ATTEMPT, which chip tempo
+  // farmed (measured: below ~4 swings/round the brake never engaged, above
+  // it it was instantly fatal). 'legacy' reverts to scramble + dodge-debt.
+  // B=0.25 x k=0.25 swept 2026-08-16: heavy dodge rate binds at 63% (triage),
+  // chip rationally eaten, 1.5 affordable heavy dodges/round, 3v1 in 1.2r.
+  defenseEconModel: 'budget',
+  defenseTimeBudgetFraction: 0.25,
+  defenseTimeCostFraction: 0.25,
+  // Dodge (LEGACY model only): each dodge delays the defender's next action
+  // by this fraction of their own action wait (declared action's wait when
+  // queued, else last wait, else a baseline-weight dex step).
   dodgeCostFraction: 0.25,
   // Scramble: consecutive dodges degrade the dodge value by this fraction
   // per stack; stacks decay continuously (1 stack per ¼ personal round ×

@@ -692,6 +692,40 @@ export function parryMassMultiplier(defenderWeight, attackerWeight, cfg = null) 
 }
 
 /**
+ * DEFENCE-TIME BUDGET (design-defense-time-budget, RULED 2026-08-16).
+ *
+ * One pool of defence time per personal round: a fraction of the defender's
+ * OWN round length. Self-relative like every other timing in the system.
+ *
+ * @param {number} roundLen  The defender's personal round length in ticks.
+ * @param {object} [cfg]     defenseTuning override, for tests.
+ * @returns {number} Budget in ticks.
+ */
+export function defenseTimeBudgetMax(roundLen, cfg = null) {
+  const t = cfg ?? (globalThis.CONFIG?.ASPECTSOFPOWER?.defenseTuning ?? {});
+  const frac = t.defenseTimeBudgetFraction ?? 0.25;
+  return Math.max(0, frac * Math.max(0, Number(roundLen) || 0));
+}
+
+/**
+ * What one dodge costs from the budget: a fraction of the INCOMING swing's
+ * committed ticks. This is the whole redesign in one line — the charge is
+ * denominated in the attacker's time, so dicing attack time into more
+ * swings cannot mint defence costs (the defect the scramble/debt economy
+ * had; see design-defense-time-budget for the measurements). Floored at 1
+ * so a dodge is never free.
+ *
+ * @param {number} swingTicks  The incoming action's committed wait in ticks.
+ * @param {object} [cfg]       defenseTuning override, for tests.
+ * @returns {number} Cost in ticks, minimum 1.
+ */
+export function defenseTimeCost(swingTicks, cfg = null) {
+  const t = cfg ?? (globalThis.CONFIG?.ASPECTSOFPOWER?.defenseTuning ?? {});
+  const frac = t.defenseTimeCostFraction ?? 0.25;
+  return Math.max(1, Math.round(frac * Math.max(0, Number(swingTicks) || 0)));
+}
+
+/**
  * THE MARGIN RULE (RULED 2026-07-31, design-defense-rework-2026-07).
  *
  * A failed defence is not pass/fail — HOW BADLY you lost decides what fraction

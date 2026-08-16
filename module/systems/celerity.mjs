@@ -17,7 +17,7 @@
  */
 
 import { AspectsofPowerItem } from '../documents/item.mjs';
-import { weaponStatBlend, perceiveGateDecision, spellCastWeight } from '../helpers/formulas.mjs';
+import { weaponStatBlend, perceiveGateDecision, spellCastWeight, defenseTimeBudgetMax } from '../helpers/formulas.mjs';
 import { effectiveClockTick, interpolateMovementPosition } from '../helpers/movement-path.mjs';
 import { heldImplementWeight } from './weapon-styles.mjs';
 import { tickDotsFor } from './dot.mjs';
@@ -426,6 +426,45 @@ async function _safeCombatantUpdate(combatant, data, options = {}) {
     data,
     options,
   });
+}
+
+/**
+ * DEFENCE-TIME BUDGET (design-defense-time-budget, ruled 2026-08-16).
+ *
+ * One pool of defence time per personal round. LAZY REFILL: spent time is
+ * anchored to the combatant's `lastRoundEndAt` — when the round bookkeeping
+ * advances that anchor, the recorded spend no longer matches and the budget
+ * reads full again. No extra writes, no refill hook; the refill emerges from
+ * the round machinery that already exists (same pattern as scramble decay
+ * reading the clock instead of ticking).
+ *
+ * Out of combat there is no clock: budget reads full and spends no-op —
+ * matching how scramble behaves out of combat.
+ *
+ * @param {Actor} actor
+ * @returns {{max:number, remaining:number, anchor:number, outOfCombat:boolean}}
+ */
+export function getDefenseBudget(actor) {
+  const dt = CONFIG.ASPECTSOFPOWER.defenseTuning ?? {};
+  const max = Math.round(defenseTimeBudgetMax(actorRoundLength(actor), dt));
+  const combatant = findCombatantForActor(actor);
+  if (!combatant) return { max, remaining: max, anchor: 0, outOfCombat: true };
+  const anchor = combatant.flags?.aspectsofpower?.lastRoundEndAt ?? 0;
+  const b = combatant.flags?.aspectsofpower?.defenseBudget ?? {};
+  const spent = (b.anchor === anchor) ? (b.spent ?? 0) : 0;
+  return { max, remaining: Math.max(0, max - spent), anchor, outOfCombat: false };
+}
+
+/** Spend defence time. No-op out of combat (no clock to refill against). */
+export async function spendDefenseBudget(actor, cost) {
+  const combatant = findCombatantForActor(actor);
+  if (!combatant) return 0;
+  const b = getDefenseBudget(actor);
+  const spend = Math.max(0, Math.round(cost));
+  await _safeCombatantUpdate(combatant, {
+    'flags.aspectsofpower.defenseBudget': { anchor: b.anchor, spent: (b.max - b.remaining) + spend },
+  });
+  return spend;
 }
 
 export async function addScrambleStack(actor) {
