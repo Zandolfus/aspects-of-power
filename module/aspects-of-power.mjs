@@ -1412,6 +1412,20 @@ Hooks.on('combatStart', async (combat) => {
   for (const combatant of combat.combatants) await _refreshCombatantForEncounter(combatant);
 });
 
+// Pools refresh at combat START and per personal round, but nothing restored
+// them AFTER a fight — the roster carried its last-fight drain forever, so a
+// mental attack landing OUTSIDE combat (or before the designated GM's
+// combatStart write) met pool 0. Measured 2026-08-16: 187 of 194 NPCs sat
+// with mind AND soul drained below half. Refresh on combat END so nobody
+// carries a dead ward out of a fight (one-time live restore cleared the
+// backlog the same day).
+Hooks.on('deleteCombat', async (combat) => {
+  if (!isActingGM()) return;
+  for (const combatant of combat.combatants) {
+    try { await _refreshCombatantForEncounter(combatant); } catch (e) { /* token may be gone */ }
+  }
+});
+
 // Reinforcements: a combatant added to an ALREADY-RUNNING fight never went
 // through combatStart, so it arrived with whatever pools the last fight left
 // it and — worse — with lastRoundEndAt at 0 while the clock stands at
