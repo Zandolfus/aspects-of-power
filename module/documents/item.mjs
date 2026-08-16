@@ -7319,7 +7319,13 @@ export class AspectsofPowerItem extends Item {
         const chainLabel = `[chain] ${chainedItem.name}`;
         const { hitFormula: cHitF, dmgFormula: cDmgF } = chainedItem._buildRollFormulas(chainRollData, { applyRarityMult: true });
 
-        const cHitRoll = cHitF ? new Roll(cHitF, chainRollData) : null;
+        // A RIDER rolls no hit of its own — the parent attack already resolved
+        // the defense, and (RULED 2026-08-16: "hemorrhage damage should be
+        // exclusively through the hit that procs it and stamina invest") it
+        // deals no direct damage either. The damage FORMULA is still rolled
+        // below because debuff magnitudes (DR-strip, crush) read it; it just
+        // never reaches HP.
+        const cHitRoll = (cHitF && !chain._rider) ? new Roll(cHitF, chainRollData) : null;
         if (cHitRoll) await cHitRoll.evaluate();
 
         const cDmgRoll = new Roll(cDmgF, chainRollData);
@@ -7327,14 +7333,18 @@ export class AspectsofPowerItem extends Item {
 
         // Post chained skill rolls to chat.
         if (cHitRoll) await cHitRoll.toMessage({ speaker, rollMode, ...(whisperGM ? { whisper: whisperGM } : {}), flavor: `${chainLabel} — To Hit` });
-        await cDmgRoll.toMessage({ speaker, rollMode, ...(whisperGM ? { whisper: whisperGM } : {}), flavor: `${chainLabel} — Roll` });
+        await cDmgRoll.toMessage({ speaker, rollMode, ...(whisperGM ? { whisper: whisperGM } : {}), flavor: `${chainLabel} — ${chain._rider ? 'Potency' : 'Roll'}` });
 
         // Dispatch each of the chained skill's own tags. (chainTags
         // already declared above for the pierce / fully-blocked gate.)
         for (const tag of chainTags) {
           switch (tag) {
             case 'attack':
-              // Rider: no second Defend prompt (parent already resolved it).
+              // Riders skip the attack dispatch entirely — no second hit card,
+              // no direct HP application (see the ruling above). Hand-wired
+              // chain steps keep it: they are real follow-up actions.
+              if (chain._rider) break;
+              // Chain step: no second Defend prompt (parent already resolved it).
               await chainedItem._handleAttackTag(chainedItem, chainRollData, cHitRoll, cDmgRoll, speaker, rollMode, chainLabel, targetToken, 1, { skipDefense: true });
               break;
             case 'restoration':
