@@ -17,7 +17,8 @@
  */
 
 import { AspectsofPowerItem } from '../documents/item.mjs';
-import { weaponStatBlend, perceiveGateDecision, spellCastWeight, defenseTimeBudgetMax } from '../helpers/formulas.mjs';
+import { weaponStatBlend, perceiveGateDecision, spellCastWeight, defenseTimeBudgetMax, dualWieldFloor } from '../helpers/formulas.mjs';
+import { dualWieldEligible, dualWieldPassiveRarity, handOf } from './weapon-styles.mjs';
 import { effectiveClockTick, interpolateMovementPosition } from '../helpers/movement-path.mjs';
 import { heldImplementWeight } from './weapon-styles.mjs';
 import { tickDotsFor } from './dot.mjs';
@@ -166,7 +167,23 @@ export function computeActionWait(actor, skill, weapon = null, investAmount = nu
   const manualMult = skill?.system?.roll?.actionWeightMultiplier ?? 1.0;
   const altMult    = skill?._resolveCostWeightMods?.()?.effectiveWeightMultiplier ?? 1.0;
   const multiplier = manualMult * altMult;
-  const baseWait = Math.max(1, Math.round((weight * multiplier * sc.SCALE) / speed));
+  // DUAL-WIELD BODY FLOOR (design-dual-wield-tempo): a weapon attack that
+  // alternates to the other ready 1H weapon was preparing while the last
+  // hand struck, so its wait compresses toward the mastery floor. Rotation
+  // in _resolveWeaponForSkill already picks the opposite hand, so this
+  // reads the same state it does; non-dual actors get 1 and nothing moves.
+  let dualAlt = 1;
+  const _rt = skill?.system?.roll?.type ?? '';
+  if (['str_weapon', 'dex_weapon', 'phys_ranged'].includes(_rt)
+      && (skill?.system?.tags ?? []).includes('attack')
+      && !skill?.system?.tagConfig?.requiresWeaponTag
+      && dualWieldEligible(actor)) {
+    const resolved = weapon ?? skill?._resolveWeaponForSkill?.();
+    const last = findCombatantForActor(actor)?.flags?.aspectsofpower?.lastSwungHand ?? 'off';
+    const alternates = !!resolved && handOf(actor, resolved) !== last;
+    dualAlt = dualWieldFloor(dualWieldPassiveRarity(actor), alternates);
+  }
+  const baseWait = Math.max(1, Math.round((weight * multiplier * dualAlt * sc.SCALE) / speed));
 
   const isMagic = _MAGIC_TYPES.has(skill?.system?.roll?.type ?? '');
   const tier = skill?.system?.roll?.tier ?? '';
@@ -477,6 +494,16 @@ export async function spendDefenseBudget(actor, cost) {
     },
   });
   return spend;
+}
+
+/** Record which hand just fired a weapon attack (dual-wield rotation state).
+ *  No-op out of combat — there is no rotation to track without a clock. */
+export async function setLastSwungHand(actor, hand) {
+  if (hand !== 'main' && hand !== 'off') return;
+  const combatant = findCombatantForActor(actor);
+  if (!combatant) return;
+  if ((combatant.flags?.aspectsofpower?.lastSwungHand ?? null) === hand) return;
+  await _safeCombatantUpdate(combatant, { 'flags.aspectsofpower.lastSwungHand': hand });
 }
 
 export async function addScrambleStack(actor) {

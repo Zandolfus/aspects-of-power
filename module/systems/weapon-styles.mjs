@@ -453,6 +453,45 @@ export function canUseSkill(actor, skill) {
   return { allowed: true, reason: '' };
 }
 
+/**
+ * Can this actor's attacks ALTERNATE hands (design-dual-wield-tempo)?
+ * Both hands must hold a 1H, non-shield weapon. Shields are the guard hand —
+ * sword-and-board is its own style, not a rotation.
+ */
+export function dualWieldEligible(actor) {
+  const main = mainHandWeapon(actor);
+  const off = offHandWeapon(actor);
+  if (!main || !off || main === off) return false;
+  if (handsUsed(main) === 2 || handsUsed(off) === 2) return false;
+  if (isShield(main) || isShield(off)) return false;
+  const oneH = (i) => (i.system?.tags ?? []).includes('1H');
+  return oneH(main) && oneH(off);
+}
+
+/**
+ * Rarity of the owned Dual Wielding style passive (highest wins, like
+ * proficiencyFor), or null when untrained — the hybrid gate's key.
+ */
+export function dualWieldPassiveRarity(actor) {
+  const order = globalThis.CONFIG?.ASPECTSOFPOWER?.skillRarityOrder ?? [];
+  let best = null, bestRank = -1;
+  for (const s of (actor?.items ?? [])) {
+    if (s.type !== 'skill' || s.system?.skillType !== 'Passive') continue;
+    if (s.name !== 'Dual Wielding') continue;
+    const rank = order.indexOf(s.system?.rarity ?? '');
+    if (rank >= bestRank) { best = s.system?.rarity ?? null; bestRank = rank; }
+  }
+  return best;
+}
+
+/** Which hand a resolved weapon is effectively in (explicit wins, else the
+ *  main-hand resolution decides). Null for no weapon. */
+export function handOf(actor, weapon) {
+  if (!weapon) return null;
+  if (weapon.system?.hand === 'main' || weapon.system?.hand === 'off') return weapon.system.hand;
+  return weapon === mainHandWeapon(actor) ? 'main' : 'off';
+}
+
 export const WeaponStyleHelpers = {
   weaponTypesOf, weaponTypesOfItem, detectStyles, hasStyle,
   proficiencyFor, activeProficiencies, proficiencyDamageMult,

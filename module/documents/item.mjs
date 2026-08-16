@@ -2,13 +2,13 @@ import { EquipmentSystem } from '../systems/equipment.mjs';
 import { getPositionalTags } from '../helpers/positioning.mjs';
 import { houseHitFormula, hybridAbilityMod, weaponStatBlend, healStatBlend, spellDamageRef, spellInvestDamage, spellWindupMultiplier, spellCastWeight, strikeInvestDamage, coInvestDamage, investSelfDamage as computeInvestSelfDamage, effectiveDodgeValue, splitEvenlyWithRemainder, parryMassMultiplier, bracedParryWeight, bracedMaxUsefulInvest, defenceMarginMultiplier, defenseTimeCost, dotTickDamage, procStaminaCost, crushFlatAmount, riderMaxInvest, auraRadiusFor, barrierStatBlend, hotTickAmount, effectiveDamageMultiplier, clashOutcome } from '../helpers/formulas.mjs';
 import { resolveSituationalMods } from '../systems/situational-mods.mjs';
-import { recordActionFired, declareAction, isInActiveCombat, computeActionWait, referenceRoundLength, computeWindupMultiplier, getScrambleStacks, addScrambleStack, applyDodgeCost, findCombatantForActor, perceiveGate, getDefenseBudget, spendDefenseBudget } from '../systems/celerity.mjs';
+import { recordActionFired, declareAction, isInActiveCombat, computeActionWait, referenceRoundLength, computeWindupMultiplier, getScrambleStacks, addScrambleStack, applyDodgeCost, findCombatantForActor, perceiveGate, getDefenseBudget, spendDefenseBudget, setLastSwungHand } from '../systems/celerity.mjs';
 import { getThreatRadiusFt, actorIsDashing } from '../systems/engagement-halts.mjs';
 import { selectTargetOnCanvas, selectTargetsOnCanvas, skillNeedsTargetPrompt, skillTargetsAtFire, selectMarkerOnCanvas } from '../canvas/target-prompt.mjs';
 import { regionTokenOverlap, segmentIntersect } from '../helpers/geometry.mjs';
 import { CraftingSkillsMixin } from '../systems/crafting-skills.mjs';
 import { executeGmAction as executeGmActionImpl } from '../systems/gm-actions.mjs';
-import { proficiencyDamageMult, proficiencyHitMult, heldWeaponWeight, heldImplementWeight, mainHandWeapon } from '../systems/weapon-styles.mjs';
+import { proficiencyDamageMult, proficiencyHitMult, heldWeaponWeight, heldImplementWeight, mainHandWeapon, offHandWeapon, dualWieldEligible, handOf } from '../systems/weapon-styles.mjs';
 import { stackDamageMultiplier, spendableRange, clampSpread, getStackCount, getStackPayload, addStacks, spendStacks, resolveStackCap } from '../systems/stacks.mjs';
 import { resolveCoInvest } from '../systems/co-invest.mjs';
 
@@ -284,6 +284,19 @@ export class AspectsofPowerItem extends Item {
     // deliberate delta: a BROKEN weapon no longer resolves (equippedWeapons
     // filters 0-durability) — a shattered blade should not drive the damage
     // formula, matching how styles already treated it.
+    //
+    // DUAL-WIELD ROTATION (design-dual-wield-tempo): when both hands hold a
+    // 1H weapon, weapon-typed attacks alternate hands — the next swing
+    // resolves with the hand OPPOSITE the last one that fired (first swing
+    // is main). Skills that pin a weapon type (requiresWeaponTag) opt out of
+    // rotation, per the adversarial findings on player agency.
+    if (!this.system.tagConfig?.requiresWeaponTag
+        && ['str_weapon', 'dex_weapon', 'phys_ranged'].includes(this.system.roll?.type ?? '')
+        && dualWieldEligible(this.actor)) {
+      const last = findCombatantForActor(this.actor)?.flags?.aspectsofpower?.lastSwungHand ?? 'off';
+      const pick = last === 'main' ? offHandWeapon(this.actor) : mainHandWeapon(this.actor);
+      if (pick) return pick;
+    }
     return mainHandWeapon(this.actor);
   }
 
@@ -6670,6 +6683,12 @@ export class AspectsofPowerItem extends Item {
       if (weapon) {
         const weight = AspectsofPowerItem.resolveEffectiveWeaponWeight(this, weapon);
         await EquipmentSystem.degradeWeaponOnAttack(weapon, dmgRoll.total, weight);
+        // Dual-wield rotation state: this swing's hand becomes the LAST hand,
+        // so the next weapon attack resolves (and prices) with the other one.
+        // Updated at FIRE, the only moment a swing actually happened.
+        if (dualWieldEligible(this.actor)) {
+          await setLastSwungHand(this.actor, handOf(this.actor, weapon));
+        }
       }
     }
 
