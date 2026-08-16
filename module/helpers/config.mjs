@@ -1142,6 +1142,29 @@ ASPECTSOFPOWER.weaponCombinations = {
 ASPECTSOFPOWER.weaponStyles = ASPECTSOFPOWER.weaponCombinations;
 
 /**
+ * DUAL-WIELD TEMPO (design-dual-wield-tempo, ladder RULED 2026-08-15,
+ * re-validated under the defence-time budget 2026-08-16).
+ *
+ * When an attack alternates to the OTHER ready 1H weapon, the weapon-weight
+ * share of its wait compresses toward a BODY FLOOR — fraction-of-own-tempo,
+ * the sanctioned dimensionless form. Hybrid gate: holding two 1H weapons
+ * gives `untrainedFloor` (physics); owning the Dual Wielding style passive
+ * tightens the floor down its RARITY. Mastery IS the floor. Legendary 0.55
+ * approaches but never reaches the 0.5 two-arm limit.
+ *
+ * Casts compress only the IMPLEMENT share (the mind casts the spell, not
+ * the second wand). `enabled: false` reverts alternation entirely.
+ */
+ASPECTSOFPOWER.dualWield = {
+  enabled: true,
+  untrainedFloor: 0.95,
+  floorByRarity: {
+    common: 0.85, uncommon: 0.80, rare: 0.72, epic: 0.65, legendary: 0.55,
+    mythic: 0.55, divine: 0.55, // unauthored GM territory holds the legendary line
+  },
+};
+
+/**
  * Weapon PROFICIENCY -> damage (ruled 2026-07-27: "attach damage of attacks
  * using weapons to weapon proficiency").
  *

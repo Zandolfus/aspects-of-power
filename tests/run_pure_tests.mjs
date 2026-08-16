@@ -2377,6 +2377,20 @@ eq('junk situational entries are skipped, not NaN',
   eq('defBudget: shipped model is budget', /defenseEconModel:\s*'budget'/.test(src), true);
   eq('defBudget: shipped B is 0.20', Number(/defenseTimeBudgetFraction:\s*([\d.]+)/.exec(src)?.[1]), 0.20);
   eq('defBudget: shipped k is 0.25', Number(/defenseTimeCostFraction:\s*([\d.]+)/.exec(src)?.[1]), 0.25);
+
+  // ── Dual-wield body floor (design-dual-wield-tempo, ladder ruled
+  //    2026-08-15, re-validated under the budget economy 2026-08-16) ──
+  const DW = { enabled: true, untrainedFloor: 0.95,
+    floorByRarity: { common: 0.85, uncommon: 0.80, rare: 0.72, epic: 0.65, legendary: 0.55 } };
+  eq('dualWield: untrained floor 0.95', F3.dualWieldFloor(null, true, DW), 0.95);
+  eq('dualWield: rare floor 0.72', F3.dualWieldFloor('rare', true, DW), 0.72);
+  eq('dualWield: legendary floor 0.55', F3.dualWieldFloor('legendary', true, DW), 0.55);
+  eq('dualWield: non-alternating swing is 1', F3.dualWieldFloor('legendary', false, DW), 1);
+  eq('dualWield: disabled reverts to 1', F3.dualWieldFloor('legendary', true, { ...DW, enabled: false }), 1);
+  eq('dualWield: unknown rarity falls to untrained', F3.dualWieldFloor('sharpness', true, DW), 0.95);
+  // Shipped ladder pins — a drifted knob re-prices every dual build silently.
+  eq('dualWield: shipped untrained 0.95', Number(/untrainedFloor:\s*([\d.]+)/.exec(src)?.[1]), 0.95);
+  eq('dualWield: shipped legendary 0.55', Number(/legendary:\s*([\d.]+)/.exec(src)?.[1]), 0.55);
 }
 
 if (failures) { console.error(`\n${failures} FAILURES`); process.exit(1); }

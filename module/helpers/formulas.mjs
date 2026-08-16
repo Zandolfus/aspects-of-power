@@ -692,6 +692,30 @@ export function parryMassMultiplier(defenderWeight, attackerWeight, cfg = null) 
 }
 
 /**
+ * DUAL-WIELD BODY FLOOR (design-dual-wield-tempo, ladder RULED 2026-08-15).
+ *
+ * The altFactor an alternating attack multiplies its weapon-weight share by.
+ * Hybrid gate: any two 1H weapons earn the untrained floor (it is physics);
+ * the Dual Wielding style passive's RARITY tightens it down the ladder —
+ * mastery IS the floor. Returns 1 (no compression) when disabled or when
+ * the attack does not alternate.
+ *
+ * @param {string|null} passiveRarity  Rarity of the owned Dual Wielding
+ *                                     style passive, or null when untrained.
+ * @param {boolean} [alternates=true]  Does this attack swap to the other
+ *                                     ready weapon? false -> 1.
+ * @param {object} [cfg]               dualWield override, for tests.
+ * @returns {number} altFactor in (0, 1].
+ */
+export function dualWieldFloor(passiveRarity, alternates = true, cfg = null) {
+  const t = cfg ?? (globalThis.CONFIG?.ASPECTSOFPOWER?.dualWield ?? {});
+  if (t.enabled === false || !alternates) return 1;
+  if (!passiveRarity) return Math.min(1, Math.max(0, t.untrainedFloor ?? 0.95));
+  const f = t.floorByRarity?.[passiveRarity];
+  return Math.min(1, Math.max(0, f ?? t.untrainedFloor ?? 0.95));
+}
+
+/**
  * DEFENCE-TIME BUDGET (design-defense-time-budget, RULED 2026-08-16).
  *
  * One pool of defence time per personal round: a fraction of the defender's
