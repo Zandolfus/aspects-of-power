@@ -325,6 +325,13 @@ export function skillNeedsTargetPrompt(item) {
   // Teleport / Leap prompt for a destination (selectDestinationOnCanvas),
   // not a target token. Their declare-time flow runs alongside this gate.
   if (tags.includes('teleport') || tags.includes('leap')) return false;
+  // Summons are the same case: creature summons pick their own DESTINATION
+  // inside _handleSummonTag, and equipment summons (summonItemName) conjure
+  // into the caster's hand — neither wants a target token. Without this a
+  // plain-clicked summon silently waits on a canvas click no one knows to
+  // make (found live 2026-08-16: Summon Threadcutter "not spawning").
+  // Attack+summon hybrids keep the prompt for their attack half.
+  if (tags.includes('summon') && !tags.includes('attack')) return false;
   return true;
 }
 
