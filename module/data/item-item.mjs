@@ -22,7 +22,11 @@ export class ItemItemData extends foundry.abstract.TypeDataModel {
       // weapon occupies both hands by derivation, never by storing 'main'
       // twice. Soft-enforced: the sheet assigns, helpers derive, nothing
       // hard-rejects — hard enforcement arrives with the dual-wield build.
-      hand:        new fields.StringField({ initial: '', choices: ['', 'main', 'off'] }),
+      // ⚠ NO `choices` — a StringField with choices implies blank:false, so
+      // every EXISTING item (whose hand is '') failed to initialize and the
+      // whole world's equipment vanished (live 2026-08-16, caught in verify).
+      // Plain string like `slot` above; consumers only read 'main'/'off'.
+      hand:        new fields.StringField({ initial: '' }),
 
       // Additional slots — item can be cross-listed in multiple slot types.
       // E.g. a hammer in 'weaponry' (combat) can also be in 'profWeapon' (profession).
