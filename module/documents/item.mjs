@@ -8,7 +8,7 @@ import { selectTargetOnCanvas, selectTargetsOnCanvas, skillNeedsTargetPrompt, sk
 import { regionTokenOverlap, segmentIntersect } from '../helpers/geometry.mjs';
 import { CraftingSkillsMixin } from '../systems/crafting-skills.mjs';
 import { executeGmAction as executeGmActionImpl } from '../systems/gm-actions.mjs';
-import { proficiencyDamageMult, proficiencyHitMult, heldWeaponWeight, heldImplementWeight } from '../systems/weapon-styles.mjs';
+import { proficiencyDamageMult, proficiencyHitMult, heldWeaponWeight, heldImplementWeight, mainHandWeapon } from '../systems/weapon-styles.mjs';
 import { stackDamageMultiplier, spendableRange, clampSpread, getStackCount, getStackPayload, addStacks, spendStacks, resolveStackCap } from '../systems/stacks.mjs';
 import { resolveCoInvest } from '../systems/co-invest.mjs';
 
@@ -277,19 +277,14 @@ export class AspectsofPowerItem extends Item {
       const direct = this.actor.items.get(this.system.requiredEquipment);
       if (direct) return direct;
     }
-    let best = null;
-    let bestWeight = 0;
-    for (const i of this.actor.items) {
-      if (i.type !== 'item') continue;
-      const s = i.system;
-      if (s?.slot !== 'weaponry') continue;
-      if (s?.equipped !== true) continue;
-      if ((s?.tags ?? []).includes('shield')) continue;
-      const w = AspectsofPowerItem.resolveWeaponWeight(i);
-      if (w <= 0) continue;
-      if (w > bestWeight) { best = i; bestWeight = w; }
-    }
-    return best;
+    // Hand-aware since 2026-08-16 (design-hand-slots): an explicit main-hand
+    // assignment wins; with none anywhere, mainHandWeapon falls back to the
+    // exact heaviest-non-shield rule that used to live inline here, so
+    // hand-less actors (the whole bestiary) resolve identically. One
+    // deliberate delta: a BROKEN weapon no longer resolves (equippedWeapons
+    // filters 0-durability) — a shattered blade should not drive the damage
+    // formula, matching how styles already treated it.
+    return mainHandWeapon(this.actor);
   }
 
   /**

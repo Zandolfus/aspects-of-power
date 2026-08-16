@@ -115,14 +115,37 @@ export async function executeEquipmentSummon(skillDoc, speaker, rollMode) {
   const data = buildSummonedItemData(actor, skill);
   if (!data) return;
 
-  /* One hand, one blade: stow whatever else is drawn. The banish hook only
-     fires for OTHER summoned equipment, so stowing crafted gear is safe. */
+  /* HAND PLACEMENT (design-hand-slots, ruled 2026-08-16): a 1H conjured
+     weapon takes the MAIN hand automatically when nothing is wielded; with
+     weapons in hand the caster is ASKED which hand, and only that hand's
+     occupant is stowed. A 2H conjuration still clears everything — it needs
+     both hands. Stowing crafted gear is safe: the banish hook only fires
+     for OTHER summoned equipment. */
+  const { mainHandWeapon, offHandWeapon, handsUsed } = await import('./weapon-styles.mjs');
+  const is2H = (data.system.tags ?? []).includes('2H');
   const drawn = actor.items.filter(i => i.type === 'item'
-    && i.system?.slot === 'weaponry' && i.system?.equipped
-    && !i.flags?.[SYS]?.summonedEquipment);
-  if (drawn.length) {
+    && i.system?.slot === 'weaponry' && i.system?.equipped);
+  if (!drawn.length) {
+    if (!is2H) data.system.hand = 'main';
+  } else if (is2H) {
     await actor.updateEmbeddedDocuments('Item',
       drawn.map(i => ({ _id: i.id, 'system.equipped': false })));
+  } else {
+    const hand = await foundry.applications.api.DialogV2.wait({
+      window: { title: `Which hand takes ${data.name}?` },
+      content: `<p>${actor.name} already has a weapon in hand.</p>`,
+      buttons: [
+        { action: 'main', label: 'Main hand', default: true, callback: () => 'main' },
+        { action: 'off', label: 'Off-hand', callback: () => 'off' },
+      ],
+      close: () => 'main',
+    }) ?? 'main';
+    data.system.hand = hand;
+    const twoHander = drawn.find(i => handsUsed(i) === 2);
+    const occupant = twoHander
+      ?? drawn.find(i => i.system?.hand === hand)
+      ?? (hand === 'main' ? mainHandWeapon(actor) : offHandWeapon(actor));
+    if (occupant) await occupant.update({ 'system.equipped': false });
   }
 
   const [created] = await actor.createEmbeddedDocuments('Item', [data]);

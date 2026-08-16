@@ -289,6 +289,11 @@ export class AspectsofPowerActorSheet extends foundry.applications.api.Handlebar
         // item sheet's Equipment tab alone read as "not deployable" in play.
         i.deployable = !!i.system.deployStubActorUuid && !i.system.deployedTokenUuid;
         i.deployed = !!i.system.deployedTokenUuid;
+        // Hand badge for equipped weaponry (design-hand-slots): 2H fills both
+        // hands by derivation; 1H shows a cycling Main/Off/unassigned toggle.
+        i.isWeaponry = i.system.slot === 'weaponry';
+        i.is2H = (i.system.tags ?? []).includes('2H');
+        i.handLabel = i.is2H ? 'Both' : (i.system.hand === 'main' ? 'Main' : i.system.hand === 'off' ? 'Off' : '—');
         gear.push(i);
       } else if (i.type === 'consumable') {
         const rarityDef = CONFIG.ASPECTSOFPOWER.rarities[i.system.rarity];
@@ -556,6 +561,31 @@ export class AspectsofPowerActorSheet extends foundry.applications.api.Handlebar
         if (!item) return;
         const { TradingSystem } = await import('../systems/trading.mjs');
         await TradingSystem.openGiveDialog(this.actor, item);
+      });
+    });
+
+    // Hand toggle (design-hand-slots): cycle '' -> main -> off -> ''. Soft
+    // exclusivity — claiming a hand another equipped weapon holds moves that
+    // weapon to the other hand if free, else unassigns it. No hard rejection.
+    this.element.querySelectorAll('.hand-toggle').forEach(el => {
+      el.addEventListener('click', async ev => {
+        const li = ev.currentTarget.closest('.item');
+        const item = this.actor.items.get(li?.dataset.itemId);
+        if (!item) return;
+        const next = { '': 'main', main: 'off', off: '' }[item.system.hand ?? ''] ?? 'main';
+        if (next) {
+          const other = this.actor.items.find(i => i !== item && i.type === 'item'
+            && i.system?.slot === 'weaponry' && i.system?.equipped === true
+            && i.system?.hand === next);
+          if (other) {
+            const free = next === 'main' ? 'off' : 'main';
+            const freeTaken = this.actor.items.some(i => i !== item && i !== other
+              && i.type === 'item' && i.system?.slot === 'weaponry'
+              && i.system?.equipped === true && i.system?.hand === free);
+            await other.update({ 'system.hand': freeTaken ? '' : free });
+          }
+        }
+        await item.update({ 'system.hand': next });
       });
     });
 

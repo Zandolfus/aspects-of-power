@@ -80,6 +80,16 @@
           </select>
         </div>
 
+        {{!-- Hand (weaponry only) — '' = unassigned, legacy heaviest rule --}}
+        <div class="equip-field">
+          <label title="Which hand holds this when equipped. Unassigned falls back to the heaviest-weapon rule; 2H weapons fill both hands regardless.">Hand</label>
+          <select name="system.hand">
+            <option value="" {{#if (eq system.hand "")}}selected{{/if}}>—</option>
+            <option value="main" {{#if (eq system.hand "main")}}selected{{/if}}>Main</option>
+            <option value="off" {{#if (eq system.hand "off")}}selected{{/if}}>Off</option>
+          </select>
+        </div>
+
         {{!-- Additional Slots (item appears in these slots too) --}}
         <div class="equip-field">
           <label>Additional Slots</label>

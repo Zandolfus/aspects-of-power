@@ -1646,6 +1646,21 @@
   white-space: nowrap;
 }
 
+/* Hand badge (design-hand-slots): which hand holds an equipped weapon. */
+.aspects-of-power .hand-badge {
+  flex: 0 0 auto;
+  font-size: 10px;
+  line-height: 1;
+  padding: 3px 6px;
+  margin-right: 4px;
+  border: 1px solid var(--aop-text-muted, #999);
+  border-radius: 8px;
+  color: var(--aop-text-muted, #999);
+  white-space: nowrap;
+}
+.aspects-of-power a.hand-toggle { cursor: pointer; }
+.aspects-of-power a.hand-toggle:hover { border-color: #4caf50; color: #4caf50; }
+
 /* Unequipped gear section */
 .aspects-of-power .unequipped-section {
   margin-top: 4px;

@@ -15,6 +15,15 @@ export class ItemItemData extends foundry.abstract.TypeDataModel {
       equipped:    new fields.BooleanField({ initial: false }),
       slot:        new fields.StringField({ initial: '' }),
 
+      // Which hand holds an equipped weaponry-slot item (design-hand-slots,
+      // ruled 2026-08-16): '' | 'main' | 'off'. Empty means "unassigned" and
+      // every consumer falls back to the legacy heaviest-non-shield rule, so
+      // the bestiary (which never assigns hands) is untouched. A 2H-tagged
+      // weapon occupies both hands by derivation, never by storing 'main'
+      // twice. Soft-enforced: the sheet assigns, helpers derive, nothing
+      // hard-rejects — hard enforcement arrives with the dual-wield build.
+      hand:        new fields.StringField({ initial: '', choices: ['', 'main', 'off'] }),
+
       // Additional slots — item can be cross-listed in multiple slot types.
       // E.g. a hammer in 'weaponry' (combat) can also be in 'profWeapon' (profession).
       additionalSlots: new fields.ArrayField(new fields.StringField(), { initial: [] }),

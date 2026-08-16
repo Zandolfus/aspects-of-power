@@ -34,6 +34,61 @@ function equippedWeapons(actor) {
     && !((i.system?.durability?.max ?? 0) > 0 && (i.system?.durability?.value ?? 0) <= 0));
 }
 
+/** Hands an item occupies: 2 for a 2H-tagged weapon, 1 otherwise. Derived,
+ *  never stored — a greatsword does not write 'main' twice. */
+export function handsUsed(item) {
+  return (item?.system?.tags ?? []).includes('2H') ? 2 : 1;
+}
+
+/**
+ * The MAIN-HAND weapon (design-hand-slots, ruled 2026-08-16).
+ *
+ * Explicit assignment wins: the equipped weaponry item with `system.hand`
+ * 'main' (a 2H weapon counts as main whatever its field says — it fills both
+ * hands). With NO assignment anywhere, falls back to the legacy rule — the
+ * heaviest equipped non-shield — so the bestiary, which never assigns hands,
+ * behaves exactly as before this field existed.
+ *
+ * @param {Actor} actor
+ * @returns {Item|null}
+ */
+export function mainHandWeapon(actor) {
+  const eq = equippedWeapons(actor);
+  const explicit = eq.find(i => i.system?.hand === 'main' || handsUsed(i) === 2);
+  if (explicit) return explicit;
+  // Legacy fallback: heaviest non-shield (the pre-hands _resolveWeaponForSkill rule).
+  const table = globalThis.CONFIG?.ASPECTSOFPOWER?.weaponWeights ?? {};
+  let best = null, bestW = 0;
+  for (const i of eq) {
+    if (isShield(i)) continue;
+    if (i.system?.hand === 'off') continue; // an assigned off-hand never main-hands by weight
+    let w = 0;
+    for (const t of (i.system?.tags ?? [])) if (table[t] != null) { w = table[t]; break; }
+    if (!w) w = i.system?.weight ?? 0;
+    if (w > bestW) { best = i; bestW = w; }
+  }
+  return best;
+}
+
+/**
+ * The OFF-HAND item: explicit `hand` 'off' first, else the equipped shield,
+ * else the second-heaviest non-shield when two are held unassigned. Null when
+ * the off hand is genuinely empty (or a 2H weapon fills it).
+ *
+ * @param {Actor} actor
+ * @returns {Item|null}
+ */
+export function offHandWeapon(actor) {
+  const eq = equippedWeapons(actor);
+  if (eq.some(i => handsUsed(i) === 2)) return null; // both hands are full of one thing
+  const explicit = eq.find(i => i.system?.hand === 'off');
+  if (explicit) return explicit;
+  const main = mainHandWeapon(actor);
+  const shield = eq.find(i => isShield(i) && i !== main);
+  if (shield) return shield;
+  return eq.find(i => i !== main && !isShield(i)) ?? null;
+}
+
 const has = (item, tag) => (item?.system?.tags ?? []).includes(tag);
 const isShield = (i) => has(i, 'shield') || has(i, 'greatshield') || has(i, 'buckler');
 const isImplement = (i) => has(i, 'wand') || has(i, 'staff') || has(i, 'orb') || has(i, 'tome');
@@ -104,10 +159,14 @@ export function detectStyles(actor) {
   }
 
   // ── Paired melee: discipline first, generic after ──
-  if (melee.length >= 2) {
-    if (allAre(melee, ['dagger'])) out.push('dual-dagger');
-    if (allAre(melee, ['sword', 'rapier'])) out.push('dual-sword');
-    if (allAre(melee, ['gauntlet'])) out.push('dual-gauntlet');
+  // 1H only (adversarial finding 2026-08-16, design-dual-wield-tempo): two
+  // equipped GREATSWORDS are not a pair of anything — without this check
+  // they detected as dual-wield and opened Twin Strike.
+  const paired = melee.filter(w => has(w, '1H'));
+  if (paired.length >= 2) {
+    if (allAre(paired, ['dagger'])) out.push('dual-dagger');
+    if (allAre(paired, ['sword', 'rapier'])) out.push('dual-sword');
+    if (allAre(paired, ['gauntlet'])) out.push('dual-gauntlet');
     out.push('dual-wield');
   }
   // Two shields is a real (if eccentric) discipline, so it is matched on the
@@ -398,4 +457,5 @@ export const WeaponStyleHelpers = {
   weaponTypesOf, weaponTypesOfItem, detectStyles, hasStyle,
   proficiencyFor, activeProficiencies, proficiencyDamageMult,
   heldWeaponWeight, canUseSkill, weaponTypeFamily, resolveGearSource,
+  mainHandWeapon, offHandWeapon, handsUsed,
 };

@@ -13,6 +13,13 @@
           <span class="item-name">
             <h4 class="equip-item-name" style="color: {{item.rarityColor}}">{{item.name}}</h4>
           </span>
+          {{#if item.isWeaponry}}
+            {{#if item.is2H}}
+              <span class="hand-badge hand-both" title="A two-handed weapon fills both hands.">Both</span>
+            {{else}}
+              <a class="hand-badge hand-toggle" title="Which hand holds this? Click to cycle Main / Off / unassigned.">{{item.handLabel}}</a>
+            {{/if}}
+          {{/if}}
           <span class="durability-display">
             <span class="durability-bar-outer">
               <span class="durability-bar-inner" style="width: {{item.durabilityPercent}}%"></span>
