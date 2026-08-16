@@ -446,13 +446,22 @@ async function _safeCombatantUpdate(combatant, data, options = {}) {
  */
 export function getDefenseBudget(actor) {
   const dt = CONFIG.ASPECTSOFPOWER.defenseTuning ?? {};
-  const max = Math.round(defenseTimeBudgetMax(actorRoundLength(actor), dt));
+  const roundLen = actorRoundLength(actor);
+  const max = Math.round(defenseTimeBudgetMax(roundLen, dt));
   const combatant = findCombatantForActor(actor);
-  if (!combatant) return { max, remaining: max, anchor: 0, outOfCombat: true };
-  const anchor = combatant.flags?.aspectsofpower?.lastRoundEndAt ?? 0;
+  if (!combatant) return { max, remaining: max, outOfCombat: true };
+  // CONTINUOUS REFILL (user ruling 2026-08-16: "per round should be the
+  // exception, not the norm"). Spent time decays at the full cap per
+  // personal round — under 100%-rate trickle, regen between two swings and
+  // the cost of dodging one BOTH scale with the attacker's interval, so the
+  // sustained dodge share is B/k at EVERY tempo. The small cap is pure
+  // burst depth: one heavy dodge banked, then you live on what flows back.
+  // Same lazy no-write pattern as scramble decay.
+  const now = getClockTick(combatant.combat);
   const b = combatant.flags?.aspectsofpower?.defenseBudget ?? {};
-  const spent = (b.anchor === anchor) ? (b.spent ?? 0) : 0;
-  return { max, remaining: Math.max(0, max - spent), anchor, outOfCombat: false };
+  const decayPerTick = roundLen > 0 ? max / roundLen : 0;
+  const spent = Math.max(0, (b.spent ?? 0) - Math.max(0, now - (b.atTick ?? 0)) * decayPerTick);
+  return { max, remaining: Math.max(0, Math.round(max - spent)), outOfCombat: false };
 }
 
 /** Spend defence time. No-op out of combat (no clock to refill against). */
@@ -462,7 +471,10 @@ export async function spendDefenseBudget(actor, cost) {
   const b = getDefenseBudget(actor);
   const spend = Math.max(0, Math.round(cost));
   await _safeCombatantUpdate(combatant, {
-    'flags.aspectsofpower.defenseBudget': { anchor: b.anchor, spent: (b.max - b.remaining) + spend },
+    'flags.aspectsofpower.defenseBudget': {
+      spent: (b.max - b.remaining) + spend,
+      atTick: getClockTick(combatant.combat),
+    },
   });
   return spend;
 }

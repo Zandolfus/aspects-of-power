@@ -736,10 +736,16 @@ ASPECTSOFPOWER.defenseTuning = {
   // are; the old scramble/debt model charged per ATTEMPT, which chip tempo
   // farmed (measured: below ~4 swings/round the brake never engaged, above
   // it it was instantly fatal). 'legacy' reverts to scramble + dodge-debt.
-  // B=0.25 x k=0.25 swept 2026-08-16: heavy dodge rate binds at 63% (triage),
-  // chip rationally eaten, 1.5 affordable heavy dodges/round, 3v1 in 1.2r.
+  // CONTINUOUS refill at the full cap per personal round (user ruling
+  // 2026-08-16: per-round semantics are the exception, not the norm). Under
+  // 100%-rate trickle the sustained dodge share is B/k at every tempo; the
+  // cap is burst depth. ⚠ FLOOR RULE: B x roundLen must bank at least one
+  // heavy dodge (k x heaviest swing ~ 681 ticks at level ~55) or heavy blows
+  // become literally undodgeable — B=0.20 clears with change to spare.
+  // Swept 2026-08-16: heavy triage 75%, Gabriel chip-mirror 7.9r (in the
+  // 6-8 band), inversions 4 marginal, 3v1 in 1.2r.
   defenseEconModel: 'budget',
-  defenseTimeBudgetFraction: 0.25,
+  defenseTimeBudgetFraction: 0.20,
   defenseTimeCostFraction: 0.25,
   // Dodge (LEGACY model only): each dodge delays the defender's next action
   // by this fraction of their own action wait (declared action's wait when
