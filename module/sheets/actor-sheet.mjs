@@ -285,6 +285,10 @@ export class AspectsofPowerActorSheet extends foundry.applications.api.Handlebar
         i.rarityColor = rarityDef?.color ?? '#ffffff';
         const dur = i.system.durability;
         i.durabilityPercent = dur?.max > 0 ? Math.round((dur.value / dur.max) * 100) : 100;
+        // Deployables get a row control (Deploy / Recover) — the button on the
+        // item sheet's Equipment tab alone read as "not deployable" in play.
+        i.deployable = !!i.system.deployStubActorUuid && !i.system.deployedTokenUuid;
+        i.deployed = !!i.system.deployedTokenUuid;
         gear.push(i);
       } else if (i.type === 'consumable') {
         const rarityDef = CONFIG.ASPECTSOFPOWER.rarities[i.system.rarity];
@@ -552,6 +556,27 @@ export class AspectsofPowerActorSheet extends foundry.applications.api.Handlebar
         if (!item) return;
         const { TradingSystem } = await import('../systems/trading.mjs');
         await TradingSystem.openGiveDialog(this.actor, item);
+      });
+    });
+
+    // Deployables: place from the inventory row / take back. Same shared flow
+    // as the item sheet's buttons (systems/deployable.mjs).
+    this.element.querySelectorAll('.item-deploy').forEach(el => {
+      el.addEventListener('click', async ev => {
+        const li = ev.currentTarget.closest('.item');
+        const item = this.actor.items.get(li.dataset.itemId);
+        if (!item) return;
+        const { promptAndDeploy } = await import('../systems/deployable.mjs');
+        await promptAndDeploy(item);
+      });
+    });
+    this.element.querySelectorAll('.item-recover').forEach(el => {
+      el.addEventListener('click', async ev => {
+        const li = ev.currentTarget.closest('.item');
+        const item = this.actor.items.get(li.dataset.itemId);
+        if (!item) return;
+        const { recoverByItem } = await import('../systems/deployable.mjs');
+        await recoverByItem(item);
       });
     });
 

@@ -1113,36 +1113,16 @@ export class AspectsofPowerItemSheet extends foundry.applications.api.Handlebars
     });
 
     // --- Deployable: place on the canvas / take it back ---
+    // One implementation shared with the actor sheet's inventory-row control
+    // (systems/deployable.mjs promptAndDeploy / recoverByItem).
     this.element.querySelector('.deployable-deploy-btn')?.addEventListener('click', async () => {
-      const actor = this.item.actor;
-      if (!actor) return void ui.notifications.warn('Deploy a copy that is in an inventory.');
-      if (!actor.isOwner) return void ui.notifications.warn('Only the owner can deploy this.');
-      const token = actor.getActiveTokens?.()?.[0];
-      if (!token) return void ui.notifications.warn(`${actor.name} has no token on this scene to deploy from.`);
-      const { selectDestinationOnCanvas } = await import('../canvas/destination-prompt.mjs');
-      const { deployItem } = await import('../systems/deployable.mjs');
-      const cfg = CONFIG.ASPECTSOFPOWER.deployable ?? {};
-      const dest = await selectDestinationOnCanvas(token, {
-        maxDistanceFt: cfg.placeRangeFt ?? 30,
-        snapToGrid: true,
-        label: `Deploy ${this.item.name}`,
-      });
-      if (!dest) return; // cancelled
-      // selectDestinationOnCanvas answers in CENTRE coords; token x/y is
-      // top-left, so a 1x1 stub dropped at the raw point would sit half a
-      // square down-right of where the player clicked.
-      const gs = canvas.grid.size;
-      await deployItem(actor, this.item, { x: dest.x - gs / 2, y: dest.y - gs / 2 });
-      this.close();
+      const { promptAndDeploy } = await import('../systems/deployable.mjs');
+      if (await promptAndDeploy(this.item)) this.close();
     });
 
     this.element.querySelector('.deployable-recover-btn')?.addEventListener('click', async () => {
-      const { recoverDeployable } = await import('../systems/deployable.mjs');
-      const tokenDoc = await fromUuid(this.item.system.deployedTokenUuid);
-      if (!tokenDoc) return void ui.notifications.warn('That deployment no longer exists on any scene.');
-      // The claimant is whoever owns the recovering character, not the stub.
-      const owner = await fromUuid(this.item.system.deployOwnerUuid);
-      await recoverDeployable(owner, tokenDoc);
+      const { recoverByItem } = await import('../systems/deployable.mjs');
+      await recoverByItem(this.item);
       this.close();
     });
 

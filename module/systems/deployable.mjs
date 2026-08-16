@@ -118,6 +118,49 @@ export async function deployItem(owner, item, position, scene = null) {
 }
 
 /**
+ * The whole sheet-side deploy flow: ownership checks, destination pick,
+ * deployItem. ONE implementation for the item sheet's Deploy button and the
+ * actor sheet's inventory-row control (added 2026-08-16 — the button lived
+ * only on the item sheet's Equipment tab and read as "not deployable").
+ *
+ * @param {Item} item  a deployable in someone's inventory
+ * @returns {Promise<boolean>} true if a token was placed
+ */
+export async function promptAndDeploy(item) {
+  const actor = item?.actor;
+  if (!actor) { ui.notifications.warn('Deploy a copy that is in an inventory.'); return false; }
+  if (!actor.isOwner) { ui.notifications.warn('Only the owner can deploy this.'); return false; }
+  const token = actor.getActiveTokens?.()?.[0];
+  if (!token) { ui.notifications.warn(`${actor.name} has no token on this scene to deploy from.`); return false; }
+  const { selectDestinationOnCanvas } = await import('../canvas/destination-prompt.mjs');
+  const cfg = CONFIG.ASPECTSOFPOWER.deployable ?? {};
+  const dest = await selectDestinationOnCanvas(token, {
+    maxDistanceFt: cfg.placeRangeFt ?? 30,
+    snapToGrid: true,
+    label: `Deploy ${item.name}`,
+  });
+  if (!dest) return false; // cancelled
+  // selectDestinationOnCanvas answers in CENTRE coords; token x/y is top-left.
+  const gs = canvas.grid.size;
+  const placed = await deployItem(actor, item, { x: dest.x - gs / 2, y: dest.y - gs / 2 });
+  return !!placed;
+}
+
+/**
+ * Sheet-side recover: resolve the deployed token from the item and hand to
+ * recoverDeployable as the owner. Shared by both sheets like promptAndDeploy.
+ *
+ * @param {Item} item  the deployed item (carried by the stub actor)
+ * @returns {Promise<boolean>}
+ */
+export async function recoverByItem(item) {
+  const tokenDoc = await fromUuid(item?.system?.deployedTokenUuid ?? '');
+  if (!tokenDoc) { ui.notifications.warn('That deployment no longer exists on any scene.'); return false; }
+  const owner = await fromUuid(item.system.deployOwnerUuid ?? '');
+  return recoverDeployable(owner, tokenDoc);
+}
+
+/**
  * Recover a deployed item back into its owner's inventory, deleting the stub
  * token and its clone actor.
  *
