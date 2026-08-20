@@ -18,7 +18,7 @@
 
 import { AspectsofPowerItem } from '../documents/item.mjs';
 import { weaponStatBlend, perceiveGateDecision, spellCastWeight, defenseTimeBudgetMax, dualWieldFloor } from '../helpers/formulas.mjs';
-import { dualWieldEligible, dualWieldPassiveRarity, handOf } from './weapon-styles.mjs';
+import { dualWieldEligible, dualWieldPassiveRarity, handOf, equippedImplementItems } from './weapon-styles.mjs';
 import { effectiveClockTick, interpolateMovementPosition } from '../helpers/movement-path.mjs';
 import { heldImplementWeight } from './weapon-styles.mjs';
 import { tickDotsFor } from './dot.mjs';
@@ -96,7 +96,18 @@ function _resolveCelerityWeight(skill, weapon = null) {
     // The DAMAGE side (spellWindupMultiplier) reads the same weight — that
     // pairing is what keeps DPR weight-invariant, exactly as it is for a swing.
     // Returns 0 when the model is off, so shipped behaviour is untouched.
-    const castW = spellCastWeight(tier, heldImplementWeight(skill?.actor));
+    //
+    // DUAL IMPLEMENTS (design-dual-wield-tempo): with two implement ITEMS in
+    // hand, casts alternate implements and only the IMPLEMENT share of the
+    // weight compresses — the tier weight is the working itself; the mind
+    // casts the spell, not the second wand. Deliberately the flat rule (no
+    // per-item rotation state): identical wands are the common case and the
+    // tag-based implement model cannot tell them apart anyway.
+    let implW = heldImplementWeight(skill?.actor);
+    if (implW > 0 && equippedImplementItems(skill?.actor) >= 2) {
+      implW *= dualWieldFloor(dualWieldPassiveRarity(skill?.actor), true);
+    }
+    const castW = spellCastWeight(tier, implW);
     if (castW > 0) return castW;
     return CONFIG.ASPECTSOFPOWER.spellTierWeights?.[tier] ?? sc.BASELINE_WEIGHT;
   }
@@ -177,6 +188,7 @@ export function computeActionWait(actor, skill, weapon = null, investAmount = nu
   if (['str_weapon', 'dex_weapon', 'phys_ranged'].includes(_rt)
       && (skill?.system?.tags ?? []).includes('attack')
       && !skill?.system?.tagConfig?.requiresWeaponTag
+      && !(skill?.system?.tagConfig?.requiresStyle ?? '').startsWith('dual')
       && dualWieldEligible(actor)) {
     const resolved = weapon ?? skill?._resolveWeaponForSkill?.();
     const last = findCombatantForActor(actor)?.flags?.aspectsofpower?.lastSwungHand ?? 'off';
@@ -826,10 +838,18 @@ export async function declareAction(actor, skill, options = {}) {
   const skillTags = skill?.system?.tags ?? [];
   const uncancellable = skillTags.includes('leap');
 
+  // Stamp the weapon this action was PRICED with (design-dual-wield-tempo,
+  // adversarial finding): wait is computed at declare, the weapon used to
+  // resolve at fire — so equipping a heavier weapon mid-windup fired heavy
+  // damage at light tempo. The fire path pins resolution to this id (while
+  // it is still equipped), closing the swap and keeping rotation pricing
+  // and payload on the same blade.
+  const declaredWeaponId = skill?._resolveWeaponForSkill?.()?.id ?? null;
   await _safeCombatantUpdate(combatant, {
     'flags.aspectsofpower.declaredAction': {
       itemId: skill.id,
       label: skill.name,
+      weaponId: declaredWeaponId,
       wait,
       scheduledTick,
       declaredAtTick: clockTick,

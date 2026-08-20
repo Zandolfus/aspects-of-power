@@ -459,6 +459,11 @@ export function canUseSkill(actor, skill) {
  * sword-and-board is its own style, not a rotation.
  */
 export function dualWieldEligible(actor) {
+  // Player escape hatch (adversarial finding: forced rotation vs weapon
+  // buffs / mismatched proficiency): flag the actor 'main-only' and every
+  // attack stays on the main hand at normal tempo. No UI yet — set via
+  // macro or GM: actor.update({'flags.aspectsofpower.dualWieldMode':'main-only'}).
+  if ((actor?.flags?.aspectsofpower?.dualWieldMode ?? 'auto') === 'main-only') return false;
   const main = mainHandWeapon(actor);
   const off = offHandWeapon(actor);
   if (!main || !off || main === off) return false;
@@ -482,6 +487,16 @@ export function dualWieldPassiveRarity(actor) {
     if (rank >= bestRank) { best = s.system?.rarity ?? null; bestRank = rank; }
   }
   return best;
+}
+
+/**
+ * How many distinct implement ITEMS are equipped. getEquippedImplements
+ * returns a Set of TAGS, so two wands collapse to one entry there — this
+ * counts documents, which is what dual-wand alternation needs (adversarial
+ * finding: dual wands were invisible to the tag set).
+ */
+export function equippedImplementItems(actor) {
+  return equippedWeapons(actor).filter(isImplement).length;
 }
 
 /** Which hand a resolved weapon is effectively in (explicit wins, else the

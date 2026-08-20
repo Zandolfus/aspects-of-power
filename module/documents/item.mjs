@@ -273,6 +273,13 @@ export class AspectsofPowerItem extends Item {
    */
   _resolveWeaponForSkill() {
     if (!this.actor) return null;
+    // Declared-weapon pin: the fire path resolves with the weapon the
+    // declare priced, while it is still equipped. A vanished/unequipped pin
+    // falls through to fresh resolution (degraded, documented).
+    if (this._pinnedWeaponId) {
+      const pinned = this.actor.items.get(this._pinnedWeaponId);
+      if (pinned?.system?.equipped) return pinned;
+    }
     if (this.system.requiredEquipment) {
       const direct = this.actor.items.get(this.system.requiredEquipment);
       if (direct) return direct;
@@ -289,8 +296,11 @@ export class AspectsofPowerItem extends Item {
     // 1H weapon, weapon-typed attacks alternate hands — the next swing
     // resolves with the hand OPPOSITE the last one that fired (first swing
     // is main). Skills that pin a weapon type (requiresWeaponTag) opt out of
-    // rotation, per the adversarial findings on player agency.
+    // rotation, per the adversarial findings on player agency — and so do
+    // BOTH-HANDS skills (requiresStyle dual-*, e.g. Twin Strike): both
+    // weapons strike at once, there is no "other hand" to rotate to.
     if (!this.system.tagConfig?.requiresWeaponTag
+        && !(this.system.tagConfig?.requiresStyle ?? '').startsWith('dual')
         && ['str_weapon', 'dex_weapon', 'phys_ranged'].includes(this.system.roll?.type ?? '')
         && dualWieldEligible(this.actor)) {
       const last = findCombatantForActor(this.actor)?.flags?.aspectsofpower?.lastSwungHand ?? 'off';
@@ -4996,6 +5006,13 @@ export class AspectsofPowerItem extends Item {
    * @private
    */
   async roll(options = {}) {
+    // Pin this roll to the weapon the DECLARE priced (threaded from the
+    // declaredAction through both dispatch routes as preWeaponId). Assigned
+    // unconditionally so a plain roll self-clears any stale pin — no finally
+    // needed. _resolveWeaponForSkill honours the pin while the weapon is
+    // still equipped, which keeps wait, damage, wear and reach on the same
+    // blade and closes the mid-windup weapon-swap exploit.
+    this._pinnedWeaponId = options.preWeaponId ?? null;
     // Combination / weapon-type / STYLE gate (design-weapon-proficiencies.md).
     // A skill that names a required arrangement, weapon, or governing style is
     // unusable without it — the same shape as the existing
@@ -6686,7 +6703,10 @@ export class AspectsofPowerItem extends Item {
         // Dual-wield rotation state: this swing's hand becomes the LAST hand,
         // so the next weapon attack resolves (and prices) with the other one.
         // Updated at FIRE, the only moment a swing actually happened.
-        if (dualWieldEligible(this.actor)) {
+        // Both-hands skills (requiresStyle dual-*) are rotation-NEUTRAL:
+        // both hands moved, neither earns the next alternation edge.
+        if (dualWieldEligible(this.actor)
+            && !(this.system.tagConfig?.requiresStyle ?? '').startsWith('dual')) {
           await setLastSwungHand(this.actor, handOf(this.actor, weapon));
         }
       }

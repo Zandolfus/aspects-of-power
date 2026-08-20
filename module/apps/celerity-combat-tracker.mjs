@@ -327,6 +327,7 @@ async function _onCelAdvance(event, target) {
   const leapApexFt = declared.leapApexFt ?? null;
   const ritualActivation = declared.ritualActivation ?? false;
   const aiAutoInvest = declared.aiAutoInvest ?? false;
+  const weaponId = declared.weaponId ?? null;
   const linkedPlayer = game.users.find(u => !u.isGM && u.active && u.character?.id === c.actor?.id);
   if (linkedPlayer) {
     game.socket.emit('system.aspects-of-power', {
@@ -344,11 +345,12 @@ async function _onCelAdvance(event, target) {
       preLeapApexFt: leapApexFt,
       preRitualActivation: ritualActivation,
       preAiAutoInvest: aiAutoInvest,
+      preWeaponId: weaponId,
     });
   } else {
     // No linked player online — GM (or whoever clicked Advance) runs it.
     try {
-      await item.roll({ executeDeferred: true, preInvestAmount: investAmount, preCoInvestAmount: coInvestAmount, preAoeRegionId: aoeRegionId, preOrbDischarging: orbDischarging, preTargetIds: targetIds, preTeleportDestination: teleportDestination, preLeapDestination: leapDestination, preLeapApexFt: leapApexFt, ritualActivation, aiAutoInvest });
+      await item.roll({ executeDeferred: true, preInvestAmount: investAmount, preCoInvestAmount: coInvestAmount, preAoeRegionId: aoeRegionId, preOrbDischarging: orbDischarging, preTargetIds: targetIds, preTeleportDestination: teleportDestination, preLeapDestination: leapDestination, preLeapApexFt: leapApexFt, ritualActivation, aiAutoInvest, preWeaponId: weaponId });
     } finally {
       // Ritual temp-skill cleanup: a Medium-fired skill cloned onto the
       // activator (compendium-sourced activation) survives the declare→fire

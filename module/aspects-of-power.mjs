@@ -1082,6 +1082,7 @@ Hooks.once('ready', async function () {
       preLeapApexFt: data.preLeapApexFt ?? null,
       ritualActivation: data.preRitualActivation ?? false,
       aiAutoInvest: data.preAiAutoInvest ?? false,
+      preWeaponId: data.preWeaponId ?? null,
     }).finally(() => {
       // Ritual temp-skill cleanup: Medium-fired clones are spent once the
       // deferred fire returns (mirrors the GM-local branch in the tracker).
