@@ -549,6 +549,53 @@ export function computeActionHeft(actor, skill, weapon = null, baseWeight = null
   return weight * manualMult * altMult * dualAlt;
 }
 
+/**
+ * Release a HELD CAST (config.castHolding): clear the flag, charge the
+ * release tick, announce, and re-roll the stored fire payload verbatim.
+ * ONE implementation for the chat button and the trigger scan below.
+ *
+ * @param {Combatant} combatant  the holder's combatant
+ * @param {string} [via]         '' | 'an ally acting' | 'an enemy acting'
+ * @returns {Promise<boolean>}
+ */
+export async function releaseHeldCast(combatant, via = '') {
+  const held = combatant?.flags?.aspectsofpower?.heldCast;
+  const actor = combatant?.actor;
+  if (!held || !actor) return false;
+  const item = actor.items.get(held.itemId);
+  await _safeCombatantUpdate(combatant, { 'flags.aspectsofpower.heldCast': null });
+  if (!item) return false;
+  await chargeActionCost(actor, CONFIG.ASPECTSOFPOWER.castHolding?.releaseCostFraction ?? 0.15);
+  ChatMessage.create({ speaker: ChatMessage.getSpeaker({ actor }),
+    content: `<p><strong>${actor.name}</strong> RELEASES <strong>${item.name}</strong>`
+      + (via ? ` — loosed by ${via}!` : '!') + `</p>` });
+  await item.roll(held.options ?? { executeDeferred: true, skipHoldPrompt: true });
+  return true;
+}
+
+/**
+ * Trigger scan (VARIABLE HOLD, user 2026-08-16: "hold until allied/enemy
+ * action"): after any combatant's action fires, release every held cast
+ * whose trigger matches the firer's disposition relative to the holder.
+ * The release follows the triggering action — a readied working flies as
+ * the trigger completes, it does not interrupt it.
+ */
+export async function checkHeldCastTriggers(combat, firedCombatant) {
+  if (!combat || !firedCombatant) return;
+  const firerDisp = firedCombatant.token?.disposition;
+  if (firerDisp === undefined || firerDisp === null) return;
+  for (const c of combat.combatants) {
+    if (c.id === firedCombatant.id) continue;
+    const held = c.flags?.aspectsofpower?.heldCast;
+    if (!held || held.trigger === 'manual' || !held.trigger) continue;
+    const holderDisp = c.token?.disposition;
+    const isAlly = holderDisp === firerDisp;
+    if ((held.trigger === 'ally' && isAlly) || (held.trigger === 'enemy' && !isAlly)) {
+      await releaseHeldCast(c, isAlly ? 'an ally acting' : 'an enemy acting');
+    }
+  }
+}
+
 /** Record which hand just fired a weapon attack (dual-wield rotation state).
  *  No-op out of combat — there is no rotation to track without a clock. */
 export async function setLastSwungHand(actor, hand) {

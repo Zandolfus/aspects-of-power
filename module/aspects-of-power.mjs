@@ -2414,22 +2414,19 @@ Hooks.on('renderChatMessageHTML', (message, html) => {
       const cbt = _heldCombatant(actor);
       const held = cbt?.flags?.aspectsofpower?.heldCast;
       if (!held) return void ui.notifications.warn('Nothing is being held.');
-      if (game.user.isGM) await cbt.update({ 'flags.aspectsofpower.heldCast': null });
-      else game.socket.emit('system.aspects-of-power', { action: 'gmCombatantUpdate',
-        combatId: cbt.combat?.id, combatantId: cbt.id,
-        data: { 'flags.aspectsofpower.heldCast': null } });
       if (btn.classList.contains('held-cast-collapse')) {
+        if (game.user.isGM) await cbt.update({ 'flags.aspectsofpower.heldCast': null });
+        else game.socket.emit('system.aspects-of-power', { action: 'gmCombatantUpdate',
+          combatId: cbt.combat?.id, combatantId: cbt.id,
+          data: { 'flags.aspectsofpower.heldCast': null } });
         ChatMessage.create({ speaker: ChatMessage.getSpeaker({ actor }),
           content: `<p><em>${actor.name} lets the held working collapse into nothing.</em></p>` });
         return;
       }
-      const item = actor.items.get(held.itemId);
-      if (!item) return void ui.notifications.warn('The held skill no longer exists.');
-      const { chargeActionCost } = await import('./systems/celerity.mjs');
-      await chargeActionCost(actor, CONFIG.ASPECTSOFPOWER.castHolding?.releaseCostFraction ?? 0.15);
-      ChatMessage.create({ speaker: ChatMessage.getSpeaker({ actor }),
-        content: `<p><strong>${actor.name}</strong> RELEASES <strong>${item.name}</strong>!</p>` });
-      await item.roll(held.options ?? { executeDeferred: true, skipHoldPrompt: true });
+      // Manual release: the shared helper owns the whole lifecycle
+      // (clear + release tick + re-roll), same path the triggers use.
+      const { releaseHeldCast } = await import('./systems/celerity.mjs');
+      await releaseHeldCast(cbt);
     });
   });
 

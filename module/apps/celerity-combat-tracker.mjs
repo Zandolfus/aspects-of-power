@@ -363,6 +363,13 @@ async function _onCelAdvance(event, target) {
     }
   }
 
+  // Variable holds: a fired action may be the trigger a held working waits
+  // on (release follows the trigger, it does not interrupt).
+  try {
+    const { checkHeldCastTriggers } = await import('../systems/celerity.mjs');
+    await checkHeldCastTriggers(combat, c);
+  } catch (e) { console.warn('[held-cast] trigger scan failed:', e); }
+
   // Sync Foundry's combat.turn pointer to the new celerity-next-up combatant
   // so pan-to-active and other built-in turn-pointer machinery stays aligned.
   // If no one is queued, leave combat.turn alone.

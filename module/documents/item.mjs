@@ -5066,24 +5066,30 @@ export class AspectsofPowerItem extends Item {
         && !this.actor.flags?.aspectsofpower?.aiProfile) {
       const combatant = findCombatantForActor(this.actor);
       if (combatant && !combatant.flags?.aspectsofpower?.heldCast) {
+        // VARIABLE HOLD (user 2026-08-16: "hold until allied/enemy action"):
+        // the trigger is chosen at hold time — manual, or auto-release the
+        // moment the next ally / enemy acts (the readied-action pattern).
         const choice = await foundry.applications.api.DialogV2.wait({
           window: { title: `${this.name} is ready` },
-          content: `<p>The working is complete. Release it now, or hold it — `
-            + `rooted, upkeep doubling each round, reactions only?</p>`,
+          content: `<p>The working is complete. Release now, or hold it — `
+            + `rooted, upkeep doubling each round, reactions only. `
+            + `Held workings can wait on a trigger.</p>`,
           buttons: [
             { action: 'release', label: 'Release', default: true, callback: () => 'release' },
-            { action: 'hold', label: 'Hold', callback: () => 'hold' },
+            { action: 'hold', label: 'Hold (manual)', callback: () => 'manual' },
+            { action: 'ally', label: 'Until an ally acts', callback: () => 'ally' },
+            { action: 'enemy', label: 'Until an enemy acts', callback: () => 'enemy' },
           ],
           close: () => 'release',
         }) ?? 'release';
-        if (choice === 'hold') {
+        if (choice !== 'release') {
           const sc = CONFIG.ASPECTSOFPOWER;
           const tier = this.system.roll?.tier ?? 'basic';
           const gradeF = sc.spellGradeFactors?.[this.actor.system.attributes?.race?.rank] ?? 0;
           const baseMana = Math.max(1, Math.round((sc.spellTierFactors?.[tier] ?? 1) * gradeF));
           const stored = { ...options, skipHoldPrompt: true };
           const flagData = { 'flags.aspectsofpower.heldCast': {
-            itemId: this.id, options: stored, baseMana, roundsHeld: 0 } };
+            itemId: this.id, options: stored, baseMana, roundsHeld: 0, trigger: choice } };
           // Combatant writes are GM-only at the server; same routing shape
           // as celerity's _safeCombatantUpdate.
           if (game.user.isGM) await combatant.update(flagData);
@@ -5091,10 +5097,12 @@ export class AspectsofPowerItem extends Item {
             action: 'gmCombatantUpdate', combatId: combatant.combat?.id,
             combatantId: combatant.id, data: flagData,
           });
+          const trigNote = choice === 'ally' ? ' It will fly the moment an ally acts.'
+            : choice === 'enemy' ? ' It will fly the moment an enemy acts.' : '';
           ChatMessage.create({
             speaker: ChatMessage.getSpeaker({ actor: this.actor }),
             content: `<p><strong>${this.actor.name}</strong> HOLDS <strong>${this.name}</strong> — `
-              + `the completed working hangs ready, and they cannot move.</p>`
+              + `the completed working hangs ready, and they cannot move.${trigNote}</p>`
               + `<p><button type="button" class="held-cast-release" data-actor-uuid="${this.actor.uuid}">Release</button> `
               + `<button type="button" class="held-cast-collapse" data-actor-uuid="${this.actor.uuid}">Let it collapse</button></p>`,
           });
