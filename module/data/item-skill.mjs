@@ -442,6 +442,18 @@ export class SkillData extends foundry.abstract.TypeDataModel {
         // Mathilda: Bolt applies (2 rounds), Drain rides it for accuracy,
         // Spikes consumes it for damage.
         markedDamageMult: new fields.NumberField({ initial: 1.0, min: 0 }),
+        // ⚠ consumesMark is LEGACY (RULED 2026-08-20: mark-spender behaviors
+        // are TAGS). The engine now gates on the `consume-mark` tag, keeping
+        // this field as a read-fallback for content authored before the
+        // ruling. The second spender tag is `internal` — while the target
+        // carries this attacker's mark, the skill resolves INSIDE the body
+        // (Mathilda's Blood Spikes: the implanted blood erupts): the hit
+        // cannot be defended (you can't dodge your own bloodstream), the
+        // armor/blockDR (or veil) wall never meets it, and toughness DR
+        // still applies in full. Barriers and resists are unchanged.
+        // Unmarked, an `internal` skill resolves completely normally (at its
+        // own hitMult — which is exactly why kits pair it with hitMult < 1:
+        // hard to touch from outside, unavoidable from within).
         consumesMark:     new fields.BooleanField({ initial: false }),
 
         // ── STACKS (design-stacks-subsystem.md, RULED 2026-08-02) ─────────

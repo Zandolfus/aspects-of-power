@@ -1830,17 +1830,29 @@ export class AspectsofPowerItem extends Item {
     // Counts ANY mark from this attacker, not just to-hit ones — a pure
     // damage-bonus mark is still something to spend.
     let markDmgMult = 1;
+    // markInternalActive: the target carries this attacker's mark and this
+    // skill carries the `internal` spender tag — it will resolve from INSIDE
+    // the body (no defence check, no armor/veil wall; toughness DR still
+    // meets it). Captured HERE, before consume deletes the mark documents.
+    // Spender behaviors are TAGS (RULED 2026-08-20): `consume-mark` and
+    // `internal`, pierce-style gates. tagConfig.consumesMark is the legacy
+    // read-fallback for pre-ruling content; markedDamageMult stays tagConfig
+    // (a magnitude, not a behavior).
+    let markInternalActive = false;
     if (targetActor && this.actor?.uuid) {
       const _tc = this.system?.tagConfig ?? {};
+      const _tags = this.system?.tags ?? [];
       const _mult = _tc.markedDamageMult ?? 1;
-      const _consumes = _tc.consumesMark === true;
-      if (_mult !== 1 || _consumes) {
+      const _consumes = _tags.includes('consume-mark') || _tc.consumesMark === true;
+      const _internal = _tags.includes('internal');
+      if (_mult !== 1 || _consumes || _internal) {
         const myMarks = targetActor.effects.filter(e =>
           !e.disabled
           && e.system?.markedByActorUuid === this.actor.uuid
           && (((e.system?.markedAttackMultiplier ?? 0) > 0) || ((e.system?.markedDamageBonus ?? 0) > 0))
         );
         if (myMarks.length > 0) {
+          markInternalActive = _internal;
           if (_mult !== 1) {
             markDmgMult = _mult;
             ChatMessage.create({
@@ -1886,6 +1898,11 @@ export class AspectsofPowerItem extends Item {
     } else {
       mitigation = (targetActor.system.defense.veil?.value ?? 0);
     }
+    // Internal eruption (markedInternal, RULED 2026-08-20): the blow starts
+    // inside the body, so the external wall — armor+blockDR or veil — never
+    // meets it. Toughness DR (effectiveToughness below) is deliberately NOT
+    // touched: the ruling keeps the body's own resilience in the way.
+    if (markInternalActive) mitigation = 0;
     const attackerToken      = this.actor.getActiveTokens()[0] ?? null;
     const baseDR             = targetActor.system.defense?.dr?.value ?? 0;
     const affinityDR         = this._getAffinityDRReduction(targetActor, attackerToken, targetToken);
@@ -2085,10 +2102,15 @@ export class AspectsofPowerItem extends Item {
     const _defLabel = (k) => (k ?? '').charAt(0).toUpperCase() + (k ?? '').slice(1);
     // Chained riders (skipDefense) auto-hit exactly like volumetric AOEs skip
     // the pool — no Defend prompt — but the chat note names the real reason.
-    if (bypassPool || skipDefense) {
-      const _primaryNote = bypassPool
-        ? `${_defLabel(targetDefKey)} pool bypassed (volumetric AOE — can't dodge gas).`
-        : `Chained hit — parent attack already resolved the defense.`;
+    // markedInternal joins them (RULED 2026-08-20): the attacker's mark is
+    // already inside the target's body, and you can't dodge your own
+    // bloodstream — guaranteed hit, full margin, no defence-time spent.
+    if (bypassPool || skipDefense || markInternalActive) {
+      const _primaryNote = markInternalActive
+        ? `Unavoidable — the mark erupts from within (no defence possible).`
+        : bypassPool
+          ? `${_defLabel(targetDefKey)} pool bypassed (volumetric AOE — can't dodge gas).`
+          : `Chained hit — parent attack already resolved the defense.`;
       primaryResult = { isHit: true, damageMultiplier: 1,
         defenseLine: `<p><em>${_primaryNote}</em></p>`,
         reactionLine: '' };

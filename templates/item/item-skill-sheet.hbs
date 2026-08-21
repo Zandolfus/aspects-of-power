@@ -1729,12 +1729,14 @@
               <label class='resource-label' title='Damage multiplier while the target carries a mark from this attacker. 1 = no payoff. The SPENDER side of the mark economy.'>Marked Damage (&times;)</label>
               <input type='number' name='system.tagConfig.markedDamageMult' value='{{system.tagConfig.markedDamageMult}}' min='0' step='0.05' />
             </div>
-            <div class='aop-field'>
-              <label class='resource-label checkbox-label' title='After benefiting, delete this attacker&apos;s marks on the target. This skill SPENDS the mark.'>
-                <input type='checkbox' name='system.tagConfig.consumesMark' {{#if system.tagConfig.consumesMark}}checked{{/if}} />
-                Consumes Mark
-              </label>
-            </div>
+            {{!-- Mark-SPENDER behaviors are TAGS (ruled 2026-08-20):
+                 `consume-mark` — after benefiting, delete this attacker's
+                 marks on the target; `internal` — vs a marked target the
+                 skill erupts from WITHIN (guaranteed hit, no armor/veil wall,
+                 toughness DR still applies). Author them in the Tags editor.
+                 tagConfig.consumesMark survives as a legacy read-fallback
+                 only. markedDamageMult stays here — a magnitude, not a
+                 behavior. --}}
             <div class='aop-field'>
               <label class='resource-label' title='Manual action weight multiplier &mdash; leave at 1 for alteration-derived weight to drive cast time.'>Manual Weight Override</label>
               <input type='number' name='system.roll.actionWeightMultiplier' value='{{system.roll.actionWeightMultiplier}}' min='0.1' step='0.05' />
