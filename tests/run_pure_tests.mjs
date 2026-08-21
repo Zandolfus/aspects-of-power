@@ -2408,6 +2408,20 @@ eq('junk situational entries are skipped, not NaN',
   // Shipped ladder pins — a drifted knob re-prices every dual build silently.
   eq('dualWield: shipped untrained 0.95', Number(/untrainedFloor:\s*([\d.]+)/.exec(src)?.[1]), 0.95);
   eq('dualWield: shipped legendary 0.55', Number(/legendary:\s*([\d.]+)/.exec(src)?.[1]), 0.55);
+
+  // ── Burn detonate (`consume-burn`, ruled 2026-08-21 — Snapfire) ──
+  // GOLDEN anchor from the live wiring session: Valentine's Burn at invest
+  // 15 spawned dotDamage 72; a fresh 3-round burn detonates for 216.
+  eq('burnDetonate: one fresh 3-round stack (72/tick)',
+     F3.burnDetonatePayload([{ dotDamage: 72, remaining: 3 }]), 216);
+  eq('burnDetonate: stacks sum (72x3 + 40x1)',
+     F3.burnDetonatePayload([{ dotDamage: 72, remaining: 3 }, { dotDamage: 40, remaining: 1 }]), 256);
+  eq('burnDetonate: spent stack pays nothing',
+     F3.burnDetonatePayload([{ dotDamage: 72, remaining: 0 }]), 0);
+  eq('burnDetonate: empty and missing are 0',
+     F3.burnDetonatePayload([]) + F3.burnDetonatePayload(), 0);
+  eq('burnDetonate: negative remaining clamps to 0',
+     F3.burnDetonatePayload([{ dotDamage: 72, remaining: -2 }]), 0);
 }
 
 if (failures) { console.error(`\n${failures} FAILURES`); process.exit(1); }

@@ -306,6 +306,33 @@ export const infusionDamage = coInvestDamage;
  * ONE copy so the dialog's `max` and the real path's clamp cannot drift —
  * the preview-parity rule that 8de305b was written to enforce.
  */
+/**
+ * Burn detonate payload (`consume-burn` tag, RULED 2026-08-21 — Valentine's
+ * Snapfire: "fires on burning targets are instantly consumed, dealing their
+ * remaining damage in a single flash").
+ *
+ * Each stack contributes its per-tick damage times the ticks it had left —
+ * the caller resolves `remaining` with the SAME expression the onStartTurn
+ * countdown uses (`system.roundsRemaining ?? duration.value`), so a detonate
+ * never pays out more than the schedule would have delivered.
+ *
+ * The payload joins the detonating hit's RAW damage and runs the full
+ * pipeline: the schedule's slow drip (which only ever met raw DR) is traded
+ * for immediacy at wall prices. Deliberate — the melted armor the burns left
+ * behind is what makes the flash land.
+ *
+ * @param {Array<{dotDamage:number, remaining:number}>} stacks
+ * @returns {number} Flat damage to add to the consuming hit's raw.
+ */
+export function burnDetonatePayload(stacks) {
+  let total = 0;
+  for (const s of stacks ?? []) {
+    total += Math.max(0, Math.round(s?.dotDamage ?? 0))
+           * Math.max(0, Math.round(s?.remaining ?? 0));
+  }
+  return Math.round(total);
+}
+
 export function coInvestCap(baseCost, capStatMod, aboveBaseFactor, pool) {
   return Math.max(0, Math.min(
     Math.floor(Math.max(0, pool)),

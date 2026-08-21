@@ -1,6 +1,6 @@
 import { EquipmentSystem } from '../systems/equipment.mjs';
 import { getPositionalTags } from '../helpers/positioning.mjs';
-import { houseHitFormula, hybridAbilityMod, weaponStatBlend, healStatBlend, spellDamageRef, spellInvestDamage, spellWindupMultiplier, spellCastWeight, strikeInvestDamage, coInvestDamage, investSelfDamage as computeInvestSelfDamage, effectiveDodgeValue, splitEvenlyWithRemainder, parryMassMultiplier, bracedParryWeight, bracedMaxUsefulInvest, defenceMarginMultiplier, defenseTimeCost, defenseDiveSurcharge, dotTickDamage, procStaminaCost, crushFlatAmount, riderMaxInvest, auraRadiusFor, barrierStatBlend, hotTickAmount, effectiveDamageMultiplier, clashOutcome } from '../helpers/formulas.mjs';
+import { houseHitFormula, hybridAbilityMod, weaponStatBlend, healStatBlend, spellDamageRef, spellInvestDamage, spellWindupMultiplier, spellCastWeight, strikeInvestDamage, coInvestDamage, investSelfDamage as computeInvestSelfDamage, effectiveDodgeValue, splitEvenlyWithRemainder, parryMassMultiplier, bracedParryWeight, bracedMaxUsefulInvest, defenceMarginMultiplier, defenseTimeCost, defenseDiveSurcharge, dotTickDamage, burnDetonatePayload, procStaminaCost, crushFlatAmount, riderMaxInvest, auraRadiusFor, barrierStatBlend, hotTickAmount, effectiveDamageMultiplier, clashOutcome } from '../helpers/formulas.mjs';
 import { resolveSituationalMods } from '../systems/situational-mods.mjs';
 import { recordActionFired, declareAction, isInActiveCombat, computeActionWait, referenceRoundLength, computeWindupMultiplier, getScrambleStacks, addScrambleStack, applyDodgeCost, findCombatantForActor, perceiveGate, getDefenseBudget, spendDefenseBudget, setLastSwungHand, computeActionHeft, actorRoundLength } from '../systems/celerity.mjs';
 import { getThreatRadiusFt, actorIsDashing } from '../systems/engagement-halts.mjs';
@@ -1868,6 +1868,41 @@ export class AspectsofPowerItem extends Item {
         }
       }
     }
+
+    // ── BURN DETONATE (`consume-burn` tag, RULED 2026-08-21) ──────────────
+    // Valentine's Snapfire: "fires on burning targets within reach are
+    // instantly consumed, dealing their remaining damage in a single flash."
+    // Sums each burn's remaining schedule (dotDamage × ticks left, resolved
+    // with the SAME expression the onStartTurn countdown uses) into a flat
+    // addition to THIS hit's raw, then deletes the consumed burns. Scoped to
+    // dot effects carrying armorMeltRate > 0 — the armor-melt scoping rule
+    // (design-burn-status) — so a bleed or poison can never be detonated.
+    // ANY caster's burns qualify ("fires", not "your fires"): John softens,
+    // Valentine snaps the flames shut. NOTE ORDERING: this runs before the
+    // mitigation calc below, so _getArmorMeltFlat no longer sees the deleted
+    // burns — detonating trades the melt (and the drip) for the flash.
+    let burnDetonateFlat = 0;
+    if (targetActor && (this.system.tags ?? []).includes('consume-burn')) {
+      const _burns = targetActor.effects.filter(e => !e.disabled
+        && e.system?.dot === true && (e.system?.armorMeltRate ?? 0) > 0);
+      if (_burns.length > 0) {
+        burnDetonateFlat = burnDetonatePayload(_burns.map(e => ({
+          dotDamage: e.system?.dotDamage ?? 0,
+          remaining: e.system?.roundsRemaining
+            ?? Number(e.duration?.value ?? e._source?.duration?.value ?? 0),
+        })));
+        if (burnDetonateFlat > 0) {
+          ChatMessage.create({
+            speaker: ChatMessage.getSpeaker({ actor: this.actor }),
+            ...(whisperGM ? { whisper: whisperGM } : {}),
+            content: `<p><em>${this.name} snaps the flames shut on ${targetActor.name}: `
+                   + `${_burns.length} burn${_burns.length > 1 ? 's' : ''} consumed — +${burnDetonateFlat} damage in a single flash.</em></p>`,
+          });
+        }
+        await targetActor.deleteEmbeddedDocuments('ActiveEffect', _burns.map(e => e.id));
+      }
+    }
+
     const isPhysical   = rollData.roll.damageType === 'physical';
     // Armor-answer routing (2026-07-16 ruling): VEIL defends mind/soul attacks
     // ONLY. Physical AND elemental damage face the ARMOR layer (armor+blockDR,
@@ -2184,7 +2219,9 @@ export class AspectsofPowerItem extends Item {
     // the target carries no mark of this attacker's).
     // stackMult: a stack SPENDER's payoff — `spent ** stackScaling`, 1 when
     // this skill spends no stacks.
-    const rawDmg = Math.max(0, Math.round(dmgRoll.total * fracClamped * markDmgMult * stackMult));
+    // burnDetonateFlat joins AFTER the multipliers — it is relocated DoT
+    // damage with its own magnitude, not part of this swing's roll.
+    const rawDmg = Math.max(0, Math.round(dmgRoll.total * fracClamped * markDmgMult * stackMult) + burnDetonateFlat);
     // ⚠ ORDERING (RULED 2026-07-31): the defence multiplier is NO LONGER
     // applied here. Under the margin rule, multiplying before the flat
     // armour/DR subtraction makes a good defence plus any wall reach zero —
