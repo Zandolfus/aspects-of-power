@@ -107,6 +107,33 @@ export const SITUATIONAL_MODS = [
       return lunarPhaseMultiplier(idx, elong);
     },
   },
+  {
+    id: 'kindled',
+    label: 'ASPECTSOFPOWER.Situational.kindled',
+    /**
+     * Kindled self-buffs (kindle tag, ruled 2026-08-21): an AOE that caught
+     * N targets left `kindledDmgMod = kindlePerTarget × N` on the caster.
+     * Bonuses SUM across distinct kindled effects, then apply as one
+     * multiplier — scoped by affinity: a fire kindle boosts fire attacks
+     * (shared entry in `system.affinities`), and an affinity-less kindle
+     * boosts everything the caster throws.
+     */
+    resolve(item) {
+      const actor = item?.actor;
+      if (!actor) return 1;
+      const atkAff = item?.system?.affinities ?? [];
+      let bonus = 0;
+      for (const e of actor.allApplicableEffects?.() ?? []) {
+        if (e.disabled) continue;
+        const k = e.system?.kindledDmgMod ?? 0;
+        if (k <= 0) continue;
+        const eAff = e.system?.affinities ?? [];
+        if (eAff.length && !atkAff.some(a => eAff.includes(a))) continue;
+        bonus += k;
+      }
+      return 1 + bonus;
+    },
+  },
 ];
 
 /**

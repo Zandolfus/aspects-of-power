@@ -456,6 +456,18 @@ export class SkillData extends foundry.abstract.TypeDataModel {
         // hard to touch from outside, unavoidable from within).
         consumesMark:     new fields.BooleanField({ initial: false }),
 
+        // ── KINDLE (`kindle` tag, RULED 2026-08-21 — Valentine's Flames
+        // Without / Flames Within) ────────────────────────────────────────
+        // An AOE attack that feeds the caster per target it catches: after
+        // dispatch, a self-buff lands carrying
+        // `kindledDmgMod = kindlePerTarget x targets.length` for
+        // kindleDuration rounds. The situational-mods registry reads it back
+        // into outgoing damage, scoped by shared affinity (a fire kindle
+        // boosts fire attacks; authored affinities are the join key).
+        // Recasting REPLACES the buff from the same skill — no stacking.
+        kindlePerTarget: new fields.NumberField({ initial: 0.1, min: 0 }),
+        kindleDuration:  new fields.NumberField({ initial: 2, min: 1, integer: true }),
+
         // ── STACKS (design-stacks-subsystem.md, RULED 2026-08-02) ─────────
         // A self-held charge pool on the CASTER. One skill produces into a
         // named pool; others spend from it. Both sides carry `stackPool`;

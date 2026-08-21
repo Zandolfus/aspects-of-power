@@ -180,6 +180,11 @@ export class AopEffectData extends foundry.data.ActiveEffectTypeDataModel {
       markedByActorUuid:       new fields.StringField({ initial: '' }),
       markedDamageBonus:       new fields.NumberField({ initial: 0, min: 0 }),
       markedAttackMultiplier:  new fields.NumberField({ initial: 0, min: 0 }),
+      // KINDLED (kindle tag, 2026-08-21): outgoing-damage bonus the caster
+      // harvested from an AOE (kindlePerTarget x targets hit). Read back by
+      // the `kindled` situational mod, scoped by the effect's `affinities`
+      // against the attacking skill's. 0 = not a kindled buff.
+      kindledDmgMod:           new fields.NumberField({ initial: 0, min: 0 }),
       markedExpiresOnHit:      new fields.BooleanField({ initial: false }),
 
       // ── Stacks subsystem (systems/stacks.mjs) ──

@@ -6994,6 +6994,43 @@ export class AspectsofPowerItem extends Item {
         });
       }
 
+      // ── KINDLE (`kindle` tag, RULED 2026-08-21 — Flames Without feeds
+      // Flames Within): each target this AOE catches feeds a self-buff on
+      // the caster — kindledDmgMod = kindlePerTarget × targets caught, for
+      // kindleDuration rounds, scoped by the skill's affinities (the
+      // `kindled` situational mod does the read-back). Recasting REPLACES
+      // the buff from this same skill; it never stacks with itself.
+      if ((this.system.tags ?? []).includes('kindle') && targets.length > 0 && this.actor) {
+        const _kPer = this.system.tagConfig?.kindlePerTarget ?? 0.1;
+        const _kDur = Math.max(1, Math.round(this.system.tagConfig?.kindleDuration ?? 2));
+        const _kMod = Math.round(_kPer * targets.length * 100) / 100;
+        if (_kMod > 0) {
+          const _stale = this.actor.effects.filter(e =>
+            (e.system?.kindledDmgMod ?? 0) > 0 && e.origin === this.uuid);
+          if (_stale.length) {
+            await this.actor.deleteEmbeddedDocuments('ActiveEffect', _stale.map(e => e.id));
+          }
+          await this.actor.createEmbeddedDocuments('ActiveEffect', [{
+            name: `${this.name} — Kindled`,
+            img: this.img,
+            origin: this.uuid,
+            duration: { value: _kDur, type: 'rounds' },
+            type: 'base',
+            system: {
+              kindledDmgMod: _kMod,
+              affinities: [...(this.system.affinities ?? [])],
+              casterActorUuid: this.actor.uuid,
+            },
+          }]);
+          ChatMessage.create({
+            speaker, rollMode,
+            content: `<p><em>${this.actor.name} draws the released flames back in: `
+                   + `+${Math.round(_kMod * 100)}% ${(this.system.affinities ?? []).join('/') || 'own'}-damage `
+                   + `for ${_kDur} rounds (${targets.length} target${targets.length > 1 ? 's' : ''} caught).</em></p>`,
+          });
+        }
+      }
+
       // Dispatch each tag to each qualifying token. Damage is scaled by
       // the per-target overlap fraction (per design 2026-05-12) — a token
       // 50% inside the AOE takes 50% of the rolled damage.
