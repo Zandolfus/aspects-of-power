@@ -2422,6 +2422,23 @@ eq('junk situational entries are skipped, not NaN',
      F3.burnDetonatePayload([]) + F3.burnDetonatePayload(), 0);
   eq('burnDetonate: negative remaining clamps to 0',
      F3.burnDetonatePayload([{ dotDamage: 72, remaining: -2 }]), 0);
+
+  // ── DoT tick vs toughness (dotTickThrough, ruled 2026-08-21:
+  //    "Toughness should be the counter to dots... I just don't want dots
+  //    to be exclusively dr strip") ──
+  // GOLDEN anchors from the ruling table (coef 3.96, the shipped one):
+  const DT_R = { defenseTuning: { dotTickModel: 'ratio', armourRatioCoef: 3.96 } };
+  const DT_F = { defenseTuning: { dotTickModel: 'flat' } };
+  eq('dotTick: triple bleed 261 vs George DR 144 -> 82', F3.dotTickThrough(261, 144, DT_R), 82);
+  eq('dotTick: triple bleed 261 vs tank DR 257 -> 53 (no absolute clot)', F3.dotTickThrough(261, 257, DT_R), 53);
+  eq('dotTick: triple burn 216 vs John DR 170 -> 52', F3.dotTickThrough(216, 170, DT_R), 52);
+  eq('dotTick: E drip 216 vs D-grade DR 1200 -> 9 (grade gap holds)', F3.dotTickThrough(216, 1200, DT_R), 9);
+  eq('dotTick: no toughness passes whole pool', F3.dotTickThrough(216, 0, DT_R), 216);
+  eq('dotTick: zero pool is zero', F3.dotTickThrough(0, 144, DT_R), 0);
+  eq('dotTick: flat revert 261 vs 144 -> 117', F3.dotTickThrough(261, 144, DT_F), 117);
+  eq('dotTick: flat revert clots the tank to 4', F3.dotTickThrough(261, 257, DT_F), 4);
+  // Shipped knob pin — a drifted model silently re-prices every DoT.
+  eq('dotTick: shipped model is ratio', /dotTickModel:\s*'ratio'/.test(src), true);
 }
 
 if (failures) { console.error(`\n${failures} FAILURES`); process.exit(1); }

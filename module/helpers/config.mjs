@@ -804,6 +804,15 @@ ASPECTSOFPOWER.defenseTuning = {
   // matchup does not move.
   armourModel:     'ratio',
   armourRatioCoef: 3.96,
+  // DoT ticks vs toughness (RULED 2026-08-21: "Toughness should be the
+  // counter to dots... I just don't want dots to be exclusively dr strip").
+  // 'ratio' routes the pooled tick through the same armourRatioApplied
+  // grammar as the wall above — a DR-257 tank eats ~80% of a triple bleed
+  // (261 pooled -> 53 through) instead of clotting it to absolute zero, and
+  // a D-grade wall crushes an E-grade drip quadratically (grade gap holds).
+  // 'flat' restores the legacy once-per-round pooled subtraction, which was
+  // the game's last absolute wall. Reuses armourRatioCoef — one grammar.
+  dotTickModel:    'ratio',
   // ── Defence lane weights (helpers/formulas defenceValue) ──
   // Every lane is `primary + secondary x secondaryWeight`, then divided by
   // their SUM so the pair carries one unit of stat — exactly like the attack

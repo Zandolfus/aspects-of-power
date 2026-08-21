@@ -24,8 +24,13 @@
  *
  * DoTs bypass armor and veil; only toughness DR reduces them (RULED
  * 2026-07-18: toughness SHOULD counter DoTs — the tank's investment paying
- * off). Do not "fix" that here.
+ * off). AMENDED 2026-08-21: the counter is now PROPORTIONAL by default
+ * ("I just don't want dots to be exclusively dr strip") — the pooled tick
+ * routes through dotTickThrough (the armourRatioApplied grammar), so a tank
+ * eats most of the schedule without clotting it to an absolute zero.
+ * `defenseTuning.dotTickModel: 'flat'` restores the legacy subtraction.
  */
+import { dotTickThrough } from '../helpers/formulas.mjs';
 
 /**
  * Group one applier's live DoTs on a target by damage type.
@@ -67,12 +72,12 @@ export async function tickDotsFor(combat, applierUuid) {
     const lines = [];
     let totalDamage = 0;
     for (const [type, pool] of pools) {
-      const damage = Math.max(0, pool.total - drValue);
+      const damage = dotTickThrough(pool.total, drValue);
       totalDamage += damage;
       lines.push(`<strong>${damage}</strong> ${type} from ${pool.names.join(', ')}`
         + (pool.stacks > 1
-          ? ` (${pool.stacks} stacks pooled: ${pool.total} &minus; DR ${drValue})`
-          : ` (DR: &minus;${drValue})`));
+          ? ` (${pool.stacks} stacks pooled: ${pool.total} vs DR ${drValue})`
+          : ` (vs DR ${drValue})`));
     }
 
     // ONE health write for all pools — re-reading system.health between updates

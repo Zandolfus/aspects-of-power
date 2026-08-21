@@ -12,7 +12,7 @@ import { EquipmentSystem } from './equipment.mjs';
 import { buffCapacity, buffModCost, buffLoadByAbility, buffDefenceCost,
          abilityModTotal, abilityPostCurveFactors, abilityValues,
          gradeMultiplierFor, solveBuffScale,
-         resolveBuffLoad } from '../helpers/formulas.mjs';
+         resolveBuffLoad, dotTickThrough } from '../helpers/formulas.mjs';
 import { applyDebuffBuildup } from './debuff-buildup.mjs';
 
 export async function executeGmAction(payload) {
@@ -738,7 +738,10 @@ export async function executeGmAction(payload) {
         // Pre-existing wounds bypass barriers — routes through: Overhealth → HP.
         if (payload.dotDamage > 0) {
           const dotDR = target.system.defense?.dr?.value ?? 0;
-          let remaining = Math.max(0, payload.dotDamage - dotDR);
+          // Proportional toughness counter (dotTickThrough, ruled 2026-08-21);
+          // this immediate on-apply tick is a single stack, so it meets the
+          // wall alone — the round ticks pool stacks first (systems/dot.mjs).
+          let remaining = dotTickThrough(payload.dotDamage, dotDR);
           const updateData = {};
           const parts = [];
 
@@ -759,12 +762,12 @@ export async function executeGmAction(payload) {
 
           await target.update(updateData);
 
-          const mitigated = Math.max(0, payload.dotDamage - dotDR);
+          const mitigated = dotTickThrough(payload.dotDamage, dotDR);
           const breakdown = parts.length ? ` (${parts.join(', ')})` : '';
           ChatMessage.create({
             whisper: ChatMessage.getWhisperRecipients('GM'),
             content: `<p><strong>${target.name}</strong> takes <strong>${mitigated}</strong> `
-                   + `${payload.dotDamageType} damage from ${payload.effectName} (DR: −${dotDR})${breakdown}. `
+                   + `${payload.dotDamageType} damage from ${payload.effectName} (vs DR ${dotDR})${breakdown}. `
                    + `Health: ${newHealth} / ${health.max}`
                    + `${newHealth === 0 ? ' &mdash; <em>Incapacitated!</em>' : ''}</p>`,
           });

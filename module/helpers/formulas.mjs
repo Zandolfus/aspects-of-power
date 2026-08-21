@@ -307,6 +307,36 @@ export const infusionDamage = coInvestDamage;
  * the preview-parity rule that 8de305b was written to enforce.
  */
 /**
+ * DoT tick through toughness (RULED 2026-08-21: "Toughness should be the
+ * counter to dots... I just don't want dots to be exclusively dr strip.")
+ *
+ * Toughness is the ONLY wall a tick ever meets (armor, veil, barrier and
+ * margin are all bypassed) — and under `dotTickModel: 'ratio'` it counters
+ * PROPORTIONALLY, the same `armourRatioApplied` grammar the armor wall
+ * adopted 2026-08-10: a DR-257 tank eats ~80% of a triple bleed (261 pooled
+ * -> 53 through) instead of clotting it to zero, and a D-grade wall crushes
+ * an E-grade drip quadratically (216 -> 9), so the grade gap holds by
+ * construction. The flat subtraction — the LAST absolute wall in the game —
+ * survives behind `dotTickModel: 'flat'`.
+ *
+ * Callers pass the POOLED per-applier-per-type total (systems/dot.mjs), or
+ * the single dot for the on-apply immediate tick.
+ *
+ * @param {number} pooledDamage Summed tick damage arriving at toughness.
+ * @param {number} drValue      The target's toughness DR.
+ * @param {object} [cfg]        CONFIG.ASPECTSOFPOWER override (tests).
+ * @returns {number}            Damage that gets through.
+ */
+export function dotTickThrough(pooledDamage, drValue, cfg = null) {
+  const sc = cfg ?? (globalThis.CONFIG?.ASPECTSOFPOWER ?? {});
+  const p = Math.max(0, Math.round(Number(pooledDamage) || 0));
+  const d = Math.max(0, Math.round(Number(drValue) || 0));
+  const model = sc.defenseTuning?.dotTickModel ?? 'ratio';
+  if (model === 'flat') return Math.max(0, p - d);
+  return armourRatioApplied(p, d, sc.defenseTuning ?? null);
+}
+
+/**
  * Burn detonate payload (`consume-burn` tag, RULED 2026-08-21 — Valentine's
  * Snapfire: "fires on burning targets are instantly consumed, dealing their
  * remaining damage in a single flash").
