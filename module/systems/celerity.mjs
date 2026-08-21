@@ -1300,6 +1300,15 @@ export async function separateOverlappingTokens(scene) {
 }
 
 export async function declareMovement(actor, startPos, endPos, distanceFt, staminaCost, mode) {
+  // ROOTED WHILE HOLDING A CAST (ruled 2026-08-16: "no movement but you can
+  // use reactions"). Release or collapse the working to move.
+  {
+    const _cbt = findCombatantForActor(actor);
+    if (_cbt?.flags?.aspectsofpower?.heldCast) {
+      ui.notifications.warn(`${actor.name} is holding a completed working and cannot move.`);
+      return null;
+    }
+  }
   const combatant = findCombatantForActor(actor);
   if (!combatant) return null;
   if (distanceFt <= 0) return null;

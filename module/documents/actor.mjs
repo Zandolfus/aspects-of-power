@@ -1298,7 +1298,12 @@ export class AspectsofPowerActor extends Actor {
       && ['heal', 'stam'].includes(e.system?.auraEffectType));
     const stamina = systemData.stamina;
     const regenPct = _healerAura ? 0 : (systemData.staminaRegen ?? 5);
-    const regenAmt = Math.floor(stamina.max * (regenPct / 100));
+    // Ticks-per-round GLOBAL (config.resourceRegen, user 2026-08-16):
+    // regen lands `ticks` times per personal round — delivered in one write
+    // at the boundary where every round mechanic already fires. The dive
+    // surcharge made stamina throughput a defence stat.
+    const _regenTicks = CONFIG.ASPECTSOFPOWER.resourceRegen?.staminaTicksPerRound ?? 1;
+    const regenAmt = Math.floor(stamina.max * (regenPct / 100)) * Math.max(1, _regenTicks);
     if (_healerAura) {
       ChatMessage.create({
         speaker, ...gmWhisper,
@@ -1314,8 +1319,36 @@ export class AspectsofPowerActor extends Actor {
       if (gained > 0) {
         ChatMessage.create({
           speaker, ...gmWhisper,
-          content: `<p><em>${this.name} regenerates ${gained} stamina (${regenPct}% of ${stamina.max}).</em></p>`,
+          content: `<p><em>${this.name} regenerates ${gained} stamina (${_regenTicks} tick${_regenTicks === 1 ? '' : 's'} of ${regenPct}%).</em></p>`,
         });
+      }
+    }
+
+    // ── 1b. Held-cast upkeep (config.castHolding, ruled 2026-08-16) ──
+    // Holding a completed working costs a fraction of its base mana that
+    // DOUBLES each held round. Can't pay -> the working collapses.
+    {
+      const _cbt = game.combat?.combatants?.find(c => c.actor === this);
+      const held = _cbt?.flags?.aspectsofpower?.heldCast;
+      if (held) {
+        const ch = CONFIG.ASPECTSOFPOWER.castHolding ?? {};
+        const rounds = (held.roundsHeld ?? 0) + 1;
+        const upkeep = Math.max(1, Math.round((held.baseMana ?? 1)
+          * (ch.upkeepBaseFraction ?? 0.25)
+          * Math.pow(ch.upkeepEscalation ?? 2, rounds - 1)));
+        const manaNow = updateData['system.mana.value'] ?? systemData.mana.value;
+        if (manaNow >= upkeep) {
+          updateData['system.mana.value'] = manaNow - upkeep;
+          await _cbt.update({ 'flags.aspectsofpower.heldCast': { ...held, roundsHeld: rounds } });
+          ChatMessage.create({ speaker, ...gmWhisper,
+            content: `<p><em>${this.name} strains to hold the working — ${upkeep} mana `
+              + `(round ${rounds}; next will cost ${upkeep * (ch.upkeepEscalation ?? 2)}).</em></p>` });
+        } else {
+          await _cbt.update({ 'flags.aspectsofpower.heldCast': null });
+          ChatMessage.create({ speaker,
+            content: `<p><strong>${this.name}</strong> can no longer sustain the held working — `
+              + `it collapses into nothing.</p>` });
+        }
       }
     }
 

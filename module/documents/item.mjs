@@ -1467,6 +1467,17 @@ export class AspectsofPowerItem extends Item {
           const cost = await applyDodgeCost(targetActor);
           costNote = cost > 0 ? ` — next action +${cost} ticks` : '';
         }
+
+        // Dodging is MOVEMENT — a held working cannot survive the dive
+        // (ruled 2026-08-16: rooted while holding; reactions only).
+        {
+          const _hc = findCombatantForActor(targetActor);
+          if (_hc?.flags?.aspectsofpower?.heldCast) {
+            await _hc.update({ 'flags.aspectsofpower.heldCast': null }).catch(() => {});
+            ChatMessage.create({ speaker: ChatMessage.getSpeaker({ actor: targetActor }),
+              content: `<p><strong>${targetActor.name}</strong>'s held working slips loose as they move — it collapses.</p>` });
+          }
+        }
         const speaker = ChatMessage.getSpeaker({ actor: targetActor });
 
         // THE MARGIN RULE (RULED 2026-07-31): how badly you lost decides what
@@ -5039,6 +5050,58 @@ export class AspectsofPowerItem extends Item {
     // still equipped, which keeps wait, damage, wear and reach on the same
     // blade and closes the mid-windup weapon-swap exploit.
     this._pinnedWeaponId = options.preWeaponId ?? null;
+
+    // ── CAST HOLDING (RULED 2026-08-16, config.castHolding) ──
+    // A tiered cast reaching its fire tick may be HELD: the whole fire
+    // payload is stored on the combatant and re-rolled verbatim at release,
+    // so costs, targets and invests all resolve at the moment of release.
+    // Escalating upkeep is charged at each personal round (onStartTurn);
+    // the holder is rooted (movement declares refuse); dodging shakes the
+    // working loose; reactions stay available. AI never holds.
+    if (options.executeDeferred && !options.skipHoldPrompt && !options.aiAutoInvest
+        && this.type === 'skill' && this.actor
+        && ['magic', 'magic_projectile', 'magic_melee'].includes(this.system.roll?.type ?? '')
+        && (this.system.roll?.tier ?? '') !== ''
+        && isInActiveCombat(this.actor)
+        && !this.actor.flags?.aspectsofpower?.aiProfile) {
+      const combatant = findCombatantForActor(this.actor);
+      if (combatant && !combatant.flags?.aspectsofpower?.heldCast) {
+        const choice = await foundry.applications.api.DialogV2.wait({
+          window: { title: `${this.name} is ready` },
+          content: `<p>The working is complete. Release it now, or hold it — `
+            + `rooted, upkeep doubling each round, reactions only?</p>`,
+          buttons: [
+            { action: 'release', label: 'Release', default: true, callback: () => 'release' },
+            { action: 'hold', label: 'Hold', callback: () => 'hold' },
+          ],
+          close: () => 'release',
+        }) ?? 'release';
+        if (choice === 'hold') {
+          const sc = CONFIG.ASPECTSOFPOWER;
+          const tier = this.system.roll?.tier ?? 'basic';
+          const gradeF = sc.spellGradeFactors?.[this.actor.system.attributes?.race?.rank] ?? 0;
+          const baseMana = Math.max(1, Math.round((sc.spellTierFactors?.[tier] ?? 1) * gradeF));
+          const stored = { ...options, skipHoldPrompt: true };
+          const flagData = { 'flags.aspectsofpower.heldCast': {
+            itemId: this.id, options: stored, baseMana, roundsHeld: 0 } };
+          // Combatant writes are GM-only at the server; same routing shape
+          // as celerity's _safeCombatantUpdate.
+          if (game.user.isGM) await combatant.update(flagData);
+          else game.socket.emit('system.aspects-of-power', {
+            action: 'gmCombatantUpdate', combatId: combatant.combat?.id,
+            combatantId: combatant.id, data: flagData,
+          });
+          ChatMessage.create({
+            speaker: ChatMessage.getSpeaker({ actor: this.actor }),
+            content: `<p><strong>${this.actor.name}</strong> HOLDS <strong>${this.name}</strong> — `
+              + `the completed working hangs ready, and they cannot move.</p>`
+              + `<p><button type="button" class="held-cast-release" data-actor-uuid="${this.actor.uuid}">Release</button> `
+              + `<button type="button" class="held-cast-collapse" data-actor-uuid="${this.actor.uuid}">Let it collapse</button></p>`,
+          });
+          return;
+        }
+      }
+    }
     // Combination / weapon-type / STYLE gate (design-weapon-proficiencies.md).
     // A skill that names a required arrangement, weapon, or governing style is
     // unusable without it — the same shape as the existing

@@ -2403,6 +2403,36 @@ Hooks.on('combatTurnChange', async (combat, _prior, current) => {
  * Reduces the target actor's health and posts a public notification.
  */
 Hooks.on('renderChatMessageHTML', (message, html) => {
+  // ── Held casts (config.castHolding): release re-rolls the stored fire
+  // payload verbatim; collapse forfeits it. Owner or GM only. ──
+  const _heldCombatant = (actor) => game.combat?.combatants?.find(c => c.actor === actor
+    && c.flags?.aspectsofpower?.heldCast);
+  html.querySelectorAll('.held-cast-release, .held-cast-collapse').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      const actor = await fromUuid(btn.dataset.actorUuid);
+      if (!actor || !(actor.isOwner || game.user.isGM)) return;
+      const cbt = _heldCombatant(actor);
+      const held = cbt?.flags?.aspectsofpower?.heldCast;
+      if (!held) return void ui.notifications.warn('Nothing is being held.');
+      if (game.user.isGM) await cbt.update({ 'flags.aspectsofpower.heldCast': null });
+      else game.socket.emit('system.aspects-of-power', { action: 'gmCombatantUpdate',
+        combatId: cbt.combat?.id, combatantId: cbt.id,
+        data: { 'flags.aspectsofpower.heldCast': null } });
+      if (btn.classList.contains('held-cast-collapse')) {
+        ChatMessage.create({ speaker: ChatMessage.getSpeaker({ actor }),
+          content: `<p><em>${actor.name} lets the held working collapse into nothing.</em></p>` });
+        return;
+      }
+      const item = actor.items.get(held.itemId);
+      if (!item) return void ui.notifications.warn('The held skill no longer exists.');
+      const { chargeActionCost } = await import('./systems/celerity.mjs');
+      await chargeActionCost(actor, CONFIG.ASPECTSOFPOWER.castHolding?.releaseCostFraction ?? 0.15);
+      ChatMessage.create({ speaker: ChatMessage.getSpeaker({ actor }),
+        content: `<p><strong>${actor.name}</strong> RELEASES <strong>${item.name}</strong>!</p>` });
+      await item.roll(held.options ?? { executeDeferred: true, skipHoldPrompt: true });
+    });
+  });
+
   html.querySelectorAll('.apply-damage').forEach(btn => {
     btn.addEventListener('click', async () => {
       if (!game.user.isGM) return;

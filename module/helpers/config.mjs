@@ -1152,6 +1152,33 @@ ASPECTSOFPOWER.weaponCombinations = {
 ASPECTSOFPOWER.weaponStyles = ASPECTSOFPOWER.weaponCombinations;
 
 /**
+ * Resource regeneration ticks (user 2026-08-16: "make stamina regeneration
+ * tick three times per round (maybe this should be a global?)" — it is one).
+ * The per-tick percentage stays the actor's `staminaRegen` (default 5);
+ * this GLOBAL multiplies how many ticks land per personal round, so total
+ * regen = pct x ticks. Applied at the round boundary in one write (the
+ * boundary is where all round mechanics already fire); the dive-surcharge
+ * economy is the consumer that made throughput matter.
+ */
+ASPECTSOFPOWER.resourceRegen = {
+  staminaTicksPerRound: 3,
+};
+
+/**
+ * CAST HOLDING (RULED 2026-08-16). A cast reaching its fire tick may be
+ * HELD instead of released: the working stays ready, visibly, until
+ * released (near-instant), collapsed by choice, starved of upkeep, or
+ * shaken loose by the holder dodging. RULED: upkeep is a fraction of the
+ * cast's base mana DOUBLING each held round; the holder is ROOTED (no
+ * movement declares) but reactions stay available.
+ */
+ASPECTSOFPOWER.castHolding = {
+  upkeepBaseFraction: 0.25,   // of the cast's base mana, round 1
+  upkeepEscalation: 2,        // x per additional held round
+  releaseCostFraction: 0.15,  // of own action wait, charged at release
+};
+
+/**
  * DUAL-WIELD TEMPO (design-dual-wield-tempo, ladder RULED 2026-08-15,
  * re-validated under the defence-time budget 2026-08-16).
  *
