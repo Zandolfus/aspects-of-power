@@ -1447,7 +1447,7 @@ export class AspectsofPowerItem extends Item {
           // time; an over-cap blow empties the whole reserve AND burns
           // stamina scaled to the excess — the dive from the meteor.
           let heft = 100;
-          try { heft = computeActionHeft(this.actor, item, null, null); } catch (e) { /* no actor context */ }
+          try { heft = computeActionHeft(this.actor, item, null, null, { forDefense: true }); } catch (e) { /* no actor context */ }
           const budget = getDefenseBudget(targetActor);
           const rawCost = defenseTimeCost(heft, actorRoundLength(targetActor), dt);
           const cost = Math.min(rawCost, budget.max);
@@ -2786,7 +2786,7 @@ export class AspectsofPowerItem extends Item {
     let _budget = null, _dodgeCost = 0, _surcharge = 0;
     if (isPhysicalLane && _econBudget) {
       let heft = 100;
-      try { heft = computeActionHeft(this.actor, this, null, null); } catch (e) { /* no combat context */ }
+      try { heft = computeActionHeft(this.actor, this, null, null, { forDefense: true }); } catch (e) { /* no combat context */ }
       _budget = getDefenseBudget(targetActor);
       const rawCost = defenseTimeCost(heft, actorRoundLength(targetActor), dt);
       _dodgeCost = Math.min(rawCost, _budget.max);

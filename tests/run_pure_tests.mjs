@@ -2378,6 +2378,12 @@ eq('junk situational entries are skipped, not NaN',
   eq('defBudget: cost floors at 1', F3.defenseTimeCost(0.1, 4444, cfg), 1);
   eq('defBudget: zero round -> zero budget', F3.defenseTimeBudgetMax(0, cfg), 0);
   eq('defBudget: zero cap -> zero surcharge', F3.defenseDiveSurcharge(500, 0, 200, cfg), 0);
+  // Spell-tier heft pins (defence side excludes the implement): bolts are
+  // dodges, mountains are dives.
+  eq('defBudget: basic working (130) is a dodge', F3.defenseTimeCost(130, 4444, cfg) < cap, true);
+  eq('defBudget: greater working (200) is a dodge', F3.defenseTimeCost(200, 4444, cfg) < cap, true);
+  eq('defBudget: major working (400) is a DIVE', F3.defenseTimeCost(400, 4444, cfg) > cap, true);
+  eq('defBudget: grand working (700) is a DIVE', F3.defenseTimeCost(700, 4444, cfg) > cap, true);
   // Shipped knobs must carry the ruled values — B/kw is a RIDGE (2.5):
   // tune both together or not at all.
   const { readFileSync: rfs } = await import('node:fs');

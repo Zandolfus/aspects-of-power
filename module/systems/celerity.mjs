@@ -513,8 +513,22 @@ export async function spendDefenseBudget(actor, cost) {
  * @param {number|null} [baseWeight] Pre-resolved celerity weight (perf).
  * @returns {number}
  */
-export function computeActionHeft(actor, skill, weapon = null, baseWeight = null) {
-  const weight = baseWeight ?? _resolveCelerityWeight(skill, weapon);
+export function computeActionHeft(actor, skill, weapon = null, baseWeight = null, { forDefense = false } = {}) {
+  // FOR THE DEFENDER, a spell's heft is the WORKING itself — tier weight
+  // only. The implement's mass is in the caster's hands, not in the bolt
+  // (user 2026-08-16: "mana bolts probably shouldn't be dives" — a staff
+  // basic priced 270 and prompted as a dive while the same bolt off a wand
+  // priced 170; the defender dodges the projectile, not the focus). The
+  // CASTER's tempo keeps implement+tier: a staff still casts slower.
+  // Result: basic/high/greater workings are dodges; major/grand are dives.
+  let weight;
+  if (forDefense && _MAGIC_TYPES.has(skill?.system?.roll?.type ?? '')) {
+    const tier = skill?.system?.roll?.tier ?? '';
+    weight = CONFIG.ASPECTSOFPOWER.spellTierWeights?.[tier]
+      ?? CONFIG.ASPECTSOFPOWER.celerity.BASELINE_WEIGHT;
+  } else {
+    weight = baseWeight ?? _resolveCelerityWeight(skill, weapon);
+  }
   const manualMult = skill?.system?.roll?.actionWeightMultiplier ?? 1.0;
   const altMult    = skill?._resolveCostWeightMods?.()?.effectiveWeightMultiplier ?? 1.0;
   // DUAL-WIELD BODY FLOOR (design-dual-wield-tempo): an alternating swing
