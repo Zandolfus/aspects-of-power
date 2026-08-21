@@ -1469,13 +1469,20 @@ export class AspectsofPowerItem extends Item {
         }
 
         // Dodging is MOVEMENT — a held working cannot survive the dive
-        // (ruled 2026-08-16: rooted while holding; reactions only).
+        // (ruled 2026-08-16: rooted while holding; reactions only). A GUARD
+        // STANCE falls the same way (design-guard-stances): in guard you
+        // answer with the parry, not footwork.
         {
           const _hc = findCombatantForActor(targetActor);
           if (_hc?.flags?.aspectsofpower?.heldCast) {
             await _hc.update({ 'flags.aspectsofpower.heldCast': null }).catch(() => {});
             ChatMessage.create({ speaker: ChatMessage.getSpeaker({ actor: targetActor }),
               content: `<p><strong>${targetActor.name}</strong>'s held working slips loose as they move — it collapses.</p>` });
+          }
+          if (_hc?.flags?.aspectsofpower?.guardStance) {
+            await _hc.update({ 'flags.aspectsofpower.guardStance': null }).catch(() => {});
+            ChatMessage.create({ speaker: ChatMessage.getSpeaker({ actor: targetActor }),
+              content: `<p><em>${targetActor.name}'s guard drops — footwork over posture.</em></p>` });
           }
         }
         const speaker = ChatMessage.getSpeaker({ actor: targetActor });
@@ -2824,6 +2831,15 @@ export class AspectsofPowerItem extends Item {
       }
       // Swap-reaction gate: hide unless the actor has a live summon to swap with.
       if ((s.system.reactionType ?? '') === 'swap' && !hasSummonPresence()) return false;
+      // GUARD STANCE gate (design-guard-stances, RULED 2026-08-21): in an
+      // active combat, parry-class reactions require the raised guard —
+      // the pre-paid answer. Out of combat there is no economy to bypass,
+      // so parries stay available (and `enabled: false` reverts wholesale).
+      if ((s.system.reactionType ?? 'dodge') === 'parry'
+          && (CONFIG.ASPECTSOFPOWER.guardStance?.enabled ?? true)) {
+        const _gcbt = findCombatantForActor(targetActor);
+        if (_gcbt && !_gcbt.flags?.aspectsofpower?.guardStance) return false;
+      }
       return true;
     });
     const reactionList = reactionSkills.map(s => ({
@@ -7320,6 +7336,9 @@ export class AspectsofPowerItem extends Item {
         case 'channel':
           await this._handleChannelTag(item, rollData, speaker, rollMode, label);
           break;
+        case 'stance':
+          await this._handleStanceTag(item, speaker, rollMode, label);
+          break;
       }
     }
 
@@ -7330,6 +7349,40 @@ export class AspectsofPowerItem extends Item {
 
     await this._applySustainEffect(speaker);
     return dmgRoll;
+  }
+
+  /**
+   * GUARD STANCE (`stance` tag, design-guard-stances, RULED 2026-08-21).
+   * Raise the guard: write `guardStance` on the combatant so parry-class
+   * reactions unlock at the defence prompt. The entry PRICE was already
+   * paid as this action's celerity wait (_resolveCelerityWeight prices a
+   * stance skill by its required guard's weight — the swing formula).
+   * Moving, attacking, or dodging collapses it (celerity gates + the
+   * dodge branch). Out of combat there is no economy: just announce.
+   */
+  async _handleStanceTag(item, speaker, rollMode, label) {
+    const guard = this._proficiencyWeapon?.() ?? null;
+    const combatant = findCombatantForActor(this.actor);
+    if (combatant) {
+      if (combatant.flags?.aspectsofpower?.guardStance?.itemId === this.id) {
+        ChatMessage.create({ speaker, rollMode,
+          content: `<p><em>${this.actor.name} is already in ${this.name}.</em></p>` });
+        return;
+      }
+      const flagData = { 'flags.aspectsofpower.guardStance': {
+        itemId: this.id, guardItemId: guard?.id ?? null, name: this.name } };
+      // Combatant writes are GM-only at the server; same routing shape as
+      // the held-cast write above.
+      if (game.user.isGM) await combatant.update(flagData);
+      else game.socket.emit('system.aspects-of-power', {
+        action: 'gmCombatantUpdate', combatId: combatant.combat?.id,
+        combatantId: combatant.id, data: flagData,
+      });
+    }
+    ChatMessage.create({ speaker, rollMode,
+      content: `<p><strong>${this.actor.name}</strong> sets <strong>${this.name}</strong>`
+        + (guard ? ` behind ${guard.name}` : '')
+        + ` — rooted and ready. Parries are live; moving or striking drops the guard.</p>` });
   }
 
   /**

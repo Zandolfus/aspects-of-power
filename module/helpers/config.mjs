@@ -1188,6 +1188,28 @@ ASPECTSOFPOWER.castHolding = {
 };
 
 /**
+ * GUARD STANCES (design-guard-stances, RULED 2026-08-21).
+ *
+ * Parrying requires a stance. Entering is an ACTION whose wait is the
+ * GUARD's weight through the swing formula (weight x SCALE / speed — zero
+ * new constants; the buckler/shield/greatshield ladder differentiates by
+ * weight alone). Moving or attacking DROPS the stance — cast holding's
+ * grammar mirrored onto the body: rooted-by-choice, reactions live.
+ * Dodging drops it too (in guard you answer with the parry, not footwork).
+ *
+ * The pre-paid answer resolves the parries-vs-budget question: the
+ * guaranteed ~1/round parry still exists, but only behind tempo spent
+ * raising the guard and offense forgone holding it. Chip still beats a
+ * turtle (parry throughput stays cooldown-capped); the stance is the
+ * anti-haymaker, dodging the anti-chip, armor the toll on everything.
+ *
+ * `enabled: false` reverts wholesale: parries prompt exactly as before.
+ */
+ASPECTSOFPOWER.guardStance = {
+  enabled: true,
+};
+
+/**
  * DUAL-WIELD TEMPO (design-dual-wield-tempo, ladder RULED 2026-08-15,
  * re-validated under the defence-time budget 2026-08-16).
  *
@@ -1997,6 +2019,7 @@ ASPECTSOFPOWER.weaponWeights = {
   buckler:    50,
   shield:    120,
   greatshield: 190,
+  buckler:    60,   // guard-stances ladder (design-guard-stances): quick weak guard
   // Gauntlets — armoured fists. Heavier than bare hands, lighter than a
   // dagger, because the weight is the armour and not a blade.
   gauntlet:   50,

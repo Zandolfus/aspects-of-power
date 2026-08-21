@@ -2439,6 +2439,14 @@ eq('junk situational entries are skipped, not NaN',
   eq('dotTick: flat revert clots the tank to 4', F3.dotTickThrough(261, 257, DT_F), 4);
   // Shipped knob pin — a drifted model silently re-prices every DoT.
   eq('dotTick: shipped model is ratio', /dotTickModel:\s*'ratio'/.test(src), true);
+
+  // ── Guard stances (design-guard-stances, ruled 2026-08-21) ──
+  // Entry is priced by guard WEIGHT through the swing formula — the ladder
+  // IS the weight table, so these pins are the ladder.
+  eq('guardStance: shipped enabled', /guardStance = \{\s*\n?\s*enabled:\s*true/.test(src), true);
+  eq('guardStance: buckler weight 60', /buckler:\s*60/.test(src), true);
+  eq('guardStance: shield weight 120', /shield:\s*120/.test(src), true);
+  eq('guardStance: greatshield weight 190', /greatshield:\s*190/.test(src), true);
 }
 
 if (failures) { console.error(`\n${failures} FAILURES`); process.exit(1); }

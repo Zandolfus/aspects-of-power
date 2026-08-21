@@ -89,6 +89,16 @@ const _MAGIC_TYPES = new Set(['magic', 'magic_melee', 'magic_projectile']);
 function _resolveCelerityWeight(skill, weapon = null) {
   const sc = CONFIG.ASPECTSOFPOWER.celerity;
   const type = skill?.system?.roll?.type ?? '';
+  // GUARD STANCE (design-guard-stances, RULED 2026-08-21): raising the
+  // guard is priced by the GUARD's weight — the item the skill requires
+  // (requiresWeaponTag, family-aware, shields included), which the normal
+  // weapon resolver deliberately excludes. _proficiencyWeapon already does
+  // that lookup for the proficiency rule; reuse it so the two can't drift.
+  if ((skill?.system?.tags ?? []).includes('stance')) {
+    const guard = skill._proficiencyWeapon?.() ?? null;
+    const gw = AspectsofPowerItem.resolveWeaponWeight(guard);
+    return gw > 0 ? gw : sc.BASELINE_WEIGHT;
+  }
   if (_MAGIC_TYPES.has(type)) {
     const tier = skill?.system?.roll?.tier ?? '';
     // MAGIC/MELEE UNIFICATION: under the 'implement' model the focus is the
@@ -574,6 +584,26 @@ export async function releaseHeldCast(combatant, via = '') {
 }
 
 /**
+ * Collapse a GUARD STANCE (design-guard-stances, RULED 2026-08-21:
+ * "moving or attacking drops it"; dodging drops it too — in guard you
+ * answer with the parry, not footwork). ONE implementation for the
+ * declare gates, the dodge branch, and any future drop site.
+ *
+ * @param {Combatant} combatant  the guarding combatant
+ * @param {string} [via]         what lowered the guard, for the chat line
+ * @returns {Promise<boolean>}   true if a stance was actually dropped
+ */
+export async function collapseGuardStance(combatant, via = '') {
+  const stance = combatant?.flags?.aspectsofpower?.guardStance;
+  const actor = combatant?.actor;
+  if (!stance || !actor) return false;
+  await _safeCombatantUpdate(combatant, { 'flags.aspectsofpower.guardStance': null });
+  ChatMessage.create({ speaker: ChatMessage.getSpeaker({ actor }),
+    content: `<p><em>${actor.name}'s guard drops${via ? ` — ${via}` : ''}.</em></p>` });
+  return true;
+}
+
+/**
  * Trigger scan (VARIABLE HOLD, user 2026-08-16: "hold until allied/enemy
  * action"): after any combatant's action fires, release every held cast
  * whose trigger matches the firer's disposition relative to the holder.
@@ -802,6 +832,15 @@ export async function declareAction(actor, skill, options = {}) {
   if ((actor.system?.health?.value ?? 1) <= 0) {
     ui.notifications.warn(`${actor.name} is incapacitated.`);
     return null;
+  }
+
+  // GUARD STANCE: attacking (any non-Reaction action that isn't itself a
+  // stance) drops the guard — RULED 2026-08-21 "moving or attacking drops
+  // it". The action proceeds; the guard falls with it. Reactions live.
+  if (combatant.flags?.aspectsofpower?.guardStance
+      && skill?.system?.skillType !== 'Reaction'
+      && !(skill?.system?.tags ?? []).includes('stance')) {
+    await collapseGuardStance(combatant, `readying ${skill?.name ?? 'an action'}`);
   }
 
   // ── Concurrency gate (design-concurrent-actions, RULED 2026-07-14) ──
@@ -1354,6 +1393,12 @@ export async function declareMovement(actor, startPos, endPos, distanceFt, stami
     if (_cbt?.flags?.aspectsofpower?.heldCast) {
       ui.notifications.warn(`${actor.name} is holding a completed working and cannot move.`);
       return null;
+    }
+    // GUARD STANCE: moving drops the guard (RULED 2026-08-21). Unlike the
+    // held cast above, the movement PROCEEDS — you may always walk away
+    // from your own posture; it just stops protecting you.
+    if (_cbt?.flags?.aspectsofpower?.guardStance) {
+      await collapseGuardStance(_cbt, 'stepping out of the posture');
     }
   }
   const combatant = findCombatantForActor(actor);
