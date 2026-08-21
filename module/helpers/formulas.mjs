@@ -732,21 +732,55 @@ export function defenseTimeBudgetMax(roundLen, cfg = null) {
 }
 
 /**
- * What one dodge costs from the budget: a fraction of the INCOMING swing's
- * committed ticks. This is the whole redesign in one line — the charge is
- * denominated in the attacker's time, so dicing attack time into more
- * swings cannot mint defence costs (the defect the scramble/debt economy
- * had; see design-defense-time-budget for the measurements). Floored at 1
- * so a dodge is never free.
+ * What one dodge costs from the budget: the incoming action's HEFT —
+ * its committed mass (celerity weight x action multipliers x the attacker's
+ * alternation floor) — expressed in the DEFENDER's own time (user ruling
+ * 2026-08-16: "weight seems the more natural item"). The wielder's speed
+ * stat neither inflates nor discounts the price; a charged smash commits
+ * more mass and costs more to answer; a rhythm flick commits less.
+ * Floored at 1 so a dodge is never free.
  *
- * @param {number} swingTicks  The incoming action's committed wait in ticks.
- * @param {object} [cfg]       defenseTuning override, for tests.
+ *   cost = kw x (heft / 100) x defender round length
+ *
+ * ⚠ Callers clamp AFFORDABILITY at the budget cap (an over-cap blow is
+ * divable at FULL reserve) and charge the stamina surcharge for the excess
+ * (defenseDiveSurcharge) — the RAW cost returned here is the physics.
+ *
+ * @param {number} heft      The action's committed mass (celerity weight
+ *                           x weight multipliers x alternation floor).
+ * @param {number} roundLen  The DEFENDER's personal round length in ticks.
+ * @param {object} [cfg]     defenseTuning override, for tests.
  * @returns {number} Cost in ticks, minimum 1.
  */
-export function defenseTimeCost(swingTicks, cfg = null) {
+export function defenseTimeCost(heft, roundLen, cfg = null) {
   const t = cfg ?? (globalThis.CONFIG?.ASPECTSOFPOWER?.defenseTuning ?? {});
-  const frac = t.defenseTimeCostFraction ?? 0.25;
-  return Math.max(1, Math.round(frac * Math.max(0, Number(swingTicks) || 0)));
+  const kw = t.defenseTimeHeftFraction ?? 0.08;
+  return Math.max(1, Math.round(kw * (Math.max(0, Number(heft) || 0) / 100) * Math.max(0, Number(roundLen) || 0)));
+}
+
+/**
+ * The stamina price of DIVING from a blow heavier than the whole reserve
+ * (user ruling 2026-08-16: "expend significant resources to even survive a
+ * grand spellcast" — supersedes the overdraw-debt model, whose 3.4-round
+ * defenceless tail was rejected). Zero for anything at or under the cap.
+ *
+ *   surcharge = SR x staminaMax x (cost - cap) / cap
+ *
+ * At SR 0.2: a barely-over cast ~3% of max stamina, a grand working ~47%.
+ * The ledger never goes negative — the pool is the limiter, not a timer.
+ *
+ * @param {number} cost        Raw defenseTimeCost of the blow.
+ * @param {number} cap         The defender's budget cap (defenseTimeBudgetMax).
+ * @param {number} staminaMax  The defender's maximum stamina.
+ * @param {object} [cfg]       defenseTuning override, for tests.
+ * @returns {number} Stamina to burn, 0 when the blow fits the reserve.
+ */
+export function defenseDiveSurcharge(cost, cap, staminaMax, cfg = null) {
+  const t = cfg ?? (globalThis.CONFIG?.ASPECTSOFPOWER?.defenseTuning ?? {});
+  const sr = t.defenseDiveSurchargeRate ?? 0.2;
+  const c = Math.max(0, Number(cost) || 0), k = Math.max(0, Number(cap) || 0);
+  if (k <= 0 || c <= k) return 0;
+  return Math.round(sr * Math.max(0, Number(staminaMax) || 0) * ((c - k) / k));
 }
 
 /**

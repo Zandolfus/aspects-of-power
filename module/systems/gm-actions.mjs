@@ -855,6 +855,19 @@ export async function executeGmAction(payload) {
         break;
       }
 
+      case 'gmSpendResource': {
+        // Defender-side resource burn from the attacker's client (the dive
+        // surcharge is the first consumer — design-defense-time-budget).
+        // Floored at 0, whitelisted resources only.
+        const target = await fromUuid(payload.targetActorUuid);
+        if (!target) return;
+        const res = payload.resource;
+        if (!['stamina', 'mana', 'health'].includes(res)) return;
+        const cur = target.system[res]?.value ?? 0;
+        await target.update({ [`system.${res}.value`]: Math.max(0, cur - Math.max(0, payload.amount ?? 0)) });
+        break;
+      }
+
       case 'gmConsumeReaction': {
         const target = await fromUuid(payload.targetActorUuid);
         if (!target) return;

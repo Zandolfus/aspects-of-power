@@ -175,27 +175,12 @@ export function computeActionWait(actor, skill, weapon = null, investAmount = nu
   // alteration-derived weight multiplier (rarity + tags). Vanilla
   // skill = 1 × 1 = 1 (unchanged); a Cleave-altered skill picks up
   // the cleave tag's weightMod automatically.
-  const manualMult = skill?.system?.roll?.actionWeightMultiplier ?? 1.0;
-  const altMult    = skill?._resolveCostWeightMods?.()?.effectiveWeightMultiplier ?? 1.0;
-  const multiplier = manualMult * altMult;
-  // DUAL-WIELD BODY FLOOR (design-dual-wield-tempo): a weapon attack that
-  // alternates to the other ready 1H weapon was preparing while the last
-  // hand struck, so its wait compresses toward the mastery floor. Rotation
-  // in _resolveWeaponForSkill already picks the opposite hand, so this
-  // reads the same state it does; non-dual actors get 1 and nothing moves.
-  let dualAlt = 1;
-  const _rt = skill?.system?.roll?.type ?? '';
-  if (['str_weapon', 'dex_weapon', 'phys_ranged'].includes(_rt)
-      && (skill?.system?.tags ?? []).includes('attack')
-      && !skill?.system?.tagConfig?.requiresWeaponTag
-      && !(skill?.system?.tagConfig?.requiresStyle ?? '').startsWith('dual')
-      && dualWieldEligible(actor)) {
-    const resolved = weapon ?? skill?._resolveWeaponForSkill?.();
-    const last = findCombatantForActor(actor)?.flags?.aspectsofpower?.lastSwungHand ?? 'off';
-    const alternates = !!resolved && handOf(actor, resolved) !== last;
-    dualAlt = dualWieldFloor(dualWieldPassiveRarity(actor), alternates);
-  }
-  const baseWait = Math.max(1, Math.round((weight * multiplier * dualAlt * sc.SCALE) / speed));
+  const heft = computeActionHeft(actor, skill, weapon, weight);
+  const baseWait = Math.max(1, Math.round((heft * sc.SCALE) / speed));
+  // Orb discharge below reprices at BASELINE_WEIGHT but keeps the skill's
+  // own weight multipliers — the same components heft folds in.
+  const multiplier = (skill?.system?.roll?.actionWeightMultiplier ?? 1.0)
+    * (skill?._resolveCostWeightMods?.()?.effectiveWeightMultiplier ?? 1.0);
 
   const isMagic = _MAGIC_TYPES.has(skill?.system?.roll?.type ?? '');
   const tier = skill?.system?.roll?.tier ?? '';
@@ -506,6 +491,48 @@ export async function spendDefenseBudget(actor, cost) {
     },
   });
   return spend;
+}
+
+/**
+ * THE ACTION'S HEFT — its committed mass: celerity weight (weapon weight,
+ * or tier+implement for casts) x action multipliers x the dual-wield
+ * alternation floor. ONE definition on both sides of an exchange:
+ *
+ *   wait       = heft x SCALE / attacker speed        (this file)
+ *   dodge cost = kw x heft/100 x defender round       (formulas.defenseTimeCost)
+ *
+ * A charged smash (awm > 1) commits more mass — slower to deliver AND
+ * costlier to answer; past the defender's cap it joins the meteor class
+ * (full-reserve dive + stamina surcharge). A rhythm flick commits less on
+ * both sides. Spells carry tier+implement, so a grand working prices as
+ * the mountain it is.
+ *
+ * @param {Actor} actor
+ * @param {Item} skill
+ * @param {Item|null} [weapon]      Optional pre-resolved weapon.
+ * @param {number|null} [baseWeight] Pre-resolved celerity weight (perf).
+ * @returns {number}
+ */
+export function computeActionHeft(actor, skill, weapon = null, baseWeight = null) {
+  const weight = baseWeight ?? _resolveCelerityWeight(skill, weapon);
+  const manualMult = skill?.system?.roll?.actionWeightMultiplier ?? 1.0;
+  const altMult    = skill?._resolveCostWeightMods?.()?.effectiveWeightMultiplier ?? 1.0;
+  // DUAL-WIELD BODY FLOOR (design-dual-wield-tempo): an alternating swing
+  // was preparing while the other hand struck. Rotation in
+  // _resolveWeaponForSkill picks the opposite hand from the same state.
+  let dualAlt = 1;
+  const _rt = skill?.system?.roll?.type ?? '';
+  if (['str_weapon', 'dex_weapon', 'phys_ranged'].includes(_rt)
+      && (skill?.system?.tags ?? []).includes('attack')
+      && !skill?.system?.tagConfig?.requiresWeaponTag
+      && !(skill?.system?.tagConfig?.requiresStyle ?? '').startsWith('dual')
+      && dualWieldEligible(actor)) {
+    const resolved = weapon ?? skill?._resolveWeaponForSkill?.();
+    const last = findCombatantForActor(actor)?.flags?.aspectsofpower?.lastSwungHand ?? 'off';
+    const alternates = !!resolved && handOf(actor, resolved) !== last;
+    dualAlt = dualWieldFloor(dualWieldPassiveRarity(actor), alternates);
+  }
+  return weight * manualMult * altMult * dualAlt;
 }
 
 /** Record which hand just fired a weapon attack (dual-wield rotation state).

@@ -2353,30 +2353,41 @@ eq('junk situational entries are skipped, not NaN',
     if (Math.abs(got - want) <= tol) { console.log(`ok   ${label}`); }
     else { console.error(`FAIL ${label}: got ${got}, want ${want}`); failures++; }
   };
-  const cfg = { defenseTimeBudgetFraction: 0.20, defenseTimeCostFraction: 0.25 };
-  // Live anchors: Phil roundLen 4338, his greatsword swing 2725; Gabriel
-  // dagger swing 733 (403 at the legendary dual floor 0.55). B=0.20 under
-  // the continuous-refill ruling; the FLOOR RULE holds: 867.6 banks one
-  // heavy dodge (681) with change.
-  near('defBudget: Phil round 4338 -> budget 867.6', F3.defenseTimeBudgetMax(4338, cfg), 867.6);
-  eq('defBudget: floor rule — cap banks one heavy dodge',
-     F3.defenseTimeBudgetMax(4338, cfg) > F3.defenseTimeCost(2725, cfg), true);
-  eq('defBudget: dodging a claymore arc (2725) costs 681', F3.defenseTimeCost(2725, cfg), 681);
-  eq('defBudget: dodging a dagger flick (733) costs 183', F3.defenseTimeCost(733, cfg), 183);
-  eq('defBudget: dual-floor flick (403) costs 101', F3.defenseTimeCost(403, cfg), 101);
-  // The invariance that IS the redesign: N swings of the same committed time
-  // cost the same total defence however the time is diced.
-  eq('defBudget: 2725 diced into 5 flicks costs within rounding of one arc',
-     Math.abs(5 * F3.defenseTimeCost(545, cfg) - F3.defenseTimeCost(2725, cfg)) <= 5, true);
+  const cfg = { defenseTimeBudgetFraction: 0.20, defenseTimeHeftFraction: 0.08,
+    defenseDiveSurchargeRate: 0.2 };
+  // HEFT BASIS (ruled 2026-08-16): cost = kw x heft/100 x DEFENDER round.
+  // Anchors at a level-55 defender round of 4444 (the sim's rabbit):
+  near('defBudget: round 4444 -> cap 888.8', F3.defenseTimeBudgetMax(4444, cfg), 888.8);
+  eq('defBudget: dagger flick (60) costs 213', F3.defenseTimeCost(60, 4444, cfg), 213);
+  eq('defBudget: greatsword arc (200) costs 711', F3.defenseTimeCost(200, 4444, cfg), 711);
+  eq('defBudget: cap banks one greatsword arc',
+     F3.defenseTimeBudgetMax(4444, cfg) > F3.defenseTimeCost(200, 4444, cfg), true);
+  // Charged smash: heft = weight x awm — Guard Breaker (200 x 1.5 = 300)
+  // crosses the cap and becomes a DIVE.
+  eq('defBudget: Guard Breaker heft 300 is over-cap',
+     F3.defenseTimeCost(300, 4444, cfg) > F3.defenseTimeBudgetMax(4444, cfg), true);
+  // Surcharge (supersedes overdraw debt): SR x stamMax x excess/cap.
+  const cap = F3.defenseTimeBudgetMax(4444, cfg);
+  eq('defBudget: in-cap blow has zero surcharge',
+     F3.defenseDiveSurcharge(F3.defenseTimeCost(200, 4444, cfg), cap, 200, cfg), 0);
+  eq('defBudget: Willy-cast (290) surcharge ~3% of 200 stamina',
+     F3.defenseDiveSurcharge(F3.defenseTimeCost(290, 4444, cfg), cap, 200, cfg), 6);
+  eq('defBudget: grand+staff (840) surcharge ~47% of 200 stamina',
+     F3.defenseDiveSurcharge(F3.defenseTimeCost(840, 4444, cfg), cap, 200, cfg), 94);
   // Never free, zero-safe.
-  eq('defBudget: cost floors at 1', F3.defenseTimeCost(0.5, cfg), 1);
+  eq('defBudget: cost floors at 1', F3.defenseTimeCost(0.1, 4444, cfg), 1);
   eq('defBudget: zero round -> zero budget', F3.defenseTimeBudgetMax(0, cfg), 0);
-  // Shipped knobs must carry the ruled values.
+  eq('defBudget: zero cap -> zero surcharge', F3.defenseDiveSurcharge(500, 0, 200, cfg), 0);
+  // Shipped knobs must carry the ruled values — B/kw is a RIDGE (2.5):
+  // tune both together or not at all.
   const { readFileSync: rfs } = await import('node:fs');
   const src = rfs(new URL('../module/helpers/config.mjs', import.meta.url), 'utf8');
   eq('defBudget: shipped model is budget', /defenseEconModel:\s*'budget'/.test(src), true);
   eq('defBudget: shipped B is 0.20', Number(/defenseTimeBudgetFraction:\s*([\d.]+)/.exec(src)?.[1]), 0.20);
-  eq('defBudget: shipped k is 0.25', Number(/defenseTimeCostFraction:\s*([\d.]+)/.exec(src)?.[1]), 0.25);
+  eq('defBudget: shipped kw is 0.08', Number(/defenseTimeHeftFraction:\s*([\d.]+)/.exec(src)?.[1]), 0.08);
+  eq('defBudget: shipped SR is 0.2', Number(/defenseDiveSurchargeRate:\s*([\d.]+)/.exec(src)?.[1]), 0.2);
+  eq('defBudget: shipped ridge B/kw = 2.5',
+     Number(/defenseTimeBudgetFraction:\s*([\d.]+)/.exec(src)?.[1]) / Number(/defenseTimeHeftFraction:\s*([\d.]+)/.exec(src)?.[1]), 2.5);
 
   // ── Dual-wield body floor (design-dual-wield-tempo, ladder ruled
   //    2026-08-15, re-validated under the budget economy 2026-08-16) ──

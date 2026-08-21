@@ -1,8 +1,8 @@
 import { EquipmentSystem } from '../systems/equipment.mjs';
 import { getPositionalTags } from '../helpers/positioning.mjs';
-import { houseHitFormula, hybridAbilityMod, weaponStatBlend, healStatBlend, spellDamageRef, spellInvestDamage, spellWindupMultiplier, spellCastWeight, strikeInvestDamage, coInvestDamage, investSelfDamage as computeInvestSelfDamage, effectiveDodgeValue, splitEvenlyWithRemainder, parryMassMultiplier, bracedParryWeight, bracedMaxUsefulInvest, defenceMarginMultiplier, defenseTimeCost, dotTickDamage, procStaminaCost, crushFlatAmount, riderMaxInvest, auraRadiusFor, barrierStatBlend, hotTickAmount, effectiveDamageMultiplier, clashOutcome } from '../helpers/formulas.mjs';
+import { houseHitFormula, hybridAbilityMod, weaponStatBlend, healStatBlend, spellDamageRef, spellInvestDamage, spellWindupMultiplier, spellCastWeight, strikeInvestDamage, coInvestDamage, investSelfDamage as computeInvestSelfDamage, effectiveDodgeValue, splitEvenlyWithRemainder, parryMassMultiplier, bracedParryWeight, bracedMaxUsefulInvest, defenceMarginMultiplier, defenseTimeCost, defenseDiveSurcharge, dotTickDamage, procStaminaCost, crushFlatAmount, riderMaxInvest, auraRadiusFor, barrierStatBlend, hotTickAmount, effectiveDamageMultiplier, clashOutcome } from '../helpers/formulas.mjs';
 import { resolveSituationalMods } from '../systems/situational-mods.mjs';
-import { recordActionFired, declareAction, isInActiveCombat, computeActionWait, referenceRoundLength, computeWindupMultiplier, getScrambleStacks, addScrambleStack, applyDodgeCost, findCombatantForActor, perceiveGate, getDefenseBudget, spendDefenseBudget, setLastSwungHand } from '../systems/celerity.mjs';
+import { recordActionFired, declareAction, isInActiveCombat, computeActionWait, referenceRoundLength, computeWindupMultiplier, getScrambleStacks, addScrambleStack, applyDodgeCost, findCombatantForActor, perceiveGate, getDefenseBudget, spendDefenseBudget, setLastSwungHand, computeActionHeft, actorRoundLength } from '../systems/celerity.mjs';
 import { getThreatRadiusFt, actorIsDashing } from '../systems/engagement-halts.mjs';
 import { selectTargetOnCanvas, selectTargetsOnCanvas, skillNeedsTargetPrompt, skillTargetsAtFire, selectMarkerOnCanvas } from '../canvas/target-prompt.mjs';
 import { regionTokenOverlap, segmentIntersect } from '../helpers/geometry.mjs';
@@ -1442,12 +1442,26 @@ export class AspectsofPowerItem extends Item {
 
         let costNote = '';
         if (econBudget) {
-          let swingTicks = 0;
-          try { swingTicks = computeActionWait(this.actor, item, null, null, null); } catch (e) { /* no actor context */ }
-          const cost = defenseTimeCost(swingTicks, dt);
+          // HEFT + SURCHARGE (design-defense-time-budget, ruled 2026-08-16):
+          // the dodge pays the blow's committed mass in the defender's own
+          // time; an over-cap blow empties the whole reserve AND burns
+          // stamina scaled to the excess — the dive from the meteor.
+          let heft = 100;
+          try { heft = computeActionHeft(this.actor, item, null, null); } catch (e) { /* no actor context */ }
+          const budget = getDefenseBudget(targetActor);
+          const rawCost = defenseTimeCost(heft, actorRoundLength(targetActor), dt);
+          const cost = Math.min(rawCost, budget.max);
+          const surcharge = defenseDiveSurcharge(rawCost, budget.max,
+            targetActor.system.stamina?.max ?? 0, dt);
           await spendDefenseBudget(targetActor, cost);
+          if (surcharge > 0) {
+            this._gmAction({ type: 'gmSpendResource', targetActorUuid: targetActor.uuid,
+              resource: 'stamina', amount: surcharge });
+          }
           const after = getDefenseBudget(targetActor);
-          costNote = ` — ${cost} defence time spent (${after.remaining}/${after.max} left this round)`;
+          costNote = ` — ${cost} defence time spent`
+            + (surcharge > 0 ? ` + ${surcharge} stamina (a dive beyond limits)` : '')
+            + ` (${after.remaining}/${after.max} left)`;
         } else {
           await addScrambleStack(targetActor);
           const cost = await applyDodgeCost(targetActor);
@@ -2769,34 +2783,46 @@ export class AspectsofPowerItem extends Item {
     // `this` is the attacking item, so the swing's committed ticks come from
     // the same computeActionWait the attacker paid.
     const _econBudget = (dt.defenseEconModel ?? 'budget') === 'budget';
-    let _budget = null, _dodgeCost = 0;
+    let _budget = null, _dodgeCost = 0, _surcharge = 0;
     if (isPhysicalLane && _econBudget) {
-      let swingTicks = 0;
-      try { swingTicks = computeActionWait(this.actor, this, null, null, null); } catch (e) { /* no combat context */ }
-      _dodgeCost = defenseTimeCost(swingTicks, dt);
+      let heft = 100;
+      try { heft = computeActionHeft(this.actor, this, null, null); } catch (e) { /* no combat context */ }
       _budget = getDefenseBudget(targetActor);
+      const rawCost = defenseTimeCost(heft, actorRoundLength(targetActor), dt);
+      _dodgeCost = Math.min(rawCost, _budget.max);
+      _surcharge = defenseDiveSurcharge(rawCost, _budget.max, targetActor.system.stamina?.max ?? 0, dt);
     }
     if (isPhysicalLane) {
       // Perception gate: you can't dodge what you can't see.
       const blinded = targetActor.effects.some(e => !e.disabled && e.system?.debuffType === 'blind');
       const stacks = _econBudget ? 0 : getScrambleStacks(targetActor);
       const dv = Math.round(effectiveDodgeValue(targetActor, defKey, stacks, dt));
-      const affordable = !_econBudget || _budget.remaining >= _dodgeCost;
+      // Over-cap blows: divable only at FULL reserve, and only if the
+      // stamina surcharge is payable. In-cap blows: plain affordability.
+      const _isDive = _surcharge > 0;
+      const _stam = targetActor.system.stamina?.value ?? 0;
+      const affordable = !_econBudget
+        || (_isDive ? (_budget.remaining >= _budget.max && _stam >= _surcharge)
+          : _budget.remaining >= _dodgeCost);
       hasDefend = !blinded && dv > 0 && gate.canReact && affordable;
-      defendLabel = 'Dodge';
+      defendLabel = _isDive ? 'Dive' : 'Dodge';
       const scrambleNote = (!_econBudget && stacks >= 1)
         ? ` (scramble −${Math.round((dt.scrambleStackPct ?? 0.15) * stacks * 100)}%)`
         : '';
       const econNote = _econBudget
-        ? `<p><em>Costs ${_dodgeCost} defence time (${_budget.remaining}/${_budget.max} left this round).</em></p>`
+        ? (_isDive
+          ? `<p><em>A dive beyond limits: your ENTIRE reserve + ${_surcharge} stamina.</em></p>`
+          : `<p><em>Costs ${_dodgeCost} defence time (${_budget.remaining}/${_budget.max} left).</em></p>`)
         : `<p><em>Dodging delays your next action and adds a scramble stack — win or lose.</em></p>`;
       defenseText = hasDefend
         ? `<p>Dodge value: <strong>${dv}</strong>${scrambleNote} vs to-hit ${hitTotal}.</p>` + econNote
         : (blinded ? `<p><em>Blinded — you cannot dodge what you cannot see.</em></p>`
           : (!gate.canReact
             ? `<p><em>Too fast to react — the blow lands before you can move (${gate.ratio.toFixed(1)}x your Celerity).</em></p>`
-            : (_econBudget && _budget && _budget.remaining < _dodgeCost
-              ? `<p><em>Out of defence time — this dodge needs ${_dodgeCost}, ${_budget.remaining} left until your round.</em></p>`
+            : (_econBudget && _budget
+              ? (_isDive
+                ? `<p><em>Diving from this needs a FULL reserve (${_budget.remaining}/${_budget.max}) and ${_surcharge} stamina (${_stam} left).</em></p>`
+                : `<p><em>Out of defence time — this dodge needs ${_dodgeCost}, ${_budget.remaining} left.</em></p>`)
               : '')));
     } else {
       hasDefend = pool > 0;

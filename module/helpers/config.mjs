@@ -744,9 +744,19 @@ ASPECTSOFPOWER.defenseTuning = {
   // become literally undodgeable — B=0.20 clears with change to spare.
   // Swept 2026-08-16: heavy triage 75%, Gabriel chip-mirror 7.9r (in the
   // 6-8 band), inversions 4 marginal, 3v1 in 1.2r.
+  // HEFT BASIS (ruled 2026-08-16, full battery simmed): a dodge costs the
+  // incoming action's COMMITTED MASS — celerity weight x multipliers x the
+  // attacker's alternation floor — in the defender's own time. The battery
+  // rides the RIDGE B/kw = 2.5: tune both together or not at all. Blows
+  // costing more than the whole reserve are divable at FULL reserve only,
+  // and burn stamina scaled to the excess (defenseDiveSurchargeRate) — a
+  // grand working ~47% of max stamina per dive; the ledger never goes
+  // negative. Frontline pressure keeping the reserve off-full is what
+  // makes artillery land — coordination, not bookkeeping.
   defenseEconModel: 'budget',
   defenseTimeBudgetFraction: 0.20,
-  defenseTimeCostFraction: 0.25,
+  defenseTimeHeftFraction: 0.08,
+  defenseDiveSurchargeRate: 0.2,
   // Dodge (LEGACY model only): each dodge delays the defender's next action
   // by this fraction of their own action wait (declared action's wait when
   // queued, else last wait, else a baseline-weight dex step).
