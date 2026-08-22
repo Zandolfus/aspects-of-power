@@ -252,6 +252,7 @@
     "Reaction": {
       "dodge": "Dodge",
       "parry": "Parry",
+      "block": "Block (shield adds armor)",
       "barrier": "Barrier",
       "swap": "Swap",
       "guardian": "Guardian",

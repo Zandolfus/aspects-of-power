@@ -1564,6 +1564,24 @@ export class AspectsofPowerItem extends Item {
           ChatMessage.create({ speaker: reactionSpeaker,
             content: `<p><strong>${targetActor.name}</strong> deftly dodges the attack with <strong>${reactionSkill.name}</strong>!</p>`,
           });
+        } else if (rType === 'block') {
+          // A BLOCK IS A BLOCK: IT ADDS ARMOR (ruled 2026-08-21 — "Blocks
+          // and parries are different things"). No opposed roll, no whiff:
+          // the judged implement is interposed and its full armorBonus
+          // joins THIS hit's wall (applied to `mitigation` downstream,
+          // before the pipeline and the data-mitigation-value stamp). The
+          // blow still lands; it just meets plate. The reliable soak
+          // beside the parry's contested full-negate.
+          const _impl = reactionSkill._proficiencyWeapon?.() ?? null;
+          if ((CONFIG.ASPECTSOFPOWER.guardStance?.shieldArmorModel ?? 'block') === 'block') {
+            bonusMitigation = Math.max(0, Math.round(_impl?.system?.armorBonus ?? 0));
+          }
+          reactionLine = `<p><em>${targetActor.name} blocks with <strong>${reactionSkill.name}</strong>`
+            + (bonusMitigation > 0 ? ` — wall +${bonusMitigation}` : '') + `.</em></p>`;
+          ChatMessage.create({ speaker: reactionSpeaker,
+            content: `<p><strong>${targetActor.name}</strong> takes the blow on `
+              + `${_impl?.name ?? 'the shield'}${bonusMitigation > 0 ? ` — <strong>+${bonusMitigation}</strong> to the wall` : ''}.</p>`,
+          });
         } else if (rType === 'parry') {
           const parryRoll = await reactionSkill.roll({ parryOnly: true });
           const rawParry = parryRoll ? Math.round(parryRoll.total) : 0;
@@ -1620,19 +1638,7 @@ export class AspectsofPowerItem extends Item {
           const parryProf = proficiencyDamageMult(
             targetActor, reactionSkill._proficiencyWeapon?.() ?? null);
           const parryTotal = Math.round(rawParry * massMult * parryProf);
-          // Shield armor applies at the BLOCK (ruled 2026-08-21): when the
-          // parrying implement is shield-family, its full armorBonus joins
-          // this hit's armor wall — attempt is enough, the shield is
-          // interposed either way. (Passive contribution removed in
-          // equipment.mjs under guardStance.shieldArmorModel 'block'.)
-          const _parryImpl = reactionSkill._proficiencyWeapon?.() ?? null;
-          const _shieldFam = CONFIG.ASPECTSOFPOWER.weaponTypeFamilies?.shield ?? ['shield', 'greatshield', 'buckler'];
-          if (_parryImpl && (_parryImpl.system.tags ?? []).some(t => _shieldFam.includes(t))
-              && (CONFIG.ASPECTSOFPOWER.guardStance?.shieldArmorModel ?? 'block') === 'block') {
-            bonusMitigation = Math.max(0, Math.round(_parryImpl.system.armorBonus ?? 0));
-          }
           const bits = [];
-          if (bonusMitigation > 0) bits.push(`shield wall +${bonusMitigation}`);
           if (bracedSpent > 0) bits.push(`braced ${bracedSpent} stam -> weight ${Math.round(effDefW)}`);
           if (massMult < 1) bits.push(`outmassed x${massMult.toFixed(2)}`);
           if (parryProf !== 1) bits.push(`proficiency x${parryProf.toFixed(2)}`);
@@ -2855,7 +2861,12 @@ export class AspectsofPowerItem extends Item {
       // Empty trigger = legacy; include for back-compat. Specific trigger
       // must match the current event (`self_attacked`).
       if (trig && trig !== 'self_attacked') return false;
-      const _isParry = (s.system.reactionType ?? 'dodge') === 'parry';
+      // Parries AND blocks are guard-work (blocks ruled their own type
+      // 2026-08-21: "a block is a block: it adds armor") — both require
+      // the raised stance; the lightning cooldown waiver stays parry-only.
+      const _rt = s.system.reactionType ?? 'dodge';
+      const _isParry = _rt === 'parry';
+      const _isGuardWork = _isParry || _rt === 'block';
       if ((cooldowns[s.id] ?? 0) > 0
           && !(_isParry && _gsStance?.parryCooldownFree)) return false;
       // Resource gate: actor must be able to afford the cost.
@@ -2868,10 +2879,10 @@ export class AspectsofPowerItem extends Item {
       // Swap-reaction gate: hide unless the actor has a live summon to swap with.
       if ((s.system.reactionType ?? '') === 'swap' && !hasSummonPresence()) return false;
       // GUARD STANCE gate (design-guard-stances, RULED 2026-08-21): in an
-      // active combat, parry-class reactions require the raised guard —
-      // the pre-paid answer. Out of combat there is no economy to bypass,
-      // so parries stay available (and `enabled: false` reverts wholesale).
-      if (_isParry && _gsEnabled && _gsCbt && !_gsStance) return false;
+      // active combat, parry- and block-class reactions require the raised
+      // guard — the pre-paid answer. Out of combat there is no economy to
+      // bypass, so both stay available (`enabled: false` reverts wholesale).
+      if (_isGuardWork && _gsEnabled && _gsCbt && !_gsStance) return false;
       return true;
     });
     const reactionList = reactionSkills.map(s => ({

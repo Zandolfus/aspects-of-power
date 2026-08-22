@@ -2555,6 +2555,11 @@ ASPECTSOFPOWER.sizeScaling = {
 ASPECTSOFPOWER.reactionTypes = {
   dodge:   'ASPECTSOFPOWER.Reaction.dodge',
   parry:   'ASPECTSOFPOWER.Reaction.parry',
+  // BLOCK (ruled 2026-08-21: "Blocks and parries are different things. A
+  // block is a block: it adds armor.") No opposed roll, no whiff: the
+  // judged implement's full armorBonus joins the hit's wall. The reliable
+  // soak beside the parry's contested full-negate. Stance-gated like parry.
+  block:   'ASPECTSOFPOWER.Reaction.block',
   barrier: 'ASPECTSOFPOWER.Reaction.barrier',
   swap:    'ASPECTSOFPOWER.Reaction.swap',
   guardian: 'ASPECTSOFPOWER.Reaction.guardian',
