@@ -2444,6 +2444,7 @@ eq('junk situational entries are skipped, not NaN',
   // Entry is priced by guard WEIGHT through the swing formula — the ladder
   // IS the weight table, so these pins are the ladder.
   eq('guardStance: shipped enabled', /guardStance = \{\s*\n?\s*enabled:\s*true/.test(src), true);
+  eq('guardStance: raise is half a swing (0.5)', Number(/entryWeightFraction:\s*([\d.]+)/.exec(src)?.[1]), 0.5);
   eq('guardStance: buckler weight 60', /buckler:\s*60/.test(src), true);
   eq('guardStance: shield weight 120', /shield:\s*120/.test(src), true);
   eq('guardStance: greatshield weight 190', /greatshield:\s*190/.test(src), true);

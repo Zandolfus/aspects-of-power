@@ -97,7 +97,10 @@ function _resolveCelerityWeight(skill, weapon = null) {
   if ((skill?.system?.tags ?? []).includes('stance')) {
     const guard = skill._proficiencyWeapon?.() ?? null;
     const gw = AspectsofPowerItem.resolveWeaponWeight(guard);
-    return gw > 0 ? gw : sc.BASELINE_WEIGHT;
+    // Raising is half the motion of swinging (guardStance.entryWeightFraction
+    // 0.5, ruled 2026-08-21) — the guard's weight still sets the ladder.
+    const frac = CONFIG.ASPECTSOFPOWER.guardStance?.entryWeightFraction ?? 0.5;
+    return Math.max(1, (gw > 0 ? gw : sc.BASELINE_WEIGHT) * frac);
   }
   if (_MAGIC_TYPES.has(type)) {
     const tier = skill?.system?.roll?.tier ?? '';

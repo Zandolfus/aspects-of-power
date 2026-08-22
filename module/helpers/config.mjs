@@ -1207,6 +1207,13 @@ ASPECTSOFPOWER.castHolding = {
  */
 ASPECTSOFPOWER.guardStance = {
   enabled: true,
+  // Raising a guard is HALF the motion of swinging it (ruled 2026-08-21:
+  // "64% of a round seems a bit much") — no wind-up committed into a
+  // target, no follow-through. Entry weight = guardWeight x this fraction,
+  // so the ladder keeps its proportions: Phil greatshield 64% -> 32% of
+  // his round, shield 20%, buckler 10%. Stance skills' own
+  // actionWeightMultiplier still stacks on top (Lightning Guard etc.).
+  entryWeightFraction: 0.5,
 };
 
 /**
