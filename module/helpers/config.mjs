@@ -1309,6 +1309,12 @@ ASPECTSOFPOWER.curse = {
   harnessDuration: 3,
   // Overflow d100: this result or lower makes the transformation permanent.
   transformPermanentOn: 1,
+  // `spend-curse` (builder/spender rebuild, RULED 2026-08-22): a spender
+  // cast is HARD-GATED on paying spendFraction x capacity from the meter,
+  // and the spent energy JOINS THE HIT BASIS — contest power, bought with
+  // banked curses. Felicia: 0.2 x 714 = 143 per Mind Crush, hit 489 -> 632.
+  // Per-skill override: tagConfig.spendCurseFraction.
+  spendFraction: 0.2,
 };
 
 /**

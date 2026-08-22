@@ -1967,3 +1967,17 @@ export function curseEatenEnergy(effects) {
 export function curseFillAmount(rollTotal, fillScale) {
   return Math.max(0, Math.round((Number(rollTotal) || 0) * (Number(fillScale) || 0)));
 }
+
+/**
+ * Price of one curse-spender cast (`spend-curse` tag, builder/spender
+ * rebuild RULED 2026-08-22: "Mind Crush should likely be another spender").
+ * A fixed fraction of the wielder's CAPACITY — stat-derived, so the price a
+ * spender pays and the wall it can crack both ride the same wil+wis curve.
+ *
+ * @param {number} capacity  curseMeterCapacity for this actor
+ * @param {number} fraction  fraction of capacity per cast (config knob)
+ * @returns {number} whole points of curse energy, never negative
+ */
+export function curseSpendPrice(capacity, fraction) {
+  return Math.max(0, Math.round((Number(capacity) || 0) * (Number(fraction) || 0)));
+}

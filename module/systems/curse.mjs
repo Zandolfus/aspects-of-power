@@ -26,7 +26,7 @@
  * different actor's effects (spread copies, transfer, non-owned consume)
  * routes through the `gmCurseOp` GM action below.
  */
-import { curseMeterCapacity, curseEatenEnergy, curseFillAmount } from '../helpers/formulas.mjs';
+import { curseMeterCapacity, curseEatenEnergy, curseFillAmount, curseSpendPrice } from '../helpers/formulas.mjs';
 
 function _cfg() {
   return CONFIG.ASPECTSOFPOWER?.curse ?? {};
@@ -169,6 +169,27 @@ export async function ventAllCurse(actor) {
 }
 
 /**
+ * Price of one `spend-curse` cast for this skill (per-skill fraction
+ * override, else the config knob), against the wielder's capacity.
+ */
+export function spendPriceFor(skill) {
+  const frac = skill.system?.tagConfig?.spendCurseFraction || (_cfg().spendFraction ?? 0.2);
+  return curseSpendPrice(meterCapacity(skill.actor), frac);
+}
+
+/**
+ * Pay a spender's price from the meter. Returns the amount spent, or null
+ * when the meter cannot cover it (the caller hard-gates the cast — RULED
+ * 2026-08-22: "no meter, no Mind Crush").
+ */
+export async function spendCurse(actor, amount) {
+  const cur = meterValue(actor);
+  if (amount <= 0 || cur < amount) return null;
+  await actor.update({ 'flags.aspectsofpower.curseMeter': cur - amount });
+  return amount;
+}
+
+/**
  * Meter fill on cast (fill ruling: "all curse casts + eating"). Fires once
  * per cast from roll()'s two cost-deduction tails. Vent skills are excluded
  * — a vent empties the vessel; its own casting does not refill it.
@@ -177,9 +198,13 @@ export async function onCurseCast(skill, rollTotal, speaker, rollMode) {
   const cfg = _cfg();
   if (!cfg.enabled || !skill?.actor) return;
   const tags = skill.system?.tags ?? [];
-  if (tags.includes('vent-curse') || tags.includes('harness')) return;
+  // Vents empty the vessel and spenders drain it — neither refills itself.
+  if (tags.includes('vent-curse') || tags.includes('harness') || tags.includes('spend-curse')) return;
   if (!(cfg.fillTags ?? ['dread', 'curse']).some(t => tags.includes(t))) return;
-  const amount = curseFillAmount(rollTotal, cfg.fillScale ?? 0.1);
+  // Per-skill fill override: a weapon conduit trickles (Maia's Lament
+  // 0.03) while a true curse cast banks the full config fraction.
+  const scale = skill.system?.tagConfig?.curseFillScale || (cfg.fillScale ?? 0.1);
+  const amount = curseFillAmount(rollTotal, scale);
   if (amount <= 0) return;
   await addCurseEnergy(skill.actor, amount, { speaker, rollMode, sourceName: skill.name });
 }

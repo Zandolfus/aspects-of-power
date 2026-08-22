@@ -11,7 +11,7 @@ import { executeGmAction as executeGmActionImpl } from '../systems/gm-actions.mj
 import { proficiencyDamageMult, proficiencyHitMult, heldWeaponWeight, heldImplementWeight, mainHandWeapon, offHandWeapon, dualWieldEligible, handOf } from '../systems/weapon-styles.mjs';
 import { stackDamageMultiplier, spendableRange, clampSpread, getStackCount, getStackPayload, addStacks, spendStacks, resolveStackCap } from '../systems/stacks.mjs';
 import { resolveCoInvest } from '../systems/co-invest.mjs';
-import { handleSpread, handleTransfer, handleConsume, handleHarness, onCurseCast, ventAllCurse, meterValue as curseMeterValue } from '../systems/curse.mjs';
+import { handleSpread, handleTransfer, handleConsume, handleHarness, onCurseCast, ventAllCurse, meterValue as curseMeterValue, spendPriceFor, spendCurse } from '../systems/curse.mjs';
 
 /**
  * Check if an actor is an assigned player character (not just owned).
@@ -1931,6 +1931,26 @@ export class AspectsofPowerItem extends Item {
           await targetActor.deleteEmbeddedDocuments('ActiveEffect', oneShots.map(e => e.id));
         }
       }
+    }
+    // ── CURSE SPEND joins the hit basis (`spend-curse`, RULED 2026-08-22) ──
+    // The energy paid at the gate becomes contest power: effective basis =
+    // basis + spent, so hitTotal grows by spent x (hitTotal/hitTotal-at-d20-0)
+    // — implemented as a flat add scaled by the roll's own d20 factor, which
+    // the house grammar makes recoverable as hitTotal / basis. Applied once
+    // (first target of the cast), like the mark it sits beside.
+    if (hitRoll && this._curseSpend > 0 && this.actor) {
+      const _spent = this._curseSpend;
+      this._curseSpend = null;
+      const _basis = Math.max(1, Math.round(hybridAbilityMod(this.actor.system.abilities ?? {}, this.system.roll ?? {})));
+      const _d20Factor = Math.max(1, hitTotal / _basis);
+      const _before = hitTotal;
+      hitTotal = Math.round(hitTotal + _spent * _d20Factor);
+      ChatMessage.create({
+        speaker: ChatMessage.getSpeaker({ actor: this.actor }),
+        ...(whisperGM ? { whisper: whisperGM } : {}),
+        content: `<p><em>${this.name} rides ${_spent} banked curse energy: `
+               + `contest ${_before} → ${hitTotal}.</em></p>`,
+      });
     }
 
     // ── MARK CONSUMERS (RULED 2026-07-31) ─────────────────────────────────
@@ -5338,6 +5358,28 @@ export class AspectsofPowerItem extends Item {
         }
       }
     }
+    // ── CURSE SPENDER gate (`spend-curse`, RULED 2026-08-22 — Felicia's
+    // builder/spender rebuild). HARD gate: the cast exists only if the
+    // meter can pay spendFraction x capacity. The spent energy is stashed
+    // on the item for THIS cast and joins the hit basis in _handleAttackTag
+    // (contest power, bought with banked curses). Deducted here, before
+    // any other cost commits — an unpayable spender fizzles cleanly.
+    this._curseSpend = null;
+    if (this.type === 'skill' && this.actor
+        && (this.system.tags ?? []).includes('spend-curse')) {
+      const _price = spendPriceFor(this);
+      const _paid = await spendCurse(this.actor, _price);
+      if (_paid === null) {
+        ChatMessage.create({
+          speaker: ChatMessage.getSpeaker({ actor: this.actor }),
+          content: `<p><em>${this.name} gutters out — not enough curse energy `
+                 + `(need ${_price}, have ${Math.round(curseMeterValue(this.actor))}). Build the meter first.</em></p>`,
+        });
+        return;
+      }
+      this._curseSpend = _paid;
+    }
+
     // Combination / weapon-type / STYLE gate (design-weapon-proficiencies.md).
     // A skill that names a required arrangement, weapon, or governing style is
     // unusable without it — the same shape as the existing

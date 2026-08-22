@@ -2486,6 +2486,14 @@ eq('junk situational entries are skipped, not NaN',
   eq('curse: spread filter is the dread tag', /spreadFilterTag:\s*'dread'/.test(src), true);
   eq('curse: fill tags are dread+curse', /fillTags:\s*\['dread',\s*'curse'\]/.test(src), true);
   eq('curse: a natural 1 is permanent', /transformPermanentOn:\s*1\b/.test(src), true);
+
+  // ── Builder/spender (spend-curse, ruled 2026-08-22) ──
+  // Felicia anchors: cap 714, price 0.2 x cap = 143; spent joins the hit
+  // basis (489 + 143 = 632 — what cracks a shredded mind-fortress).
+  eq('curse: Mind Crush price is 143 on Felicia', F3.curseSpendPrice(714, 0.2), 143);
+  eq('curse: zero fraction prices nothing', F3.curseSpendPrice(714, 0), 0);
+  eq('curse: Maia trickle 197 x 0.03 banks 6', F3.curseFillAmount(197, 0.03), 6);
+  eq('curse: shipped spendFraction 0.2', /spendFraction:\s*0\.2\b/.test(src), true);
 }
 
 if (failures) { console.error(`\n${failures} FAILURES`); process.exit(1); }
