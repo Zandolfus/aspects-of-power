@@ -500,7 +500,11 @@ export class SkillData extends foundry.abstract.TypeDataModel {
         // Per-skill meter-fill override: fraction of the roll this builder
         // banks. 0 = the config default (CONFIG.curse.fillScale). Lets a
         // weapon conduit trickle (Maia's Lament 0.03) while casts bank full.
+        // On a `curse-empath` passive it overrides empathFillScale instead.
         curseFillScale: new fields.NumberField({ initial: 0, min: 0 }),
+        // `curse-empath` radius override: how far the bloodline feels
+        // suffering, in feet. 0 = config default (CONFIG.curse.empathRadiusFt).
+        empathRadiusFt: new fields.NumberField({ initial: 0, min: 0 }),
 
         // ── STACKS (design-stacks-subsystem.md, RULED 2026-08-02) ─────────
         // A self-held charge pool on the CASTER. One skill produces into a

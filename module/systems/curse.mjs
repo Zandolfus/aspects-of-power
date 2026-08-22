@@ -106,7 +106,7 @@ export function meterCapacity(actor) {
  * The transformation's FORM is table territory — the engine provides the
  * trigger, the roll, the control loss, and the permanence flag.
  */
-export async function addCurseEnergy(actor, amount, { speaker, rollMode, sourceName = '' } = {}) {
+export async function addCurseEnergy(actor, amount, { speaker, rollMode, sourceName = '', quiet = false } = {}) {
   if (!_cfg().enabled || !actor || amount <= 0) return;
   const cap = meterCapacity(actor);
   if (cap <= 0) return;
@@ -115,11 +115,17 @@ export async function addCurseEnergy(actor, amount, { speaker, rollMode, sourceN
 
   if (next < cap) {
     await actor.update({ 'flags.aspectsofpower.curseMeter': next });
-    ChatMessage.create({
-      speaker, rollMode,
-      content: `<p><em>Curse energy on ${actor.name}: <strong>${next} / ${cap}</strong>`
-             + `${sourceName ? ` (+${Math.round(amount)} from ${sourceName})` : ''}.</em></p>`,
-    });
+    // Quiet deposits (the empath's ambient trickle) only speak when the
+    // meter crosses a quarter of capacity — a per-hit line for every blow
+    // landed near her would drown the chat log.
+    const crossed = Math.floor(4 * cur / cap) !== Math.floor(4 * next / cap);
+    if (!quiet || crossed) {
+      ChatMessage.create({
+        speaker, rollMode,
+        content: `<p><em>Curse energy on ${actor.name}: <strong>${next} / ${cap}</strong>`
+               + `${sourceName ? ` (+${Math.round(amount)} from ${sourceName})` : ''}.</em></p>`,
+      });
+    }
     return;
   }
 
@@ -207,6 +213,44 @@ export async function onCurseCast(skill, rollTotal, speaker, rollMode) {
   const amount = curseFillAmount(rollTotal, scale);
   if (amount <= 0) return;
   await addCurseEnergy(skill.actor, amount, { speaker, rollMode, sourceName: skill.name });
+}
+
+/**
+ * CURSED BLOODLINE (`curse-empath` passive tag, RULED 2026-08-22: "She has
+ * a cursed bloodline that forces her to feel the negative emotions (curse)
+ * of everyone around her. So curse based on damage done around her?").
+ *
+ * Called from the damage-application seams whenever HP is actually lost:
+ * every actor on the scene holding a curse-empath passive within its radius
+ * of the victim feels the suffering — curseFillScale x hpLoss lands on
+ * their meter, quietly (quarter-crossings and overflow still announce).
+ * Solo she starves; in a real battle the violence feeds her. Overflow can
+ * trigger mid-fight — "forces her to feel" is the operative verb.
+ */
+export async function feedNearbyEmpaths(victimActor, hpLoss) {
+  const cfg = _cfg();
+  if (!cfg.enabled || !(hpLoss > 0) || !victimActor) return;
+  const victimToken = victimActor.getActiveTokens?.()[0] ?? null;
+  if (!victimToken || !canvas?.ready) return;
+  const grid = canvas.scene?.grid;
+  const pxPerFt = grid?.size && grid?.distance ? grid.size / grid.distance : 0;
+  if (!pxPerFt) return;
+  for (const tok of canvas.tokens?.placeables ?? []) {
+    const a = tok.actor;
+    if (!a) continue;
+    const empath = a.items.find(i => i.type === 'skill'
+      && (i.system?.tags ?? []).includes('curse-empath'));
+    if (!empath) continue;
+    const radius = empath.system?.tagConfig?.empathRadiusFt || (cfg.empathRadiusFt ?? 60);
+    const distFt = Math.hypot(tok.center.x - victimToken.center.x,
+                              tok.center.y - victimToken.center.y) / pxPerFt;
+    if (distFt > radius) continue;
+    const scale = empath.system?.tagConfig?.curseFillScale || (cfg.empathFillScale ?? 0.05);
+    const amount = curseFillAmount(hpLoss, scale);
+    if (amount > 0) {
+      await addCurseEnergy(a, amount, { quiet: true, sourceName: 'suffering nearby' });
+    }
+  }
 }
 
 /* -------------------------------------------- */

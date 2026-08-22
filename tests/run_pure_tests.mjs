@@ -2494,6 +2494,11 @@ eq('junk situational entries are skipped, not NaN',
   eq('curse: zero fraction prices nothing', F3.curseSpendPrice(714, 0), 0);
   eq('curse: Maia trickle 197 x 0.03 banks 6', F3.curseFillAmount(197, 0.03), 6);
   eq('curse: shipped spendFraction 0.2', /spendFraction:\s*0\.2\b/.test(src), true);
+  // Cursed Bloodline (curse-empath): ambient fill — a 1000-damage round
+  // nearby banks 50; the knobs are the fight-tempo dial.
+  eq('curse: empath feels 5% of nearby suffering', F3.curseFillAmount(1000, 0.05), 50);
+  eq('curse: shipped empathFillScale 0.05', /empathFillScale:\s*0\.05\b/.test(src), true);
+  eq('curse: shipped empathRadiusFt 60', /empathRadiusFt:\s*60\b/.test(src), true);
 }
 
 if (failures) { console.error(`\n${failures} FAILURES`); process.exit(1); }

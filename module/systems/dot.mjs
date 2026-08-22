@@ -99,6 +99,13 @@ export async function tickDotsFor(combat, applierUuid) {
              + `Health: ${newHealth} / ${health.max}`
              + `${newHealth === 0 ? ' &mdash; <em>Incapacitated!</em>' : ''}</p>`,
     });
+    // Cursed bloodline: DoT suffering feeds nearby curse-empaths too.
+    if (totalDamage > 0) {
+      try {
+        const { feedNearbyEmpaths } = await import('./curse.mjs');
+        await feedNearbyEmpaths(c.actor, totalDamage);
+      } catch { /* never break the tick */ }
+    }
     results.push({ name: c.actor.name, damage: totalDamage, newHealth });
   }
   return results;

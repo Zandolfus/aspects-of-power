@@ -1315,6 +1315,14 @@ ASPECTSOFPOWER.curse = {
   // banked curses. Felicia: 0.2 x 714 = 143 per Mind Crush, hit 489 -> 632.
   // Per-skill override: tagConfig.spendCurseFraction.
   spendFraction: 0.2,
+  // `curse-empath` (Cursed Bloodline, RULED 2026-08-22): the meter's main
+  // BUILDER is ambient — an empath feels every HP loss within radius as
+  // curse energy (empathFillScale x hpLoss, quiet deposits). A 4v4 fight
+  // dealing ~1000 damage a round nearby banks ~50/round: one Mind Crush
+  // every ~3 rounds. Solo duels starve her — that is the character.
+  // Per-skill overrides: tagConfig.empathRadiusFt / tagConfig.curseFillScale.
+  empathFillScale: 0.05,
+  empathRadiusFt: 60,
 };
 
 /**

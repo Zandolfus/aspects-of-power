@@ -2802,6 +2802,16 @@ Hooks.on('renderChatMessageHTML', (message, html) => {
         await _applyForcedMovement(target, btn.dataset.attackerTokenId, forcedDir, forcedDist, parseInt(btn.dataset.hitTotal, 10) || 0);
       }
 
+      // ── Cursed bloodline: nearby empaths feel the blow ──
+      // Every HP loss feeds curse-empath passives in radius (systems/curse
+      // feedNearbyEmpaths — quiet deposits, quarter-crossings announce).
+      if (actualHpLoss > 0) {
+        try {
+          const { feedNearbyEmpaths } = await import('./systems/curse.mjs');
+          await feedNearbyEmpaths(target, actualHpLoss);
+        } catch { /* empath feed must never break damage application */ }
+      }
+
       // ── Lifesteal → overhealth ──
       // Any attacker passive skill carrying `flags.aspectsofpower.lifestealPct`
       // (0..1) credits that fraction of HP damage dealt to the attacker's
