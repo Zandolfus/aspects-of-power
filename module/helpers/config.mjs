@@ -862,6 +862,12 @@ ASPECTSOFPOWER.defenseTuning = {
   // Hard ceiling on the weight multiplier, so a braced dagger cannot pretend
   // to be a siege ram. The mass cap min(1, …) usually binds first anyway.
   bracedMaxWeightMult: 3.0,
+  // DIVE INVEST (ruled 2026-08-23: "Dives should be slidable invests").
+  // Beyond the mandatory over-cap surcharge, extra stamina buys dodge value
+  // at the braced price (bracedCostHitFrac x hit per +100% of dv), capped at
+  // this multiple — the legs buy dodge the way the shield arm buys wall
+  // (bulwarkMaxBonusMult's sibling; same bulwarkWallBonus math).
+  diveMaxBoostMult: 1.0,
   // Shrapnel: instead of the old pool-cost multiplier, shrapnel attacks
   // penalize the dodge roll by this fraction (fragments are hard to dodge).
   shrapnelDodgePenalty: 0.25,

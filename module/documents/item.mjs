@@ -995,6 +995,68 @@ export class AspectsofPowerItem extends Item {
   }
 
   /**
+   * Shared defence-invest SLIDER ("Dives should be slidable invests, same
+   * with bulwark", ruled 2026-08-23). One range input with live readouts,
+   * the same shape as the braced-parry prompt — bulwark braces and dive
+   * boosts both price through bulwarkWallBonus, so one dialog serves both.
+   *
+   * @param {object} o
+   * @param {string} o.title      Window title.
+   * @param {string} o.lead       Intro line (HTML ok).
+   * @param {number} o.cap        Max investable stamina.
+   * @param {number} o.pool       Current stamina (display).
+   * @param {string} o.bonusNoun  What the bonus buys ('wall', 'dodge').
+   * @param {(v: number) => number} o.bonusAt  Bonus for an invest of v.
+   * @param {string} o.confirmLabel  Confirm button label.
+   * @param {string} o.plainLabel    Zero-invest button label.
+   * @returns {Promise<number|null>} chosen invest, or null on close.
+   */
+  async _promptWallInvest({ title, lead, cap, pool, bonusNoun, bonusAt, confirmLabel, plainLabel }) {
+    const content = `
+      <div class="resource-invest wall-invest">
+        <p style="margin:0 0 6px;">${lead}</p>
+        <div class="form-group">
+          <label>Invest: <span class="invest-display">0</span> stamina</label>
+          <input type="range" name="invest" min="0" max="${cap}" value="0" step="1" style="width:100%;" />
+        </div>
+        <div class="invest-readouts" style="display:grid;grid-template-columns:1fr 1fr;gap:4px;margin-top:8px;">
+          <div>Bonus ${bonusNoun}: <strong class="bonus-display">+0</strong></div>
+          <div>Stamina after: <strong class="remaining-display">${pool}</strong></div>
+        </div>
+        <p class="hint" style="font-size:11px;margin-top:8px;">Full slide reaches +${bonusAt(cap)} ${bonusNoun}.</p>
+      </div>`;
+    return foundry.applications.api.DialogV2.wait({
+      window: { title },
+      content,
+      buttons: [
+        {
+          action: 'confirm', label: confirmLabel, default: true,
+          callback: (event, button) => {
+            const v = parseInt(button.form.elements.invest?.value, 10);
+            return Math.min(Math.max(0, v || 0), cap);
+          },
+        },
+        { action: 'none', label: plainLabel, callback: () => 0 },
+      ],
+      close: () => null,
+      render: (event, dialog) => {
+        const root = dialog?.element ?? dialog;
+        const slider = root?.querySelector('input[name="invest"]');
+        if (!slider) return;
+        const invD = root.querySelector('.invest-display');
+        const bD   = root.querySelector('.bonus-display');
+        const remD = root.querySelector('.remaining-display');
+        slider.addEventListener('input', () => {
+          const v = parseInt(slider.value, 10) || 0;
+          invD.textContent = v;
+          bD.textContent = '+' + bonusAt(v);
+          remD.textContent = pool - v;
+        });
+      },
+    });
+  }
+
+  /**
    * @param {object} rollData
    * @param {object} [opts]
    * @param {boolean} [opts.applyRarityMult]  Multiply damage by the skill's
@@ -1455,12 +1517,7 @@ export class AspectsofPowerItem extends Item {
         const econBudget = (dt.defenseEconModel ?? 'budget') === 'budget';
         const stacks = econBudget ? 0 : getScrambleStacks(targetActor);
         const dv = effectiveDodgeValue(targetActor, defKey, stacks, dt);
-        const die = await new Roll('1d20').evaluate();
-        let droll = dv * (1 + die.total / 100);
-        // Shrapnel is hard to dodge — penalize the roll (replaces the old
-        // pool-cost multiplier for physical lanes).
-        if (shrapnelMult > 1) droll *= (1 - (dt.shrapnelDodgePenalty ?? 0.25));
-        droll = Math.round(droll);
+        let dvBoost = 0;
 
         let costNote = '';
         if (econBudget) {
@@ -1475,20 +1532,61 @@ export class AspectsofPowerItem extends Item {
           const cost = Math.min(rawCost, budget.max);
           const surcharge = defenseDiveSurcharge(rawCost, budget.max,
             targetActor.system.stamina?.max ?? 0, dt);
-          await spendDefenseBudget(targetActor, cost);
+          // DIVE INVEST (ruled 2026-08-23: "Dives should be slidable
+          // invests"): beyond the mandatory surcharge, the diver can hurl
+          // MORE stamina into the dive. Same pricing grammar as the bulwark
+          // brace — bracedCostHitFrac x hit per +100% of the dodge value,
+          // capped at diveMaxBoostMult — the legs buy dodge the way the
+          // shield arm buys wall. Same local-prompt guard as braces.
+          let _diveExtra = 0;
           if (surcharge > 0) {
+            const _dFrac = dt.bracedCostHitFrac ?? 0.05;
+            const _dMax = dt.diveMaxBoostMult ?? 1.0;
+            const _stam = targetActor.system.stamina?.value ?? 0;
+            const _dCap = Math.min(Math.max(0, Math.round(_stam - surcharge)),
+              Math.max(0, Math.round(_dFrac * hitTotal * _dMax)));
+            const _dPlayer = game.users.find(u =>
+              u.active && !u.isGM && u.character?.id === targetActor.id);
+            const _dMayDecide = _dPlayer
+              ? _dPlayer.id === game.user.id
+              : (game.user.isGM || targetActor.isOwner);
+            if (_dMayDecide && _dCap > 0) {
+              const chosen = await this._promptWallInvest({
+                title: `${item.name} incoming — Dive`,
+                lead: `An over-limit blow (hit ${hitTotal}) — the dive costs `
+                  + `<strong>${surcharge}</strong> stamina. Throw MORE into it to dodge harder `
+                  + `(cap +${Math.round(dv * _dMax)} dodge).`,
+                cap: _dCap, pool: _stam, bonusNoun: 'dodge',
+                bonusAt: (v) => bulwarkWallBonus(dv, v, hitTotal, _dFrac, _dMax),
+                confirmLabel: 'Dive', plainLabel: 'Bare dive',
+              }) ?? 0;
+              _diveExtra = Math.min(Math.max(0, Math.round(chosen)), _dCap);
+              if (_diveExtra > 0) dvBoost = bulwarkWallBonus(dv, _diveExtra, hitTotal, _dFrac, _dMax);
+            }
+          }
+          await spendDefenseBudget(targetActor, cost);
+          if (surcharge + _diveExtra > 0) {
             this._gmAction({ type: 'gmSpendResource', targetActorUuid: targetActor.uuid,
-              resource: 'stamina', amount: surcharge });
+              resource: 'stamina', amount: surcharge + _diveExtra });
           }
           const after = getDefenseBudget(targetActor);
           costNote = ` — ${cost} defence time spent`
-            + (surcharge > 0 ? ` + ${surcharge} stamina (a dive beyond limits)` : '')
+            + (surcharge > 0 ? ` + ${surcharge + _diveExtra} stamina (a dive beyond limits`
+              + (_diveExtra > 0 ? `, +${dvBoost} dodge bought` : '') + ')' : '')
             + ` (${after.remaining}/${after.max} left)`;
         } else {
           await addScrambleStack(targetActor);
           const cost = await applyDodgeCost(targetActor);
           costNote = cost > 0 ? ` — next action +${cost} ticks` : '';
         }
+
+        // Roll AFTER the dive invest so bought dodge value is in the roll.
+        const die = await new Roll('1d20').evaluate();
+        let droll = (dv + dvBoost) * (1 + die.total / 100);
+        // Shrapnel is hard to dodge — penalize the roll (replaces the old
+        // pool-cost multiplier for physical lanes).
+        if (shrapnelMult > 1) droll *= (1 - (dt.shrapnelDodgePenalty ?? 0.25));
+        droll = Math.round(droll);
 
         // Dodging is MOVEMENT — a held working cannot survive the dive
         // (ruled 2026-08-16: rooted while holding; reactions only). A GUARD
@@ -1617,19 +1715,16 @@ export class AspectsofPowerItem extends Item {
                 : (game.user.isGM || targetActor.isOwner);
               let _bwSpent = 0;
               if (_bwMayDecide && _bwCap > 0) {
-                const chosen = await foundry.applications.api.DialogV2.wait({
-                  window: { title: `${reactionSkill.name} — Brace the wall` },
-                  content: `<p>Incoming hit ${hitTotal}. The shield holds <strong>+${_shieldArmor}</strong>; `
-                    + `stamina braces it further — <strong>${_bwFullCost}</strong> stamina per additional +${_shieldArmor} `
-                    + `(cap +${Math.round(_shieldArmor * _bwMax)}). Pool: ${_bwPool}.</p>`
-                    + `<div class="form-group"><label>Brace stamina</label>`
-                    + `<input type="number" name="brace" value="0" min="0" max="${_bwCap}" step="1" autofocus /></div>`,
-                  buttons: [
-                    { action: 'ok', label: 'Block', default: true,
-                      callback: (ev, btn) => Number(btn.form?.elements?.brace?.value ?? 0) },
-                    { action: 'plain', label: 'Plain block', callback: () => 0 },
-                  ],
-                  close: () => 0,
+                // Slider, not a number field (ruled 2026-08-23: "bulwark
+                // should be a slider") — same live-readout shape as the
+                // braced parry.
+                const chosen = await this._promptWallInvest({
+                  title: `${reactionSkill.name} — Brace the wall`,
+                  lead: `Incoming hit ${hitTotal}. The shield holds <strong>+${_shieldArmor}</strong>; `
+                    + `stamina braces it further (cap +${Math.round(_shieldArmor * _bwMax)}).`,
+                  cap: _bwCap, pool: _bwPool, bonusNoun: 'wall',
+                  bonusAt: (v) => bulwarkWallBonus(_shieldArmor, v, hitTotal, _bwFrac, _bwMax),
+                  confirmLabel: 'Block', plainLabel: 'Plain block',
                 }) ?? 0;
                 _bwSpent = Math.min(Math.max(0, Math.round(chosen)), _bwCap);
               }

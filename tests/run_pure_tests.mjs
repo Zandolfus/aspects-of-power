@@ -2458,6 +2458,11 @@ eq('junk situational entries are skipped, not NaN',
   eq('bulwark: zero invest is a plain block', F3.bulwarkWallBonus(185, 0, 1000, 0.05, 1.0), 0);
   eq('bulwark: bigger hit, dearer brace', F3.bulwarkWallBonus(185, 50, 2000, 0.05, 1.0), 93);
   eq('bulwark: shipped cap is 1.0', Number(/bulwarkMaxBonusMult:\s*([\d.]+)/.exec(src)?.[1]), 1.0);
+  // Dive invest (ruled 2026-08-23) rides the SAME bulwarkWallBonus math on
+  // the dodge value — one grammar for wall and legs.
+  eq('dive: shipped boost cap 1.0', Number(/diveMaxBoostMult:\s*([\d.]+)/.exec(src)?.[1]), 1.0);
+  eq('dive: half-price invest buys half the dodge',
+     F3.bulwarkWallBonus(600, 27, 1070, 0.05, 1.0), Math.round(600 * (27 / (0.05 * 1070))));
   eq('tagGrants: greatshield signatures', /greatshield:\s*\['Bulwark Block', 'Shield Wall'\]/.test(src), true);
   // Weapon tag grants (ruled 2026-08-21): the ruling's own examples, pinned.
   eq('tagGrants: shields grant the pair', /shield:\s*\['Raise Shield', 'Shield Block'\]/.test(src), true);
