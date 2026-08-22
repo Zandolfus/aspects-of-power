@@ -545,8 +545,10 @@ eq('crush at 0.05 affordable for Phil (1023 dmg, 184 pool)',
    procStaminaCost(1023, 0.05) <= 184, true);
 // armorCrushMaxStacks is 3, so the cost only needs to permit ~3 procs.
 eq('George affords 3 crush stacks', Math.floor(225 / procStaminaCost(1354, 0.05)) >= 3, true);
-// Bleed keeps the default and stays where it was tuned.
-eq('bleed default unchanged for Strike', procStaminaCost(300, 0.20), 60);
+// REPRICED 2026-08-23 ("insanely high"): default 0.20 -> 0.05, magnitudes
+// preserved via dotInvestScale 0.5 -> 2.0 on the content. Gabriel's live
+// 539-damage Strike now prices Hemorrhage at 27, not 108.
+eq('bleed reprice: Gabriel Strike 539 -> 27', procStaminaCost(539, 0.05), 27);
 
 // -- riderDamageBase: the ONE rule both rider magnitudes size off (RULED
 // 2026-07-30). Before it existed, dotTickDamage preferred the parent while

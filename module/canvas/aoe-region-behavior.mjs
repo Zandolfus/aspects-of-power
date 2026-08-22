@@ -47,14 +47,16 @@ class PersistentAoeBehavior extends foundry.data.regionBehaviors.RegionBehaviorT
     const tokenDoc = event.data?.token;
     if (!tokenDoc) return;
 
-    // Ground-anchored AOEs (skill tagged `ground` — oil slicks, spike
-    // traps, vine fields) only affect targets on the ground. A leaping
-    // actor passing overhead skips them. The leap handler sets
-    // _aopInLeap on the token doc for the duration of the move; the
-    // tag rides through persistentData.tags (snapshotted at creation).
+    // GROUND IS THE DEFAULT (RULED 2026-08-22: "volumetric aoes should be
+    // the exception, not the rule, need a tag specifically for it").
+    // Every AOE is ground-anchored unless tagged `volumetric` (fireball
+    // bursts, gas clouds) — a leaping actor passing overhead skips
+    // everything else. The old `ground` tag is now redundant but kept as
+    // an explicit marker. The leap handler sets _aopInLeap on the token
+    // doc for the duration of the move; tags ride persistentData.tags.
     const region = this.region;
     const aoeTags = region?.flags?.['aspects-of-power']?.persistentData?.tags ?? [];
-    if (aoeTags.includes('ground') && tokenDoc._aopInLeap) {
+    if (!aoeTags.includes('volumetric') && tokenDoc._aopInLeap) {
       return;
     }
 

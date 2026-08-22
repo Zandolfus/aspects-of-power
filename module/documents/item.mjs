@@ -1812,7 +1812,13 @@ export class AspectsofPowerItem extends Item {
             });
           }
         } else if (rType === 'barrier') {
-          await reactionSkill.roll();
+          // executeDeferred: a plain roll() inside an ACTIVE COMBAT declares
+          // onto the clock and never fires — the shell went into the queue
+          // and the caster got no invest prompt ("reactive barriers like
+          // metal mana shield do not prompt mana input", night 2026-08-22).
+          // A reaction is an immediate fire by definition. skipHoldPrompt:
+          // holding a defensive shell mid-incoming-blow is not a choice.
+          await reactionSkill.roll({ executeDeferred: true, skipHoldPrompt: true });
           reactionLine = `<p><em>${targetActor.name} reacts with <strong>${reactionSkill.name}</strong> (Barrier)!</em></p>`;
           ChatMessage.create({ speaker: reactionSpeaker,
             content: `<p><strong>${targetActor.name}</strong> raises a barrier with <strong>${reactionSkill.name}</strong>!</p>`,
@@ -2652,6 +2658,22 @@ export class AspectsofPowerItem extends Item {
       ? `<p>Defense reduction: −${Math.round((1 - damageMultiplier) * 100)}%</p>`
       : '';
 
+    // Marks on the card ("marks should be included in the attack card",
+    // night 2026-08-22): damage-marks apply at the CLICK, reading live
+    // target state — surface them here so the number shift is expected,
+    // not mysterious. Preview only; the apply handler stays the collector.
+    let markLine = '';
+    if (isHit && targetActor && this.actor?.uuid) {
+      const _dmgMarks = targetActor.effects.filter(e => !e.disabled
+        && e.system?.markedByActorUuid === this.actor.uuid
+        && (e.system?.markedDamageBonus ?? 0) > 0);
+      const _mb = _dmgMarks.reduce((s, e) => s + (Number(e.system?.markedDamageBonus) || 0), 0);
+      if (_mb > 0) {
+        markLine = `<p><em>Marked: +${Math.round(_mb * 100)}% damage will apply on the click `
+                 + `(${_dmgMarks.map(e => e.name).join(', ')})</em></p>`;
+      }
+    }
+
     // Guardian-redirect (P2c): split the LANDED final damage — the ally keeps
     // (1−pct), the guardian takes pct RAW (Option A: no guardian armor). Override
     // the ally button to the kept amount with toughness/affinity 0 so the handler
@@ -2710,6 +2732,7 @@ export class AspectsofPowerItem extends Item {
            ${defenseReductionLine}
            ${barrierLine}
            ${toughnessLine}
+           ${markLine}
            <p><strong>Final damage: ${displayDamage}</strong></p>
            ${redirectLine}
            ${fmLine}
@@ -2735,6 +2758,20 @@ export class AspectsofPowerItem extends Item {
       });
     } else {
       game.socket.emit('system.aspects-of-power', { type: 'gmCombatResult', content: gmContent });
+    }
+
+    // Player-facing pre-mitigation card ("show players damage pre-mit in
+    // another card", night 2026-08-22): the full card above is GM-whispered
+    // because it reveals the defender's walls. The attacker still deserves
+    // to see what their blow was WORTH before the target's defenses ate it.
+    if (isHit && this.actor?.hasPlayerOwner) {
+      ChatMessage.create({
+        speaker,
+        content: `<div class="combat-result"><h3>${item.name} — ${resultBadge}</h3>`
+               + `<p>${this.actor.name} strikes ${targetActor.name}: `
+               + `<strong>${rawDmg}</strong> damage before defenses.`
+               + `${markLine}</p></div>`,
+      });
     }
 
     // Barrier fully absorbs → flag so debuff/DoT can be skipped.

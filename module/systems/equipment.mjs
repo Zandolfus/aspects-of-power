@@ -588,6 +588,27 @@ export class EquipmentSystem {
     if (newValue <= 0) {
       await this._removeItemEffects(weapon);
       ui.notifications.warn(`${weapon.name} has broken from overuse!`);
+      // MAIN-HAND PROMOTION ("upon main hand breaking, swap off-hand
+      // weapon to main hand", night 2026-08-22): a broken main hand
+      // leaves the fighter swinging a stump while a ready blade sits in
+      // the other fist. Promote the off-hand weapon (never a shield —
+      // a guard stays a guard) and announce it.
+      const actor = weapon.parent;
+      if (actor && (weapon.system.hand ?? '') === 'main') {
+        const offhand = actor.items.find(i => i.type === 'item'
+          && i.system?.slot === 'weaponry' && i.system?.equipped
+          && (i.system?.hand ?? '') === 'off' && i.id !== weapon.id
+          && (i.system?.durability?.max <= 0 || i.system?.durability?.value > 0)
+          && !(i.system?.tags ?? []).some(t => ['shield', 'greatshield', 'buckler'].includes(t)));
+        if (offhand) {
+          await offhand.update({ 'system.hand': 'main' });
+          ChatMessage.create({
+            speaker: ChatMessage.getSpeaker({ actor }),
+            content: `<p><em>${actor.name}'s ${weapon.name} shatters — `
+                   + `<strong>${offhand.name}</strong> comes across to the main hand.</em></p>`,
+          });
+        }
+      }
     } else {
       ui.notifications.warn(`${weapon.name} lost ${excess} durability (exceeded damage limit of ${damageLimit}).`);
     }

@@ -1392,18 +1392,23 @@ ASPECTSOFPOWER.dualWield = {
  * and stops it taxing accuracy builds (archers have the highest hit totals in
  * the game and would otherwise pay most for the same effect).
  *
- * On 0.20: DoT ticks bypass armour and face only DR, so the cost is really
- * buying ACCESS to armoured targets, not damage — a direct light-weapon hit is
- * ~119 damage/stamina where it lands and ZERO against 11 of 14 party members,
- * while a bleed is ~1 damage/stamina but non-zero against those same 11.
- * Because stacks pool before DR is charged once, the coefficient decides WHICH
- * targets are bleedable at all: at 0.20 a rogue reaches roughly DR 170, and
- * the heaviest tank (DR 256, needing 9 stacks = 540 stamina against a 400 pool)
- * stays out of reach — consistent with hard matchups existing on level.
+ * ⚠ REPRICED 0.20 -> 0.05 (2026-08-23, user: "the stamina cost of
+ * hemorrhage: it's insanely high" — live it charged Gabriel 108 stamina
+ * beside a 7-stamina Strike). The 0.20 economics were calibrated when DoT
+ * ticks met a FLAT DR wall; under the proportional tick (dotTickThrough,
+ * 2026-08-21) a single unstacked bleed against real DR delivers ~12-50
+ * total damage, so 0.20 priced the rider far above its worth. 0.05 also
+ * ALIGNS THE FAMILY: Armor Crush was already authored at procCostFrac
+ * 0.05 per-skill (George base 68, 3 stacks affordable). Base magnitudes
+ * are PRESERVED by rescaling invest coefficients on the content
+ * (Hemorrhage dotInvestScale 0.5 -> 2.0: base tick still 0.10 x parent),
+ * so only the PRICE moved. Stack-access economics rescale accordingly:
+ * every pool reaches ~4x more stacks, and the tank wall is now priced by
+ * the ratio tick itself rather than the toll.
  */
 ASPECTSOFPOWER.riders = {
   // Stamina charged per rider proc = frac × the parent attack's damage.
-  procCostDamageFrac: 0.20,
+  procCostDamageFrac: 0.05,
   // Trigger key riders subscribe to. Attacker-side counterpart to the
   // defender-side reactionTrigger vocabulary (self_attacked, self_struck…).
   procTriggerPierced: 'self_attack_pierced',

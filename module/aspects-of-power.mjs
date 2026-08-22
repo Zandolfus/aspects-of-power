@@ -3406,6 +3406,12 @@ async function createItemMacro(data, slot) {
       command: command,
       flags: { 'aspects-of-power.itemMacro': true },
     });
+  } else if (macro.img !== item.img) {
+    // Re-dropping refreshes a stale icon ("macros don't inherit the skill
+    // icon", night 2026-08-22 — usually the skill got real art AFTER the
+    // macro was made; most of the report is skills still wearing the
+    // default item-bag, which is a content pass).
+    await macro.update({ img: item.img });
   }
   game.user.assignHotbarMacro(macro, slot);
   return false;

@@ -320,8 +320,18 @@ export function skillNeedsTargetPrompt(item) {
   if (item.system.skillCategory === 'profession' && !tags.includes('repair')) return false;
   // AOE has its own placement; skip the single-target prompt.
   if ((item.system.aoe?.enabled === true) || tags.includes('aoe') || (item.system.alterations ?? []).some(a => (a.id ?? a) === 'aoe')) return false;
-  // Sustain toggles on self — no target.
-  if (tags.includes('sustain')) return false;
+  // Sustain toggles on self — no target. UNLESS the skill is also a
+  // targeted restoration/buff/debuff: Faye's Rejuvenation (restoration +
+  // sustain) lost its target prompt to this line and healed nobody
+  // ("rejuvenation not applying to target, considered a sustain", night
+  // 2026-08-22). The sustain half never needed the targeting veto — it
+  // just maintains upkeep on whatever the primary tag targeted.
+  if (tags.includes('sustain')
+      && !tags.includes('restoration') && !tags.includes('buff') && !tags.includes('debuff')) return false;
+  // Stances raise YOUR guard — self-targeted by definition ("stances
+  // should self target automatically", night session 2026-08-22). Same
+  // for harness (vents the caster's own meter into a self-buff).
+  if (tags.includes('stance') || tags.includes('harness')) return false;
   // Teleport / Leap prompt for a destination (selectDestinationOnCanvas),
   // not a target token. Their declare-time flow runs alongside this gate.
   if (tags.includes('teleport') || tags.includes('leap')) return false;
