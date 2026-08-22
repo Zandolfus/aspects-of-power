@@ -307,6 +307,29 @@ export const infusionDamage = coInvestDamage;
  * the preview-parity rule that 8de305b was written to enforce.
  */
 /**
+ * Bulwark wall bonus (braced BLOCK, ruled 2026-08-21 — greatshield-only
+ * content): stamina invested into a block buys ADDITIONAL wall on top of
+ * the shield's armorBonus, priced by the blow being caught — the braced
+ * grammar (`bracedCostHitFrac` x hitTotal buys +100% of the shield's
+ * armor), capped at `maxMult` x armor. Zero invested = exactly a plain
+ * block; the meteor answer scales with what you pay, like the dive.
+ *
+ * @param {number} armorBonus  The blocking shield's armor value.
+ * @param {number} invested    Stamina committed.
+ * @param {number} hitTotal    The incoming hit total (price anchor).
+ * @param {number} frac        bracedCostHitFrac (0.05 shipped).
+ * @param {number} maxMult     Bonus cap as a multiple of armorBonus.
+ * @returns {number}           Additional wall (0 when nothing invested).
+ */
+export function bulwarkWallBonus(armorBonus, invested, hitTotal, frac, maxMult = 1.0) {
+  const a = Math.max(0, Number(armorBonus) || 0);
+  const inv = Math.max(0, Number(invested) || 0);
+  if (a <= 0 || inv <= 0) return 0;
+  const fullCost = Math.max(1, (Number(frac) || 0.05) * Math.max(1, Number(hitTotal) || 0));
+  return Math.round(a * Math.min(Math.max(0, Number(maxMult) || 1), inv / fullCost));
+}
+
+/**
  * DoT tick through toughness (RULED 2026-08-21: "Toughness should be the
  * counter to dots... I just don't want dots to be exclusively dr strip.")
  *

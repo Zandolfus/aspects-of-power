@@ -2981,6 +2981,24 @@ async function _applyForcedMovement(targetActor, attackerTokenId, dir, distFt, h
     speaker: ChatMessage.getSpeaker({ actor: targetActor }),
     content: `<p><strong>${targetActor.name}</strong> ${dirLabel} ${distFt} ft! (${strRoll.total} vs ${hitTotal})</p>`,
   });
+
+  // KNOCKBACK vs GUARD STANCES (ruled 2026-08-21: "Greatshield resists,
+  // others break"): being moved off your ground collapses the guard —
+  // unless the guard item is greatshield-family, which rides the shove.
+  {
+    const _cbt = Celerity.findCombatantForActor?.(targetActor);
+    const _stance = _cbt?.flags?.aspectsofpower?.guardStance;
+    if (_stance) {
+      const _gItem = targetActor.items.get(_stance.guardItemId ?? '');
+      const _isGreat = _gItem && (_gItem.system.tags ?? []).includes('greatshield');
+      if (_isGreat) {
+        ChatMessage.create({ speaker: ChatMessage.getSpeaker({ actor: targetActor }),
+          content: `<p><em>${targetActor.name}'s guard rides the shove — the bulwark holds.</em></p>` });
+      } else {
+        await Celerity.collapseGuardStance(_cbt, 'thrown from the posture');
+      }
+    }
+  }
 }
 
 /* -------------------------------------------- */

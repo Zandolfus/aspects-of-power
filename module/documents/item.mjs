@@ -1,6 +1,6 @@
 import { EquipmentSystem } from '../systems/equipment.mjs';
 import { getPositionalTags } from '../helpers/positioning.mjs';
-import { houseHitFormula, hybridAbilityMod, weaponStatBlend, healStatBlend, spellDamageRef, spellInvestDamage, spellWindupMultiplier, spellCastWeight, strikeInvestDamage, coInvestDamage, investSelfDamage as computeInvestSelfDamage, effectiveDodgeValue, splitEvenlyWithRemainder, parryMassMultiplier, bracedParryWeight, bracedMaxUsefulInvest, defenceMarginMultiplier, defenseTimeCost, defenseDiveSurcharge, dotTickDamage, burnDetonatePayload, procStaminaCost, crushFlatAmount, riderMaxInvest, auraRadiusFor, barrierStatBlend, hotTickAmount, effectiveDamageMultiplier, clashOutcome } from '../helpers/formulas.mjs';
+import { houseHitFormula, hybridAbilityMod, weaponStatBlend, healStatBlend, spellDamageRef, spellInvestDamage, spellWindupMultiplier, spellCastWeight, strikeInvestDamage, coInvestDamage, investSelfDamage as computeInvestSelfDamage, effectiveDodgeValue, splitEvenlyWithRemainder, parryMassMultiplier, bracedParryWeight, bracedMaxUsefulInvest, defenceMarginMultiplier, defenseTimeCost, defenseDiveSurcharge, dotTickDamage, burnDetonatePayload, bulwarkWallBonus, procStaminaCost, crushFlatAmount, riderMaxInvest, auraRadiusFor, barrierStatBlend, hotTickAmount, effectiveDamageMultiplier, clashOutcome } from '../helpers/formulas.mjs';
 import { resolveSituationalMods } from '../systems/situational-mods.mjs';
 import { recordActionFired, declareAction, isInActiveCombat, computeActionWait, referenceRoundLength, computeWindupMultiplier, getScrambleStacks, addScrambleStack, applyDodgeCost, findCombatantForActor, perceiveGate, getDefenseBudget, spendDefenseBudget, setLastSwungHand, computeActionHeft, actorRoundLength } from '../systems/celerity.mjs';
 import { getThreatRadiusFt, actorIsDashing } from '../systems/engagement-halts.mjs';
@@ -1233,6 +1233,13 @@ export class AspectsofPowerItem extends Item {
         const have = reactorActor.system[resKey]?.value ?? 0;
         if (have < cost) return false;
       }
+      // Authored stance requirement (Shield Wall cover, ruled 2026-08-21:
+      // "stance required unless a skill exists to remove that requirement").
+      if (s.system.tagConfig?.requiresGuardStance === true
+          && (CONFIG.ASPECTSOFPOWER.guardStance?.enabled ?? true)) {
+        const _rCbt = findCombatantForActor(reactorActor);
+        if (_rCbt && !_rCbt.flags?.aspectsofpower?.guardStance) return false;
+      }
       return true;
     });
     if (candidates.length === 0) return null;
@@ -1586,14 +1593,57 @@ export class AspectsofPowerItem extends Item {
           // blow still lands; it just meets plate. The reliable soak
           // beside the parry's contested full-negate.
           const _impl = reactionSkill._proficiencyWeapon?.() ?? null;
+          let _bulwarkNote = '';
           if ((CONFIG.ASPECTSOFPOWER.guardStance?.shieldArmorModel ?? 'block') === 'block') {
-            bonusMitigation = Math.max(0, Math.round(_impl?.system?.armorBonus ?? 0));
+            const _shieldArmor = Math.max(0, Math.round(_impl?.system?.armorBonus ?? 0));
+            bonusMitigation = _shieldArmor;
+            // BULWARK (braced BLOCK, phase 2 ruled 2026-08-21, greatshield
+            // content): stamina invested buys additional wall at the braced
+            // price — bracedCostHitFrac x hitTotal per +100% of the shield's
+            // armor, capped at bulwarkMaxBonusMult. Same local-prompt guard
+            // as braced parries: another player's defender gets a plain block.
+            if (_shieldArmor > 0 && (reactionSkill.system.tags ?? []).includes('braced')) {
+              const _bwFrac = CONFIG.ASPECTSOFPOWER.defenseTuning?.bracedCostHitFrac ?? 0.05;
+              const _bwMax = CONFIG.ASPECTSOFPOWER.guardStance?.bulwarkMaxBonusMult ?? 1.0;
+              const _bwPool = targetActor.system.stamina?.value ?? 0;
+              const _bwFullCost = Math.max(1, Math.round(_bwFrac * hitTotal));
+              const _bwCap = Math.min(_bwPool, Math.round(_bwFullCost * _bwMax));
+              const _bwPlayer = game.users.find(u =>
+                u.active && !u.isGM && u.character?.id === targetActor.id);
+              const _bwMayDecide = _bwPlayer
+                ? _bwPlayer.id === game.user.id
+                : (game.user.isGM || targetActor.isOwner);
+              let _bwSpent = 0;
+              if (_bwMayDecide && _bwCap > 0) {
+                const chosen = await foundry.applications.api.DialogV2.wait({
+                  window: { title: `${reactionSkill.name} — Brace the wall` },
+                  content: `<p>Incoming hit ${hitTotal}. The shield holds <strong>+${_shieldArmor}</strong>; `
+                    + `stamina braces it further — <strong>${_bwFullCost}</strong> stamina per additional +${_shieldArmor} `
+                    + `(cap +${Math.round(_shieldArmor * _bwMax)}). Pool: ${_bwPool}.</p>`
+                    + `<div class="form-group"><label>Brace stamina</label>`
+                    + `<input type="number" name="brace" value="0" min="0" max="${_bwCap}" step="1" autofocus /></div>`,
+                  buttons: [
+                    { action: 'ok', label: 'Block', default: true,
+                      callback: (ev, btn) => Number(btn.form?.elements?.brace?.value ?? 0) },
+                    { action: 'plain', label: 'Plain block', callback: () => 0 },
+                  ],
+                  close: () => 0,
+                }) ?? 0;
+                _bwSpent = Math.min(Math.max(0, Math.round(chosen)), _bwCap);
+              }
+              if (_bwSpent > 0) {
+                const _bwBonus = bulwarkWallBonus(_shieldArmor, _bwSpent, hitTotal, _bwFrac, _bwMax);
+                bonusMitigation += _bwBonus;
+                await targetActor.update({ 'system.stamina.value': _bwPool - _bwSpent });
+                _bulwarkNote = ` (braced ${_bwSpent} stam -> +${_bwBonus})`;
+              }
+            }
           }
           reactionLine = `<p><em>${targetActor.name} blocks with <strong>${reactionSkill.name}</strong>`
-            + (bonusMitigation > 0 ? ` — wall +${bonusMitigation}` : '') + `.</em></p>`;
+            + (bonusMitigation > 0 ? ` — wall +${bonusMitigation}${_bulwarkNote}` : '') + `.</em></p>`;
           ChatMessage.create({ speaker: reactionSpeaker,
             content: `<p><strong>${targetActor.name}</strong> takes the blow on `
-              + `${_impl?.name ?? 'the shield'}${bonusMitigation > 0 ? ` — <strong>+${bonusMitigation}</strong> to the wall` : ''}.</p>`,
+              + `${_impl?.name ?? 'the shield'}${bonusMitigation > 0 ? ` — <strong>+${bonusMitigation}</strong> to the wall${_bulwarkNote}` : ''}.</p>`,
           });
         } else if (rType === 'parry') {
           const parryRoll = await reactionSkill.roll({ parryOnly: true });
@@ -1606,8 +1656,23 @@ export class AspectsofPowerItem extends Item {
           // BRACED (`braced` tag, RULED 2026-07-31): stamina buys EFFECTIVE
           // weight for the mass ratio only. Opt-in per skill, so an untagged
           // parry behaves exactly as before and stays free.
-          const _defW = heldWeaponWeight(targetActor);
+          let _defW = heldWeaponWeight(targetActor);
           const _atkW = heldWeaponWeight(this.actor);
+          // BUCKLER ASSIST (phase 2, ruled 2026-08-21): while the raised
+          // guard is a buckler, weapon parries add the buckler's weight to
+          // their effective mass — the off-hand deflects alongside the
+          // blade (dagger 60 + buckler 60 vs an axe: mass 0.68 -> 0.83).
+          // Braced stamina still stacks on top toward parity.
+          let _bucklerAssist = 0;
+          {
+            const _gsCbt2 = findCombatantForActor(targetActor);
+            const _gItem = targetActor.items.get(
+              _gsCbt2?.flags?.aspectsofpower?.guardStance?.guardItemId ?? '');
+            if (_gItem && (_gItem.system.tags ?? []).includes('buckler')) {
+              _bucklerAssist = AspectsofPowerItem.resolveWeaponWeight(_gItem);
+              _defW += _bucklerAssist;
+            }
+          }
           let effDefW = _defW;
           let bracedSpent = 0;
           if ((reactionSkill.system.tags ?? []).includes('braced')) {
@@ -1652,6 +1717,7 @@ export class AspectsofPowerItem extends Item {
             targetActor, reactionSkill._proficiencyWeapon?.() ?? null);
           const parryTotal = Math.round(rawParry * massMult * parryProf);
           const bits = [];
+          if (_bucklerAssist > 0) bits.push(`buckler +${_bucklerAssist} mass`);
           if (bracedSpent > 0) bits.push(`braced ${bracedSpent} stam -> weight ${Math.round(effDefW)}`);
           if (massMult < 1) bits.push(`outmassed x${massMult.toFixed(2)}`);
           if (parryProf !== 1) bits.push(`proficiency x${parryProf.toFixed(2)}`);
@@ -2896,6 +2962,10 @@ export class AspectsofPowerItem extends Item {
       // guard — the pre-paid answer. Out of combat there is no economy to
       // bypass, so both stay available (`enabled: false` reverts wholesale).
       if (_isGuardWork && _gsEnabled && _gsCbt && !_gsStance) return false;
+      // Authored stance requirement (Shield Wall etc. — "stance required
+      // unless a skill exists to remove that requirement").
+      if (s.system.tagConfig?.requiresGuardStance === true
+          && _gsEnabled && _gsCbt && !_gsStance) return false;
       return true;
     });
     const reactionList = reactionSkills.map(s => ({

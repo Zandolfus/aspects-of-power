@@ -1244,6 +1244,11 @@ ASPECTSOFPOWER.weaponTagGrants = {
   hammer:      ['Armor Crush'],
   greathammer: ['Armor Crush'],
   mace:        ['Armor Crush'],
+  // Greatshield signatures (phase 2, ruled 2026-08-21) — ADDITIVE to the
+  // shield family-head entry above (a greatshield grants all four):
+  // Bulwark = braced block (stamina buys wall), Shield Wall = ally cover
+  // (guardian intercept, stance-required by authoring).
+  greatshield: ['Bulwark', 'Shield Wall'],
 };
 
 ASPECTSOFPOWER.guardStance = {
@@ -1261,6 +1266,13 @@ ASPECTSOFPOWER.guardStance = {
   // shield is interposed win or lose). 'passive' restores the always-on
   // equipment-armor contribution.
   shieldArmorModel: 'block',
+  // Bulwark (braced blocks, greatshield content): stamina bonus cap as a
+  // multiple of the shield's armorBonus. 1.0 = a fully braced block holds
+  // DOUBLE the shield's armor. Pricing reuses defenseTuning.bracedCostHitFrac.
+  bulwarkMaxBonusMult: 1.0,
+  // Knockback vs stances (ruled 2026-08-21: "Greatshield resists, others
+  // break"): forced movement collapses a guard stance UNLESS the guard item
+  // is greatshield-family — the bulwark rides the shove.
 };
 
 /**

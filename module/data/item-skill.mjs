@@ -466,6 +466,11 @@ export class SkillData extends foundry.abstract.TypeDataModel {
         // mid-round leaves the normal throttle correctly in force.
         // Standard stances leave this false: one parry per skill per round.
         stanceParryCooldownFree: new fields.BooleanField({ initial: false }),
+        // On a REACTION: only offered while the actor's guard stance is up
+        // (RULED 2026-08-21 for Shield Wall cover: "stance required unless a
+        // skill exists to remove that requirement" — the requirement is
+        // authored per skill, so a legendary version simply sets it false).
+        requiresGuardStance: new fields.BooleanField({ initial: false }),
 
         // ── KINDLE (`kindle` tag, RULED 2026-08-21 — Valentine's Flames
         // Without / Flames Within) ────────────────────────────────────────
