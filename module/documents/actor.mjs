@@ -568,7 +568,12 @@ export class AspectsofPowerActor extends Actor {
         const table = CONFIG.ASPECTSOFPOWER.weaponWeights ?? {};
         for (const i of this.items) {
           if (i.type !== 'item' || !i.system.equipped || i.system.slot !== 'weaponry') continue;
-          if ((i.system.tags ?? []).includes('shield')) continue;
+          // Family-aware (2026-08-21): greatshields and bucklers are shields
+          // too — a greatshield-only tag list must not qualify as the
+          // "heaviest non-shield weapon" and double-dip weapon blockDR on
+          // top of its block armor.
+          const _shieldFam = CONFIG.ASPECTSOFPOWER.weaponTypeFamilies?.shield ?? ['shield', 'greatshield', 'buckler'];
+          if ((i.system.tags ?? []).some(t => _shieldFam.includes(t))) continue;
           if (i.system.durability?.value <= 0 && i.system.durability?.max > 0) continue;
           for (const tag of (i.system.tags ?? [])) {
             if (table[tag] != null) {

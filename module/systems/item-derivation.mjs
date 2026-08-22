@@ -72,7 +72,12 @@ export function deriveItemStats(itemOrPatch) {
   }
   const itemTypeDef = typeKey ? sc.craftItemTypes[typeKey] : null;
   const slotCategory = itemTypeDef?.category;
-  const isShield = tags.includes('shield');
+  // Family-aware (2026-08-21): a greatshield-only or buckler-only tag list
+  // is still a shield. The literal check here is what zeroed a hand-statted
+  // greatshield's armorBonus when its redundant 'shield' head-tag was
+  // deduped away — the derive reclassified it as a weapon.
+  const _shieldFamily = sc.weaponTypeFamilies?.shield ?? ['shield', 'greatshield', 'buckler'];
+  const isShield = tags.some(t => _shieldFamily.includes(t));
 
   // Element inferred from any *-affinity tag in the unified tags array.
   const affinityTag = tags.find(t => typeof t === 'string' && t.endsWith('-affinity'));

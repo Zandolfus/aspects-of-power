@@ -322,9 +322,22 @@ export class AspectsofPowerItem extends Item {
   static resolveWeaponWeight(item) {
     if (!item) return 0;
     const table = CONFIG.ASPECTSOFPOWER.weaponWeights ?? {};
-    for (const tag of item.system?.tags ?? []) {
-      if (table[tag] != null) return table[tag];
+    const tags = item.system?.tags ?? [];
+    // FAMILY HEADS LOSE TO FAMILY MEMBERS (2026-08-21). Crafted items carry
+    // both the head tag and the size tag ('shield' + 'greatshield' — a shim
+    // for literal-tag readers), and first-match-by-item-tag-order priced
+    // Phil's greatshield at 120 for weeks. When a matched tag is a family
+    // head and a member of its family also matches, the member wins.
+    const families = CONFIG.ASPECTSOFPOWER.weaponTypeFamilies ?? {};
+    let match = null;
+    for (const tag of tags) {
+      if (table[tag] == null) continue;
+      const fam = families[tag];
+      if (fam && tags.some(t => t !== tag && fam.includes(t) && table[t] != null)) continue;
+      match = tag;
+      break;
     }
+    if (match != null) return table[match];
     return item.system?.weight ?? 0;
   }
 

@@ -1941,7 +1941,11 @@ class CraftingSkills {
         staticTypeTags = itemTypeDef?.tags ?? [];
       }
       const slotCategory = itemTypeDef?.category;
-      const isShield = staticTypeTags.includes('shield');
+      // Family-aware (2026-08-21): craft type-defs no longer NEED to bake
+      // the 'shield' head-tag into greatshield/buckler tag lists for this
+      // check to hold.
+      const _craftShieldFam = CONFIG.ASPECTSOFPOWER.weaponTypeFamilies?.shield ?? ['shield', 'greatshield', 'buckler'];
+      const isShield = staticTypeTags.some(t => _craftShieldFam.includes(t));
 
       // Slot value lookup: typeKey first (so 1H/2H weapons get distinct values), then outputSlot.
       // For iterative reworks, derive an effective typeKey by picking the most specific match
