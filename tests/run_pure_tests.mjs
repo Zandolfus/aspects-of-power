@@ -2445,6 +2445,10 @@ eq('junk situational entries are skipped, not NaN',
   // IS the weight table, so these pins are the ladder.
   eq('guardStance: shipped enabled', /guardStance = \{\s*\n?\s*enabled:\s*true/.test(src), true);
   eq('guardStance: raise is half a swing (0.5)', Number(/entryWeightFraction:\s*([\d.]+)/.exec(src)?.[1]), 0.5);
+  // Weapon tag grants (ruled 2026-08-21): the ruling's own examples, pinned.
+  eq('tagGrants: shields grant the pair', /shield:\s*\['Raise Shield', 'Shield Block'\]/.test(src), true);
+  eq('tagGrants: hammers grant Armor Crush', /hammer:\s*\['Armor Crush'\]/.test(src), true);
+  eq('tagGrants: pack is world.skills', /weaponTagGrantsPack = 'world\.skills'/.test(src), true);
   eq('guardStance: buckler weight 60', /buckler:\s*60/.test(src), true);
   eq('guardStance: shield weight 120', /shield:\s*120/.test(src), true);
   eq('guardStance: greatshield weight 190', /greatshield:\s*190/.test(src), true);

@@ -1205,6 +1205,43 @@ ASPECTSOFPOWER.castHolding = {
  *
  * `enabled: false` reverts wholesale: parries prompt exactly as before.
  */
+/**
+ * WEAPON TAG GRANTS (RULED 2026-08-21: "weapons granting skills
+ * automatically based on their tags. So shields grant Shield Block and
+ * Raise Shield, hammers grant Armor Crush, etc.").
+ *
+ * When an item is EQUIPPED, EquipmentSystem._grantSkills unions the item's
+ * own authored `grantedSkills` UUIDs with this registry: every tag the item
+ * carries contributes its listed skills. Entries are skill NAMES resolved
+ * against the `weaponTagGrantsPack` compendium at grant time — names, not
+ * UUIDs, so the registry survives world rebuilds and reads like the ruling.
+ * Grants carry the standard provenance flags (grantedBy/grantedFrom) and
+ * leave with the item on unequip. An actor who already owns a same-named
+ * skill (personal training) is NOT double-granted.
+ *
+ * The `shield` family entry covers buckler/greatshield via
+ * weaponTypeFamilies at lookup, so list the FAMILY HEAD tag here.
+ */
+ASPECTSOFPOWER.weaponTagGrantsPack = 'world.skills';
+ASPECTSOFPOWER.weaponTagGrants = {
+  // Sword-and-board: the guard and the block arrive with the shield.
+  shield:      ['Raise Shield', 'Shield Block'],
+  // Parry-capable blades and hafts: the guard and the parry arrive with
+  // the weapon. (Personal stances — Lightning Parry — replace Assume
+  // Stance by simply being better; the name-dedupe keeps both distinct.)
+  sword:       ['Assume Stance', 'Standard Parry'],
+  longsword:   ['Assume Stance', 'Standard Parry'],
+  greatsword:  ['Assume Stance', 'Standard Parry'],
+  dagger:      ['Assume Stance', 'Standard Parry'],
+  spear:       ['Assume Stance', 'Standard Parry'],
+  axe:         ['Assume Stance', 'Standard Parry'],
+  greataxe:    ['Assume Stance', 'Standard Parry'],
+  // The armor answer arrives with the crushing weapons.
+  hammer:      ['Armor Crush'],
+  greathammer: ['Armor Crush'],
+  mace:        ['Armor Crush'],
+};
+
 ASPECTSOFPOWER.guardStance = {
   enabled: true,
   // Raising a guard is HALF the motion of swinging it (ruled 2026-08-21:

@@ -296,7 +296,37 @@ export class EquipmentSystem {
   static async _grantSkills(item) {
     const actor = item.parent;
     if (!actor) return;
-    const uuids = item.system.grantedSkills ?? [];
+    const uuids = [...(item.system.grantedSkills ?? [])];
+
+    // WEAPON TAG GRANTS (RULED 2026-08-21: shields grant Shield Block and
+    // Raise Shield, hammers grant Armor Crush, ...). Union the registry's
+    // canonical skills for every tag the item carries — family-aware, so a
+    // `greatshield` item picks up the `shield` family head's entry. Names
+    // resolve against the weaponTagGrantsPack compendium; a name the pack
+    // does not hold is skipped silently (content not yet authored).
+    const registry = CONFIG.ASPECTSOFPOWER?.weaponTagGrants ?? {};
+    const families = CONFIG.ASPECTSOFPOWER?.weaponTypeFamilies ?? {};
+    const itemTags = item.system.tags ?? [];
+    const grantNames = new Set();
+    for (const tag of itemTags) {
+      for (const n of (registry[tag] ?? [])) grantNames.add(n);
+      for (const [head, fam] of Object.entries(families)) {
+        if (head !== tag && (fam ?? []).includes(tag)) {
+          for (const n of (registry[head] ?? [])) grantNames.add(n);
+        }
+      }
+    }
+    if (grantNames.size > 0) {
+      const packId = CONFIG.ASPECTSOFPOWER?.weaponTagGrantsPack ?? 'world.skills';
+      const pack = game.packs?.get(packId);
+      if (pack) {
+        const index = await pack.getIndex();
+        for (const name of grantNames) {
+          const entry = index.find(e => e.name === name && e.type === 'skill');
+          if (entry) uuids.push(pack.getUuid?.(entry._id) ?? `Compendium.${packId}.Item.${entry._id}`);
+        }
+      }
+    }
     if (uuids.length === 0) return;
 
     const alreadyGrantedFrom = new Set(
@@ -306,11 +336,17 @@ export class EquipmentSystem {
     );
 
     const toCreate = [];
+    const queuedNames = new Set();
     for (const uuid of uuids) {
       if (!uuid || alreadyGrantedFrom.has(uuid)) continue;
       let src;
       try { src = await fromUuid(uuid); } catch (e) { continue; }
       if (!src || src.type !== 'skill') continue;
+      // Personal training wins: an actor who already owns a same-named
+      // skill (from any source, including another equipped item) is not
+      // double-granted — the same dedupe-by-name rule template grants use.
+      if (queuedNames.has(src.name)
+          || actor.items.some(i => i.type === 'skill' && i.name === src.name)) continue;
       const data = src.toObject();
       delete data._id; // let Foundry assign a new id on the actor
       data.system = data.system ?? {};
@@ -318,6 +354,7 @@ export class EquipmentSystem {
       foundry.utils.setProperty(data, 'flags.aspectsofpower.grantedBy', item.id);
       foundry.utils.setProperty(data, 'flags.aspectsofpower.grantedFrom', uuid);
       toCreate.push(data);
+      queuedNames.add(src.name);
     }
     if (toCreate.length > 0) {
       await actor.createEmbeddedDocuments('Item', toCreate);
