@@ -1740,6 +1740,53 @@ export class AspectsofPowerItem extends Item {
             ChatMessage.create({ speaker: reactionSpeaker,
               content: `<p><strong>${targetActor.name}</strong> parries the blow with <strong>${reactionSkill.name}</strong>! (${parryTotal} vs ${hitTotal})${massNote}</p>`,
             });
+            // PARRY-MARK (Lightning Parry reauthored 2026-08-22): a parry
+            // skill carrying the `mark` tag rides a FULL deflection like a
+            // feint — turning the blow aside leaves the attacker open, and
+            // the mark (the parrier's, feint semantics: markedByActorUuid =
+            // the DEFENDER) primes the riposte. Win-only: a failed parry
+            // opens nothing.
+            const _pmTc = reactionSkill.system.tagConfig ?? {};
+            const _pmDmg = _pmTc.markBonus ?? 0;
+            const _pmAtk = _pmTc.markAttackBonus ?? 0;
+            if ((reactionSkill.system.tags ?? []).includes('mark')
+                && (_pmDmg > 0 || _pmAtk > 0) && attackerToken?.actor) {
+              const _pmDur = _pmTc.debuffDuration ?? 2;
+              await this._gmAction({
+                type: 'gmApplyDebuff',
+                targetActorUuid: attackerToken.actor.uuid,
+                effectName: `${reactionSkill.name} (Mark)`,
+                originUuid: reactionSkill.uuid,
+                stackable: false,
+                effectData: {
+                  name: `${reactionSkill.name} (Mark)`,
+                  img: reactionSkill.img,
+                  origin: reactionSkill.uuid,
+                  type: 'base',
+                  disabled: false,
+                  changes: [],
+                  duration: { rounds: _pmDur },
+                  system: {
+                    debuffType: 'none',
+                    casterActorUuid: targetActor.uuid,
+                    markedByActorUuid: targetActor.uuid,
+                    markedDamageBonus: _pmDmg,
+                    markedAttackMultiplier: _pmAtk,
+                    markedExpiresOnHit: _pmTc.markExpiresOnHit ?? true,
+                    tags: [...(reactionSkill.system.tags ?? [])],
+                  },
+                },
+                dotDamage: 0,
+                dotDamageType: 'physical',
+                duration: _pmDur,
+                statSummary: null,
+                targetDefense: 'melee',
+                speaker: reactionSpeaker,
+              });
+              ChatMessage.create({ speaker: reactionSpeaker,
+                content: `<p><em>The deflection leaves <strong>${attackerToken.actor.name}</strong> open — `
+                       + `marked for ${targetActor.name}'s next strike.</em></p>` });
+            }
           } else {
             reactionLine = `<p><em>${targetActor.name} fails to parry with <strong>${reactionSkill.name}</strong> `
                          + `(${parryTotal} vs ${hitTotal})${massNote}</em></p>`;
