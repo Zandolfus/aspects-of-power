@@ -1635,7 +1635,14 @@ export class AspectsofPowerItem extends Item {
               if (_bwSpent > 0) {
                 const _bwBonus = bulwarkWallBonus(_shieldArmor, _bwSpent, hitTotal, _bwFrac, _bwMax);
                 bonusMitigation += _bwBonus;
-                await targetActor.update({ 'system.stamina.value': _bwPool - _bwSpent });
+                // Same cross-client rule as the braced parry below: the
+                // defender's stamina must not be written by a non-owner.
+                if (targetActor.isOwner) {
+                  await targetActor.update({ 'system.stamina.value': _bwPool - _bwSpent });
+                } else {
+                  await this._gmAction({ type: 'gmSpendResource',
+                    targetActorUuid: targetActor.uuid, resource: 'stamina', amount: _bwSpent });
+                }
                 _bulwarkNote = ` (braced ${_bwSpent} stam -> +${_bwBonus})`;
               }
             }
@@ -1698,7 +1705,16 @@ export class AspectsofPowerItem extends Item {
             bracedSpent = Math.min(Math.max(0, chosen ?? 0), _pool);
             if (bracedSpent > 0) {
               effDefW = bracedParryWeight(_defW, bracedSpent, hitTotal, _scale);
-              await targetActor.update({ 'system.stamina.value': _pool - bracedSpent });
+              // The DEFENDER's stamina, often deducted from the ATTACKER's
+              // client — a direct update is a permission error for players
+              // ("User John lacks permission to update Actor", live
+              // 2026-08-22). gmSpendResource exists for exactly this.
+              if (targetActor.isOwner) {
+                await targetActor.update({ 'system.stamina.value': _pool - bracedSpent });
+              } else {
+                await this._gmAction({ type: 'gmSpendResource',
+                  targetActorUuid: targetActor.uuid, resource: 'stamina', amount: bracedSpent });
+              }
             }
           }
           const massMult = parryMassMultiplier(effDefW, _atkW);
@@ -1975,7 +1991,7 @@ export class AspectsofPowerItem extends Item {
         });
         const oneShots = myAttackMarks.filter(e => e.system?.markedExpiresOnHit === true);
         if (oneShots.length > 0) {
-          await targetActor.deleteEmbeddedDocuments('ActiveEffect', oneShots.map(e => e.id));
+          await this._gmDeleteTargetEffects(targetActor, oneShots.map(e => e.id));
         }
       }
     }
@@ -2041,7 +2057,7 @@ export class AspectsofPowerItem extends Item {
             });
           }
           if (_consumes) {
-            await targetActor.deleteEmbeddedDocuments('ActiveEffect', myMarks.map(e => e.id));
+            await this._gmDeleteTargetEffects(targetActor, myMarks.map(e => e.id));
           }
         }
       }
@@ -2077,7 +2093,7 @@ export class AspectsofPowerItem extends Item {
                    + `${_burns.length} burn${_burns.length > 1 ? 's' : ''} consumed — +${burnDetonateFlat} damage in a single flash.</em></p>`,
           });
         }
-        await targetActor.deleteEmbeddedDocuments('ActiveEffect', _burns.map(e => e.id));
+        await this._gmDeleteTargetEffects(targetActor, _burns.map(e => e.id));
       }
     }
 
@@ -3577,6 +3593,24 @@ export class AspectsofPowerItem extends Item {
       await AspectsofPowerItem.executeGmAction(payload);
     } else {
       game.socket.emit('system.aspects-of-power', payload);
+    }
+  }
+
+  /**
+   * Delete effects on a possibly-foreign target, cross-client safe. A
+   * direct deleteEmbeddedDocuments from a player against a doc they don't
+   * own is a permission error, and a raced double-delete throws "does not
+   * exist" (both live 2026-08-22). Filters to still-live ids and routes
+   * non-owned targets through gmCurseOp deleteEffects.
+   */
+  async _gmDeleteTargetEffects(targetActor, ids) {
+    const live = (ids ?? []).filter(id => targetActor.effects.get(id));
+    if (!live.length) return;
+    if (targetActor.isOwner) {
+      await targetActor.deleteEmbeddedDocuments('ActiveEffect', live);
+    } else {
+      await this._gmAction({ type: 'gmCurseOp', op: 'deleteEffects',
+        targetActorUuid: targetActor.uuid, effectIds: live });
     }
   }
 

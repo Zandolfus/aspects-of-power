@@ -73,7 +73,16 @@ export async function declarePlannedMove(tokenDoc, startPos, endPos) {
   if (!tokenDoc) return false;
   try {
     if (['planned', 'pending', 'paused'].includes(tokenDoc.movement?.state)) {
-      await tokenDoc.stopMovement();
+      // Route through stopDeclaredMove — a direct stopMovement() throws for
+      // any client but the movement's driver (live 2026-08-22: the GM's
+      // realtime glide on Gabriel's token made HIS OWN move declares fail
+      // with "Only the User that initiated the movement can stop it").
+      await stopDeclaredMove(tokenDoc);
+      // Foreign-driven stops land via socket on the driver's client — give
+      // the round-trip a beat before planning over the old glide.
+      for (let i = 0; i < 6 && ['planned', 'pending', 'paused'].includes(tokenDoc.movement?.state); i++) {
+        await new Promise(r => setTimeout(r, 50));
+      }
     }
     const path = buildCheckpointPath(startPos, endPos, _checkpointSpacingPx(tokenDoc.parent));
     // Opaque enemies: only PC paths render the core ruler for players. The
@@ -169,9 +178,13 @@ export async function stopDeclaredMove(tokenDoc) {
       // driver — an orphan walk with no declaration behind it. Route the
       // stop to the driver as well.
       if (!tokenDoc.movement.user?.isSelf) {
+        // v14 hard-errors a stop from any client but the driver ("Only the
+        // User that initiated the movement can stop it") — the socket IS
+        // the stop for foreign-driven movement; don't also call it locally.
         game.socket.emit('system.aspects-of-power', { action: 'aopStopMove', tokenUuid: tokenDoc.uuid });
+      } else {
+        await tokenDoc.stopMovement();
       }
-      await tokenDoc.stopMovement();
     }
   } catch (err) {
     console.warn('[movement] stop failed:', err);
@@ -453,7 +466,10 @@ export function registerMovementHooks() {
     if (!doc?.movement?.user?.isSelf) return;
     _executing.delete(doc.id);
     if (['planned', 'pending', 'paused'].includes(doc.movement.state)) {
-      doc.stopMovement().catch(err => console.warn('[movement] routed stop failed:', err));
+      // stopMovement is not reliably thenable across states — never chain
+      // .catch on its raw return (threw live 2026-08-22).
+      try { Promise.resolve(doc.stopMovement()).catch(err => console.warn('[movement] routed stop failed:', err)); }
+      catch (err) { console.warn('[movement] routed stop failed:', err); }
     }
   });
 
