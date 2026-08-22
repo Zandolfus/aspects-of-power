@@ -3541,10 +3541,16 @@ export class AspectsofPowerItem extends Item {
       const edgeDist     = Math.max(0, dist - casterRadius - tgtRadius);
       if (edgeDist > reachPx) {
         const edgeFt = Math.round(edgeDist / pxPerFt);
+        // TOAST TOO, not just chat (live repro 2026-08-23): "Gabriel using
+        // infused strike not getting dialog for input" was THIS gate — the
+        // rejection posted one chat line that combat spam buried, and the
+        // player read the silence as a broken dialog. The toast is local to
+        // the declaring client, exactly who needs to know.
+        ui.notifications.warn(`${this.name}: ${tgt.document?.name ?? 'target'} is ${edgeFt} ft away (reach ${reach} ft) — out of range.`);
         ChatMessage.create({
           speaker: ChatMessage.getSpeaker({ actor: this.actor }),
           flavor: this.name,
-          content: `<p><em>⚠️ ${tgt.document?.name ?? tgt.name ?? 'Target'} is ${edgeFt} ft away (reach ${reach} ft). Out of range — strike fails to land.</em></p>`,
+          content: `<p><em>${tgt.document?.name ?? tgt.name ?? 'Target'} is ${edgeFt} ft away (reach ${reach} ft). Out of range — strike fails to land.</em></p>`,
         });
         return false;
       }
