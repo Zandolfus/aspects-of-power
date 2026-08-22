@@ -1025,7 +1025,13 @@ Hooks.once('ready', async function () {
     for (const scene of candidates) {
       if (!scene.regions?.get(priorRegionId)) continue;
       if (isActingGM()) {
-        scene.deleteEmbeddedDocuments('Region', [priorRegionId]).catch(e => console.warn('[orphan-aoe-cleanup]', e));
+        // Losing the delete race (the fire path or another cleanup got the
+        // region first) is expected and fine — only surprises get logged.
+        scene.deleteEmbeddedDocuments('Region', [priorRegionId]).catch(e => {
+          if (!String(e?.message ?? '').includes('does not exist')) {
+            console.warn('[orphan-aoe-cleanup]', e);
+          }
+        });
       } else if (!game.user.isGM) {
         // Players route through the GM. Non-acting GM clients do NOTHING —
         // the acting GM's own copy of this hook handles it (multi-GM safe:
