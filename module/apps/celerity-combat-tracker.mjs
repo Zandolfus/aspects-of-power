@@ -73,6 +73,11 @@ async function _onCelAdvance(event, target) {
   // The boundary tick simultaneously ends round N and starts round N+1;
   // we now phrase it as round-start. Per design-celerity.md round length
   // is RL-tied (build-neutral), one boundary every roundLen ticks.
+  // Boundary-flag writes BATCH into one embedded update at the end —
+  // sixteen sequential awaited member.update()s per advance meant sixteen
+  // DB round-trips and sixteen tracker re-renders on every client, the
+  // "periodic lag" of the 2026-08-22 session.
+  const _boundaryUpdates = [];
   for (const member of combat.combatants) {
     const actor = member.actor;
     if (!actor) continue;
@@ -97,9 +102,11 @@ async function _onCelAdvance(event, target) {
     // Flag name kept (lastRoundEndAt) for backward compat with existing
     // saved combats; semantically this is "tick of the most recent
     // boundary crossed for this actor."
-    await member.update({
-      [`flags.${FLAG_NS}.lastRoundEndAt`]: lastBoundary + crossings * roundLen,
-    });
+    _boundaryUpdates.push({ _id: member.id,
+      [`flags.${FLAG_NS}.lastRoundEndAt`]: lastBoundary + crossings * roundLen });
+  }
+  if (_boundaryUpdates.length) {
+    await combat.updateEmbeddedDocuments('Combatant', _boundaryUpdates);
   }
 
   // TRIAL-REALTIME: engagement-halts + first-contact-LOS halts disabled for
@@ -783,14 +790,20 @@ export class CelerityCombatTracker extends ParentTracker {
         const stored = combat.flags?.[FLAG_NS]?.clockTick ?? 0;
         let requested = commitTick;
         if (requested == null) {
-          requested = getClockTick(combat);
           let earliest = Infinity;
           for (const cm of combat.combatants) {
             for (const d of [cm.flags?.[FLAG_NS]?.declaredAction, cm.flags?.[FLAG_NS]?.declaredMovement]) {
               if (d && typeof d.scheduledTick === 'number') earliest = Math.min(earliest, d.scheduledTick);
             }
           }
-          if (earliest !== Infinity) requested = Math.min(requested, earliest);
+          // EMPTY QUEUE = FROZEN CLOCK (RCA round 3, 2026-08-22: "everything
+          // cleared and rapidly accelerated" — after a drain the continuous
+          // clock kept counting table-think time and the stop committed it,
+          // so the next declares stamped thousands of ticks late). Wall time
+          // with nothing queued is not game time: commit the stored tick.
+          requested = earliest !== Infinity
+            ? Math.min(getClockTick(combat), earliest)
+            : stored;
         }
         const effective = Math.max(stored, requested);
         try {

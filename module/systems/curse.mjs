@@ -98,6 +98,26 @@ export function meterCapacity(actor) {
 }
 
 /**
+ * SINGLE-WRITER LAW (2026-08-22, live: Felicia's meter fell 192 -> 93 and
+ * 231 -> 88 with no vent): the meter is a read-modify-write flag touched
+ * by BOTH the GM client (empath feed at every damage apply) and the
+ * owner's client (cast fills, spends). Concurrent RMWs on stale reads
+ * lose increments. ALL meter mutations therefore route to the ACTING GM
+ * (gmCurseOp addEnergy/spendEnergy/ventAll) — one writer, no lost
+ * updates. Gates and payoff sizes still read the local flag (eventually
+ * consistent; Math.max floors cover the edges).
+ */
+async function _routeCurseOp(payload) {
+  payload.type = 'gmCurseOp';
+  if (game.user.isGM) {
+    const { executeGmAction } = await import('./gm-actions.mjs');
+    await executeGmAction(payload);
+  } else {
+    game.socket.emit('system.aspects-of-power', payload);
+  }
+}
+
+/**
  * Deposit curse energy on an actor's meter, announcing the new level.
  * Overflow (>= capacity) triggers the uncontrolled transformation: the
  * stored energy discharges into the change (meter resets to 0), a d100
@@ -105,8 +125,18 @@ export function meterCapacity(actor) {
  * uncontrollable"), and an enraged-semantics control-loss effect lands.
  * The transformation's FORM is table territory — the engine provides the
  * trigger, the roll, the control loss, and the permanence flag.
+ *
+ * Public entry: routes to the acting GM (single-writer law above).
+ * `addCurseEnergyCore` is the GM-side body — call it ONLY from gmCurseOp.
  */
-export async function addCurseEnergy(actor, amount, { speaker, rollMode, sourceName = '', quiet = false } = {}) {
+export async function addCurseEnergy(actor, amount, opts = {}) {
+  if (!_cfg().enabled || !actor || amount <= 0) return;
+  await _routeCurseOp({ op: 'addEnergy', actorUuid: actor.uuid,
+    amount: Math.round(amount), sourceName: opts.sourceName ?? '',
+    quiet: !!opts.quiet, speaker: opts.speaker, rollMode: opts.rollMode });
+}
+
+export async function addCurseEnergyCore(actor, amount, { speaker, rollMode, sourceName = '', quiet = false } = {}) {
   if (!_cfg().enabled || !actor || amount <= 0) return;
   const cap = meterCapacity(actor);
   if (cap <= 0) return;
@@ -167,10 +197,10 @@ export async function addCurseEnergy(actor, amount, { speaker, rollMode, sourceN
   });
 }
 
-/** Empty the meter, returning what was vented. */
+/** Empty the meter, returning the locally-read vented amount. */
 export async function ventAllCurse(actor) {
   const cur = meterValue(actor);
-  if (cur > 0) await actor.update({ 'flags.aspectsofpower.curseMeter': 0 });
+  if (cur > 0) await _routeCurseOp({ op: 'ventAll', actorUuid: actor.uuid });
   return cur;
 }
 
@@ -186,12 +216,13 @@ export function spendPriceFor(skill) {
 /**
  * Pay a spender's price from the meter. Returns the amount spent, or null
  * when the meter cannot cover it (the caller hard-gates the cast — RULED
- * 2026-08-22: "no meter, no Mind Crush").
+ * 2026-08-22: "no meter, no Mind Crush"). The affordability check reads
+ * the local flag; the deduction routes to the single writer.
  */
 export async function spendCurse(actor, amount) {
   const cur = meterValue(actor);
   if (amount <= 0 || cur < amount) return null;
-  await actor.update({ 'flags.aspectsofpower.curseMeter': cur - amount });
+  await _routeCurseOp({ op: 'spendEnergy', actorUuid: actor.uuid, amount: Math.round(amount) });
   return amount;
 }
 
@@ -533,6 +564,29 @@ export async function gmCurseOp(payload, executeGmAction) {
       if (!target) return;
       const ids = (payload.effectIds ?? []).filter(id => target.effects.get(id));
       if (ids.length) await target.deleteEmbeddedDocuments('ActiveEffect', ids);
+      break;
+    }
+    // ── Meter ops (single-writer law — see addCurseEnergy) ──
+    case 'addEnergy': {
+      const actor = await fromUuid(payload.actorUuid);
+      if (!actor) return;
+      await addCurseEnergyCore(actor, payload.amount, {
+        speaker: payload.speaker, rollMode: payload.rollMode,
+        sourceName: payload.sourceName, quiet: payload.quiet,
+      });
+      break;
+    }
+    case 'spendEnergy': {
+      const actor = await fromUuid(payload.actorUuid);
+      if (!actor) return;
+      const cur = meterValue(actor);
+      await actor.update({ 'flags.aspectsofpower.curseMeter': Math.max(0, cur - Math.max(0, payload.amount ?? 0)) });
+      break;
+    }
+    case 'ventAll': {
+      const actor = await fromUuid(payload.actorUuid);
+      if (!actor) return;
+      await actor.update({ 'flags.aspectsofpower.curseMeter': 0 });
       break;
     }
   }
