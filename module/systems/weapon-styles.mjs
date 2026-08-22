@@ -468,7 +468,11 @@ export function dualWieldEligible(actor) {
   const off = offHandWeapon(actor);
   if (!main || !off || main === off) return false;
   if (handsUsed(main) === 2 || handsUsed(off) === 2) return false;
-  if (isShield(main) || isShield(off)) return false;
+  // Shields dual-wield (RULED 2026-08-21: "Shields can dual-wield. No
+  // reason for that to be impossible") — a 1H shield alternates like any
+  // other 1H item: sword-and-board bashes on the off-beat at the shield's
+  // own weight and blend, dual bucklers are a legal (if eccentric) rig.
+  // The old exclusion predated blocks being real.
   const oneH = (i) => (i.system?.tags ?? []).includes('1H');
   return oneH(main) && oneH(off);
 }
