@@ -456,6 +456,17 @@ export class SkillData extends foundry.abstract.TypeDataModel {
         // hard to touch from outside, unavoidable from within).
         consumesMark:     new fields.BooleanField({ initial: false }),
 
+        // ── STANCE PARRY RATE (RULED 2026-08-21: "No discounts, instead
+        // lightning parry should have an increased parry rate.") ─────────
+        // On a `stance` skill: while THIS stance is held, parry-class
+        // reactions skip their per-skill cooldown check — parry rate is
+        // then bound only by the reaction budget (reactions.max, already
+        // AE-modifiable content: Gabriel's Geppetto's Eye runs his at 3).
+        // The cooldown still STAMPS on fire, so dropping the stance
+        // mid-round leaves the normal throttle correctly in force.
+        // Standard stances leave this false: one parry per skill per round.
+        stanceParryCooldownFree: new fields.BooleanField({ initial: false }),
+
         // ── KINDLE (`kindle` tag, RULED 2026-08-21 — Valentine's Flames
         // Without / Flames Within) ────────────────────────────────────────
         // An AOE attack that feeds the caster per target it catches: after

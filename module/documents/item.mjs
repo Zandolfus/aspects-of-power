@@ -2815,13 +2815,23 @@ export class AspectsofPowerItem extends Item {
       } catch (_e) { _hasSummon = false; }
       return _hasSummon;
     };
+    // Guard stance state, resolved ONCE for the filter below: parry-class
+    // reactions require it (design-guard-stances), and a lightning-class
+    // stance (stanceParryCooldownFree) waives the parry COOLDOWN while held
+    // — rate then bound only by the reaction budget (RULED 2026-08-21:
+    // "increased parry rate", no entry discounts).
+    const _gsEnabled = CONFIG.ASPECTSOFPOWER.guardStance?.enabled ?? true;
+    const _gsCbt = _gsEnabled ? findCombatantForActor(targetActor) : null;
+    const _gsStance = _gsCbt?.flags?.aspectsofpower?.guardStance ?? null;
     const reactionSkills = targetActor.items.filter(s => {
       if (s.type !== 'skill' || s.system.skillType !== 'Reaction') return false;
       const trig = s.system.tagConfig?.reactionTrigger ?? '';
       // Empty trigger = legacy; include for back-compat. Specific trigger
       // must match the current event (`self_attacked`).
       if (trig && trig !== 'self_attacked') return false;
-      if ((cooldowns[s.id] ?? 0) > 0) return false;
+      const _isParry = (s.system.reactionType ?? 'dodge') === 'parry';
+      if ((cooldowns[s.id] ?? 0) > 0
+          && !(_isParry && _gsStance?.parryCooldownFree)) return false;
       // Resource gate: actor must be able to afford the cost.
       const resKey = s.system.roll?.resource;
       const cost   = s.system.roll?.cost ?? 0;
@@ -2835,11 +2845,7 @@ export class AspectsofPowerItem extends Item {
       // active combat, parry-class reactions require the raised guard —
       // the pre-paid answer. Out of combat there is no economy to bypass,
       // so parries stay available (and `enabled: false` reverts wholesale).
-      if ((s.system.reactionType ?? 'dodge') === 'parry'
-          && (CONFIG.ASPECTSOFPOWER.guardStance?.enabled ?? true)) {
-        const _gcbt = findCombatantForActor(targetActor);
-        if (_gcbt && !_gcbt.flags?.aspectsofpower?.guardStance) return false;
-      }
+      if (_isParry && _gsEnabled && _gsCbt && !_gsStance) return false;
       return true;
     });
     const reactionList = reactionSkills.map(s => ({
@@ -7370,7 +7376,10 @@ export class AspectsofPowerItem extends Item {
         return;
       }
       const flagData = { 'flags.aspectsofpower.guardStance': {
-        itemId: this.id, guardItemId: guard?.id ?? null, name: this.name } };
+        itemId: this.id, guardItemId: guard?.id ?? null, name: this.name,
+        // Lightning-class stances: parries skip their cooldown while held
+        // (rate bound by the reaction budget instead).
+        parryCooldownFree: this.system.tagConfig?.stanceParryCooldownFree === true } };
       // Combatant writes are GM-only at the server; same routing shape as
       // the held-cast write above.
       if (game.user.isGM) await combatant.update(flagData);
