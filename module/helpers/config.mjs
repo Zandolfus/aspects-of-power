@@ -1170,6 +1170,10 @@ ASPECTSOFPOWER.weaponStyles = ASPECTSOFPOWER.weaponCombinations;
  * economy is the consumer that made throughput matter.
  */
 ASPECTSOFPOWER.resourceRegen = {
+  // ⚠ CADENCE ONLY, scales NOTHING (fixed 2026-08-21: this used to multiply
+  // the full per-round percentage — an accidental tripling). Total regen per
+  // round is the actor's staminaRegen pct; this knob is reserved for a
+  // future true mid-round delivery cadence.
   staminaTicksPerRound: 3,
 };
 

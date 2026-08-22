@@ -1298,12 +1298,15 @@ export class AspectsofPowerActor extends Actor {
       && ['heal', 'stam'].includes(e.system?.auraEffectType));
     const stamina = systemData.stamina;
     const regenPct = _healerAura ? 0 : (systemData.staminaRegen ?? 5);
-    // Ticks-per-round GLOBAL (config.resourceRegen, user 2026-08-16):
-    // regen lands `ticks` times per personal round — delivered in one write
-    // at the boundary where every round mechanic already fires. The dive
-    // surcharge made stamina throughput a defence stat.
-    const _regenTicks = CONFIG.ASPECTSOFPOWER.resourceRegen?.staminaTicksPerRound ?? 1;
-    const regenAmt = Math.floor(stamina.max * (regenPct / 100)) * Math.max(1, _regenTicks);
+    // ⚠ FIXED 2026-08-21 (user: "I think we accidentally tripled stamina
+    // regeneration"): staminaTicksPerRound was MULTIPLYING the full per-round
+    // percentage (5% x 3 = 15%/round) instead of subdividing its delivery.
+    // Ticks are a CADENCE, not a magnitude — and since this implementation
+    // delivers in ONE write at the round boundary anyway, the tick count
+    // must not touch the amount at all. Total per round = staminaRegen pct.
+    // (config.resourceRegen.staminaTicksPerRound is reserved for a future
+    // true mid-round cadence; it no longer scales anything.)
+    const regenAmt = Math.floor(stamina.max * (regenPct / 100));
     if (_healerAura) {
       ChatMessage.create({
         speaker, ...gmWhisper,
@@ -1319,7 +1322,7 @@ export class AspectsofPowerActor extends Actor {
       if (gained > 0) {
         ChatMessage.create({
           speaker, ...gmWhisper,
-          content: `<p><em>${this.name} regenerates ${gained} stamina (${_regenTicks} tick${_regenTicks === 1 ? '' : 's'} of ${regenPct}%).</em></p>`,
+          content: `<p><em>${this.name} regenerates ${gained} stamina (${regenPct}% per round).</em></p>`,
         });
       }
     }
