@@ -6944,6 +6944,31 @@ export class AspectsofPowerItem extends Item {
     // ── Evaluate both rolls (shared across all tags) ────────────────────
     // `let` so the detonate-redirect block below can swap in the summon's
     // rolls when this cast is consuming a mine (damage = summon identity).
+    //
+    // NaN SENTINEL (2026-08-22, "Unresolved StringTerm NaN" threw inside a
+    // live advance — John's Blazing Greatsword): a formula carrying
+    // NaN/undefined means an upstream override built arithmetic from a
+    // missing input. Throwing mid-fire wastes the action AND hides the
+    // inputs; dump everything that could have produced it and fizzle
+    // cleanly. The dump IS the diagnostic the next occurrence needs.
+    if (/\bNaN\b|\bundefined\b|\bInfinity\b/.test(String(dmgFormula) + ' ' + String(hitFormula ?? ''))) {
+      console.error('[aspects-of-power] MALFORMED FORMULA — report this dump:', {
+        skill: this.name, actor: this.actor?.name,
+        hitFormula, dmgFormula,
+        rollType: this.system.roll?.type, tier: this.system.roll?.tier ?? null,
+        preInvestAmount: options.preInvestAmount ?? null,
+        preCoInvestAmount: options.preCoInvestAmount ?? null,
+        preAoeRegionId: options.preAoeRegionId ?? null,
+        preWeaponId: options.preWeaponId ?? null,
+        mana: this.actor?.system?.mana?.value, stamina: this.actor?.system?.stamina?.value,
+        wisMod: this.actor?.system?.abilities?.wisdom?.mod,
+        gradeRank: this.actor?.system?.attributes?.race?.rank ?? null,
+      });
+      ChatMessage.create({ speaker, rollMode,
+        content: `<p><em>${this.name} fizzles — its roll formula came out malformed. `
+               + `The full diagnostic is in the console (F12); tell the GM what you just did.</em></p>` });
+      return;
+    }
     let hitRoll = hitFormula ? new Roll(hitFormula, rollData) : null;
     if (hitRoll) await hitRoll.evaluate();
 

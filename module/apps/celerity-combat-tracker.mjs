@@ -858,7 +858,7 @@ export class CelerityCombatTracker extends ParentTracker {
       } catch (e) {
         errored = true;
         console.error('[TRIAL-REALTIME] advance failed:', e);
-        ui.notifications.error('Advance failed — clock held, action kept. See console (F12).');
+        ui.notifications.error('Advance failed — clock held. The firing action may have been consumed; redeclare if missing. See console (F12).');
       }
       // A THROW must never move the clock (RCA 2026-08-22): committing
       // nextTick here left the unfired entry at `scheduledTick <= clock`,
