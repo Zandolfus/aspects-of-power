@@ -245,7 +245,16 @@ export class EquipmentSystem {
 
     // Armor/veil: stored values are the augment-inclusive totals (rings:
     // ring-divided + augment-readded above). Apply directly.
-    if (baseArmorValue > 0) {
+    // SHIELD ARMOR LIVES IN THE BLOCK (ruled 2026-08-21: "shields shouldn't
+    // add full passive armor and instead only apply their full armor as
+    // additional DR when blocking"): shield-family items contribute NO
+    // passive armor — their armorBonus (still sized by crafting) is read by
+    // the parry branch as this-hit wall bonus on a block attempt.
+    // guardStance.shieldArmorModel 'passive' restores the old behavior.
+    const _shieldFam = CONFIG.ASPECTSOFPOWER?.weaponTypeFamilies?.shield ?? ['shield', 'greatshield', 'buckler'];
+    const _shieldArmorToBlock = (item.system.tags ?? []).some(t => _shieldFam.includes(t))
+      && (CONFIG.ASPECTSOFPOWER?.guardStance?.shieldArmorModel ?? 'block') === 'block';
+    if (baseArmorValue > 0 && !_shieldArmorToBlock) {
       changes.push({
         key: 'system.defense.armor.value',
         mode: 2,

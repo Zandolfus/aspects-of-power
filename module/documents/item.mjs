@@ -1537,6 +1537,12 @@ export class AspectsofPowerItem extends Item {
       });
     }
 
+    // SHIELD ARMOR LIVES IN THE BLOCK (ruled 2026-08-21: "shields shouldn't
+    // add full passive armor and instead only apply their full armor as
+    // additional DR when blocking"). Set by the parry branch when the
+    // parrying implement is shield-family; joins the armor wall for THIS
+    // hit only, win or lose — the shield is interposed on the attempt.
+    let bonusMitigation = 0;
     if (defenseResult.reactionSkillId) {
       const reactionSkill = targetActor.items.get(defenseResult.reactionSkillId);
       if (reactionSkill) {
@@ -1614,7 +1620,19 @@ export class AspectsofPowerItem extends Item {
           const parryProf = proficiencyDamageMult(
             targetActor, reactionSkill._proficiencyWeapon?.() ?? null);
           const parryTotal = Math.round(rawParry * massMult * parryProf);
+          // Shield armor applies at the BLOCK (ruled 2026-08-21): when the
+          // parrying implement is shield-family, its full armorBonus joins
+          // this hit's armor wall — attempt is enough, the shield is
+          // interposed either way. (Passive contribution removed in
+          // equipment.mjs under guardStance.shieldArmorModel 'block'.)
+          const _parryImpl = reactionSkill._proficiencyWeapon?.() ?? null;
+          const _shieldFam = CONFIG.ASPECTSOFPOWER.weaponTypeFamilies?.shield ?? ['shield', 'greatshield', 'buckler'];
+          if (_parryImpl && (_parryImpl.system.tags ?? []).some(t => _shieldFam.includes(t))
+              && (CONFIG.ASPECTSOFPOWER.guardStance?.shieldArmorModel ?? 'block') === 'block') {
+            bonusMitigation = Math.max(0, Math.round(_parryImpl.system.armorBonus ?? 0));
+          }
           const bits = [];
+          if (bonusMitigation > 0) bits.push(`shield wall +${bonusMitigation}`);
           if (bracedSpent > 0) bits.push(`braced ${bracedSpent} stam -> weight ${Math.round(effDefW)}`);
           if (massMult < 1) bits.push(`outmassed x${massMult.toFixed(2)}`);
           if (parryProf !== 1) bits.push(`proficiency x${parryProf.toFixed(2)}`);
@@ -1758,7 +1776,7 @@ export class AspectsofPowerItem extends Item {
     // (2026-07-15 cosmetic finding.)
     if (defenseResult.reactionSkillId && isHit === false) defenseLine = '';
 
-    return { isHit, damageMultiplier, defenseLine, reactionLine, swappedTargetActor, swappedTargetToken };
+    return { isHit, damageMultiplier, defenseLine, reactionLine, swappedTargetActor, swappedTargetToken, bonusMitigation };
   }
 
   /**
@@ -2187,6 +2205,14 @@ export class AspectsofPowerItem extends Item {
       targetActor = primaryResult.swappedTargetActor;
       targetToken = primaryResult.swappedTargetToken;
     }
+
+    // Shield-block wall bonus (ruled 2026-08-21): the blocking shield's full
+    // armorBonus joins THIS hit's mitigation — before the pipeline runs and
+    // before data-mitigation-value is stamped, so display and application
+    // agree (the crush/pierce lesson).
+    const _blockWall = (primaryResult.bonusMitigation ?? 0)
+                     + (secondaryResult?.bonusMitigation ?? 0);
+    if (_blockWall > 0) mitigation += _blockWall;
 
     const halfFactor = hasDualDefense ? 0.5 : 1.0;
     const isHit = primaryResult.isHit || (secondaryResult?.isHit ?? false);

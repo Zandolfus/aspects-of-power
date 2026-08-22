@@ -1251,6 +1251,12 @@ ASPECTSOFPOWER.guardStance = {
   // his round, shield 20%, buckler 10%. Stance skills' own
   // actionWeightMultiplier still stacks on top (Lightning Guard etc.).
   entryWeightFraction: 0.5,
+  // Where a shield's armorBonus lives (ruled 2026-08-21): 'block' = no
+  // passive armor; the FULL armorBonus joins the wall of any hit the
+  // shield-bearer answers with a shield parry (attempt is enough — the
+  // shield is interposed win or lose). 'passive' restores the always-on
+  // equipment-armor contribution.
+  shieldArmorModel: 'block',
 };
 
 /**
