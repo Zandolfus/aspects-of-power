@@ -49,16 +49,24 @@ async function _onCelAdvance(event, target) {
     if (dm) out.push({ c, declared: dm });
     return out;
   };
+  // OVERDUE ENTRIES FIRE FIRST (RCA 2026-08-22, the stranded-combat bug):
+  // this filter used to demand `scheduledTick > clockTick`, which made any
+  // entry the clock had passed WITHOUT firing invisible forever. Under the
+  // realtime loop, an advance that THREW committed the clock at exactly the
+  // failed entry's tick (see the error path in _scheduleNextFire) — one
+  // stranded action per play-press, "everyone ready, actions queued, rounds
+  // zooming". Overdue entries are now simply the most-urgent queue members:
+  // they fire immediately and the clock never moves backwards (max guard).
   const queued = [...combat.combatants]
     .flatMap(_entriesOf)
-    .filter(e => typeof e.declared.scheduledTick === 'number' && e.declared.scheduledTick > clockTick)
+    .filter(e => typeof e.declared.scheduledTick === 'number')
     .sort((a, b) => a.declared.scheduledTick - b.declared.scheduledTick);
   if (queued.length === 0) {
     ui.notifications.info('No queued actions to advance to.');
     return 'none';
   }
   let { c, declared } = queued[0];
-  let newClock = declared.scheduledTick;
+  let newClock = Math.max(clockTick, declared.scheduledTick);
 
   // Round-start mechanics: fire DoTs + onStartTurn for any actor whose
   // personal reference-round boundary was crossed by this clock advance.
@@ -75,8 +83,16 @@ async function _onCelAdvance(event, target) {
     let crossings = Math.floor((newClock - lastBoundary) / roundLen);
     if (crossings <= 0) continue;
     crossings = Math.min(crossings, MAX_ROUND_BOUNDARIES_PER_ADVANCE);
-    for (let i = 0; i < crossings; i++) {
-      await runRoundStart(combat, member);
+    // One member's broken round-start must not take down the whole advance
+    // (RCA 2026-08-22: an uncaught throw anywhere in this loop stranded the
+    // firing entry under realtime). Contain it, name the member, move on.
+    try {
+      for (let i = 0; i < crossings; i++) {
+        await runRoundStart(combat, member);
+      }
+    } catch (e) {
+      console.error(`[celerity] round-start failed for ${member.name}:`, e);
+      ui.notifications.warn(`Round-start failed for ${member.name} — see console.`);
     }
     // Flag name kept (lastRoundEndAt) for backward compat with existing
     // saved combats; semantically this is "tick of the most recent
@@ -115,7 +131,8 @@ async function _onCelAdvance(event, target) {
   if (requeued.length > 0 && requeued[0].declared.scheduledTick <= newClock) {
     c = requeued[0].cm;
     declared = requeued[0].declared;
-    newClock = declared.scheduledTick;
+    // Same overdue rule as the initial pick: the clock is monotonic.
+    newClock = Math.max(clockTick, declared.scheduledTick);
   }
 
   // ── RESOURCE-AURA CADENCE (design-aura-ticks.md) ──────────────────────
@@ -810,9 +827,23 @@ export class CelerityCombatTracker extends ParentTracker {
       this._realtimeTimeoutId = null;
       if (!this._realtimeRunning) return;
       let fired = 'pause';
+      let errored = false;
       try {
         fired = await _onCelAdvance.call(this);
-      } catch (e) { console.error('[TRIAL-REALTIME] advance failed:', e); }
+      } catch (e) {
+        errored = true;
+        console.error('[TRIAL-REALTIME] advance failed:', e);
+        ui.notifications.error('Advance failed — clock held, action kept. See console (F12).');
+      }
+      // A THROW must never move the clock (RCA 2026-08-22): committing
+      // nextTick here left the unfired entry at `scheduledTick <= clock`,
+      // where the old advance filter could never see it again — the
+      // stranded-combat bug. Stop at the STORED tick; the entry stays
+      // queued and (now overdue-eligible) fires on the next advance.
+      if (errored) {
+        this._realtimeStop(this.viewed?.flags?.[FLAG_NS]?.clockTick ?? 0);
+        return;
+      }
       // 'pause' = a decision point (any real action fire, or a PLAYER's
       // arrival/whiff) — stop so players declare without the clock eating
       // their thinking time. 'continue' = NPC arrivals and NPC whiffs — the
