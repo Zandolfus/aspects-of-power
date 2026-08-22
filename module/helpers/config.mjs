@@ -1248,7 +1248,7 @@ ASPECTSOFPOWER.weaponTagGrants = {
   // shield family-head entry above (a greatshield grants all four):
   // Bulwark = braced block (stamina buys wall), Shield Wall = ally cover
   // (guardian intercept, stance-required by authoring).
-  greatshield: ['Bulwark', 'Shield Wall'],
+  greatshield: ['Bulwark Block', 'Shield Wall'],
 };
 
 ASPECTSOFPOWER.guardStance = {
