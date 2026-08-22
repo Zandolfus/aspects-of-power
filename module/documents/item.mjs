@@ -12,6 +12,7 @@ import { proficiencyDamageMult, proficiencyHitMult, heldWeaponWeight, heldImplem
 import { stackDamageMultiplier, spendableRange, clampSpread, getStackCount, getStackPayload, addStacks, spendStacks, resolveStackCap } from '../systems/stacks.mjs';
 import { resolveCoInvest } from '../systems/co-invest.mjs';
 import { handleSpread, handleTransfer, handleConsume, handleHarness, onCurseCast, ventAllCurse, meterValue as curseMeterValue, spendPriceFor, spendCurse } from '../systems/curse.mjs';
+import { resolveDamage } from '../systems/damage.mjs';
 
 /**
  * Check if an actor is an assigned player character (not just owned).
@@ -2478,6 +2479,7 @@ export class AspectsofPowerItem extends Item {
     // Untyped damage (no skill affinity AND no augment affinity) flows
     // through the existing armor/DR/barrier pipeline unchanged.
     let damageBreakdownAttr = '';
+    let _previewBreakdown = {};
     {
       const equipped = this.actor?.system?.equippedDamageBonus ?? 0;
       const breakdownRaw = this.actor?.system?.equippedDamageBonusByAffinity ?? {};
@@ -2534,28 +2536,43 @@ export class AspectsofPowerItem extends Item {
       if (Object.keys(scaled).length > 0) {
         damageBreakdownAttr = ` data-damage-breakdown='${JSON.stringify(scaled)}'`;
       }
+      _previewBreakdown = scaled;
     }
 
     // Barrier absorbs before armor/veil — it takes raw (post-defense-pool) damage.
     const barrierValue = targetActor.system.barrier?.value ?? 0;
+    // ── THE PREVIEW IS THE PIPELINE (2026-08-23, "values on the cards are
+    // incorrect"). This card used to rebuild the chain with FLAT subtraction
+    // while the apply handler runs resolveDamage's RATIO wall — overstating
+    // real walls 35-50% (George vs John: card 579, applied 389) and zeroing
+    // chip the ratio model lets through (dagger vs John: card 0, applied
+    // 24). One implementation, called with the same inputs the apply
+    // handler passes. Marks and overhealth stay apply-time — they read
+    // live target state at the click and the apply card labels them.
+    const _affResistPreview = (() => {
+      const dr = targetActor.system.damageReduction?.affinities ?? {};
+      let s = 0;
+      for (const [aff, amt] of Object.entries(_previewBreakdown)) s += Math.min(amt, Number(dr[aff]) || 0);
+      return s;
+    })();
+    const _previewRes = resolveDamage({
+      incoming: afterDefense,
+      affinityResist: _affResistPreview,
+      barrier: isHit ? barrierValue : 0,
+      mitigation,
+      drValue: baseDR,
+      affinityDR,
+      augDR: targetActor.system.damageReduction?.[isPhysical ? 'physical' : 'magical'] ?? 0,
+      margin: defenceMargin,
+      health: 1e9,
+    });
     let barrierLine = '';
     let barrierAbsorbs = 0;
-    let afterBarrier = afterDefense;
-    if (isHit && barrierValue > 0) {
-      barrierAbsorbs = Math.min(barrierValue, afterDefense);
-      afterBarrier = afterDefense - barrierAbsorbs;
-      barrierLine = `<p>Barrier absorbs: ${barrierAbsorbs} / ${barrierValue}${barrierAbsorbs >= barrierValue ? ' <em>(breaks)</em>' : ''}</p>`;
+    if (isHit && _previewRes.barrierAbsorbed > 0) {
+      barrierAbsorbs = _previewRes.barrierAbsorbed;
+      barrierLine = `<p>Barrier absorbs: ${barrierAbsorbs} / ${barrierValue}${_previewRes.barrierBroke ? ' <em>(breaks)</em>' : ''}</p>`;
     }
-
-    // Armor/veil reduces whatever got through the barrier.
-    const preToughnessDmg = Math.max(0, afterBarrier - mitigation);
-    // ⚠ THE MARGIN LANDS HERE, LAST (RULED 2026-07-31) — after barrier, after
-    // armour/veil, after DR. Applying it any earlier lets a decent defence
-    // plus any wall reach zero. Consequence accepted: barrier and armour are
-    // charged against the FULL blow, so giving ground does not preserve your
-    // barrier — the shell takes the impact regardless of your footwork.
-    const postDR      = Math.max(0, preToughnessDmg - effectiveToughness);
-    const finalDamage = isHit ? Math.max(0, Math.round(postDR * defenceMargin)) : 0;
+    const finalDamage = isHit ? _previewRes.hpLoss : 0;
     const displayDamage   = finalDamage;
 
     // ── self_damage_taken passive auto-fire (Phase C) ──
@@ -2593,8 +2610,11 @@ export class AspectsofPowerItem extends Item {
       ? `<p>Halves: ${primaryResult.isHit ? primaryContrib : 0} (${targetDefKey}) + ${secondaryResult.isHit ? secondaryContrib : 0} (${secondaryDefKey}) = <strong>${afterDefense}</strong></p>`
       : '';
 
-    const toughnessLine = preToughnessDmg > 0
-      ? `<p>DR: −${Math.min(effectiveToughness, preToughnessDmg)}${affinityDR > 0 ? ` <em>(−${affinityDR} affinity)</em>` : ''}</p>`
+    const toughnessLine = (_previewRes.drReduced > 0 || _previewRes.augReduced > 0 || _affResistPreview > 0)
+      ? `<p>DR: −${_previewRes.drReduced}`
+        + `${affinityDR > 0 ? ` <em>(−${affinityDR} affinity strip)</em>` : ''}`
+        + `${_previewRes.augReduced > 0 ? ` &middot; Resist: −${_previewRes.augReduced}` : ''}`
+        + `${_affResistPreview > 0 ? ` &middot; Affinity DR: −${_affResistPreview}` : ''}</p>`
       : '';
 
     // Forced movement info for the button data attributes.
@@ -2686,7 +2706,7 @@ export class AspectsofPowerItem extends Item {
            <hr>
            <p>Raw damage: ${rawDmg}${hasDualDefense ? ' (split 50/50 across halves)' : ''}${fracClamped < 1 ? ` <em>(AOE overlap ${Math.round(fracClamped * 100)}% × ${Math.round(dmgRoll.total)} roll)</em>` : ''}</p>
            ${halvesLine}
-           <p>${mitigLabel}: −${mitigation}</p>
+           <p>${mitigLabel}: −${_previewRes.mitigated}${_previewRes.mitigated !== mitigation ? ` <em>(wall ${mitigation})</em>` : ''}</p>
            ${defenseReductionLine}
            ${barrierLine}
            ${toughnessLine}
@@ -2718,7 +2738,8 @@ export class AspectsofPowerItem extends Item {
     }
 
     // Barrier fully absorbs → flag so debuff/DoT can be skipped.
-    const fullyBlocked = isHit && preToughnessDmg > 0 && barrierValue >= preToughnessDmg;
+    const fullyBlocked = isHit && afterDefense > 0
+      && _previewRes.barrierAbsorbed > 0 && _previewRes.postBarrier === 0;
     // Pierce flag for chained-skill gating: did some damage make it past
     // the target's armor/veil into the DR layer? Used by chains tagged
     // `requires_armor_pierce` (e.g. Hemorrhage — light-warrior bleed
@@ -2727,7 +2748,10 @@ export class AspectsofPowerItem extends Item {
     // bolt-spells route through armor (Pyroblast) while bleed-style
     // chains on magical parents would want the equivalent veil-pierce
     // signal. Designers tag specific chains; untagged chains fire on hit.
-    const piercedMitigation = isHit && preToughnessDmg > 0;
+    // Under the ratio wall "pierced" means damage actually reached HP —
+    // the proportional model never fully clots, so this is the honest gate
+    // for requires_armor_pierce chains (Hemorrhage off a real wound only).
+    const piercedMitigation = isHit && _previewRes.hpLoss > 0;
 
     // mine tag (per design 2026-05-12): summon-style skills plant a
     // persistent region "mine" at the target's position. A generic
