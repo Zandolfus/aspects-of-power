@@ -2464,6 +2464,28 @@ eq('junk situational entries are skipped, not NaN',
   eq('guardStance: buckler weight 60', /buckler:\s*60/.test(src), true);
   eq('guardStance: shield weight 120', /shield:\s*120/.test(src), true);
   eq('guardStance: greatshield weight 190', /greatshield:\s*190/.test(src), true);
+
+  // ── Dread/curse engine (design-dread-curse-engine, ruled 2026-08-21) ──
+  // GOLDEN anchor from the live world: Felicia wil.mod 489 + wis.mod 225.
+  eq('curse: Felicia capacity 714', F3.curseMeterCapacity(489, 225), 714);
+  eq('curse: capacity never negative', F3.curseMeterCapacity(-50, 20), 0);
+  // Eaten energy = stat magnitudes + DoT remaining schedule. A Despair at
+  // roll 500 writes a -150 mind change (0.3x): eating it banks 150.
+  eq('curse: eating one Despair (roll 500) banks 150',
+     F3.curseEatenEnergy([{ changes: [{ value: -150 }] }]), 150);
+  eq('curse: DoT remainder joins the meal (150 + 72x3)',
+     F3.curseEatenEnergy([{ changes: [{ value: -150 }], dotDamage: 72, remaining: 3 }]), 366);
+  eq('curse: change values may arrive as strings', F3.curseEatenEnergy([{ changes: [{ value: '-150' }] }]), 150);
+  eq('curse: empty and missing are 0', F3.curseEatenEnergy([]) + F3.curseEatenEnergy(), 0);
+  // Fill: a 500-roll Despair at the shipped 0.1 banks 50 — capacity holds
+  // ~14 casts, so the meter is upkeep, not an instant bomb.
+  eq('curse: fill is a tenth of the roll', F3.curseFillAmount(500, 0.1), 50);
+  eq('curse: zero scale banks nothing', F3.curseFillAmount(500, 0), 0);
+  // Shipped knob pins — the ruling's exact shape.
+  eq('curse: shipped enabled', /curse = \{\s*\n?\s*enabled:\s*true/.test(src), true);
+  eq('curse: spread filter is the dread tag', /spreadFilterTag:\s*'dread'/.test(src), true);
+  eq('curse: fill tags are dread+curse', /fillTags:\s*\['dread',\s*'curse'\]/.test(src), true);
+  eq('curse: a natural 1 is permanent', /transformPermanentOn:\s*1\b/.test(src), true);
 }
 
 if (failures) { console.error(`\n${failures} FAILURES`); process.exit(1); }

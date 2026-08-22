@@ -1276,6 +1276,42 @@ ASPECTSOFPOWER.guardStance = {
 };
 
 /**
+ * DREAD / CURSE ENGINE (design-dread-curse-engine, RULED 2026-08-21).
+ *
+ * Felicia's curse-manipulation family: debuff effects are stamped with their
+ * source skill's tags at apply time, and three verbs filter over that stamp —
+ * `spread-debuff` copies the anchor's Dreads to everyone else in the AOE,
+ * `transfer-debuff` moves one off an ally onto an enemy, `consume-debuff`
+ * eats them into the curse meter. Underneath runs the meter itself: capacity
+ * = wil.mod + wis.mod (curseMeterCapacity), filled by every curse cast
+ * (fillScale x roll) and by eating, vented ONLY by `vent-curse` (Curse Shot:
+ * everything, one big shot) and `harness` (Harness Emotions: everything,
+ * into a self-buff). Overflow = uncontrolled transformation with a d100;
+ * a natural 1 is PERMANENT ("A 1 makes the transformation permanent and
+ * remains uncontrollable").
+ */
+ASPECTSOFPOWER.curse = {
+  enabled: true,
+  // Which skill tags participate in the meter — a cast carrying any of
+  // these channels curse energy (fill ruling: "all curse casts + eating").
+  fillTags: ['dread', 'curse'],
+  // Fraction of a curse cast's roll that sticks to the meter.
+  fillScale: 0.1,
+  // Which stamped tag the spread/transfer/consume verbs match by default
+  // ("Only spread Dreads. Stun will not be a Dread."). Authoring law: a
+  // hard-CC skill must never carry `dread`. Per-skill override:
+  // tagConfig.spreadFilterTag.
+  spreadFilterTag: 'dread',
+  // Harness Emotions self-buff: outgoing-damage bonus = harnessScale x
+  // (vented / capacity), carried for harnessDuration rounds via the
+  // kindledDmgMod channel. A full meter fully harnessed = +50% at 0.5.
+  harnessScale: 0.5,
+  harnessDuration: 3,
+  // Overflow d100: this result or lower makes the transformation permanent.
+  transformPermanentOn: 1,
+};
+
+/**
  * DUAL-WIELD TEMPO (design-dual-wield-tempo, ladder RULED 2026-08-15,
  * re-validated under the defence-time budget 2026-08-16).
  *

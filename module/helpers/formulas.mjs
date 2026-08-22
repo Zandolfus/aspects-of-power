@@ -1918,3 +1918,52 @@ export function spatialCapacityFromCraft(craftRoll, magnifier, cfg = null) {
   if (roll <= 0 || mag <= 0) return 0;
   return Math.floor(Math.pow(roll, exp) * mag * scale);
 }
+
+/**
+ * Curse meter capacity (dread/curse engine, RULED 2026-08-21 — "a curse
+ * meter based on willpower and wisdom"). The two mods SUM: willpower is the
+ * vessel's strength, wisdom the handler's skill, and both grow it. No flat
+ * constants — the capacity rides the stat curve, so a higher-grade curse
+ * wielder holds proportionally more before the transformation risk.
+ *
+ * @param {number} wilMod  willpower ability mod
+ * @param {number} wisMod  wisdom ability mod
+ * @returns {number} whole points of curse energy, never negative
+ */
+export function curseMeterCapacity(wilMod, wisMod) {
+  return Math.max(0, Math.round((Number(wilMod) || 0) + (Number(wisMod) || 0)));
+}
+
+/**
+ * Curse energy released by eating debuff effects (`consume-debuff` tag).
+ * A stored curse's energy is everything it still owes the world: the sum of
+ * its stat-change magnitudes plus its DoT's remaining schedule (dotDamage x
+ * rounds left — the same remaining-payload expression burnDetonatePayload
+ * uses). Effects arrive as plain snapshots so tests need no documents.
+ *
+ * @param {Array<{changes?: Array<{value: number|string}>, dotDamage?: number,
+ *                remaining?: number}>} effects
+ * @returns {number} whole points of curse energy, never negative
+ */
+export function curseEatenEnergy(effects) {
+  let total = 0;
+  for (const e of effects ?? []) {
+    for (const c of e.changes ?? []) total += Math.abs(Number(c.value) || 0);
+    total += Math.max(0, Number(e.dotDamage) || 0) * Math.max(0, Number(e.remaining) || 0);
+  }
+  return Math.max(0, Math.round(total));
+}
+
+/**
+ * Curse energy a single cast channels onto the meter (fill ruling
+ * 2026-08-21: "all curse casts + eating" — the meter rises from normal play,
+ * so venting is upkeep, not an option). A fraction of the cast's roll: the
+ * bigger the working, the more energy lingers in the vessel.
+ *
+ * @param {number} rollTotal  the cast's damage/potency roll total
+ * @param {number} fillScale  fraction of the roll that sticks (config knob)
+ * @returns {number} whole points of curse energy, never negative
+ */
+export function curseFillAmount(rollTotal, fillScale) {
+  return Math.max(0, Math.round((Number(rollTotal) || 0) * (Number(fillScale) || 0)));
+}

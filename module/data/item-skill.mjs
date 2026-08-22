@@ -484,6 +484,17 @@ export class SkillData extends foundry.abstract.TypeDataModel {
         kindlePerTarget: new fields.NumberField({ initial: 0.1, min: 0 }),
         kindleDuration:  new fields.NumberField({ initial: 2, min: 1, integer: true }),
 
+        // ── DREAD / CURSE FAMILY (design-dread-curse-engine, RULED
+        // 2026-08-21) ──────────────────────────────────────────────────────
+        // Which stamped effect-tag the spread/transfer/consume verbs match.
+        // Empty = the config default (CONFIG.curse.spreadFilterTag, 'dread').
+        // "Only spread Dreads. Stun will not be a Dread."
+        spreadFilterTag: new fields.StringField({ initial: '' }),
+        // Harness Emotions (`harness` tag): self-buff scale and duration for
+        // the vented-meter conversion. 0 falls back to the config knobs.
+        harnessScale:    new fields.NumberField({ initial: 0, min: 0 }),
+        harnessDuration: new fields.NumberField({ initial: 0, min: 0, integer: true }),
+
         // ── STACKS (design-stacks-subsystem.md, RULED 2026-08-02) ─────────
         // A self-held charge pool on the CASTER. One skill produces into a
         // named pool; others spend from it. Both sides carry `stackPool`;

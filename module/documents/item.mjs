@@ -11,6 +11,7 @@ import { executeGmAction as executeGmActionImpl } from '../systems/gm-actions.mj
 import { proficiencyDamageMult, proficiencyHitMult, heldWeaponWeight, heldImplementWeight, mainHandWeapon, offHandWeapon, dualWieldEligible, handOf } from '../systems/weapon-styles.mjs';
 import { stackDamageMultiplier, spendableRange, clampSpread, getStackCount, getStackPayload, addStacks, spendStacks, resolveStackCap } from '../systems/stacks.mjs';
 import { resolveCoInvest } from '../systems/co-invest.mjs';
+import { handleSpread, handleTransfer, handleConsume, handleHarness, onCurseCast, ventAllCurse, meterValue as curseMeterValue } from '../systems/curse.mjs';
 
 /**
  * Check if an actor is an assigned player character (not just owned).
@@ -2013,6 +2014,25 @@ export class AspectsofPowerItem extends Item {
       }
     }
 
+    // ── CURSE VENT (`vent-curse` tag, RULED 2026-08-21) ────────────────────
+    // Curse Shot: "vents everything, one big shot" — the caster's entire
+    // curse meter joins this hit's raw as a flat addition (the same seam the
+    // burn detonate uses), and the meter empties. The energy was banked by
+    // earlier casts (fillScale x roll each) and by Curse Eater, so the flat
+    // add is grade-correct by construction. See design-dread-curse-engine.
+    let ventCurseFlat = 0;
+    if ((this.system.tags ?? []).includes('vent-curse') && this.actor) {
+      ventCurseFlat = Math.round(curseMeterValue(this.actor));
+      if (ventCurseFlat > 0) {
+        await ventAllCurse(this.actor);
+        ChatMessage.create({
+          speaker: ChatMessage.getSpeaker({ actor: this.actor }),
+          ...(whisperGM ? { whisper: whisperGM } : {}),
+          content: `<p><em>${this.name} vents the vessel: +${ventCurseFlat} curse energy discharged in a single shot.</em></p>`,
+        });
+      }
+    }
+
     const isPhysical   = rollData.roll.damageType === 'physical';
     // Armor-answer routing (2026-07-16 ruling): VEIL defends mind/soul attacks
     // ONLY. Physical AND elemental damage face the ARMOR layer (armor+blockDR,
@@ -2339,7 +2359,9 @@ export class AspectsofPowerItem extends Item {
     // this skill spends no stacks.
     // burnDetonateFlat joins AFTER the multipliers — it is relocated DoT
     // damage with its own magnitude, not part of this swing's roll.
-    const rawDmg = Math.max(0, Math.round(dmgRoll.total * fracClamped * markDmgMult * stackMult) + burnDetonateFlat);
+    // ventCurseFlat rides the same seam: banked curse energy discharged by
+    // this shot, its magnitude already fixed when it was banked.
+    const rawDmg = Math.max(0, Math.round(dmgRoll.total * fracClamped * markDmgMult * stackMult) + burnDetonateFlat + ventCurseFlat);
     // ⚠ ORDERING (RULED 2026-07-31): the defence multiplier is NO LONGER
     // applied here. Under the margin rule, multiplying before the flat
     // armour/DR subtraction makes a good defence plus any wall reach zero —
@@ -4229,6 +4251,11 @@ export class AspectsofPowerItem extends Item {
       affinities: this.system.affinities ?? [],
       magicType: (this.system.tags ?? []).includes('magic') ? 'magical' : 'non-magical',
       directions,
+      // Source-tag stamp (dread/curse engine, RULED 2026-08-21): the spawned
+      // effect remembers its skill's tags so the curse verbs can filter by
+      // them later ("Only spread Dreads"). The schema field predates this —
+      // it was designed for exactly this dispel-by-tag shape.
+      tags: [...(this.system.tags ?? [])],
       ...(dismemberedSlot ? { dismemberedSlot } : {}),
       ...(dealsDmg ? { dot: true, dotDamage: dotDmg, dotDamageType: dmgType, applierActorUuid: this.actor.uuid, drStrip: hasShred || !!this.system.tagConfig?.debuffDRStrip } : {}),
       ...(armorCrushVal > 0 ? { armorCrush: armorCrushVal, armorCrushFlat } : {}),
@@ -7173,6 +7200,26 @@ export class AspectsofPowerItem extends Item {
         }
       }
 
+      // ── SPREAD (`spread-debuff` tag, design-dread-curse-engine, RULED
+      // 2026-08-21): project the dread already festering in the ANCHOR
+      // (the caster's declared target) onto every other target the AOE
+      // caught — full strength, remaining duration, per-victim gates via
+      // gmApplyDebuff. The skill's own authored debuff still lands on
+      // everyone through the normal per-target dispatch below. The anchor
+      // keeps its curses (projection, not transfer).
+      if ((this.system.tags ?? []).includes('spread-debuff') && targets.length > 0) {
+        let _anchor = options.preTargetIds?.length
+          ? canvas.tokens.get(options.preTargetIds[0]) ?? null
+          : game.user.targets.first() ?? null;
+        // The anchor must be something the wave actually washed over.
+        if (_anchor && !targets.some(t => t.token.id === _anchor.id)) _anchor = null;
+        // Untargeted cast: the region's sole occupant can anchor by itself —
+        // there is no ambiguity to resolve. More than one and no target =
+        // nothing to project from.
+        if (!_anchor && targets.length === 1) _anchor = targets[0].token;
+        await handleSpread(this, _anchor, targets.map(t => t.token), speaker, rollMode);
+      }
+
       // Dispatch each tag to each qualifying token. Damage is scaled by
       // the per-target overlap fraction (per design 2026-05-12) — a token
       // 50% inside the AOE takes 50% of the rolled damage.
@@ -7269,6 +7316,10 @@ export class AspectsofPowerItem extends Item {
       // Barrier skills defer cost deduction to executeGmAction (after target accepts).
       await _commitCastCost();
 
+      // Curse meter fill (design-dread-curse-engine): every curse cast
+      // channels a fraction of its roll onto the caster's meter.
+      await onCurseCast(this, dmgRoll?.total ?? 0, speaker, rollMode);
+
       // Remove instantaneous AOE regions (duration = 0). Routes through GM
       // dispatch since players don't have OWNER on the scene; a direct
       // delete here would silently fail and orphan the region on canvas.
@@ -7294,6 +7345,10 @@ export class AspectsofPowerItem extends Item {
     // ── Deduct resource cost (non-AOE) ──────────────────────────────────
     // Barrier skills defer cost until after the target accepts.
     await _commitCastCost();
+
+    // Curse meter fill (design-dread-curse-engine): every curse cast
+    // channels a fraction of its roll onto the caster's meter.
+    await onCurseCast(this, dmgRoll?.total ?? 0, speaker, rollMode);
 
     // ── STACKS: bank the pool (producer side) ───────────────────────────
     // After the cost is committed, so a cast that could not be paid for
@@ -7464,6 +7519,23 @@ export class AspectsofPowerItem extends Item {
           break;
         case 'stance':
           await this._handleStanceTag(item, speaker, rollMode, label);
+          break;
+        // Dread/curse verbs (design-dread-curse-engine, RULED 2026-08-21).
+        // `spread-debuff` is AOE-only and dispatches in the AOE branch.
+        case 'transfer-debuff': {
+          const _tok = (options.preTargetIds?.length ? canvas.tokens.get(options.preTargetIds[0]) : null)
+            ?? game.user.targets.first() ?? null;
+          await handleTransfer(this, _tok, speaker, rollMode);
+          break;
+        }
+        case 'consume-debuff': {
+          const _tok = (options.preTargetIds?.length ? canvas.tokens.get(options.preTargetIds[0]) : null)
+            ?? game.user.targets.first() ?? null;
+          await handleConsume(this, _tok, speaker, rollMode);
+          break;
+        }
+        case 'harness':
+          await handleHarness(this, speaker, rollMode);
           break;
       }
     }

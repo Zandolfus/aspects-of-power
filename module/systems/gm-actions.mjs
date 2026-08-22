@@ -790,6 +790,16 @@ export async function executeGmAction(payload) {
         break;
       }
 
+      case 'gmCurseOp': {
+        // Dread/curse engine cross-actor ops (spread / transfer / delete) —
+        // the logic lives with its family in systems/curse.mjs; the executor
+        // is passed in so spread/transfer can recurse into gmApplyDebuff
+        // without an import cycle.
+        const { gmCurseOp } = await import('./curse.mjs');
+        await gmCurseOp(payload, executeGmAction);
+        break;
+      }
+
       case 'gmApplyCleanse': {
         const target = await fromUuid(payload.targetActorUuid);
         if (!target) return;
