@@ -774,8 +774,25 @@ export class CelerityCombatTracker extends ParentTracker {
         // that must not leak into the combat clock as skipped ticks. The
         // max() guard keeps the clock monotonic if the advance already
         // committed past the requested tick.
+        //
+        // NULL-COMMIT CLAMP (RCA round 2, 2026-08-22): a stop with no
+        // explicit tick used to commit the raw continuous read — wall-time
+        // inflated if the loop had been idling — vaulting the clock over
+        // every queued action. The committed clock must never pass the
+        // earliest thing still scheduled to happen.
         const stored = combat.flags?.[FLAG_NS]?.clockTick ?? 0;
-        const effective = Math.max(stored, commitTick ?? getClockTick(combat));
+        let requested = commitTick;
+        if (requested == null) {
+          requested = getClockTick(combat);
+          let earliest = Infinity;
+          for (const cm of combat.combatants) {
+            for (const d of [cm.flags?.[FLAG_NS]?.declaredAction, cm.flags?.[FLAG_NS]?.declaredMovement]) {
+              if (d && typeof d.scheduledTick === 'number') earliest = Math.min(earliest, d.scheduledTick);
+            }
+          }
+          if (earliest !== Infinity) requested = Math.min(requested, earliest);
+        }
+        const effective = Math.max(stored, requested);
         try {
           await combat.update({
             [`flags.${FLAG_NS}.clockTick`]: effective,
@@ -801,10 +818,18 @@ export class CelerityCombatTracker extends ParentTracker {
     // movement-only queue never fired and walks hung until some action
     // happened to advance the clock — one of the live "roughness" defects.
     const clock = getClockTick(combat); // continuous while running
+    // OVERDUE ENTRIES FIRE IMMEDIATELY (RCA round 2, 2026-08-22): this used
+    // to filter `scheduledTick > clock` against the CONTINUOUS clock, so an
+    // entry whose tick slipped past while no timeout was pending (a declare-
+    // hook reschedule racing a fire is enough) never got a timeout at all.
+    // The loop then idled while the continuous clock climbed on WALL TIME,
+    // and the eventual stop committed that inflated value — vaulting the
+    // world past everything queued (58953 -> 77093 live). Same rule as the
+    // advance: overdue = most urgent, fire it NOW.
     const queued = [];
     for (const c of combat.combatants) {
       for (const declared of [c.flags?.[FLAG_NS]?.declaredAction, c.flags?.[FLAG_NS]?.declaredMovement]) {
-        if (declared && typeof declared.scheduledTick === 'number' && declared.scheduledTick > clock) {
+        if (declared && typeof declared.scheduledTick === 'number') {
           queued.push(declared.scheduledTick);
         }
       }
