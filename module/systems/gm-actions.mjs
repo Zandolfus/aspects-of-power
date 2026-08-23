@@ -145,10 +145,18 @@ export async function executeGmAction(payload) {
           );
 
           // Prompt the target's owner to accept. If the target is an NPC, GM decides.
+          // CANONICAL PLAYER FIRST (2026-08-23, "Gabriel just got George's
+          // barrier accept prompt"): ownership alone routes to whichever
+          // co-owner Object.entries surfaces first — the same trap the
+          // defence prompt documents. The user whose ASSIGNED CHARACTER is
+          // the target decides; a co-owner only when no such player is
+          // online; the GM when nobody is.
+          const charOwner = game.users.find(u =>
+            u.active && !u.isGM && u.character?.id === target.id);
           const owners = Object.entries(target.ownership ?? {})
             .filter(([uid, level]) => level >= 3 && uid !== 'default')
             .map(([uid]) => uid);
-          const playerOwner = owners.find(uid => {
+          const playerOwner = charOwner?.id ?? owners.find(uid => {
             const u = game.users.get(uid);
             return u?.active && !u.isGM;
           });
