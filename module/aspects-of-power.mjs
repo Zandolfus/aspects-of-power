@@ -1306,7 +1306,7 @@ Hooks.once('ready', async function () {
         whisper: ChatMessage.getWhisperRecipients('GM'),
         content: payload.content,
       });
-    } else if (['gmApplyBuff', 'gmApplyDebuff', 'gmApplyRestoration', 'gmApplyRepair', 'gmApplyCleanse', 'gmCurseOp', 'gmUpdateDefensePool', 'gmSpendResource', 'gmConsumeReaction', 'gmExecuteTrade', 'gmCreateAoeRegion', 'gmDeleteAoeRegion', 'gmOverworldNote', 'gmEnsureHexResident'].includes(payload.type)) {
+    } else if (['gmApplyBuff', 'gmApplyDebuff', 'gmApplyRestoration', 'gmApplyRepair', 'gmApplyCleanse', 'gmCurseOp', 'gmUpdateDefensePool', 'gmSpendResource', 'gmConsumeReaction', 'gmExecuteTrade', 'gmCreateAoeRegion', 'gmDeleteAoeRegion', 'gmUpdateAoeAffected', 'gmOverworldNote', 'gmEnsureHexResident'].includes(payload.type)) {
       await AspectsofPowerItem.executeGmAction(payload);
     } else if (payload.type === 'gmCelerityRealtimeToggle') {
       // TRIAL-REALTIME: player clicked the play/pause button. The real loop
@@ -2036,9 +2036,27 @@ async function _triggerPersistentAoe(tokenDoc, force = false) {
       if (tokenDisp !== casterDisp) continue;
     }
 
-    // Record last-ticked clockTick for this token.
-    const updatedMap = { ...(pd.affectedTokens ?? {}), [tokenDoc.id]: currentTick };
-    await doc.update({ 'flags.aspects-of-power.persistentData.affectedTokens': updatedMap });
+    // Record last-ticked clockTick for this token. ROUTED (2026-08-23):
+    // this function runs on the MOVING client — a player walking through
+    // a zone cannot write the region. The GM-side op re-reads the current
+    // map and merges ONE entry (single-writer, no RMW clobber). Local flow
+    // continues immediately; the cadence gate tolerates the write landing
+    // a beat later.
+    if (game.user.isGM) {
+      const cur = doc.flags?.['aspects-of-power']?.persistentData?.affectedTokens ?? {};
+      await doc.update({
+        'flags.aspects-of-power.persistentData.affectedTokens':
+          { ...cur, [tokenDoc.id]: currentTick },
+      });
+    } else {
+      game.socket.emit('system.aspects-of-power', {
+        type: 'gmUpdateAoeAffected',
+        sceneId: doc.parent.id,
+        regionId: doc.id,
+        tokenId: tokenDoc.id,
+        tick: currentTick,
+      });
+    }
 
     // Apply effects.
     const casterActor = await fromUuid(flags.casterActorUuid);

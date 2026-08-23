@@ -79,6 +79,29 @@ export async function executeGmAction(payload) {
         return;
       }
 
+      case 'gmUpdateAoeAffected': {
+        // Persistent-zone tick bookkeeping (2026-08-23: "User Willy lacks
+        // permission to update Region"). _triggerPersistentAoe runs on the
+        // MOVING client — a player walking through a zone cannot write the
+        // region's affectedTokens map. SINGLE-WRITER MERGE, deliberately:
+        // the payload carries ONE (tokenId, tick) entry and the CURRENT map
+        // is re-read here, so two clients ticking different tokens cannot
+        // clobber each other (the curse-meter lost-update lesson).
+        const scene = game.scenes.get(payload.sceneId);
+        const doc = scene?.regions.get(payload.regionId);
+        if (!doc) return;
+        try {
+          const cur = doc.flags?.['aspects-of-power']?.persistentData?.affectedTokens ?? {};
+          await doc.update({
+            'flags.aspects-of-power.persistentData.affectedTokens':
+              { ...cur, [payload.tokenId]: payload.tick },
+          });
+        } catch (e) {
+          console.warn('[gmUpdateAoeAffected] failed:', e);
+        }
+        return;
+      }
+
       case 'gmApplyRestoration': {
         const target = await fromUuid(payload.targetActorUuid);
         if (!target) return;
