@@ -661,10 +661,66 @@ export function registerOverworldSettings() {
   });
 }
 
+/* ------------------------------------------------------------------ */
+/* Per-user view memory                                                */
+/* ------------------------------------------------------------------ */
+
+/**
+ * REMEMBER THE HEX YOU WERE ON (2026-08-22, "upon reloading the
+ * server/client does not remember the last hex you were on").
+ *
+ * v14 keeps `User#viewedScene` as TRANSIENT activity state — nothing
+ * persists it — and Game#initializeCanvas boots every client onto
+ * `scenes.current`, which before canvas init is always the ACTIVE scene.
+ * Right for a one-scene world; in the hex overworld the party spreads
+ * across scenes and a reload teleported everyone to whichever hex
+ * happened to be active.
+ *
+ * So we own it: every scene view is recorded in a flag on the user's own
+ * User document (their own doc — no GM routing needed), and after boot
+ * the client walks back to it. Fallback when the flag is empty or the
+ * scene is gone: wherever the user's character token stands. No target =
+ * today's behavior (the active scene).
+ *
+ * ⚠ ORDER MATTERS: the boot draw of the active scene fires canvasReady
+ * BEFORE we restore — recording that draw would overwrite the flag we
+ * are about to read. The remembered id is read at `ready`, and recording
+ * only arms after the restore attempt.
+ */
+const VIEW_FLAG = 'lastViewedScene';
+let _viewMemoryArmed = false;
+
+function _rememberViewedScene() {
+  if (!_viewMemoryArmed) return;
+  const id = canvas.scene?.id;
+  if (!id || game.user.getFlag(SYS, VIEW_FLAG) === id) return;
+  game.user.setFlag(SYS, VIEW_FLAG, id).catch(() => {});
+}
+
+function _restoreViewedScene() {
+  const remembered = game.scenes.get(game.user.getFlag(SYS, VIEW_FLAG) ?? '');
+  const char = game.user.character;
+  const withToken = remembered ? null
+    : (char ? game.scenes.find(s => s.tokens.some(t => t.actorId === char.id)) : null);
+  const target = remembered ?? withToken;
+  _viewMemoryArmed = true;
+  if (!target || target.id === canvas.scene?.id) return;
+  /* A beat after canvasReady: Scene#view refuses while the texture loader
+     is still running on the boot scene. */
+  setTimeout(() => {
+    if (target.id !== canvas.scene?.id) target.view().catch(() => {});
+  }, 250);
+}
+
 export function registerOverworldHooks() {
   Hooks.on('canvasReady', () => { syncExploration(canvas?.scene); });
   Hooks.on('createToken', (doc) => { syncExploration(doc?.parent); });
   Hooks.on('preUpdateToken', onPreUpdateTokenForTravel);
+  Hooks.on('canvasReady', _rememberViewedScene);
   /* Availability needs the pack index; packs do not exist before ready. */
-  Hooks.once('ready', () => { loadHexPackIndex(); });
+  Hooks.once('ready', () => {
+    loadHexPackIndex();
+    if (canvas.ready) _restoreViewedScene();
+    else Hooks.once('canvasReady', _restoreViewedScene);
+  });
 }
