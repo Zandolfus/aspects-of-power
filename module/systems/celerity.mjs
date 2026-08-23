@@ -516,9 +516,10 @@ export async function spendDefenseBudget(actor, cost) {
  *
  * A charged smash (awm > 1) commits more mass — slower to deliver AND
  * costlier to answer; past the defender's cap it joins the meteor class
- * (full-reserve dive + stamina surcharge). A rhythm flick commits less on
- * both sides. Spells carry tier+implement, so a grand working prices as
- * the mountain it is.
+ * (the dive: full reserve drained, quality and the hit-scaled invest
+ * slider price the rest). A rhythm flick commits less on both sides.
+ * Spells carry tier+implement, so a grand working prices as the
+ * mountain it is.
  *
  * @param {Actor} actor
  * @param {Item} skill

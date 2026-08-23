@@ -2368,7 +2368,8 @@ eq('junk situational entries are skipped, not NaN',
   // crosses the cap and becomes a DIVE.
   eq('defBudget: Guard Breaker heft 300 is over-cap',
      F3.defenseTimeCost(300, 4444, cfg) > F3.defenseTimeBudgetMax(4444, cfg), true);
-  // Surcharge (supersedes overdraw debt): SR x stamMax x excess/cap.
+  // Surcharge (DEPRECATED 2026-08-22 — no engine caller; shim pinned for
+  // external macros only): SR x stamMax x excess/cap.
   const cap = F3.defenseTimeBudgetMax(4444, cfg);
   eq('defBudget: in-cap blow has zero surcharge',
      F3.defenseDiveSurcharge(F3.defenseTimeCost(200, 4444, cfg), cap, 200, cfg), 0);
@@ -2398,47 +2399,51 @@ eq('junk situational entries are skipped, not NaN',
      Number(/defenseTimeBudgetFraction:\s*([\d.]+)/.exec(src)?.[1]) / Number(/defenseTimeHeftFraction:\s*([\d.]+)/.exec(src)?.[1]), 2.5);
 
   // ── ROLL ALWAYS AVAILABLE (ruled 2026-08-22: "margin should basically
-  //    always exist") — shortfall prices dodge QUALITY, never availability.
-  //    quality = floor + (1-floor) x settled; both currencies fold into one
-  //    settled fraction in the blow's own time units. Anchors from the
-  //    Boughbreaker night fight (Gabriel: cap 793, stamina 348).
+  //    always exist"), simplified same day ("a simple invest x for
+  //    additional dodge") — EACH PRICE CHARGED ONCE. Time sets quality:
+  //    quality = floor + (1-floor) x payBudget/min(rawCost, cap). Stamina
+  //    is the voluntary dive-invest slider (bulwarkWallBonus, pinned
+  //    above); the mandatory surcharge is DELETED from the dive path.
+  //    Anchors from the Boughbreaker night fight (Gabriel: cap 793).
   const qcfg = { ...cfg, dodgeShortfallFloor: 0.5 };
   // Fully paid in-cap dodge is exactly the old dodge.
   {
-    const q = F3.dodgeShortfallQuality(634, 793, 793, 348, 0, qcfg);
+    const q = F3.dodgeShortfallQuality(634, 793, 793, qcfg);
     eq('shortfall: paid in-cap -> quality 1', q.quality, 1);
     eq('shortfall: paid in-cap spends the raw cost', q.payBudget, 634);
   }
   // Flat broke: the roll survives at the floor, nothing is spent.
   {
-    const q = F3.dodgeShortfallQuality(634, 793, 0, 0, 0, qcfg);
+    const q = F3.dodgeShortfallQuality(634, 793, 0, qcfg);
     eq('shortfall: flat broke -> floor quality', q.quality, 0.5);
     eq('shortfall: flat broke spends nothing', q.payBudget, 0);
   }
   // Half the time available -> halfway between floor and full.
-  near('shortfall: half settled -> 0.75', F3.dodgeShortfallQuality(634, 793, 317, 0, 0, qcfg).quality, 0.75, 0.001);
-  // Over-cap dive, everything payable: quality 1 (Splintering Charge 888
-  // vs cap 793, surcharge 8 — the live case that used to be REFUSED
-  // off-full-reserve).
+  near('shortfall: half settled -> 0.75', F3.dodgeShortfallQuality(634, 793, 317, qcfg).quality, 0.75, 0.001);
+  // Over-cap dive off a full reserve rolls at FULL strength — the excess
+  // carries no separate toll (the contest prices it: margin + the
+  // hit-scaled slider). Splintering Charge 888 vs cap 793, the live case
+  // that used to be REFUSED off-full-reserve.
   {
-    const q = F3.dodgeShortfallQuality(888, 793, 793, 348, 8, qcfg);
-    eq('shortfall: funded dive -> quality 1', q.quality, 1);
-    eq('shortfall: funded dive pays the cap', q.payBudget, 793);
-    eq('shortfall: funded dive pays the surcharge', q.payStam, 8);
+    const q = F3.dodgeShortfallQuality(888, 793, 793, qcfg);
+    eq('shortfall: full-reserve dive -> quality 1', q.quality, 1);
+    eq('shortfall: dive drains the cap, not the raw', q.payBudget, 793);
+    eq('shortfall: dive settles against the cap', q.budgetPortion, 793);
   }
   // Over-cap dive from a drained reserve — the night-fight wall, now a
-  // degraded roll instead of "takes the hit": 300/793 time + full surcharge.
+  // degraded roll instead of "takes the hit": 300 of the cap's 793.
   near('shortfall: tired dive settles partway',
-    F3.dodgeShortfallQuality(888, 793, 300, 348, 8, qcfg).quality, 0.722, 0.001);
-  // Surcharge unpayable: only the stamina share of the excess goes unsettled.
-  near('shortfall: broke-stamina dive still nearly full off a full reserve',
-    F3.dodgeShortfallQuality(888, 793, 793, 0, 8, qcfg).quality, 0.947, 0.001);
+    F3.dodgeShortfallQuality(888, 793, 300, qcfg).quality, 0.689, 0.001);
+  // A grand working (raw >> cap) prices the same TIME as any dive — its
+  // size bites through the margin and the slider rate, not double-billing.
+  eq('shortfall: meteor time-price equals the cap',
+     F3.dodgeShortfallQuality(5000, 793, 793, qcfg).quality, 1);
   // Negative control: quality is clamped to [floor, 1] — overpay cannot
   // exceed 1, and no shortfall can dip below the floor.
   eq('shortfall: overfull reserve clamps at 1',
-     F3.dodgeShortfallQuality(100, 793, 9999, 0, 0, qcfg).quality, 1);
+     F3.dodgeShortfallQuality(100, 793, 9999, qcfg).quality, 1);
   eq('shortfall: worst case never below floor',
-     F3.dodgeShortfallQuality(5000, 793, 0, 0, 500, qcfg).quality >= 0.5, true);
+     F3.dodgeShortfallQuality(5000, 793, 0, qcfg).quality >= 0.5, true);
   eq('defBudget: shipped shortfall floor is 0.5',
      Number(/dodgeShortfallFloor:\s*([\d.]+)/.exec(src)?.[1]), 0.5);
 

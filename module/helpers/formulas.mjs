@@ -822,9 +822,9 @@ export function defenseTimeBudgetMax(roundLen, cfg = null) {
  *
  *   cost = kw x (heft / 100) x defender round length
  *
- * ⚠ Callers clamp AFFORDABILITY at the budget cap (an over-cap blow is
- * divable at FULL reserve) and charge the stamina surcharge for the excess
- * (defenseDiveSurcharge) — the RAW cost returned here is the physics.
+ * ⚠ Callers settle against the reserve via dodgeShortfallQuality (ROLL
+ * ALWAYS AVAILABLE, ruled 2026-08-22) — the RAW cost returned here is the
+ * physics; anything past the budget cap is priced by the contest itself.
  *
  * @param {number} heft      The action's committed mass (celerity weight
  *                           x weight multipliers x alternation floor).
@@ -839,10 +839,12 @@ export function defenseTimeCost(heft, roundLen, cfg = null) {
 }
 
 /**
- * The stamina price of DIVING from a blow heavier than the whole reserve
- * (user ruling 2026-08-16: "expend significant resources to even survive a
- * grand spellcast" — supersedes the overdraw-debt model, whose 3.4-round
- * defenceless tail was rejected). Zero for anything at or under the cap.
+ * @deprecated DELETED FROM THE DIVE PATH (ruled 2026-08-22: "a simple
+ * invest x for additional dodge"). The mandatory surcharge was the entry
+ * fee of the old permission-gate model; under ROLL ALWAYS AVAILABLE the
+ * blow's size is priced ONCE — in the contest (the margin rule plus the
+ * hit-scaled dive-invest slider). Kept only so external macros reading it
+ * do not throw (standard 15); no engine caller remains.
  *
  *   surcharge = SR x staminaMax x (cost - cap) / cap
  *
@@ -865,48 +867,45 @@ export function defenseDiveSurcharge(cost, cap, staminaMax, cfg = null) {
 
 /**
  * ROLL ALWAYS AVAILABLE (RULED 2026-08-22: "let roll always be available.
- * Margin should basically always exist and should be used generally.").
+ * Margin should basically always exist and should be used generally."),
+ * simplified same day ("a simple invest x for additional dodge"):
+ * EACH PRICE IS CHARGED ONCE.
  *
- * Affordability no longer gates the dodge — a shortfall prices its QUALITY.
- * The defender settles what they can: defence time up to the cap, stamina
- * for the over-cap excess (the dive surcharge). Both currencies fold into
- * one settled fraction, measured in the blow's own time units — the excess
- * counts as settled in proportion to the surcharge actually paid:
+ *   TIME has one job — quality. The dodge drains what the reserve holds,
+ *   against the blow's time price clamped at the cap:
  *
- *   settled = (payBudget + excess x payStam/surcharge) / rawCost
- *   quality = floor + (1 - floor) x settled
+ *     settled = payBudget / min(rawCost, cap)
+ *     quality = floor + (1 - floor) x settled
  *
- * A fully-paid dodge is exactly the old dodge (quality 1). A flat-broke one
- * keeps `dodgeShortfallFloor` of its basis; the margin rule then converts
- * whatever basis survives into damage turned aside. This replaces BOTH old
- * refusals — "out of defence time" and "dive needs a FULL reserve" — with
- * a degraded roll. Chosen after the lethality board showed boss-density
- * basics one-shot the light PC frame at every level: a frame that lives on
- * the defence roll must always get the roll.
+ *   STAMINA has one job — the dive-invest slider (bulwarkWallBonus),
+ *   voluntary, priced against the incoming hit. No mandatory surcharge.
+ *
+ *   The blow's SIZE is priced once — in the contest: a meteor's hit total
+ *   both widens the margin that gets through and raises the slider's
+ *   price per point of dodge. It needs no separate toll.
+ *
+ * A full reserve is a full-strength roll (quality 1, exactly the old
+ * dodge). A flat-broke one keeps `dodgeShortfallFloor` of its basis; the
+ * margin rule converts whatever survives into damage turned aside. This
+ * replaces BOTH old refusals — "out of defence time" and "dive needs a
+ * FULL reserve" — with a degraded roll. Chosen after the lethality board
+ * showed boss-density basics one-shot the light PC frame at every level:
+ * a frame that lives on the defence roll must always get the roll.
  *
  * @param {number} rawCost    The blow's uncapped time price (defenseTimeCost).
  * @param {number} cap        The defender's budget cap (defenseTimeBudgetMax).
  * @param {number} remaining  Defence time currently in the reserve.
- * @param {number} stamina    The defender's CURRENT stamina.
- * @param {number} surcharge  Over-cap stamina price (defenseDiveSurcharge).
  * @param {object} [cfg]      defenseTuning override, for tests.
- * @returns {{payBudget:number, payStam:number, settled:number, quality:number}}
+ * @returns {{payBudget:number, budgetPortion:number, settled:number, quality:number}}
  */
-export function dodgeShortfallQuality(rawCost, cap, remaining, stamina, surcharge, cfg = null) {
+export function dodgeShortfallQuality(rawCost, cap, remaining, cfg = null) {
   const t = cfg ?? (globalThis.CONFIG?.ASPECTSOFPOWER?.defenseTuning ?? {});
   const floor = Math.max(0, Math.min(1, t.dodgeShortfallFloor ?? 0.5));
   const raw = Math.max(1, Math.round(Number(rawCost) || 0));
-  const budgetPortion = Math.min(raw, Math.max(0, Math.round(Number(cap) || 0)));
+  const budgetPortion = Math.max(1, Math.min(raw, Math.round(Number(cap) || 0)));
   const payBudget = Math.max(0, Math.min(Math.round(Number(remaining) || 0), budgetPortion));
-  const sur = Math.max(0, Math.round(Number(surcharge) || 0));
-  const payStam = Math.min(Math.max(0, Math.round(Number(stamina) || 0)), sur);
-  const excess = raw - budgetPortion;
-  // surcharge 0 with a real excess = no price was asked (zero-stamina frame);
-  // the unpriced share counts as settled rather than punishing what cannot
-  // be bought at any price.
-  const excessSettled = excess > 0 ? (sur > 0 ? excess * (payStam / sur) : excess) : 0;
-  const settled = Math.max(0, Math.min(1, (payBudget + excessSettled) / raw));
-  return { payBudget, payStam, settled, quality: floor + (1 - floor) * settled };
+  const settled = Math.max(0, Math.min(1, payBudget / budgetPortion));
+  return { payBudget, budgetPortion, settled, quality: floor + (1 - floor) * settled };
 }
 
 /**

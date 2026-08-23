@@ -1,6 +1,6 @@
 import { EquipmentSystem } from '../systems/equipment.mjs';
 import { getPositionalTags } from '../helpers/positioning.mjs';
-import { houseHitFormula, hybridAbilityMod, weaponStatBlend, healStatBlend, spellDamageRef, spellInvestDamage, spellWindupMultiplier, spellCastWeight, strikeInvestDamage, coInvestDamage, investSelfDamage as computeInvestSelfDamage, effectiveDodgeValue, splitEvenlyWithRemainder, parryMassMultiplier, bracedParryWeight, bracedMaxUsefulInvest, defenceMarginMultiplier, defenseTimeCost, defenseDiveSurcharge, dodgeShortfallQuality, dotTickDamage, burnDetonatePayload, bulwarkWallBonus, procStaminaCost, crushFlatAmount, riderMaxInvest, auraRadiusFor, barrierStatBlend, hotTickAmount, effectiveDamageMultiplier, clashOutcome } from '../helpers/formulas.mjs';
+import { houseHitFormula, hybridAbilityMod, weaponStatBlend, healStatBlend, spellDamageRef, spellInvestDamage, spellWindupMultiplier, spellCastWeight, strikeInvestDamage, coInvestDamage, investSelfDamage as computeInvestSelfDamage, effectiveDodgeValue, splitEvenlyWithRemainder, parryMassMultiplier, bracedParryWeight, bracedMaxUsefulInvest, defenceMarginMultiplier, defenseTimeCost, dodgeShortfallQuality, dotTickDamage, burnDetonatePayload, bulwarkWallBonus, procStaminaCost, crushFlatAmount, riderMaxInvest, auraRadiusFor, barrierStatBlend, hotTickAmount, effectiveDamageMultiplier, clashOutcome } from '../helpers/formulas.mjs';
 import { resolveSituationalMods } from '../systems/situational-mods.mjs';
 import { recordActionFired, declareAction, isInActiveCombat, computeActionWait, referenceRoundLength, computeWindupMultiplier, getScrambleStacks, addScrambleStack, applyDodgeCost, findCombatantForActor, perceiveGate, getDefenseBudget, spendDefenseBudget, setLastSwungHand, computeActionHeft, actorRoundLength } from '../systems/celerity.mjs';
 import { getThreatRadiusFt, actorIsDashing } from '../systems/engagement-halts.mjs';
@@ -1529,33 +1529,32 @@ export class AspectsofPowerItem extends Item {
         let costNote = '';
         let dodgeQuality = 1;
         if (econBudget) {
-          // HEFT + SURCHARGE (design-defense-time-budget, ruled 2026-08-16)
-          // under ROLL ALWAYS AVAILABLE (ruled 2026-08-22): the dodge pays
-          // the blow's committed mass in the defender's own time, and what
-          // cannot be paid degrades the dodge BASIS instead of refusing the
-          // roll — dodgeShortfallQuality folds defence time and the dive's
-          // stamina surcharge into one settled fraction.
+          // EACH PRICE CHARGED ONCE (ruled 2026-08-22, superseding the
+          // mandatory surcharge): TIME sets quality — the dodge drains what
+          // the reserve holds against the blow's price clamped at the cap
+          // (dodgeShortfallQuality); STAMINA is the voluntary dive-invest
+          // slider below; the blow's SIZE is priced by the contest itself
+          // (margin + the slider's hit-scaled rate).
           let heft = 100;
           try { heft = computeActionHeft(this.actor, item, null, null, { forDefense: true }); } catch (e) { /* no actor context */ }
           const budget = getDefenseBudget(targetActor);
           const rawCost = defenseTimeCost(heft, actorRoundLength(targetActor), dt);
-          const surcharge = defenseDiveSurcharge(rawCost, budget.max,
-            targetActor.system.stamina?.max ?? 0, dt);
-          const settleQ = dodgeShortfallQuality(rawCost, budget.max, budget.remaining,
-            targetActor.system.stamina?.value ?? 0, surcharge, dt);
+          const settleQ = dodgeShortfallQuality(rawCost, budget.max, budget.remaining, dt);
           dodgeQuality = settleQ.quality;
-          // DIVE INVEST (ruled 2026-08-23: "Dives should be slidable
-          // invests"): beyond the mandatory surcharge, the diver can hurl
-          // MORE stamina into the dive. Same pricing grammar as the bulwark
-          // brace — bracedCostHitFrac x hit per +100% of the dodge value,
-          // capped at diveMaxBoostMult — the legs buy dodge the way the
-          // shield arm buys wall. Same local-prompt guard as braces.
+          // DIVE INVEST (ruled 2026-08-23 "Dives should be slidable
+          // invests", simplified 2026-08-22 "a simple invest x for
+          // additional dodge"): on an over-cap blow the diver may hurl
+          // stamina into the dive — bracedCostHitFrac x hit per +100% of
+          // the dodge value, capped at diveMaxBoostMult — the legs buy
+          // dodge the way the shield arm buys wall. Zero is a legal
+          // answer (bare dive). Same local-prompt guard as braces.
           let _diveExtra = 0;
-          if (surcharge > 0) {
+          const _isDive = rawCost > budget.max;
+          if (_isDive) {
             const _dFrac = dt.bracedCostHitFrac ?? 0.05;
             const _dMax = dt.diveMaxBoostMult ?? 1.0;
             const _stam = targetActor.system.stamina?.value ?? 0;
-            const _dCap = Math.min(Math.max(0, Math.round(_stam - settleQ.payStam)),
+            const _dCap = Math.min(Math.max(0, Math.round(_stam)),
               Math.max(0, Math.round(_dFrac * hitTotal * _dMax)));
             const _dPlayer = game.users.find(u =>
               u.active && !u.isGM && u.character?.id === targetActor.id);
@@ -1565,9 +1564,9 @@ export class AspectsofPowerItem extends Item {
             if (_dMayDecide && _dCap > 0) {
               const chosen = await this._promptWallInvest({
                 title: `${item.name} incoming — Dive`,
-                lead: `An over-limit blow (hit ${hitTotal}) — the dive costs `
-                  + `<strong>${surcharge}</strong> stamina. Throw MORE into it to dodge harder `
-                  + `(cap +${Math.round(dv * _dMax)} dodge).`,
+                lead: `An over-limit blow (hit ${hitTotal}) — your legs give `
+                  + `<strong>${Math.round(dodgeQuality * 100)}%</strong>. Throw stamina into the dive `
+                  + `to dodge harder (cap +${Math.round(dv * _dMax)} dodge).`,
                 cap: _dCap, pool: _stam, bonusNoun: 'dodge',
                 bonusAt: (v) => bulwarkWallBonus(dv, v, hitTotal, _dFrac, _dMax),
                 confirmLabel: 'Dive', plainLabel: 'Bare dive',
@@ -1577,14 +1576,14 @@ export class AspectsofPowerItem extends Item {
             }
           }
           await spendDefenseBudget(targetActor, settleQ.payBudget);
-          if (settleQ.payStam + _diveExtra > 0) {
+          if (_diveExtra > 0) {
             this._gmAction({ type: 'gmSpendResource', targetActorUuid: targetActor.uuid,
-              resource: 'stamina', amount: settleQ.payStam + _diveExtra });
+              resource: 'stamina', amount: _diveExtra });
           }
           const after = getDefenseBudget(targetActor);
-          costNote = ` — settled ${settleQ.payBudget}/${rawCost} defence time`
-            + (settleQ.payStam + _diveExtra > 0 ? ` + ${settleQ.payStam + _diveExtra} stamina (a dive beyond limits`
-              + (_diveExtra > 0 ? `, +${dvBoost} dodge bought` : '') + ')' : '')
+          costNote = ` — settled ${settleQ.payBudget}/${settleQ.budgetPortion} defence time`
+            + (_isDive ? ` (a dive beyond limits${_diveExtra > 0
+              ? `: ${_diveExtra} stamina, +${dvBoost} dodge bought` : ''})` : '')
             + (dodgeQuality < 1 ? ` — tired legs, dodging at ${Math.round(dodgeQuality * 100)}%` : '')
             + ` (${after.remaining}/${after.max} left)`;
         } else {
@@ -3273,18 +3272,16 @@ export class AspectsofPowerItem extends Item {
     // `this` is the attacking item, so the swing's committed ticks come from
     // the same computeActionWait the attacker paid.
     const _econBudget = (dt.defenseEconModel ?? 'budget') === 'budget';
-    let _budget = null, _rawCost = 0, _surcharge = 0, _settle = null;
+    let _budget = null, _rawCost = 0, _settle = null;
     if (isPhysicalLane && _econBudget) {
       let heft = 100;
       try { heft = computeActionHeft(this.actor, this, null, null, { forDefense: true }); } catch (e) { /* no combat context */ }
       _budget = getDefenseBudget(targetActor);
       _rawCost = defenseTimeCost(heft, actorRoundLength(targetActor), dt);
-      _surcharge = defenseDiveSurcharge(_rawCost, _budget.max, targetActor.system.stamina?.max ?? 0, dt);
       // ROLL ALWAYS AVAILABLE (ruled 2026-08-22): the same settle the spend
       // path performs, computed here so the prompt previews the exact
       // quality the roll will carry (preview-parity rule).
-      _settle = dodgeShortfallQuality(_rawCost, _budget.max, _budget.remaining,
-        targetActor.system.stamina?.value ?? 0, _surcharge, dt);
+      _settle = dodgeShortfallQuality(_rawCost, _budget.max, _budget.remaining, dt);
     }
     if (isPhysicalLane) {
       // Perception gate: you can't dodge what you can't see.
@@ -3296,7 +3293,7 @@ export class AspectsofPowerItem extends Item {
       // shortfall degrades the dodge basis (dodgeShortfallQuality) and the
       // margin rule prices the rest. Blind, zero basis, and the perceive
       // gate remain the only refusals: they are content, not bookkeeping.
-      const _isDive = _surcharge > 0;
+      const _isDive = _econBudget && _budget && _rawCost > _budget.max;
       hasDefend = !blinded && dv > 0 && gate.canReact;
       defendLabel = _isDive ? 'Dive' : 'Dodge';
       const scrambleNote = (!_econBudget && stacks >= 1)
@@ -3308,7 +3305,7 @@ export class AspectsofPowerItem extends Item {
         : '';
       const econNote = _econBudget
         ? `<p><em>` + (_isDive
-          ? `A dive beyond limits: your reserve (${_budget.remaining}/${_budget.max}) + ${_settle.payStam}/${_surcharge} stamina.`
+          ? `A dive beyond limits — drains your reserve (${_budget.remaining}/${_budget.max}); stamina can buy extra dodge.`
           : `Costs ${_rawCost} defence time (${_budget.remaining}/${_budget.max} left).`)
           + _qNote + `</em></p>`
         : `<p><em>Dodging delays your next action and adds a scramble stack — win or lose.</em></p>`;

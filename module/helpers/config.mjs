@@ -748,26 +748,29 @@ ASPECTSOFPOWER.defenseTuning = {
   // incoming action's COMMITTED MASS — celerity weight x multipliers x the
   // attacker's alternation floor — in the defender's own time. The battery
   // rides the RIDGE B/kw = 2.5: tune both together or not at all. Blows
-  // costing more than the whole reserve are divable at FULL reserve only,
-  // and burn stamina scaled to the excess (defenseDiveSurchargeRate) — a
-  // grand working ~47% of max stamina per dive; the ledger never goes
-  // negative. Frontline pressure keeping the reserve off-full is what
-  // makes artillery land — coordination, not bookkeeping.
+  // costing more than the whole reserve are DIVES: the reserve drains
+  // whole and the hit-scaled invest slider buys extra dodge.
   defenseEconModel: 'budget',
   defenseTimeBudgetFraction: 0.20,
   defenseTimeHeftFraction: 0.08,
+  // ⚠ DEPRECATED (ruled 2026-08-22 "a simple invest x for additional
+  // dodge"): the mandatory dive surcharge is deleted from the engine —
+  // the blow's size is priced by the contest (margin + the slider's
+  // hit-scaled rate). Knob kept only for defenseDiveSurcharge, which
+  // survives as a shim for external macros (code standard 15).
   defenseDiveSurchargeRate: 0.2,
   // ── ROLL ALWAYS AVAILABLE (RULED 2026-08-22) ── "let roll always be
   // available. Margin should basically always exist and should be used
-  // generally." Affordability no longer hides the dodge button: the
-  // defender settles what they can (defence time, plus stamina for the
-  // over-cap excess) and the shortfall degrades the dodge BASIS instead —
-  // quality = floor + (1-floor) x settledFraction (dodgeShortfallQuality).
-  // The margin rule converts whatever basis survives into damage turned
-  // aside, so a flat-broke dodge still answers half. Chosen after the
-  // lethality board (migration/local/lethality_progression.mjs) showed
-  // boss-density basics one-shot the light PC frame at EVERY level — a
-  // frame that lives on the defence roll must always get the roll.
+  // generally." + same-day simplification: EACH PRICE IS CHARGED ONCE.
+  // TIME sets quality — the dodge drains what the reserve holds against
+  // the blow's price clamped at the cap: quality = floor + (1-floor) x
+  // payBudget/min(rawCost, cap) (dodgeShortfallQuality). STAMINA is the
+  // voluntary dive-invest slider. The margin rule converts whatever basis
+  // survives into damage turned aside, so a flat-broke dodge still
+  // answers half. Chosen after the lethality board
+  // (migration/local/lethality_progression.mjs) showed boss-density
+  // basics one-shot the light PC frame at EVERY level — a frame that
+  // lives on the defence roll must always get the roll.
   dodgeShortfallFloor: 0.5,
   // Dodge (LEGACY model only): each dodge delays the defender's next action
   // by this fraction of their own action wait (declared action's wait when
