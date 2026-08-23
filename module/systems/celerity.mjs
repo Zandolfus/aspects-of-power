@@ -976,6 +976,12 @@ export async function declareAction(actor, skill, options = {}) {
   // it is still equipped), closing the swap and keeping rotation pricing
   // and payload on the same blade.
   const declaredWeaponId = skill?._resolveWeaponForSkill?.()?.id ?? null;
+  // diff:false (2026-08-23, "queued item not found id=undefined"): a
+  // re-declare's client-side diff strips keys equal to local state —
+  // itemId above all — so a concurrent clear landing between produced a
+  // partial declaredAction fragment (the update-DIFF resurrection race,
+  // playbook-live-data-reliability). Sending the whole object every time
+  // makes the worst interleaving a clean loss, never a fragment.
   await _safeCombatantUpdate(combatant, {
     'flags.aspectsofpower.declaredAction': {
       itemId: skill.id,
@@ -1009,7 +1015,7 @@ export async function declareAction(actor, skill, options = {}) {
     'flags.aspectsofpower.lastActionWait': wait,
     'flags.aspectsofpower.lastActionName': skill.name + ' (queued)',
     'flags.aspectsofpower.dodgeDebt': 0,
-  });
+  }, { diff: false });
 
   const investNote = investAmount ? ` — invest ${investAmount}` : '';
   const infusedNote = coInvestAmount ? ` (+${coInvestAmount} ${coInvestResource || 'mana'})` : '';
@@ -1519,7 +1525,7 @@ export async function declareMovement(actor, startPos, endPos, distanceFt, stami
     'flags.aspectsofpower.nextActionTick': Math.min(scheduledTick, _qaTick),
     'flags.aspectsofpower.lastActionWait': wait,
     'flags.aspectsofpower.lastActionName': `${label} (queued)`,
-  });
+  }, { diff: false }); // same fragment guard as the skill declare
 
   ChatMessage.create({
     speaker: ChatMessage.getSpeaker({ actor }),
@@ -1589,7 +1595,7 @@ export async function declareBreakFree(actor, effect) {
     'flags.aspectsofpower.nextActionTick': scheduledTick,
     'flags.aspectsofpower.lastActionWait': wait,
     'flags.aspectsofpower.lastActionName': `${label} (queued)`,
-  });
+  }, { diff: false }); // same fragment guard as the skill declare
 
   ChatMessage.create({
     speaker: ChatMessage.getSpeaker({ actor }),
