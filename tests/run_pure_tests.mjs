@@ -2397,6 +2397,51 @@ eq('junk situational entries are skipped, not NaN',
   eq('defBudget: shipped ridge B/kw = 2.5',
      Number(/defenseTimeBudgetFraction:\s*([\d.]+)/.exec(src)?.[1]) / Number(/defenseTimeHeftFraction:\s*([\d.]+)/.exec(src)?.[1]), 2.5);
 
+  // ── ROLL ALWAYS AVAILABLE (ruled 2026-08-22: "margin should basically
+  //    always exist") — shortfall prices dodge QUALITY, never availability.
+  //    quality = floor + (1-floor) x settled; both currencies fold into one
+  //    settled fraction in the blow's own time units. Anchors from the
+  //    Boughbreaker night fight (Gabriel: cap 793, stamina 348).
+  const qcfg = { ...cfg, dodgeShortfallFloor: 0.5 };
+  // Fully paid in-cap dodge is exactly the old dodge.
+  {
+    const q = F3.dodgeShortfallQuality(634, 793, 793, 348, 0, qcfg);
+    eq('shortfall: paid in-cap -> quality 1', q.quality, 1);
+    eq('shortfall: paid in-cap spends the raw cost', q.payBudget, 634);
+  }
+  // Flat broke: the roll survives at the floor, nothing is spent.
+  {
+    const q = F3.dodgeShortfallQuality(634, 793, 0, 0, 0, qcfg);
+    eq('shortfall: flat broke -> floor quality', q.quality, 0.5);
+    eq('shortfall: flat broke spends nothing', q.payBudget, 0);
+  }
+  // Half the time available -> halfway between floor and full.
+  near('shortfall: half settled -> 0.75', F3.dodgeShortfallQuality(634, 793, 317, 0, 0, qcfg).quality, 0.75, 0.001);
+  // Over-cap dive, everything payable: quality 1 (Splintering Charge 888
+  // vs cap 793, surcharge 8 — the live case that used to be REFUSED
+  // off-full-reserve).
+  {
+    const q = F3.dodgeShortfallQuality(888, 793, 793, 348, 8, qcfg);
+    eq('shortfall: funded dive -> quality 1', q.quality, 1);
+    eq('shortfall: funded dive pays the cap', q.payBudget, 793);
+    eq('shortfall: funded dive pays the surcharge', q.payStam, 8);
+  }
+  // Over-cap dive from a drained reserve — the night-fight wall, now a
+  // degraded roll instead of "takes the hit": 300/793 time + full surcharge.
+  near('shortfall: tired dive settles partway',
+    F3.dodgeShortfallQuality(888, 793, 300, 348, 8, qcfg).quality, 0.722, 0.001);
+  // Surcharge unpayable: only the stamina share of the excess goes unsettled.
+  near('shortfall: broke-stamina dive still nearly full off a full reserve',
+    F3.dodgeShortfallQuality(888, 793, 793, 0, 8, qcfg).quality, 0.947, 0.001);
+  // Negative control: quality is clamped to [floor, 1] — overpay cannot
+  // exceed 1, and no shortfall can dip below the floor.
+  eq('shortfall: overfull reserve clamps at 1',
+     F3.dodgeShortfallQuality(100, 793, 9999, 0, 0, qcfg).quality, 1);
+  eq('shortfall: worst case never below floor',
+     F3.dodgeShortfallQuality(5000, 793, 0, 0, 500, qcfg).quality >= 0.5, true);
+  eq('defBudget: shipped shortfall floor is 0.5',
+     Number(/dodgeShortfallFloor:\s*([\d.]+)/.exec(src)?.[1]), 0.5);
+
   // ── Dual-wield body floor (design-dual-wield-tempo, ladder ruled
   //    2026-08-15, re-validated under the budget economy 2026-08-16) ──
   const DW = { enabled: true, untrainedFloor: 0.95,

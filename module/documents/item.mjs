@@ -1,6 +1,6 @@
 import { EquipmentSystem } from '../systems/equipment.mjs';
 import { getPositionalTags } from '../helpers/positioning.mjs';
-import { houseHitFormula, hybridAbilityMod, weaponStatBlend, healStatBlend, spellDamageRef, spellInvestDamage, spellWindupMultiplier, spellCastWeight, strikeInvestDamage, coInvestDamage, investSelfDamage as computeInvestSelfDamage, effectiveDodgeValue, splitEvenlyWithRemainder, parryMassMultiplier, bracedParryWeight, bracedMaxUsefulInvest, defenceMarginMultiplier, defenseTimeCost, defenseDiveSurcharge, dotTickDamage, burnDetonatePayload, bulwarkWallBonus, procStaminaCost, crushFlatAmount, riderMaxInvest, auraRadiusFor, barrierStatBlend, hotTickAmount, effectiveDamageMultiplier, clashOutcome } from '../helpers/formulas.mjs';
+import { houseHitFormula, hybridAbilityMod, weaponStatBlend, healStatBlend, spellDamageRef, spellInvestDamage, spellWindupMultiplier, spellCastWeight, strikeInvestDamage, coInvestDamage, investSelfDamage as computeInvestSelfDamage, effectiveDodgeValue, splitEvenlyWithRemainder, parryMassMultiplier, bracedParryWeight, bracedMaxUsefulInvest, defenceMarginMultiplier, defenseTimeCost, defenseDiveSurcharge, dodgeShortfallQuality, dotTickDamage, burnDetonatePayload, bulwarkWallBonus, procStaminaCost, crushFlatAmount, riderMaxInvest, auraRadiusFor, barrierStatBlend, hotTickAmount, effectiveDamageMultiplier, clashOutcome } from '../helpers/formulas.mjs';
 import { resolveSituationalMods } from '../systems/situational-mods.mjs';
 import { recordActionFired, declareAction, isInActiveCombat, computeActionWait, referenceRoundLength, computeWindupMultiplier, getScrambleStacks, addScrambleStack, applyDodgeCost, findCombatantForActor, perceiveGate, getDefenseBudget, spendDefenseBudget, setLastSwungHand, computeActionHeft, actorRoundLength } from '../systems/celerity.mjs';
 import { getThreatRadiusFt, actorIsDashing } from '../systems/engagement-halts.mjs';
@@ -1255,11 +1255,18 @@ export class AspectsofPowerItem extends Item {
    *                       ablative pool depletion (already handled in
    *                       persistent-region behavior, but flagged here
    *                       for routing distinctness).
-   *   'aoe-volumetric'  — AOE attack with no shrapnel or mental subtype.
-   *                       Bypasses physical defense pools — "you can't
-   *                       dodge gas." Dodge/parry/barrier reactions skip.
-   *                       Per the design memo, this is the default AOE
-   *                       case unless tagged otherwise.
+   *   'aoe-volumetric'  — AOE attack carrying the `volumetric` tag (gas,
+   *                       eruption, psychic wave). Bypasses physical
+   *                       defense pools — "you can't dodge gas."
+   *                       Dodge/parry/barrier reactions skip.
+   *   'aoe-ground'      — every other physical AOE (sweeps, tramples,
+   *                       floods, stomps). ROLL ALWAYS AVAILABLE (ruled
+   *                       2026-08-22: "margin should basically always
+   *                       exist"): a swinging trunk is a moving mass, not
+   *                       an atmosphere — enters the normal defence
+   *                       pipeline and the margin rule prices the answer.
+   *                       Mirrors the volumetric-by-exception flip the
+   *                       leap gate already took.
    */
   static _classifyAoeContext(skill) {
     if (!skill) return 'not-aoe';
@@ -1272,7 +1279,7 @@ export class AspectsofPowerItem extends Item {
     if (tags.includes('shrapnel')) return 'aoe-shrapnel';
     const def = sys.roll?.targetDefense;
     if (def === 'mind' || def === 'soul') return 'aoe-mental';
-    return 'aoe-volumetric';
+    return tags.includes('volumetric') ? 'aoe-volumetric' : 'aoe-ground';
   }
 
   async _promptReactiveChoice(reactorActor, triggerKey, ctx) {
@@ -1520,18 +1527,23 @@ export class AspectsofPowerItem extends Item {
         let dvBoost = 0;
 
         let costNote = '';
+        let dodgeQuality = 1;
         if (econBudget) {
-          // HEFT + SURCHARGE (design-defense-time-budget, ruled 2026-08-16):
-          // the dodge pays the blow's committed mass in the defender's own
-          // time; an over-cap blow empties the whole reserve AND burns
-          // stamina scaled to the excess — the dive from the meteor.
+          // HEFT + SURCHARGE (design-defense-time-budget, ruled 2026-08-16)
+          // under ROLL ALWAYS AVAILABLE (ruled 2026-08-22): the dodge pays
+          // the blow's committed mass in the defender's own time, and what
+          // cannot be paid degrades the dodge BASIS instead of refusing the
+          // roll — dodgeShortfallQuality folds defence time and the dive's
+          // stamina surcharge into one settled fraction.
           let heft = 100;
           try { heft = computeActionHeft(this.actor, item, null, null, { forDefense: true }); } catch (e) { /* no actor context */ }
           const budget = getDefenseBudget(targetActor);
           const rawCost = defenseTimeCost(heft, actorRoundLength(targetActor), dt);
-          const cost = Math.min(rawCost, budget.max);
           const surcharge = defenseDiveSurcharge(rawCost, budget.max,
             targetActor.system.stamina?.max ?? 0, dt);
+          const settleQ = dodgeShortfallQuality(rawCost, budget.max, budget.remaining,
+            targetActor.system.stamina?.value ?? 0, surcharge, dt);
+          dodgeQuality = settleQ.quality;
           // DIVE INVEST (ruled 2026-08-23: "Dives should be slidable
           // invests"): beyond the mandatory surcharge, the diver can hurl
           // MORE stamina into the dive. Same pricing grammar as the bulwark
@@ -1543,7 +1555,7 @@ export class AspectsofPowerItem extends Item {
             const _dFrac = dt.bracedCostHitFrac ?? 0.05;
             const _dMax = dt.diveMaxBoostMult ?? 1.0;
             const _stam = targetActor.system.stamina?.value ?? 0;
-            const _dCap = Math.min(Math.max(0, Math.round(_stam - surcharge)),
+            const _dCap = Math.min(Math.max(0, Math.round(_stam - settleQ.payStam)),
               Math.max(0, Math.round(_dFrac * hitTotal * _dMax)));
             const _dPlayer = game.users.find(u =>
               u.active && !u.isGM && u.character?.id === targetActor.id);
@@ -1564,15 +1576,16 @@ export class AspectsofPowerItem extends Item {
               if (_diveExtra > 0) dvBoost = bulwarkWallBonus(dv, _diveExtra, hitTotal, _dFrac, _dMax);
             }
           }
-          await spendDefenseBudget(targetActor, cost);
-          if (surcharge + _diveExtra > 0) {
+          await spendDefenseBudget(targetActor, settleQ.payBudget);
+          if (settleQ.payStam + _diveExtra > 0) {
             this._gmAction({ type: 'gmSpendResource', targetActorUuid: targetActor.uuid,
-              resource: 'stamina', amount: surcharge + _diveExtra });
+              resource: 'stamina', amount: settleQ.payStam + _diveExtra });
           }
           const after = getDefenseBudget(targetActor);
-          costNote = ` — ${cost} defence time spent`
-            + (surcharge > 0 ? ` + ${surcharge + _diveExtra} stamina (a dive beyond limits`
+          costNote = ` — settled ${settleQ.payBudget}/${rawCost} defence time`
+            + (settleQ.payStam + _diveExtra > 0 ? ` + ${settleQ.payStam + _diveExtra} stamina (a dive beyond limits`
               + (_diveExtra > 0 ? `, +${dvBoost} dodge bought` : '') + ')' : '')
+            + (dodgeQuality < 1 ? ` — tired legs, dodging at ${Math.round(dodgeQuality * 100)}%` : '')
             + ` (${after.remaining}/${after.max} left)`;
         } else {
           await addScrambleStack(targetActor);
@@ -1581,8 +1594,10 @@ export class AspectsofPowerItem extends Item {
         }
 
         // Roll AFTER the dive invest so bought dodge value is in the roll.
+        // Shortfall quality degrades the BASE dodge value only — dvBoost is
+        // fresh stamina paid at full price, it does not arrive tired.
         const die = await new Roll('1d20').evaluate();
-        let droll = (dv + dvBoost) * (1 + die.total / 100);
+        let droll = (dv * dodgeQuality + dvBoost) * (1 + die.total / 100);
         // Shrapnel is hard to dodge — penalize the roll (replaces the old
         // pool-cost multiplier for physical lanes).
         if (shrapnelMult > 1) droll *= (1 - (dt.shrapnelDodgePenalty ?? 0.25));
@@ -2439,12 +2454,14 @@ export class AspectsofPowerItem extends Item {
       }
     }
 
-    // Phase F: volumetric AOEs bypass physical defense pools — "you can't
-    // dodge gas." `_classifyAoeContext` returns 'aoe-volumetric' for any
-    // AOE attack-tagged skill without `shrapnel` and not targeting mind/
-    // soul defense (those have their own pipelines). Skip the pool prompt
-    // (and therefore the reactive dodge/parry/barrier choice, which lives
-    // in `_promptDefensePool` inside `_resolveDefenseCheck`). Damage flows
+    // Phase F: VOLUMETRIC AOEs bypass physical defense pools — "you can't
+    // dodge gas." `_classifyAoeContext` returns 'aoe-volumetric' only for
+    // AOEs carrying the `volumetric` tag (ROLL ALWAYS AVAILABLE, ruled
+    // 2026-08-22): ground-anchored sweeps/tramples classify 'aoe-ground'
+    // and fall through to the normal defence pipeline below — the margin
+    // rule prices the answer, composing with the AOE overlap fraction.
+    // For volumetrics, skip the pool prompt (and therefore the reactive
+    // dodge/parry/barrier choice in `_promptDefensePool`); damage flows
     // straight through to armor/veil/toughness at fraction-scaled full.
     // Shrapnel AOEs and single-target attacks keep their existing pipeline.
     const aoeContext = this.constructor._classifyAoeContext(this);
@@ -3256,47 +3273,51 @@ export class AspectsofPowerItem extends Item {
     // `this` is the attacking item, so the swing's committed ticks come from
     // the same computeActionWait the attacker paid.
     const _econBudget = (dt.defenseEconModel ?? 'budget') === 'budget';
-    let _budget = null, _dodgeCost = 0, _surcharge = 0;
+    let _budget = null, _rawCost = 0, _surcharge = 0, _settle = null;
     if (isPhysicalLane && _econBudget) {
       let heft = 100;
       try { heft = computeActionHeft(this.actor, this, null, null, { forDefense: true }); } catch (e) { /* no combat context */ }
       _budget = getDefenseBudget(targetActor);
-      const rawCost = defenseTimeCost(heft, actorRoundLength(targetActor), dt);
-      _dodgeCost = Math.min(rawCost, _budget.max);
-      _surcharge = defenseDiveSurcharge(rawCost, _budget.max, targetActor.system.stamina?.max ?? 0, dt);
+      _rawCost = defenseTimeCost(heft, actorRoundLength(targetActor), dt);
+      _surcharge = defenseDiveSurcharge(_rawCost, _budget.max, targetActor.system.stamina?.max ?? 0, dt);
+      // ROLL ALWAYS AVAILABLE (ruled 2026-08-22): the same settle the spend
+      // path performs, computed here so the prompt previews the exact
+      // quality the roll will carry (preview-parity rule).
+      _settle = dodgeShortfallQuality(_rawCost, _budget.max, _budget.remaining,
+        targetActor.system.stamina?.value ?? 0, _surcharge, dt);
     }
     if (isPhysicalLane) {
       // Perception gate: you can't dodge what you can't see.
       const blinded = targetActor.effects.some(e => !e.disabled && e.system?.debuffType === 'blind');
       const stacks = _econBudget ? 0 : getScrambleStacks(targetActor);
       const dv = Math.round(effectiveDodgeValue(targetActor, defKey, stacks, dt));
-      // Over-cap blows: divable only at FULL reserve, and only if the
-      // stamina surcharge is payable. In-cap blows: plain affordability.
+      // ROLL ALWAYS AVAILABLE (ruled 2026-08-22: "margin should basically
+      // always exist"): affordability no longer gates the button — a
+      // shortfall degrades the dodge basis (dodgeShortfallQuality) and the
+      // margin rule prices the rest. Blind, zero basis, and the perceive
+      // gate remain the only refusals: they are content, not bookkeeping.
       const _isDive = _surcharge > 0;
-      const _stam = targetActor.system.stamina?.value ?? 0;
-      const affordable = !_econBudget
-        || (_isDive ? (_budget.remaining >= _budget.max && _stam >= _surcharge)
-          : _budget.remaining >= _dodgeCost);
-      hasDefend = !blinded && dv > 0 && gate.canReact && affordable;
+      hasDefend = !blinded && dv > 0 && gate.canReact;
       defendLabel = _isDive ? 'Dive' : 'Dodge';
       const scrambleNote = (!_econBudget && stacks >= 1)
         ? ` (scramble −${Math.round((dt.scrambleStackPct ?? 0.15) * stacks * 100)}%)`
         : '';
+      const _q = _settle?.quality ?? 1;
+      const _qNote = _q < 1
+        ? ` Tired legs — dodging at <strong>${Math.round(_q * 100)}%</strong> strength.`
+        : '';
       const econNote = _econBudget
-        ? (_isDive
-          ? `<p><em>A dive beyond limits: your ENTIRE reserve + ${_surcharge} stamina.</em></p>`
-          : `<p><em>Costs ${_dodgeCost} defence time (${_budget.remaining}/${_budget.max} left).</em></p>`)
+        ? `<p><em>` + (_isDive
+          ? `A dive beyond limits: your reserve (${_budget.remaining}/${_budget.max}) + ${_settle.payStam}/${_surcharge} stamina.`
+          : `Costs ${_rawCost} defence time (${_budget.remaining}/${_budget.max} left).`)
+          + _qNote + `</em></p>`
         : `<p><em>Dodging delays your next action and adds a scramble stack — win or lose.</em></p>`;
       defenseText = hasDefend
         ? `<p>Dodge value: <strong>${dv}</strong>${scrambleNote} vs to-hit ${hitTotal}.</p>` + econNote
         : (blinded ? `<p><em>Blinded — you cannot dodge what you cannot see.</em></p>`
           : (!gate.canReact
             ? `<p><em>Too fast to react — the blow lands before you can move (${gate.ratio.toFixed(1)}x your Celerity).</em></p>`
-            : (_econBudget && _budget
-              ? (_isDive
-                ? `<p><em>Diving from this needs a FULL reserve (${_budget.remaining}/${_budget.max}) and ${_surcharge} stamina (${_stam} left).</em></p>`
-                : `<p><em>Out of defence time — this dodge needs ${_dodgeCost}, ${_budget.remaining} left.</em></p>`)
-              : '')));
+            : ''));
     } else {
       hasDefend = pool > 0;
       defendLabel = 'Defend';
@@ -3321,10 +3342,12 @@ export class AspectsofPowerItem extends Item {
       let defend = false;
       let note = gate.canReact ? 'takes the hit' : 'cannot react — too fast to see';
       if (isPhysicalLane && hasDefend) {
-        // hasDefend already carries the budget-affordability gate under the
-        // budget economy, so the AI cannot overdraw defence time.
+        // ROLL ALWAYS AVAILABLE: a shortfall no longer blocks the AI either.
+        // It decides on the expected reduction of the quality-degraded basis;
+        // the spend path clamps to what exists, so it cannot overdraw.
         const aiStacks = _econBudget ? 0 : getScrambleStacks(targetActor);
-        const aiDv = effectiveDodgeValue(targetActor, defKey, aiStacks, dt);
+        const aiDv = effectiveDodgeValue(targetActor, defKey, aiStacks, dt)
+          * (_settle?.quality ?? 1);
         // Under THE MARGIN RULE defending is never wasted — any dodge basis
         // turns aside a proportional share — so the old "35% chance of TOTAL
         // avoidance" gate is far too conservative and would have AI actors eat
