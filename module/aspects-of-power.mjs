@@ -1590,9 +1590,13 @@ Hooks.on('combatTurnChange', async (combat, prior, _current) => {
  * Only visible to the token's owning player(s).
  */
 Hooks.on('refreshToken', (token) => {
+  // Teardown race guard (same family as the destroyed-token animation
+  // guard below): a refresh landing on a token mid-destroy would addChild
+  // onto a dead container and poison the render pass.
+  if (!token || token.destroyed || !token.transform) return;
   // ── Facing indicator ──────────────────────────────────────────────────────
   if (token._facingIndicator) {
-    token._facingIndicator.destroy();
+    if (!token._facingIndicator.destroyed) token._facingIndicator.destroy();
     token._facingIndicator = null;
   }
 
@@ -1874,6 +1878,30 @@ Hooks.on('canvasTearDown', () => detachOverlayLayer());
 // and updateActor (sense tags / stats changed).
 Hooks.on('canvasReady', () => attachPowerSenseLayer());
 Hooks.on('canvasTearDown', () => detachPowerSenseLayer());
+
+/* -------------------------------------------- */
+/*  Destroyed-token animation guard             */
+/* -------------------------------------------- */
+// MAP-TRANSITION RENDER CORRUPTION (2026-08-22, John's smeared canvas +
+// Willy's console). The party walks together, so a hex teleport tears a
+// client's canvas down WHILE the other walkers' position updates are still
+// streaming in. Core v14's update path (handleUpdateDocuments → _onUpdate →
+// #onUpdateAnimation → Token#animate) can then start an animation on a
+// Token whose PIXI object the teardown already destroyed — "can't access
+// property 'position', this.transform is null" — and the broken listener
+// stays on the shared ticker, so EVERY subsequent render pass throws and
+// aborts mid-frame: the giant-zoom smear with black vision wedges.
+// Guard the entry point core is missing: a destroyed placeable animates as
+// a no-op. Fixes the symptom class for every placeable update racing a
+// teardown, not just travel.
+Hooks.once('ready', () => {
+  const TokenCls = CONFIG.Token.objectClass;
+  const _animate = TokenCls.prototype.animate;
+  TokenCls.prototype.animate = function (...args) {
+    if (this.destroyed || !this.transform) return Promise.resolve();
+    return _animate.apply(this, args);
+  };
+});
 Hooks.on('controlToken', () => { refreshPowerSense(); refreshOverlay(); });
 Hooks.on('updateToken', () => { refreshPowerSense(); refreshOverlay(); });
 
