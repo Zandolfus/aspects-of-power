@@ -505,6 +505,15 @@ export class SkillData extends foundry.abstract.TypeDataModel {
         // `curse-empath` radius override: how far the bloodline feels
         // suffering, in feet. 0 = config default (CONFIG.curse.empathRadiusFt).
         empathRadiusFt: new fields.NumberField({ initial: 0, min: 0 }),
+        // HIT-BASIS OVERRIDE (RULED 2026-08-22: "Felicia -> Willpower/Wis
+        // aim"): ability keys replacing the roll type's hard-coded aim
+        // grid — primary x0.9 + secondary x0.3, the house two-stat aim
+        // shape. Damage formulas are untouched (hit and damage use
+        // different stats on magic skills — the damage playbook rule).
+        // Empty = the roll type's default aim. Curse skills aim with the
+        // caster's will, not scholarship.
+        hitPrimary:   new fields.StringField({ initial: '' }),
+        hitSecondary: new fields.StringField({ initial: '' }),
 
         // ── STACKS (design-stacks-subsystem.md, RULED 2026-08-02) ─────────
         // A self-held charge pool on the CASTER. One skill produces into a

@@ -1095,41 +1095,57 @@ export class AspectsofPowerItem extends Item {
     rollData.roll.abilitymod    = ab;
     rollData.roll.resourcevalue = this.actor.system[rollData.roll.resource]?.value ?? 0;
 
+    // HIT-BASIS OVERRIDE (RULED 2026-08-22: "Felicia -> Willpower/Wis
+    // aim"): tagConfig.hitPrimary/hitSecondary replace the roll type's
+    // hard-coded aim grid with primary x0.9 + secondary x0.3 (the house
+    // two-stat aim shape). Damage formulas below never read this — hit
+    // and damage use different stats on magic skills, deliberately.
+    const _hitOverride = (() => {
+      const p = this.system.tagConfig?.hitPrimary ?? '';
+      if (!p || !A[p]) return null;
+      const s = this.system.tagConfig?.hitSecondary ?? '';
+      return A[s] ? `${A[p].mod}*(9/10)+${A[s].mod}*(3/10)` : `${A[p].mod}`;
+    })();
+
     let hitFormula, dmgFormula;
 
     if (typ === 'dex_weapon') {
-      const m = `${A.dexterity.mod}*(9/10)+${A.strength.mod}*(3/10)`;
+      const m = _hitOverride ?? `${A.dexterity.mod}*(9/10)+${A.strength.mod}*(3/10)`;
       hitFormula = houseHitFormula(m);
       dmgFormula = `(((${dic}/50*(${A.strength.mod}*(9/10)+${A.dexterity.mod}*(3/10)))+${A.strength.mod}+${A.dexterity.mod}*(3/10))*${db})`;
 
     } else if (typ === 'str_weapon') {
-      const m = `${A.strength.mod}*(9/10)+${A.dexterity.mod}*(3/10)`;
+      const m = _hitOverride ?? `${A.strength.mod}*(9/10)+${A.dexterity.mod}*(3/10)`;
       hitFormula = houseHitFormula(m);
       dmgFormula = `((${dic}/50*(${A.strength.mod})+${A.strength.mod}+${A.strength.mod}*(3/10))*${db})`;
 
     } else if (typ === 'phys_ranged') {
-      const m = `${A.perception.mod}*(9/10)+${A.dexterity.mod}*(3/10)`;
+      const m = _hitOverride ?? `${A.perception.mod}*(9/10)+${A.dexterity.mod}*(3/10)`;
       hitFormula = houseHitFormula(m);
       dmgFormula = `(((${dic}/50*(${A.perception.mod}*(9/10)+${A.dexterity.mod}*(3/10)))+${A.perception.mod}*(9/10)+${A.dexterity.mod}*(3/10))*${db})`;
 
     } else if (typ === 'magic_projectile') {
-      const m = `${A.intelligence.mod}*(9/10)+${A.perception.mod}*(3/10)`;
+      const m = _hitOverride ?? `${A.intelligence.mod}*(9/10)+${A.perception.mod}*(3/10)`;
       hitFormula = houseHitFormula(m);
       dmgFormula = `(((${dic}/100*${ab})+${ab})*${db})`;
 
     } else if (typ === 'magic_melee') {
+      // m feeds the DAMAGE formula here — the aim override applies to the
+      // hit alone, per the hit/damage split rule.
       const m = `${A.intelligence.mod}*(9/10)+${A.strength.mod}*(3/10)`;
-      hitFormula = houseHitFormula(m);
+      hitFormula = houseHitFormula(_hitOverride ?? m);
       dmgFormula = `(((${dic}/50*(${m}))+(${m}))*${db})`;
 
     } else if (typ === 'magic') {
-      const m = `${A.intelligence.mod}`;
+      const m = _hitOverride ?? `${A.intelligence.mod}`;
       hitFormula = houseHitFormula(m);
       dmgFormula = `(((${dic}/100*${ab})+${ab})*${db})`;
 
     } else if (typ === 'wisdom_dexterity') {
+      // m feeds the DAMAGE formula here — the aim override applies to the
+      // hit alone, per the hit/damage split rule.
       const m = `${A.wisdom.mod}*(9/10)+${A.dexterity.mod}*(3/10)`;
-      hitFormula = houseHitFormula(m);
+      hitFormula = houseHitFormula(_hitOverride ?? m);
       dmgFormula = `(((${dic}/50*(${m}))+(${m}))*${db})`;
 
     } else {
@@ -2678,8 +2694,25 @@ export class AspectsofPowerItem extends Item {
       for (const [aff, amt] of Object.entries(_previewBreakdown)) s += Math.min(amt, Number(dr[aff]) || 0);
       return s;
     })();
+    // Marks fold into the PREVIEW final (ruled 2026-08-22: "it should
+    // appear in the card in damage prior to the apply (no surprises)") —
+    // same live-state read the apply handler performs, same seam in
+    // resolveDamage. The normal apply button still carries the unmarked
+    // afterDefense (the handler re-collects and consumes marks at the
+    // click); the guardian-redirect branch bakes resolved numbers, so it
+    // stamps data-mark-applied to stop the handler double-counting.
+    let _previewMarkBonus = 0;
+    let _previewMarkNames = '';
+    if (targetActor && this.actor?.uuid) {
+      const _dmgMarks = targetActor.effects.filter(e => !e.disabled
+        && e.system?.markedByActorUuid === this.actor.uuid
+        && (e.system?.markedDamageBonus ?? 0) > 0);
+      _previewMarkBonus = _dmgMarks.reduce((s, e) => s + (Number(e.system?.markedDamageBonus) || 0), 0);
+      _previewMarkNames = _dmgMarks.map(e => e.name).join(', ');
+    }
     const _previewRes = resolveDamage({
       incoming: afterDefense,
+      markBonus: isHit ? _previewMarkBonus : 0,
       affinityResist: _affResistPreview,
       barrier: isHit ? barrierValue : 0,
       mitigation,
@@ -2775,21 +2808,13 @@ export class AspectsofPowerItem extends Item {
       ? `<p>Defense reduction: −${Math.round((1 - damageMultiplier) * 100)}%</p>`
       : '';
 
-    // Marks on the card ("marks should be included in the attack card",
-    // night 2026-08-22): damage-marks apply at the CLICK, reading live
-    // target state — surface them here so the number shift is expected,
-    // not mysterious. Preview only; the apply handler stays the collector.
-    let markLine = '';
-    if (isHit && targetActor && this.actor?.uuid) {
-      const _dmgMarks = targetActor.effects.filter(e => !e.disabled
-        && e.system?.markedByActorUuid === this.actor.uuid
-        && (e.system?.markedDamageBonus ?? 0) > 0);
-      const _mb = _dmgMarks.reduce((s, e) => s + (Number(e.system?.markedDamageBonus) || 0), 0);
-      if (_mb > 0) {
-        markLine = `<p><em>Marked: +${Math.round(_mb * 100)}% damage will apply on the click `
-                 + `(${_dmgMarks.map(e => e.name).join(', ')})</em></p>`;
-      }
-    }
+    // Marks on the card ("no surprises", ruled 2026-08-22): the bonus is
+    // already folded into the Final above via _previewRes — this line just
+    // names what did it.
+    const markLine = (isHit && _previewMarkBonus > 0)
+      ? `<p><em>Marked: +${Math.round(_previewMarkBonus * 100)}% damage included `
+        + `(${_previewMarkNames})</em></p>`
+      : '';
 
     // Guardian-redirect (P2c): split the LANDED final damage — the ally keeps
     // (1−pct), the guardian takes pct RAW (Option A: no guardian armor). Override
@@ -2821,6 +2846,7 @@ export class AspectsofPowerItem extends Item {
       allyApplyAttr = `data-damage="${keep}"
              data-toughness="0"
              data-affinity-dr="0"
+             data-mark-applied="1"
              data-damage-type="${isPhysical ? 'physical' : 'magical'}"
              data-mitigation="${_mitLane}" data-mitigation-value="0"${fmAttrs}`;
       redirectLine = `<p><em>Redirected ${share} of ${finalDamage} to ${redirectGuardian.name} (${Math.round(redirectPct * 100)}%).</em></p>`;

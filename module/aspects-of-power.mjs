@@ -2482,7 +2482,11 @@ Hooks.on('renderChatMessageHTML', (message, html) => {
       // raw incoming damage. Per-attacker summing — different markers each
       // keep their own bonus. Effects with `markedExpiresOnHit: true` are
       // deleted after the bonus fires (Feint-style one-shot).
+      // data-mark-applied: the card baked a mark-inclusive number (guardian
+      // redirect splits the resolved final) — collecting again here would
+      // double-count. Preview and apply read the same live marks otherwise.
       const attackerActorUuid = btn.dataset.attackerActorUuid || '';
+      const _markPreApplied = btn.dataset.markApplied === '1';
       let markBonus = 0;
       if (attackerActorUuid) {
         const myMarks = target.effects.filter(e =>
@@ -2492,11 +2496,16 @@ Hooks.on('renderChatMessageHTML', (message, html) => {
         );
         const totalBonus = myMarks.reduce((s, e) => s + (Number(e.system?.markedDamageBonus) || 0), 0);
         if (totalBonus > 0) {
-          markBonus = totalBonus;
-          const before = incomingDmg;
-          incomingDmg = applyMarkBonus(incomingDmg, totalBonus);
-          parts.push(`Marked: +${Math.round(totalBonus * 100)}% (${before} → ${incomingDmg})`);
-          // Delete expires-on-hit marks AFTER applying the bonus.
+          if (!_markPreApplied) {
+            markBonus = totalBonus;
+            const before = incomingDmg;
+            incomingDmg = applyMarkBonus(incomingDmg, totalBonus);
+            parts.push(`Marked: +${Math.round(totalBonus * 100)}% (${before} → ${incomingDmg})`);
+          } else {
+            parts.push(`Marked: +${Math.round(totalBonus * 100)}% (already in the card's number)`);
+          }
+          // Delete expires-on-hit marks AFTER the bonus lands — whichever
+          // side of the card computed it, the hit still consumes the mark.
           const oneShots = myMarks.filter(e => e.system?.markedExpiresOnHit === true);
           if (oneShots.length > 0) {
             await target.deleteEmbeddedDocuments('ActiveEffect', oneShots.map(e => e.id));
