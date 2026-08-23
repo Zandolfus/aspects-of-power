@@ -114,7 +114,15 @@ export function spellCastWeight(tier, implementWeight = 0, cfg = null) {
  */
 export function spellWindupMultiplier(tier, implementWeight = 0, cfg = null) {
   const sc = cfg ?? (globalThis.CONFIG?.ASPECTSOFPOWER ?? {});
-  const w = spellCastWeight(tier, implementWeight, sc);
+  // MAGIC REBUILD (ruled 2026-08-23): the implement contributes only
+  // `implementShare` of its weight to the DAMAGE windup — a staff helps,
+  // it does not double a basic cast (the Aug-3 unification gave implements
+  // full share and, stacked with the sqrt invest ruling the same day,
+  // quadrupled staff-caster output; see design-magic-economy-resim).
+  // The TEMPO side (spellCastWeight via celerity) keeps FULL implement
+  // weight — a staff still casts slower; only its damage share is halved.
+  const share = sc.spellWeight?.implementShare ?? 1;
+  const w = spellCastWeight(tier, implementWeight * share, sc);
   if (w <= 0) return 1;
   const dt = sc.defenseTuning ?? {};
   const max = sc.spellWeight?.windupMaxSpell ?? dt.windupMax ?? 3.0;

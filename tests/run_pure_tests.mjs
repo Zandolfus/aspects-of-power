@@ -952,6 +952,44 @@ eq('spellweight: staff+grand unlocked is 8.4',
 eq('spellweight: windupMin floors the result',
    spellWindupMultiplier('basic', 0, { ...SWCFG('implement'), spellTierWeights: { basic: 10 } }), 0.5);
 
+/* ── MAGIC REBUILD (ruled 2026-08-23, design-magic-economy-resim) ──────── */
+// Aug 3 shipped TWO multiplicative buffs the same day (implement windup +
+// sqrt invest on a ^0.2-designed ref) and no sim saw them together (the
+// deferred path clamps invests). Live anchor: Willy's Defiance hit 2764 -
+// int 672 x rarity 0.64 x windup 2.80 x push 2.29. The rebuild:
+// implementShare 0.5, push vs OWN base, push cap 3x, costs flattened.
+{
+  const RB = SWCFG('implement', { windupMaxSpell: 99, implementShare: 0.5 });
+  // Staff share halves on the DAMAGE side: staff(130)+high(150) was 2.8.
+  eq('rebuild: staff high windup at half share', spellWindupMultiplier('high', 130, RB), 2.15);
+  eq('rebuild: staff basic no longer doubles', spellWindupMultiplier('basic', 130, RB), 1.95);
+  eq('rebuild: grand+staff half share is 7.65 (never-bind law holds)',
+     spellWindupMultiplier('grand', 130, RB), 7.65);
+  // Tempo keeps FULL implement weight - only damage share halves.
+  eq('rebuild: cast WEIGHT keeps the full staff', spellCastWeight('high', 130, RB), 280);
+  // THE ANCHOR, both economies. Live card read 2764; the -5 delta is the
+  // sized-cone estimate (65) in the commitment, not formula drift.
+  const C05 = { invest: { curveExponent: 0.5 } };
+  const liveWu = spellWindupMultiplier('high', 130, SWCFG('implement', { windupMaxSpell: 99 }));
+  eq('rebuild: LIVE anchor reproduces Willy Defiance (2759 ~ live 2764)',
+     strikeInvestDamage(672, 0.64, liveWu, 105, 20, C05), 2759);
+  eq('rebuild: same cast lands 1556 under the rebuild',
+     strikeInvestDamage(672, 0.64, spellWindupMultiplier('high', 130, RB), 85, 30, C05), 1556);
+  // Push cap: base + 3x base + staff base -> sqrt(5) = x2.24, never more.
+  near('rebuild: max push multiplier x2.236',
+       Math.pow((30 * 4 + 30) / 30, 0.5), 2.236, 0.001);
+  // Shipped config carries the ruled values.
+  const { readFileSync: rfs2 } = await import('node:fs');
+  const csrc = rfs2(new URL('../module/helpers/config.mjs', import.meta.url), 'utf8');
+  eq('rebuild: shipped implementShare 0.5', Number(/implementShare:\s*([\d.]+)/.exec(csrc)?.[1]), 0.5);
+  eq('rebuild: shipped spellInvestCapMult 3', Number(/spellInvestCapMult:\s*([\d.]+)/.exec(csrc)?.[1]), 3);
+  eq('rebuild: shipped tier cost ladder flattened',
+     /basic:\s*2,\s*high:\s*3,\s*greater:\s*5,\s*major:\s*12,\s*grand:\s*25/.test(csrc), true);
+  // Longevity: the ladder in casts-per-722-pool at grade E.
+  eq('rebuild: high tier is 24 casts a pool', Math.floor(722 / (3 * 10)), 24);
+  eq('rebuild: major tier is 6 casts a pool', Math.floor(722 / (12 * 10)), 6);
+}
+
 /* ── STACKS (systems/stacks.mjs) ───────────────────────────────────────── */
 // Linear is the RULED default: spreading five fields across five targets and
 // dumping all five into one must deal the SAME total, so the choice is breadth

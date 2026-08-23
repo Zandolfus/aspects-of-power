@@ -69,7 +69,14 @@ ASPECTSOFPOWER.spellTiers = {
 };
 
 ASPECTSOFPOWER.spellTierFactors = {
-  basic: 2, high: 4, greater: 8, major: 25, grand: 50,
+  // MAGIC REBUILD (ruled 2026-08-23, "It isn't about throughput: it's
+  // longevity"): the tier COST ladder flattened from 2/4/8/25/50 —
+  // basic 20 stays the anchor (user: "20 as base cost is fine"); a
+  // 722-mana pool now buys 24 high / 14 greater / 6 major / 2.8 grand
+  // casts instead of 18/9/2/1.4. Tier POWER differentiation moved to
+  // windup + the invest push; costs are the longevity dial. Mana never
+  // regenerates in combat by design - the pool is the whole budget.
+  basic: 2, high: 3, greater: 5, major: 12, grand: 25,
 };
 
 /**
@@ -289,6 +296,16 @@ ASPECTSOFPOWER.spellWeight = {
   // max ≥ heaviestWeight/100 (3.4 today). Set well above that so future
   // content cannot silently re-invert it.
   windupMaxSpell: 99,
+  // MAGIC REBUILD (ruled 2026-08-23): the implement contributes HALF its
+  // weight to the damage windup (tempo keeps full weight — a staff still
+  // casts slower). Full share let a 130-weight staff DOUBLE a basic cast
+  // (1.3 -> 2.6); stacked with the same-day sqrt invest ruling it
+  // quadrupled staff-caster output (design-magic-economy-resim). At 0.5
+  // a staff on a high cast is x2.15 vs x1.5 bare - an implement, not an
+  // amplifier. NOTE: heaviest damage-side stack is now grand+staff at
+  // (700+65)/100 = 7.65, still under windupMaxSpell - the never-bind law
+  // above holds.
+  implementShare: 0.5,
 };
 
 /**
@@ -366,6 +383,12 @@ ASPECTSOFPOWER.invest = {
   // slider caps here so nobody can commit a lethal amount by accident.
   // (`_commitCastCost` clamps at 0, so the guard has to live at the slider.)
   healthFloor: 1,
+  // MAGIC REBUILD (ruled 2026-08-23): a spell's invest may not exceed
+  // base + spellInvestCapMult x base — the push multiplier tops out at
+  // sqrt(1 + cap + staffBase) ~ x2.24 over a base cast. The alpha strike
+  // (pool-dump x4.3 under uncapped sqrt) dies by construction; the sqrt
+  // exponent ruling itself is untouched.
+  spellInvestCapMult: 3,
   toughCapFactor:     0.02,
   staminaBaseDivisor: 20,
   staminaNormalizer:  1085,

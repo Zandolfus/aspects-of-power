@@ -6361,7 +6361,12 @@ export class AspectsofPowerItem extends Item {
         ?? sc.spellMaxInvestAboveBase?.['']
         ?? 1.0;
       const wisCap   = Math.round(baseMana + wisMod * aboveBaseFactor);
-      const maxInvest = Math.min(livePool, wisCap);
+      // PUSH CAP (magic rebuild, ruled 2026-08-23): invest tops out at
+      // base + spellInvestCapMult x base — the push multiplier can never
+      // exceed ~x2.24 over a base cast, killing the pool-dump alpha strike
+      // by construction. Scales with the SIZED base for AOE, like wisCap.
+      const pushCap  = Math.round(baseMana * (1 + (sc.invest?.spellInvestCapMult ?? 3)));
+      const maxInvest = Math.min(livePool, wisCap, pushCap);
 
       if (livePool < baseMana && !options.ritualActivation) {
         ChatMessage.create({
@@ -6438,7 +6443,7 @@ export class AspectsofPowerItem extends Item {
         const result = await this._promptCoInvest({
           primary: {
             baseCost: baseMana, safeInvest: 0, maxPool: maxInvest, potency: intMod,
-            damageRef: spellDamageRef(gradeFactor), resourceLabel: _resKey,
+            damageRef: baseManaAt5ft, resourceLabel: _resKey,
             damageLabel: 'Spell',
           },
           co: coInvest,
@@ -6495,7 +6500,7 @@ export class AspectsofPowerItem extends Item {
               channelStat: wisMod,
               channelFactor: sc.celerity?.CHANNEL_FACTOR ?? null,
               hardCap: true,                              // hide safe-ceiling/self-damage rows
-              damageRef: spellDamageRef(gradeFactor),
+              damageRef: baseManaAt5ft,
               // maxPool here is the WIS-capped invest ceiling, so without this
               // the hardCap layout printed the same number twice — once labelled
               // "Max invest" and once labelled "Pool".
@@ -6598,7 +6603,15 @@ export class AspectsofPowerItem extends Item {
         // ratio is grade-invariant (tier scaling identical at every grade; the
         // grade power-jump comes purely from the int stat curve). Still ^0.2
         // concave → dumping the pool is inefficient, no alpha strike.
-        const spellDmgRef = spellDamageRef(gradeFactor);
+        // MAGIC REBUILD (ruled 2026-08-23): the push yardstick is the
+        // spell's OWN unsized base, not the grade-fixed basic cost. The old
+        // fixed ref (20 at E) measured every serious cast as enormous; own-
+        // base means "cast at base = neutral, push past it = pay for more".
+        // Tier power now differentiates via windup + absolute base costs.
+        // UNSIZED deliberately: an AOE sized up commits more mana and that
+        // commitment SHOULD push damage - sizing must not cancel itself.
+        // (spellDamageRef stays live for co-invest infusion, untouched.)
+        const spellDmgRef = baseManaAt5ft;
         // MAGIC/MELEE UNIFICATION (config.spellWeight, OFF by default). A weapon
         // spends its weight twice — windup for damage, wait for tempo — which is
         // what makes DPR weight-invariant. Spells only spent it on wait, so tier
