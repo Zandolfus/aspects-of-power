@@ -989,6 +989,19 @@ eq('spellweight: windupMin floors the result',
   eq('rebuild: shipped spellInvestCapMult 3', Number(/spellInvestCapMult:\s*([\d.]+)/.exec(csrc)?.[1]), 3);
   eq('rebuild: tier cost ladder is the CLASSIC one (costs were restored)',
      /basic:\s*2,\s*high:\s*4,\s*greater:\s*8,\s*major:\s*25,\s*grand:\s*50/.test(csrc), true);
+  // MID-TIER RAISE (ruled 2026-08-23: "Phil should need a healer to
+  // survive a full assault from Will[y]"): high 170 / greater 230 —
+  // windup rides weight, so mid tiers hit ~13% harder and wind up ~13%
+  // longer together (pairing law). Sub-round casts throughout.
+  eq('phil-line: shipped tier weights carry the mid-tier raise',
+     /basic:\s*130,\s*high:\s*170,\s*greater:\s*230,\s*major:\s*400,\s*grand:\s*700/.test(csrc.replace(/\n/g, '')), true);
+  const SHIPPED = { spellWeight: { model: 'implement', implementShare: 0, windupMaxSpell: 99 },
+    spellTierWeights: { basic: 130, high: 170, greater: 230, major: 400, grand: 700 },
+    defenseTuning: { windupMin: 0.5, windupMax: 3.0 } };
+  eq('phil-line: high windup 1.7', spellWindupMultiplier('high', 130, SHIPPED), 1.7);
+  eq('phil-line: greater windup 2.3', spellWindupMultiplier('greater', 130, SHIPPED), 2.3);
+  eq('phil-line: Defiance base cast lands 1034',
+     strikeInvestDamage(672, 0.64, spellWindupMultiplier('high', 130, SHIPPED), 80, 40, C05), 1034);
 }
 
 /* ── STACKS (systems/stacks.mjs) ───────────────────────────────────────── */

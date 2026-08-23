@@ -314,11 +314,20 @@ ASPECTSOFPOWER.spellWeight = {
  * Spell-tier celerity weights per design-magic-system.md.
  * Drives `wait = weight × multiplier × SCALE / actor_speed` for magic skills.
  * Mirror of weaponWeights but keyed by spell tier rather than weapon-type tag.
+ *
+ * MID-TIER RAISE (ruled 2026-08-23: "Phil should need a healer to survive
+ * a full assault from Will[y]"): high 150->170, greater 200->230. Windup
+ * rides weight/100, so mid tiers hit ~13% harder AND wind up ~13% longer —
+ * the pairing law holds (weight pays tempo and damage together). Simmed:
+ * a full Willy pool now drops a solo Phil at ~8.8 rounds with ~80 mana to
+ * spare; ONE heal in the fight tips him back over the line. Tempo stays
+ * humane: a high cast is 0.63 of a round, nowhere near multi-round casts
+ * (ruled out the same day: "Three round casts are bullshit").
  */
 ASPECTSOFPOWER.spellTierWeights = {
   basic:    130,
-  high:     150,
-  greater:  200,
+  high:     170,
+  greater:  230,
   major:    400,
   grand:    700,
 };
