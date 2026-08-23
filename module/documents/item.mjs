@@ -1541,35 +1541,41 @@ export class AspectsofPowerItem extends Item {
           const rawCost = defenseTimeCost(heft, actorRoundLength(targetActor), dt);
           const settleQ = dodgeShortfallQuality(rawCost, budget.max, budget.remaining, dt);
           dodgeQuality = settleQ.quality;
-          // DIVE INVEST (ruled 2026-08-23 "Dives should be slidable
-          // invests", simplified 2026-08-22 "a simple invest x for
-          // additional dodge"): on an over-cap blow the diver may hurl
-          // stamina into the dive — bracedCostHitFrac x hit per +100% of
-          // the dodge value, capped at diveMaxBoostMult — the legs buy
-          // dodge the way the shield arm buys wall. Zero is a legal
-          // answer (bare dive). Same local-prompt guard as braces.
+          // DODGE INVEST (ruled 2026-08-23 "Dives should be slidable
+          // invests"; 2026-08-22 "a simple invest x for additional dodge",
+          // extended same day to EVERY physical dodge — the enumeration
+          // showed the in-cap/over-cap boundary inverting danger: Gore was
+          // deadlier than the heavier Charge because only dives got the
+          // slider). Stamina buys dodge — bracedCostHitFrac x hit per
+          // +100% of the dodge value, capped at diveMaxBoostMult — the
+          // legs buy dodge the way the shield arm buys wall. Zero is a
+          // legal answer. Same local-prompt guard as braces; AI-profiled
+          // defenders skip the dialog (their policy does not invest).
           let _diveExtra = 0;
           const _isDive = rawCost > budget.max;
-          if (_isDive) {
+          {
             const _dFrac = dt.bracedCostHitFrac ?? 0.05;
             const _dMax = dt.diveMaxBoostMult ?? 1.0;
             const _stam = targetActor.system.stamina?.value ?? 0;
             const _dCap = Math.min(Math.max(0, Math.round(_stam)),
               Math.max(0, Math.round(_dFrac * hitTotal * _dMax)));
+            const _dAi = targetActor.flags?.aspectsofpower?.aiProfile
+              && (targetActor.flags?.aspectsofpower?.aiDefense ?? 'auto') === 'auto';
             const _dPlayer = game.users.find(u =>
               u.active && !u.isGM && u.character?.id === targetActor.id);
             const _dMayDecide = _dPlayer
               ? _dPlayer.id === game.user.id
               : (game.user.isGM || targetActor.isOwner);
-            if (_dMayDecide && _dCap > 0) {
+            if (!_dAi && _dMayDecide && _dCap > 0) {
               const chosen = await this._promptWallInvest({
-                title: `${item.name} incoming — Dive`,
-                lead: `An over-limit blow (hit ${hitTotal}) — your legs give `
-                  + `<strong>${Math.round(dodgeQuality * 100)}%</strong>. Throw stamina into the dive `
-                  + `to dodge harder (cap +${Math.round(dv * _dMax)} dodge).`,
+                title: `${item.name} incoming — ${_isDive ? 'Dive' : 'Dodge'}`,
+                lead: (_isDive ? `An over-limit blow (hit ${hitTotal})` : `Hit ${hitTotal}`)
+                  + ` — your legs give <strong>${Math.round(dodgeQuality * 100)}%</strong>. `
+                  + `Throw stamina in to dodge harder (cap +${Math.round(dv * _dMax)} dodge).`,
                 cap: _dCap, pool: _stam, bonusNoun: 'dodge',
                 bonusAt: (v) => bulwarkWallBonus(dv, v, hitTotal, _dFrac, _dMax),
-                confirmLabel: 'Dive', plainLabel: 'Bare dive',
+                confirmLabel: _isDive ? 'Dive' : 'Dodge',
+                plainLabel: _isDive ? 'Bare dive' : 'Plain dodge',
               }) ?? 0;
               _diveExtra = Math.min(Math.max(0, Math.round(chosen)), _dCap);
               if (_diveExtra > 0) dvBoost = bulwarkWallBonus(dv, _diveExtra, hitTotal, _dFrac, _dMax);
@@ -1582,8 +1588,8 @@ export class AspectsofPowerItem extends Item {
           }
           const after = getDefenseBudget(targetActor);
           costNote = ` — settled ${settleQ.payBudget}/${settleQ.budgetPortion} defence time`
-            + (_isDive ? ` (a dive beyond limits${_diveExtra > 0
-              ? `: ${_diveExtra} stamina, +${dvBoost} dodge bought` : ''})` : '')
+            + (_diveExtra > 0 ? ` + ${_diveExtra} stamina (+${dvBoost} dodge)` : '')
+            + (_isDive ? ` (a dive beyond limits)` : '')
             + (dodgeQuality < 1 ? ` — tired legs, dodging at ${Math.round(dodgeQuality * 100)}%` : '')
             + ` (${after.remaining}/${after.max} left)`;
         } else {
@@ -3305,9 +3311,9 @@ export class AspectsofPowerItem extends Item {
         : '';
       const econNote = _econBudget
         ? `<p><em>` + (_isDive
-          ? `A dive beyond limits — drains your reserve (${_budget.remaining}/${_budget.max}); stamina can buy extra dodge.`
+          ? `A dive beyond limits — drains your reserve (${_budget.remaining}/${_budget.max}).`
           : `Costs ${_rawCost} defence time (${_budget.remaining}/${_budget.max} left).`)
-          + _qNote + `</em></p>`
+          + ` Stamina can buy extra dodge.` + _qNote + `</em></p>`
         : `<p><em>Dodging delays your next action and adds a scramble stack — win or lose.</em></p>`;
       defenseText = hasDefend
         ? `<p>Dodge value: <strong>${dv}</strong>${scrambleNote} vs to-hit ${hitTotal}.</p>` + econNote
