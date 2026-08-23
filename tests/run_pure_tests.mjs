@@ -976,8 +976,8 @@ eq('spellweight: windupMin floors the result',
   eq('rebuild: same cast lands 1556 under the rebuild',
      strikeInvestDamage(672, 0.64, spellWindupMultiplier('high', 130, RB), 85, 30, C05), 1556);
   // Push cap: base + 3x base + staff base -> sqrt(5) = x2.24, never more.
-  near('rebuild: max push multiplier x2.236',
-       Math.pow((30 * 4 + 30) / 30, 0.5), 2.236, 0.001);
+  eq('rebuild: max push multiplier x2.236',
+     Math.round(Math.pow((30 * 4 + 30) / 30, 0.5) * 1000), 2236);
   // Shipped config carries the ruled values.
   const { readFileSync: rfs2 } = await import('node:fs');
   const csrc = rfs2(new URL('../module/helpers/config.mjs', import.meta.url), 'utf8');
