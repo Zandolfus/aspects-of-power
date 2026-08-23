@@ -94,8 +94,15 @@ export function spellCastWeight(tier, implementWeight = 0, cfg = null) {
   if (model === 'none') return 0;
   const tierW = sc.spellTierWeights?.[tier];
   if (!tierW) return 0;
+  // IMPLEMENTS NEVER SLOW CASTS (ruled 2026-08-23). implementShare scales
+  // the implement's contribution to spell weight on BOTH sides — tempo and
+  // windup stay symmetric, so the never-bind law holds by construction.
+  // At the shipped share of 0 an implement carries no weight at all: the
+  // tier alone prices the cast's time and its damage windup. Implements
+  // keep their PERKS instead (wand basic-cast speed-up, staff free-base).
+  const share = sc.spellWeight?.implementShare ?? 1;
   return model === 'implement'
-    ? tierW + Math.max(0, Number(implementWeight) || 0)
+    ? tierW + Math.max(0, Number(implementWeight) || 0) * share
     : tierW;
 }
 
@@ -114,15 +121,9 @@ export function spellCastWeight(tier, implementWeight = 0, cfg = null) {
  */
 export function spellWindupMultiplier(tier, implementWeight = 0, cfg = null) {
   const sc = cfg ?? (globalThis.CONFIG?.ASPECTSOFPOWER ?? {});
-  // MAGIC REBUILD (ruled 2026-08-23): the implement contributes only
-  // `implementShare` of its weight to the DAMAGE windup — a staff helps,
-  // it does not double a basic cast (the Aug-3 unification gave implements
-  // full share and, stacked with the sqrt invest ruling the same day,
-  // quadrupled staff-caster output; see design-magic-economy-resim).
-  // The TEMPO side (spellCastWeight via celerity) keeps FULL implement
-  // weight — a staff still casts slower; only its damage share is halved.
-  const share = sc.spellWeight?.implementShare ?? 1;
-  const w = spellCastWeight(tier, implementWeight * share, sc);
+  // implementShare is applied INSIDE spellCastWeight (2026-08-23), so
+  // tempo and windup read the same weight and cannot drift.
+  const w = spellCastWeight(tier, implementWeight, sc);
   if (w <= 0) return 1;
   const dt = sc.defenseTuning ?? {};
   const max = sc.spellWeight?.windupMaxSpell ?? dt.windupMax ?? 3.0;

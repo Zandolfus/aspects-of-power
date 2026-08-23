@@ -69,14 +69,14 @@ ASPECTSOFPOWER.spellTiers = {
 };
 
 ASPECTSOFPOWER.spellTierFactors = {
-  // MAGIC REBUILD (ruled 2026-08-23, "It isn't about throughput: it's
-  // longevity"): the tier COST ladder flattened from 2/4/8/25/50 —
-  // basic 20 stays the anchor (user: "20 as base cost is fine"); a
-  // 722-mana pool now buys 24 high / 14 greater / 6 major / 2.8 grand
-  // casts instead of 18/9/2/1.4. Tier POWER differentiation moved to
-  // windup + the invest push; costs are the longevity dial. Mana never
-  // regenerates in combat by design - the pool is the whole budget.
-  basic: 2, high: 3, greater: 5, major: 12, grand: 25,
+  // RESTORED 2026-08-23 same-day (user, reading the patch notes: "I
+  // don't mind higher costs for higher spells. My problem was
+  // throughput."): the classic ladder stands — big workings cost big
+  // mana, and with no in-combat mana regen the pool is the whole
+  // budget. The throughput fix lives elsewhere: implements carry no
+  // weight (implementShare 0), the push measures against the spell's
+  // OWN base, and AOE sizing never scales damage.
+  basic: 2, high: 4, greater: 8, major: 25, grand: 50,
 };
 
 /**
@@ -296,16 +296,18 @@ ASPECTSOFPOWER.spellWeight = {
   // max ≥ heaviestWeight/100 (3.4 today). Set well above that so future
   // content cannot silently re-invert it.
   windupMaxSpell: 99,
-  // MAGIC REBUILD (ruled 2026-08-23): the implement contributes HALF its
-  // weight to the damage windup (tempo keeps full weight — a staff still
-  // casts slower). Full share let a 130-weight staff DOUBLE a basic cast
-  // (1.3 -> 2.6); stacked with the same-day sqrt invest ruling it
-  // quadrupled staff-caster output (design-magic-economy-resim). At 0.5
-  // a staff on a high cast is x2.15 vs x1.5 bare - an implement, not an
-  // amplifier. NOTE: heaviest damage-side stack is now grand+staff at
-  // (700+65)/100 = 7.65, still under windupMaxSpell - the never-bind law
-  // above holds.
-  implementShare: 0.5,
+  // IMPLEMENTS NEVER SLOW CASTS (ruled 2026-08-23): implementShare
+  // scales the implement's contribution to spell weight on BOTH sides
+  // inside spellCastWeight — tempo and windup stay symmetric, so the
+  // never-bind law above holds by construction. At the shipped 0 an
+  // implement carries no weight at all: TIER alone prices a cast's time
+  // and its damage windup (basic 1.3 ... grand 7.0, bare or not).
+  // Implements keep their perks instead: the wand's basic-cast speed-up
+  // and the staff's free-base push (~x1.41). Full-share history: a
+  // 130-weight staff DOUBLED a basic cast and, stacked with the sqrt
+  // invest ruling shipped the same day, quadrupled staff-caster output
+  // (design-magic-economy-resim).
+  implementShare: 0,
 };
 
 /**

@@ -562,7 +562,7 @@ export class AspectsofPowerItem extends Item {
    *                                   buffs), so the preview totals what lands.
    * @returns {Promise<number|null>}   Selected invest amount, or null on cancel.
    */
-  async _promptResourceInvest({ baseCost, safeInvest, maxPool, potency, multiplier, resourceLabel, potencyLabel, label, channelStat = null, channelFactor = null, hardCap = false, damageRef = null, windup = 1, truePool = null, flatBonus = 0 }) {
+  async _promptResourceInvest({ baseCost, safeInvest, maxPool, potency, multiplier, resourceLabel, potencyLabel, label, channelStat = null, channelFactor = null, hardCap = false, damageRef = null, windup = 1, truePool = null, flatBonus = 0, investDamageOffset = 0 }) {
     const safeCeiling = baseCost + safeInvest;
     const startInvest = baseCost;
     // Damage curve: potency × multiplier × windup × (invested/ref)^0.2 — very
@@ -579,7 +579,12 @@ export class AspectsofPowerItem extends Item {
     // Code standard 2: a dialog preview and its real path MUST call the same
     // function — see [[playbook-damage-measurement]].
     const dmgRef = Math.max(1, damageRef ?? baseCost);
-    const computeDmg = (v) => strikeInvestDamage(potency, multiplier, windup, v, dmgRef)
+    // investDamageOffset (ruled 2026-08-23: "Sizing AOEs shouldn't scale
+    // damage"): the AOE size surcharge is stripped from the push term, so a
+    // bigger cone costs more mana but previews (and deals) the same damage
+    // per target. Same subtraction the cast path performs - preview parity.
+    const computeDmg = (v) => strikeInvestDamage(potency, multiplier, windup,
+      Math.max(1, v - investDamageOffset), dmgRef)
       + Math.max(0, Math.round(flatBonus));
     const computeSelfDmg = (v) => computeInvestSelfDamage(potency, v, baseCost, safeInvest);
     // Channel time for spell invest — Wis_mod controls rate per design memo.
@@ -722,7 +727,7 @@ export class AspectsofPowerItem extends Item {
     const _flat = Math.max(0, Math.round(flatBonus));
     // Both previews call the SAME helpers the real paths call. That is the one
     // non-negotiable rule in this file (8de305b).
-    const computePrimary = (v) => strikeInvestDamage(primary.potency, multiplier, windup, v, Math.max(primary.damageRef ?? primary.baseCost, 1)) + _flat;
+    const computePrimary = (v) => strikeInvestDamage(primary.potency, multiplier, windup, Math.max(1, v - (primary.investDamageOffset ?? 0)), Math.max(primary.damageRef ?? primary.baseCost, 1)) + _flat;
     const computeCo = (v) => coInvestDamage(co.potency, co.coef, v, co.dmgRef);
     const computeSelfDmg = (v) => computeInvestSelfDamage(primary.potency, v, primary.baseCost, primary.safeInvest);
     // Channel time on a MANA co-invest only — Wis controls the rate, mirroring
@@ -6365,7 +6370,9 @@ export class AspectsofPowerItem extends Item {
       // base + spellInvestCapMult x base — the push multiplier can never
       // exceed ~x2.24 over a base cast, killing the pool-dump alpha strike
       // by construction. Scales with the SIZED base for AOE, like wisCap.
-      const pushCap  = Math.round(baseMana * (1 + (sc.invest?.spellInvestCapMult ?? 3)));
+      // Headroom is measured UNSIZED (ruled 2026-08-23): the size surcharge
+      // rides on top of the cap because it buys area, not push.
+      const pushCap  = Math.round(baseMana + (sc.invest?.spellInvestCapMult ?? 3) * baseManaAt5ft);
       const maxInvest = Math.min(livePool, wisCap, pushCap);
 
       if (livePool < baseMana && !options.ritualActivation) {
@@ -6443,7 +6450,7 @@ export class AspectsofPowerItem extends Item {
         const result = await this._promptCoInvest({
           primary: {
             baseCost: baseMana, safeInvest: 0, maxPool: maxInvest, potency: intMod,
-            damageRef: baseManaAt5ft, resourceLabel: _resKey,
+            damageRef: baseManaAt5ft, investDamageOffset: baseMana - baseManaAt5ft, resourceLabel: _resKey,
             damageLabel: 'Spell',
           },
           co: coInvest,
@@ -6501,6 +6508,7 @@ export class AspectsofPowerItem extends Item {
               channelFactor: sc.celerity?.CHANNEL_FACTOR ?? null,
               hardCap: true,                              // hide safe-ceiling/self-damage rows
               damageRef: baseManaAt5ft,
+              investDamageOffset: baseMana - baseManaAt5ft,
               // maxPool here is the WIS-capped invest ceiling, so without this
               // the hardCap layout printed the same number twice — once labelled
               // "Max invest" and once labelled "Pool".
@@ -6576,7 +6584,14 @@ export class AspectsofPowerItem extends Item {
       const hasStaff = !orbDischarging
         && this.actor?.getEquippedImplements?.().has('staff')
         && _staffQualifies;
-      const effectiveInvested = hasStaff ? invested + baseMana : invested;
+      // SIZE NEVER PUSHES (ruled 2026-08-23: "Sizing AOEs shouldn't scale
+      // damage"): the AOE surcharge (sized base - unsized base) is paid as
+      // mana but stripped from the damage push - a wider cone hits more
+      // targets at the same per-target damage. The staff's free-base perk
+      // is unsized for the same reason.
+      const _sizeSurcharge = Math.max(0, baseMana - baseManaAt5ft);
+      const _investForDamage = Math.max(baseManaAt5ft, invested - _sizeSurcharge);
+      const effectiveInvested = hasStaff ? _investForDamage + baseManaAt5ft : _investForDamage;
       // Damage uses sized base for AOE (so over-invest above sized base
       // boosts damage), original base for non-AOE.
       if (options.ritualActivation) {
