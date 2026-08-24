@@ -292,6 +292,11 @@ export class AspectsofPowerItemSheet extends foundry.applications.api.Handlebars
 
     // Prepare augment slot display data for item-type items.
     if (this.item.type === 'item') {
+      // Tome seize cap (progress x rarity) for the equipment-tab display.
+      if ((this.item.system.tags ?? []).includes('tome')) {
+        const { tomeSeizeCapFor } = await import('../systems/implements.mjs');
+        context.tomeSeizeCap = tomeSeizeCapFor(this.item);
+      }
       const slots = this.item.system.augmentSlots ?? 0;
       const existing = this.item.system.augments ?? [];
       context.augmentSlots = [];
@@ -788,6 +793,21 @@ export class AspectsofPowerItemSheet extends foundry.applications.api.Handlebars
         }
 
         await this.document.update(updateData);
+        return;
+      }
+
+      // Curse level (cursed vessel) + weave fields: direct writes, same
+      // reason as the augment fields below — the full-form processor trips
+      // over array-vs-string fields, so anything relying on it saves
+      // silently-not-at-all.
+      if (name === 'system.curseLevel' || name === 'system.weaveAttuned') {
+        await this.document.update({ [name]: event.target.value });
+        return;
+      }
+      if (name === 'system.wovenAffinities') {
+        const arr = String(event.target.value ?? '')
+          .split(',').map(s => s.trim().toLowerCase()).filter(Boolean);
+        await this.document.update({ 'system.wovenAffinities': arr });
         return;
       }
 

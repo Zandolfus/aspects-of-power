@@ -1317,6 +1317,10 @@ ASPECTSOFPOWER.weaponTagGrants = {
   // Bulwark = braced block (stamina buys wall), Shield Wall = ally cover
   // (guardian intercept, stance-required by authoring).
   greatshield: ['Bulwark Block', 'Shield Wall'],
+  // Tome (ruled 2026-08-24): the seize reaction and its release arrive
+  // with the book. ⚠ Both skills must exist in weaponTagGrantsPack —
+  // reload-verify the pack write (pack creates silently fail).
+  tome:        ['Seize Spell', 'Release Binding'],
 };
 
 ASPECTSOFPOWER.guardStance = {
@@ -1423,6 +1427,42 @@ ASPECTSOFPOWER.curseLevels = {
   hexed:    { label: 'Hexed',    weight: 140, fillScale: 0.10 },
   baneful:  { label: 'Baneful',  weight: 240, fillScale: 0.15 },
   anathema: { label: 'Anathema', weight: 400, fillScale: 0.25 },
+};
+
+/**
+ * TOME (ruled 2026-08-24): "seize spells out of the air as a reaction —
+ * up to a damage/healing cap based on the quality of the tome."
+ * Cap = progress x capRarityMult[rarity] (ruled: progress-based, rarity
+ * plays in). Anchors (live 2026-08-24, masterwork ~1000 progress; EPIC is
+ * the reference band per standing rule): epic masterwork ~2600 catches a
+ * base-cost major; grands (~4258 live) need legendary quality. Steps ride
+ * the familiar ~x1.4 rarity ladder.
+ * A failed over-cap seize DESTABILIZES any held binding: it detonates on
+ * the holder after detonateDelayRounds (ruled: "all the held magic
+ * explodes after a short duration, plus it fails"). Bindings decay at
+ * combat end (ruled: bound, but decays).
+ */
+ASPECTSOFPOWER.tome = {
+  capRarityMult: {
+    inferior: 0.6, common: 0.9, uncommon: 1.3, rare: 1.85, epic: 2.6,
+    ancient: 3.7, legendary: 5.2, mythic: 7.4, divine: 10.4,
+  },
+  detonateDelayRounds: 1,
+};
+
+/**
+ * WEAVE (ruled 2026-08-24): "affinity swap catalysts." A WORN implement —
+ * tailoring content, the one implement that leaves both hands free. Its
+ * affinities are woven in at craft (`wovenAffinities`); rarity gates how
+ * many the weave honours (read-time slice — weaveOfferedAffinities). The
+ * wearer attunes to one (`weaveAttuned`) and magic casts carry THAT
+ * affinity through the entire pipeline.
+ */
+ASPECTSOFPOWER.weave = {
+  affinitySlotsByRarity: {
+    inferior: 0, common: 1, uncommon: 1, rare: 2, epic: 3,
+    ancient: 3, legendary: 4, mythic: 5, divine: 5,
+  },
 };
 
 /**

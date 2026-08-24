@@ -40,6 +40,14 @@ export class ItemItemData extends foundry.abstract.TypeDataModel {
       // ⚠ Plain StringField, NO choices: a choices constraint on a live
       // world field vaporised the world once (e4c333b). Validate in code.
       curseLevel:  new fields.StringField({ initial: '' }),
+      // ── WEAVE = AFFINITY SWAP CATALYST (ruled 2026-08-24) ──
+      // Affinities woven in at craft; rarity gates how many the weave
+      // honours (sliced at READ time by weaveOfferedAffinities, so no
+      // craft-side clamp exists to forget). `weaveAttuned` is the one the
+      // wearer is currently channelling — while set (and offered), the
+      // wearer's magic casts carry THAT affinity instead of their own.
+      wovenAffinities: new fields.ArrayField(new fields.StringField(), { initial: [] }),
+      weaveAttuned:    new fields.StringField({ initial: '' }),
       twoHanded:   new fields.BooleanField({ initial: false }),
 
       // Material type — determines which repair skills can target this item.

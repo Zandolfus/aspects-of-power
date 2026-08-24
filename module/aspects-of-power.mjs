@@ -1306,7 +1306,7 @@ Hooks.once('ready', async function () {
         whisper: ChatMessage.getWhisperRecipients('GM'),
         content: payload.content,
       });
-    } else if (['gmApplyBuff', 'gmApplyDebuff', 'gmApplyRestoration', 'gmApplyRepair', 'gmApplyCleanse', 'gmCurseOp', 'gmUpdateDefensePool', 'gmSpendResource', 'gmConsumeReaction', 'gmExecuteTrade', 'gmCreateAoeRegion', 'gmDeleteAoeRegion', 'gmUpdateAoeAffected', 'gmOverworldNote', 'gmEnsureHexResident'].includes(payload.type)) {
+    } else if (['gmApplyBuff', 'gmApplyDebuff', 'gmApplyRestoration', 'gmApplyRepair', 'gmApplyCleanse', 'gmCurseOp', 'gmUpdateDefensePool', 'gmSpendResource', 'gmConsumeReaction', 'gmExecuteTrade', 'gmCreateAoeRegion', 'gmDeleteAoeRegion', 'gmUpdateAoeAffected', 'gmOverworldNote', 'gmEnsureHexResident', 'gmTomeState'].includes(payload.type)) {
       await AspectsofPowerItem.executeGmAction(payload);
     } else if (payload.type === 'gmCelerityRealtimeToggle') {
       // TRIAL-REALTIME: player clicked the play/pause button. The real loop

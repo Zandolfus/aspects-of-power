@@ -1044,8 +1044,12 @@ export class AspectsofPowerActor extends Actor {
     for (const item of this.items) {
       if (item.type !== 'item') continue;
       if (!item.system?.equipped) continue;
-      if ((item.system?.slot ?? '') !== 'weaponry') continue;
       const tags = item.system?.tags ?? [];
+      // A WEAVE is WORN, not held (ruled 2026-08-24: the vestment
+      // implement — affinity swap catalyst) — recognised on any slot.
+      // Every other implement must be in hand.
+      if (tags.includes('weave')) found.add('weave');
+      if ((item.system?.slot ?? '') !== 'weaponry') continue;
       for (const t of tags) if (known.has(t)) found.add(t);
     }
     return found;

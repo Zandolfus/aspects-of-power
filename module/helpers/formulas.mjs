@@ -2045,6 +2045,19 @@ export function resolveCurseFillScale(skillScale, vesselLevel, cfg) {
 }
 
 /**
+ * A tome's seize cap (ruled 2026-08-24: "based on item progress but rarity
+ * should play into it") — the largest rolled magnitude the book can catch
+ * out of the air. progress x the rarity's multiplier, floored at 0.
+ *
+ * @param {number} progress    the tome's craft progress
+ * @param {number} rarityMult  tome.capRarityMult[rarity]
+ * @returns {number}
+ */
+export function tomeSeizeCap(progress, rarityMult) {
+  return Math.max(0, Math.round((Number(progress) || 0) * (Number(rarityMult) || 0)));
+}
+
+/**
  * Price of one curse-spender cast (`spend-curse` tag, builder/spender
  * rebuild RULED 2026-08-22: "Mind Crush should likely be another spender").
  * A fixed fraction of the wielder's CAPACITY — stat-derived, so the price a

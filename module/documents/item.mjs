@@ -12,6 +12,7 @@ import { proficiencyDamageMult, proficiencyHitMult, heldWeaponWeight, heldImplem
 import { stackDamageMultiplier, spendableRange, clampSpread, getStackCount, getStackPayload, addStacks, spendStacks, resolveStackCap } from '../systems/stacks.mjs';
 import { resolveCoInvest } from '../systems/co-invest.mjs';
 import { handleSpread, handleTransfer, handleConsume, handleHarness, onCurseCast, ventAllCurse, meterValue as curseMeterValue, spendPriceFor, spendCurse, equippedCursedVessel } from '../systems/curse.mjs';
+import { equippedTome, tomeSeizeCapFor, tomeBinding, castAffinities } from '../systems/implements.mjs';
 import { resolveDamage } from '../systems/damage.mjs';
 
 /**
@@ -1260,9 +1261,16 @@ export class AspectsofPowerItem extends Item {
    * their own classification. Reactions filtered for melee will not fire
    * against ranged attackers, and vice versa.
    */
-  static _reactionMatchesAttackType(reactionSkill, attackerType) {
+  static _reactionMatchesAttackType(reactionSkill, attackerType, attackerSkill = null) {
     const filter = reactionSkill.system?.tagConfig?.reactionAttackType ?? 'any';
     if (filter === 'any') return true;
+    // 'magic' (tome seize, ruled 2026-08-24): matches WORKINGS — magic and
+    // magic_melee roll types — orthogonal to the melee/ranged axis, so a
+    // seize is offered against a fireball but never against an arrow.
+    if (filter === 'magic') {
+      const t = attackerSkill?.system?.roll?.type ?? '';
+      return ['magic', 'magic_melee'].includes(t);
+    }
     return filter === attackerType;
   }
 
@@ -1318,7 +1326,7 @@ export class AspectsofPowerItem extends Item {
       const trig = s.system.tagConfig?.reactionTrigger ?? '';
       if (trig !== triggerKey) return false; // strict match — no legacy fallback for non-self_attacked
       if ((cooldowns[s.id] ?? 0) > 0) return false;
-      if (!this.constructor._reactionMatchesAttackType(s, attackerType)) return false;
+      if (!this.constructor._reactionMatchesAttackType(s, attackerType, ctx?.attackerSkill ?? this)) return false;
       const resKey = s.system.roll?.resource;
       const cost = s.system.roll?.cost ?? 0;
       if (resKey && cost > 0) {
@@ -1449,7 +1457,7 @@ export class AspectsofPowerItem extends Item {
       s.system.skillType === 'Passive' &&
       (s.system.tags ?? []).includes('retaliation') &&
       (s.system.tagConfig?.reactionTrigger ?? '') === triggerKey &&
-      this.constructor._reactionMatchesAttackType(s, attackerType)
+      this.constructor._reactionMatchesAttackType(s, attackerType, attackerSkill ?? this)
     );
     for (const skill of passives) {
       try {
@@ -1959,6 +1967,70 @@ export class AspectsofPowerItem extends Item {
           ChatMessage.create({ speaker: reactionSpeaker,
             content: `<p><strong>${targetActor.name}</strong> raises a barrier with <strong>${reactionSkill.name}</strong>!</p>`,
           });
+        } else if (rType === 'seize') {
+          // SEIZE — the tome catches the working out of the air (ruled
+          // 2026-08-24). Judged against the tome's quality cap: under it,
+          // the spell never lands and is BOUND into the book (released
+          // later as the holder's own action; decays at combat end). Over
+          // it, the seize FAILS — the spell lands in full, the reaction is
+          // spent, and any binding already held DESTABILIZES: the caught
+          // magic detonates on the holder after a short delay ("all the
+          // held magic explodes after a short duration, plus it fails").
+          // Reads/writes on the defender's tome route through gmTomeState
+          // (this branch runs on the attacker's client — standard 16).
+          const _tome = equippedTome(targetActor);
+          const _cap = _tome ? tomeSeizeCapFor(_tome) : 0;
+          const _magnitude = Math.max(0, Math.round(incomingDamage));
+          if (_tome && _magnitude <= _cap) {
+            isHit = false;
+            await this._gmAction({
+              type: 'gmTomeState',
+              tomeUuid: _tome.uuid,
+              bound: {
+                label: this.name,
+                amount: _magnitude,
+                affinities: this.effectiveAffinities(),
+                combatId: game.combat?.id ?? '',
+              },
+            });
+            reactionLine = `<p><em>${targetActor.name} seizes the working with <strong>${_tome.name}</strong>! (${_magnitude} bound, cap ${_cap})</em></p>`;
+            ChatMessage.create({ speaker: reactionSpeaker,
+              content: `<p><strong>${targetActor.name}</strong> tears <strong>${this.name}</strong> out of the air — the working is bound into <strong>${_tome.name}</strong> (${_magnitude}).</p>`,
+            });
+          } else {
+            // Failure: the spell lands untouched. A held binding blows.
+            const _held = _tome ? tomeBinding(_tome) : null;
+            reactionLine = `<p><em>${targetActor.name} reaches for the working with <strong>${_tome?.name ?? 'no tome'}</strong> and fails (${_magnitude} vs cap ${_cap}).</em></p>`;
+            ChatMessage.create({ speaker: reactionSpeaker,
+              content: `<p><strong>${targetActor.name}</strong> tries to seize <strong>${this.name}</strong> — the working is beyond the book (${_magnitude} vs cap ${_cap}).</p>`,
+            });
+            if (_held) {
+              const _delay = CONFIG.ASPECTSOFPOWER.tome?.detonateDelayRounds ?? 1;
+              await this._gmAction({ type: 'gmTomeState', tomeUuid: _tome.uuid, bound: null });
+              await this._gmAction({
+                type: 'gmApplyDebuff',
+                targetActorUuid: targetActor.uuid,
+                effectData: {
+                  name: 'Unstable Binding',
+                  img: _tome.img || 'icons/svg/explosion.svg',
+                  duration: { rounds: _delay },
+                  origin: _tome.uuid,
+                  type: 'base',
+                  system: {
+                    debuffDamage: _held.amount,
+                    debuffType: 'unstable-binding',
+                    casterActorUuid: targetActor.uuid,
+                    dot: true, dotDamage: _held.amount,
+                    dotDamageType: (_held.affinities?.[0]) || 'magical',
+                    applierActorUuid: targetActor.uuid,
+                  },
+                },
+              });
+              ChatMessage.create({ speaker: reactionSpeaker,
+                content: `<p><strong>The bound ${_held.label} destabilizes!</strong> The held magic (${_held.amount}) will tear itself free of ${targetActor.name}'s ${_tome.name}.</p>`,
+              });
+            }
+          }
         } else if (rType === 'clash') {
           // CLASH — meet the blow with a blow (design-clash-reaction.md).
           //
@@ -2666,7 +2738,7 @@ export class AspectsofPowerItem extends Item {
       // (2) Skill-affinity portion: route the non-augment, non-weapon-buff
       // damage through the skill's affinities, split evenly across multiple
       // (the last slice absorbs rounding to keep the sum exact).
-      const skillAffinities = this.system?.affinities ?? [];
+      const skillAffinities = this.effectiveAffinities();
       if (skillAffinities.length > 0 && ratio > 0) {
         const augmentPortion = Math.round(equipped * ratio);
         const skillPortion = Math.max(0, afterDefense - augmentPortion - weaponBuffAfter);
@@ -3271,6 +3343,15 @@ export class AspectsofPowerItem extends Item {
       }
       // Swap-reaction gate: hide unless the actor has a live summon to swap with.
       if ((s.system.reactionType ?? '') === 'swap' && !hasSummonPresence()) return false;
+      // Attack-type filter (melee/ranged + 'magic' for tome seize,
+      // 2026-08-24). `this` is the attacking skill in this prompt flow.
+      // Previously unapplied here — a melee-only Retaliatory Strike was
+      // offered against arrows; now the filter means what it says at the
+      // prompt too.
+      if (!this.constructor._reactionMatchesAttackType(
+        s, this.constructor._classifyAttackType(this), this)) return false;
+      // Seize needs a tome in hand — no vessel, no catch.
+      if ((s.system.reactionType ?? '') === 'seize' && !equippedTome(targetActor)) return false;
       // GUARD STANCE gate (design-guard-stances, RULED 2026-08-21): in an
       // active combat, parry- and block-class reactions require the raised
       // guard — the pre-paid answer. Out of combat there is no economy to
@@ -3672,7 +3753,7 @@ export class AspectsofPowerItem extends Item {
     const rollType = this.system.roll?.type;
     const isPhysWeaponType = rollType === 'str_weapon' || rollType === 'dex_weapon' || rollType === 'phys_ranged';
 
-    const skillAffinities = [...(this.system.affinities ?? [])];
+    const skillAffinities = this.effectiveAffinities();
     if (isPhysWeaponType && !skillMagicType) {
       // "A sword is a sword" (ruled 2026-07-03): a weapon STRIKE is always
       // physical, PLUS the WIELDED WEAPON's enchant affinity (a lightning
@@ -3858,6 +3939,19 @@ export class AspectsofPowerItem extends Item {
    * labelled by what it does. Mixed skills (attack + restoration rider,
    * e.g. drain heals) keep the attack card: the fight is the headline there.
    */
+  /**
+   * The affinities THIS CAST carries (weave = affinity swap catalyst,
+   * ruled 2026-08-24): the skill's own, unless the caster wears an
+   * attuned weave and this is a magic cast — then the attuned affinity
+   * replaces them WHOLESALE. Every cast-side typing read (damage routing,
+   * DR-strip matching, barrier/aura/buff affinities, debuff payloads)
+   * goes through here so the pipeline can never disagree with itself
+   * about what the spell is.
+   */
+  effectiveAffinities() {
+    return castAffinities(this);
+  }
+
   _supportCardKind() {
     const tags = this.system.tags ?? [];
     if (tags.includes('attack') || tags.includes('debuff')) return null;
@@ -3966,7 +4060,7 @@ export class AspectsofPowerItem extends Item {
     // Barrier creation passes affinities, source name, and caster cost info
     // so the GM can deduct cost only after the target accepts.
     if (resource === 'barrier') {
-      actionPayload.barrierAffinities = this.system.affinities ?? [];
+      actionPayload.barrierAffinities = this.effectiveAffinities();
       actionPayload.barrierSource = this.name;
       const casterRes = rollData.roll.resource ?? 'mana';
       const casterCost = rollData.roll.cost ?? 0;
@@ -4361,7 +4455,7 @@ export class AspectsofPowerItem extends Item {
       systemOverrides.auraDamage        = amount; // legacy alias
       systemOverrides.auraDamageType    = tc.auraDamageType ?? 'physical';
       systemOverrides.auraTargeting     = tc.auraTargeting ?? 'enemies';
-      systemOverrides.auraAffinities    = [...(this.system.affinities ?? [])];
+      systemOverrides.auraAffinities    = this.effectiveAffinities();
       systemOverrides.auraIsMagic       = (this.system.tags ?? []).includes('magic');
       systemOverrides.auraEffectType    = tc.auraEffectType ?? 'damage';
       systemOverrides.auraHealResource  = tc.auraHealResource ?? 'health';
@@ -4379,7 +4473,7 @@ export class AspectsofPowerItem extends Item {
     const weaponBuffScale = tc.weaponBuffScale ?? 0;
     if (weaponBuffScale > 0) {
       systemOverrides.weaponBuffDamage = Math.max(0, Math.round(rollTotal * weaponBuffScale));
-      systemOverrides.weaponBuffAffinities = [...(this.system.affinities ?? [])];
+      systemOverrides.weaponBuffAffinities = this.effectiveAffinities();
     }
 
     // If the only thing this skill does is set system overrides (no stat
@@ -4592,7 +4686,7 @@ export class AspectsofPowerItem extends Item {
       debuffDamage: rollTotal,
       debuffType,
       casterActorUuid: this.actor.uuid,
-      affinities: this.system.affinities ?? [],
+      affinities: this.effectiveAffinities(),
       magicType: (this.system.tags ?? []).includes('magic') ? 'magical' : 'non-magical',
       directions,
       // Source-tag stamp (dread/curse engine, RULED 2026-08-21): the spawned
@@ -6094,6 +6188,21 @@ export class AspectsofPowerItem extends Item {
     // Done BEFORE the celerity defer gate so the variable-invest dialog (which
     // needs formula context) can capture the invest amount at declaration time.
     let { hitFormula, dmgFormula } = this._buildRollFormulas(rollData);
+
+    // ── RELEASE BINDING (tome, ruled 2026-08-24) ──────────────────────────
+    // Hurl the working seized earlier: flat damage = the bound magnitude,
+    // typed by the bound affinities (castAffinities reads the binding).
+    // Nothing bound — or the binding decayed with its combat — is nothing
+    // to release. The binding is consumed after the cast commits below.
+    if (tags.includes('release-binding')) {
+      const _relTome = equippedTome(this.actor);
+      const _relHeld = _relTome ? tomeBinding(_relTome) : null;
+      if (!_relHeld) {
+        ui.notifications.warn(`${this.name}: nothing is bound in the tome.`);
+        return;
+      }
+      dmgFormula = String(_relHeld.amount);
+    }
 
     // ── Spellstrike accuracy override (ruled 2026-07-03) ──────────────────
     // A `spellstrike` skill's accuracy comes from the WIELDED WEAPON, not its
@@ -7622,7 +7731,7 @@ export class AspectsofPowerItem extends Item {
             type: 'base',
             system: {
               kindledDmgMod: _kMod,
-              affinities: [...(this.system.affinities ?? [])],
+              affinities: this.effectiveAffinities(),
               casterActorUuid: this.actor.uuid,
             },
           }]);
@@ -7789,6 +7898,15 @@ export class AspectsofPowerItem extends Item {
     // After the cost is committed, so a cast that could not be paid for
     // conjures nothing.
     await this._produceStacks(speaker, rollMode, dmgRoll?.total ?? 0);
+
+    // Release Binding consumes the binding once the cast is committed —
+    // the caster owns their own tome, so this write is legal on any client.
+    if (tags.includes('release-binding')) {
+      const _rt = equippedTome(this.actor);
+      if (_rt && tomeBinding(_rt)) {
+        await _rt.update({ 'flags.aspects-of-power.tomeBound': null });
+      }
+    }
 
     // ── Legacy behavior for tagless skills ──────────────────────────────
     if (tags.length === 0) {

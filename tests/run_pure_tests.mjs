@@ -2534,7 +2534,10 @@ eq('junk situational entries are skipped, not NaN',
   eq('dualWield: unknown rarity falls to untrained', F3.dualWieldFloor('sharpness', true, DW), 0.95);
   // Shipped ladder pins — a drifted knob re-prices every dual build silently.
   eq('dualWield: shipped untrained 0.95', Number(/untrainedFloor:\s*([\d.]+)/.exec(src)?.[1]), 0.95);
-  eq('dualWield: shipped legendary 0.55', Number(/legendary:\s*([\d.]+)/.exec(src)?.[1]), 0.55);
+  // Scoped to the dualWield block — a bare /legendary:/ started matching
+  // the tome cap ladder (2026-08-24) which now sits earlier in config.
+  eq('dualWield: shipped legendary 0.55',
+     Number(/floorByRarity:\s*\{[^}]*legendary:\s*([\d.]+)/.exec(src.replace(/\n/g, ' '))?.[1]), 0.55);
 
   // ── Burn detonate (`consume-burn`, ruled 2026-08-21 — Snapfire) ──
   // GOLDEN anchor from the live wiring session: Valentine's Burn at invest
@@ -2659,6 +2662,19 @@ eq('junk situational entries are skipped, not NaN',
      F3.curseFillAmount(487, F3.resolveCurseFillScale(null, 'hexed', CL)), 49);
   eq('curse-levels: Despair through anathema banks 122',
      F3.curseFillAmount(487, F3.resolveCurseFillScale(null, 'anathema', CL)), 122);
+
+  // ── TOME SEIZE CAP (ruled 2026-08-24: progress x rarity) ──
+  // Live anchors: masterwork gear ~1000 progress; EPIC is the reference
+  // band. Epic masterwork ~2600 catches a base major (2433 live); grands
+  // (~4258 live) need legendary. Ladder pinned via config regex.
+  eq('tome: shipped cap ladder (epic 2.6, legendary 5.2)',
+     /capRarityMult:\s*\{[^}]*epic:\s*2\.6\b[^}]*legendary:\s*5\.2\b/.test(src.replace(/\n/g, ' ')), true);
+  eq('tome: epic masterwork cap 2600', F3.tomeSeizeCap(1000, 2.6), 2600);
+  eq('tome: epic masterwork catches a base major (2433)', F3.tomeSeizeCap(1000, 2.6) >= 2433, true);
+  eq('tome: epic masterwork cannot catch a live grand (4258)', F3.tomeSeizeCap(1000, 2.6) < 4258, true);
+  eq('tome: legendary masterwork catches the grand', F3.tomeSeizeCap(1000, 5.2) >= 4258, true);
+  eq('tome: common mid-craft cap 271 (median 301 progress)', F3.tomeSeizeCap(301, 0.9), 271);
+  eq('tome: zero progress seizes nothing', F3.tomeSeizeCap(0, 2.6), 0);
 }
 
 if (failures) { console.error(`\n${failures} FAILURES`); process.exit(1); }

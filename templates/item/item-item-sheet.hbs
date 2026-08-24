@@ -133,6 +133,34 @@
           </select>
         </div>
 
+        {{!-- Weave (affinity swap catalyst): affinities woven at craft,
+              rarity gates how many are honoured; the wearer attunes to one. --}}
+        {{#if (includes @root.system.tags 'weave')}}
+        <div class="equip-field">
+          <label title="Comma-separated affinities woven into this catalyst. Rarity gates how many are honoured.">Woven Affinities</label>
+          <input type="text" name="system.wovenAffinities"
+                 value="{{#each system.wovenAffinities}}{{this}}{{#unless @last}}, {{/unless}}{{/each}}"
+                 placeholder="fire, ice" />
+        </div>
+        <div class="equip-field">
+          <label title="The affinity the wearer is channelling. Magic casts carry this affinity while attuned.">Attuned</label>
+          <select name="system.weaveAttuned">
+            <option value="" {{#unless @root.system.weaveAttuned}}selected{{/unless}}>None (spell's own)</option>
+            {{#each system.wovenAffinities as |aff|}}
+              <option value="{{aff}}" {{#if (eq aff @root.system.weaveAttuned)}}selected{{/if}}>{{aff}}</option>
+            {{/each}}
+          </select>
+        </div>
+        {{/if}}
+
+        {{!-- Tome (spell seizure): show the cap derived from progress x rarity. --}}
+        {{#if (includes @root.system.tags 'tome')}}
+        <div class="equip-field">
+          <label title="The largest rolled magnitude this tome can seize out of the air (progress x rarity).">Seize Cap</label>
+          <span class="tome-seize-cap">{{tomeSeizeCap}}</span>
+        </div>
+        {{/if}}
+
         {{!-- Deployable: a rare item that is PLACED rather than used up.
               Deploying spawns the stub and moves this item onto it; only the
               owner can pick it back up. --}}

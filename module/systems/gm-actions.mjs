@@ -102,6 +102,21 @@ export async function executeGmAction(payload) {
         return;
       }
 
+      case 'gmTomeState': {
+        // Tome binding write (seize reaction, ruled 2026-08-24). The seize
+        // resolves on the ATTACKER's client, which does not own the
+        // defender's tome — single writer, whole-object set (bound is a
+        // small self-contained payload; null clears). Standard 16.
+        const tome = await fromUuid(payload.tomeUuid);
+        if (!tome) return;
+        try {
+          await tome.update({ 'flags.aspects-of-power.tomeBound': payload.bound ?? null });
+        } catch (e) {
+          console.warn('[gmTomeState] failed:', e);
+        }
+        return;
+      }
+
       case 'gmApplyRestoration': {
         const target = await fromUuid(payload.targetActorUuid);
         if (!target) return;
