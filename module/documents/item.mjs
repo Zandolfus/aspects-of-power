@@ -3847,6 +3847,30 @@ export class AspectsofPowerItem extends Item {
   /**
    * Restoration tag: restore health, mana, or stamina and route through GM.
    */
+  /**
+   * Card flavor for a SUPPORT cast, or null for anything that fights.
+   *
+   * "Wards are given damage cards and not healing/barrier cards" (triage
+   * 2026-08-23): a pure restoration/buff cast used to post the same
+   * "— To Hit" + "— Roll" pair as an attack — an attack-shaped card for the
+   * ally being shielded. A support cast posts NO to-hit line (nothing is
+   * contested, and no support handler ever reads hitRoll) and its roll is
+   * labelled by what it does. Mixed skills (attack + restoration rider,
+   * e.g. drain heals) keep the attack card: the fight is the headline there.
+   */
+  _supportCardKind() {
+    const tags = this.system.tags ?? [];
+    if (tags.includes('attack') || tags.includes('debuff')) return null;
+    if (tags.includes('restoration')) {
+      return (this.system.tagConfig?.restorationResource ?? 'health') === 'barrier'
+        ? 'Barrier' : 'Healing';
+    }
+    if (tags.includes('repair')) return 'Repair';
+    if (tags.includes('cleanse')) return 'Cleanse';
+    if (tags.includes('buff')) return 'Buff';
+    return null;
+  }
+
   async _handleRestorationTag(item, rollData, dmgRoll, speaker, rollMode, label, targetTokenOverride = null) {
     const whisperGM = !_isPlayerCharacter(this.actor) ? ChatMessage.getWhisperRecipients('GM') : undefined;
     // `restorationScale` is 1 for every skill that does not set it, so this is
@@ -5238,8 +5262,9 @@ export class AspectsofPowerItem extends Item {
         content: `<div class="aoe-result"><p><strong>${this.actor.name}</strong> dies — <strong>${this.name}</strong> bursts! ${targets.length} target(s)${targets.length ? ' — ' + targets.map(t => t.token.document.name).join(', ') : ''}.</p></div>`,
       });
 
-      if (hitRoll) await hitRoll.toMessage({ speaker, rollMode, flavor: `${label} — To Hit` });
-      await dmgRoll.toMessage({ speaker, rollMode, flavor: `${label} — Roll` });
+      const _supportKindBurst = this._supportCardKind();
+      if (hitRoll && !_supportKindBurst) await hitRoll.toMessage({ speaker, rollMode, flavor: `${label} — To Hit` });
+      await dmgRoll.toMessage({ speaker, rollMode, flavor: `${label} — ${_supportKindBurst ?? 'Roll'}` });
 
       // ── Dispatch each tag to each qualifying token ─────────────────────
       // Mirrors the AOE dispatch loop in roll(); skips tags that don't make
@@ -7537,9 +7562,11 @@ export class AspectsofPowerItem extends Item {
         ui.notifications.warn(game.i18n.localize('ASPECTSOFPOWER.AOE.noTokensInArea'));
       }
 
-      // Post roll results to chat.
-      if (hitRoll) await hitRoll.toMessage({ speaker, rollMode, ...(whisperGM ? { whisper: whisperGM } : {}), flavor: `${label} — To Hit` });
-      await dmgRoll.toMessage({ speaker, rollMode, ...(whisperGM ? { whisper: whisperGM } : {}), flavor: `${label} — Roll` });
+      // Post roll results to chat. Support casts (a friendly blessing AOE)
+      // drop the to-hit line and label the roll by what it does.
+      const _supportKindAoe = this._supportCardKind();
+      if (hitRoll && !_supportKindAoe) await hitRoll.toMessage({ speaker, rollMode, ...(whisperGM ? { whisper: whisperGM } : {}), flavor: `${label} — To Hit` });
+      await dmgRoll.toMessage({ speaker, rollMode, ...(whisperGM ? { whisper: whisperGM } : {}), flavor: `${label} — ${_supportKindAoe ?? 'Roll'}` });
 
       // Announce targets with their overlap fraction (informational).
       if (targets.length > 0) {
@@ -7763,8 +7790,9 @@ export class AspectsofPowerItem extends Item {
     }
 
     // ── Post roll results to chat once (shared) ─────────────────────────
-    if (hitRoll) await hitRoll.toMessage({ speaker, rollMode, ...(whisperGM ? { whisper: whisperGM } : {}), flavor: `${label} — To Hit` });
-    await dmgRoll.toMessage({ speaker, rollMode, ...(whisperGM ? { whisper: whisperGM } : {}), flavor: `${label} — Roll` });
+    const _supportKind = this._supportCardKind();
+    if (hitRoll && !_supportKind) await hitRoll.toMessage({ speaker, rollMode, ...(whisperGM ? { whisper: whisperGM } : {}), flavor: `${label} — To Hit` });
+    await dmgRoll.toMessage({ speaker, rollMode, ...(whisperGM ? { whisper: whisperGM } : {}), flavor: `${label} — ${_supportKind ?? 'Roll'}` });
 
     // ── Orient caster toward target (single-target) ──
     const singleTarget = game.user.targets.first() ?? null;
@@ -8235,9 +8263,11 @@ export class AspectsofPowerItem extends Item {
         const cDmgRoll = new Roll(cDmgF, chainRollData);
         await cDmgRoll.evaluate();
 
-        // Post chained skill rolls to chat.
-        if (cHitRoll) await cHitRoll.toMessage({ speaker, rollMode, ...(whisperGM ? { whisper: whisperGM } : {}), flavor: `${chainLabel} — To Hit` });
-        await cDmgRoll.toMessage({ speaker, rollMode, ...(whisperGM ? { whisper: whisperGM } : {}), flavor: `${chainLabel} — ${chain._rider ? 'Potency' : 'Roll'}` });
+        // Post chained skill rolls to chat. A chained support skill (heal
+        // rider that is its own restoration skill) drops the to-hit line.
+        const _supportKindChain = chainedItem._supportCardKind?.() ?? null;
+        if (cHitRoll && !_supportKindChain) await cHitRoll.toMessage({ speaker, rollMode, ...(whisperGM ? { whisper: whisperGM } : {}), flavor: `${chainLabel} — To Hit` });
+        await cDmgRoll.toMessage({ speaker, rollMode, ...(whisperGM ? { whisper: whisperGM } : {}), flavor: `${chainLabel} — ${chain._rider ? 'Potency' : (_supportKindChain ?? 'Roll')}` });
 
         // Dispatch each of the chained skill's own tags. (chainTags
         // already declared above for the pierce / fully-blocked gate.)

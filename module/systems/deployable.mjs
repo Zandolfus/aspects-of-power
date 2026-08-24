@@ -75,23 +75,61 @@ export async function deployItem(owner, item, position, scene = null) {
     return null;
   }
 
-  // Clone the stub as a world actor so the deployed object owns its own HP
-  // and can hold the item. Named for the item, not the stub, so the map
-  // reads "Pylon of Civilization" rather than "Pylon Stub".
-  const cloneData = stub.toObject();
-  delete cloneData._id;
-  cloneData.name = item.name;
-  if (item.img) cloneData.img = item.img;
-  foundry.utils.setProperty(cloneData, `flags.${FLAG_SCOPE}.deployable`, {
-    ownerUuid: owner.uuid,
-    itemName: item.name,
-  });
-  const clone = await Actor.create(cloneData);
-  if (!clone) return null;
+  // ONE PERSISTENT CLONE PER DEPLOYABLE (triage 2026-08-23: "pylon should
+  // not generate a new actor every time and should be owned by the
+  // deployer"). The deployable carries a stable `deployableId` flag that
+  // survives every inventory move (toObject copies keep flags), and the
+  // clone actor is stamped with the same id — so redeploying finds the
+  // actor made last time instead of minting another. Recovery parks the
+  // clone (tokenless, itemless — inert to every aura/pylon scan, which
+  // all key off the token or the carried pylon item) rather than
+  // deleting it, so installed auras survive a deploy/recover cycle.
+  // ⚠ Stub edits after first deploy do NOT propagate to an existing
+  // clone — the stub is a birth template, not a live link.
+  let deployableId = item.flags?.[FLAG_SCOPE]?.deployableId;
+  let clone = deployableId
+    ? game.actors.find(a => a.flags?.[FLAG_SCOPE]?.deployable?.deployableId === deployableId)
+    : null;
+  if (!deployableId) deployableId = foundry.utils.randomID();
+
+  // OWNED BY THE DEPLOYER: copy the deploying actor's ownership block onto
+  // the clone wholesale, so whoever plays the deployer can open and move
+  // their own pylon. Replaced on every deploy (recursive:false — ownership
+  // key deletion silently no-ops, so stale entries must be overwritten
+  // wholesale, never deleted).
+  const cloneOwnership = foundry.utils.deepClone(owner.ownership ?? { default: 0 });
+
+  if (clone) {
+    await clone.update({
+      name: item.name,
+      ...(item.img ? { img: item.img } : {}),
+      [`flags.${FLAG_SCOPE}.deployable.ownerUuid`]: owner.uuid,
+      [`flags.${FLAG_SCOPE}.deployable.itemName`]: item.name,
+    });
+    // Ownership separately, wholesale (the verified no-op-safe pattern).
+    await clone.update({ ownership: cloneOwnership }, { recursive: false });
+  } else {
+    // Clone the stub as a world actor so the deployed object owns its own
+    // HP and can hold the item. Named for the item, not the stub, so the
+    // map reads "Pylon of Civilization" rather than "Pylon Stub".
+    const cloneData = stub.toObject();
+    delete cloneData._id;
+    cloneData.name = item.name;
+    if (item.img) cloneData.img = item.img;
+    cloneData.ownership = cloneOwnership;
+    foundry.utils.setProperty(cloneData, `flags.${FLAG_SCOPE}.deployable`, {
+      ownerUuid: owner.uuid,
+      itemName: item.name,
+      deployableId,
+    });
+    clone = await Actor.create(cloneData);
+    if (!clone) return null;
+  }
 
   const itemData = item.toObject();
   delete itemData._id;
   itemData.system.deployOwnerUuid = owner.uuid;
+  foundry.utils.setProperty(itemData, `flags.${FLAG_SCOPE}.deployableId`, deployableId);
   const [placedItem] = await clone.createEmbeddedDocuments('Item', [itemData]);
 
   const tokenData = await clone.getTokenDocument({
@@ -194,10 +232,20 @@ export async function recoverDeployable(claimant, tokenDoc) {
 
   const cloneActor = tokenDoc.actor;
   await tokenDoc.delete();
-  // Only delete the clone when it is the throwaway we made — a linked world
-  // actor that happens to hold a deployable must not be destroyed.
   if (cloneActor?.flags?.[FLAG_SCOPE]?.deployable && !cloneActor.getActiveTokens()?.length) {
-    await cloneActor.delete();
+    if (cloneActor.flags[FLAG_SCOPE].deployable.deployableId) {
+      // Persistent clone (2026-08-23): PARK it, don't delete. Remove the
+      // deployed item copy (the original just moved back to the claimant)
+      // and leave installed auras aboard — tokenless and pylon-item-less,
+      // the parked actor is inert to every aura/pylon scan, and the auras
+      // are waiting on the next deploy.
+      await cloneActor.deleteEmbeddedDocuments('Item', [deployed.id]);
+    } else {
+      // Legacy clone from before persistence — still a throwaway. A linked
+      // world actor that happens to hold a deployable must not be destroyed
+      // (the flag gate above).
+      await cloneActor.delete();
+    }
   }
 
   ChatMessage.create({
