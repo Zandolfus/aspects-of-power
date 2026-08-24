@@ -388,7 +388,11 @@ export class SkillData extends foundry.abstract.TypeDataModel {
         // attacker's roll.type drives classification: str_weapon/dex_weapon/
         // magic_melee → melee, others → ranged. Skill tags `melee`/`ranged`
         // override the roll.type classification when present.
-        reactionAttackType:    new fields.StringField({ initial: 'any', choices: ['any', 'melee', 'ranged'] }),
+        // 'magic' (tome seize, 2026-08-24): matches workings — magic and
+        // magic_melee roll types — orthogonal to the melee/ranged axis.
+        // EXTENDING choices is safe (all stored values stay valid); never
+        // NARROW a choices list on a live field (e4c333b).
+        reactionAttackType:    new fields.StringField({ initial: 'any', choices: ['any', 'melee', 'ranged', 'magic'] }),
 
         // ── Guardian reactions (per design-guardian-reactions.md) ──
         // When reactionType === 'guardian' on an `ally_attacked` reaction, the
