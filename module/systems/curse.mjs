@@ -26,10 +26,33 @@
  * different actor's effects (spread copies, transfer, non-owned consume)
  * routes through the `gmCurseOp` GM action below.
  */
-import { curseMeterCapacity, curseEatenEnergy, curseFillAmount, curseSpendPrice } from '../helpers/formulas.mjs';
+import { curseMeterCapacity, curseEatenEnergy, curseFillAmount, curseSpendPrice, resolveCurseFillScale } from '../helpers/formulas.mjs';
 
 function _cfg() {
   return CONFIG.ASPECTSOFPOWER?.curse ?? {};
+}
+
+/* -------------------------------------------- */
+/*  Cursed vessels (curse levels, 2026-08-24)    */
+/* -------------------------------------------- */
+
+/**
+ * The actor's equipped cursed vessel, or null. An item is a vessel iff its
+ * `system.curseLevel` names a rung in CONFIG.curseLevels — the field is the
+ * single truth (deliberately not a tag; see the config note). Equipped
+ * items only: a cursed ring in a backpack infects nobody. When several are
+ * equipped, the VILEST one is the vessel (highest ladder weight).
+ */
+export function equippedCursedVessel(actor) {
+  const levels = CONFIG.ASPECTSOFPOWER?.curseLevels ?? {};
+  let best = null, bestWeight = -1;
+  for (const item of actor?.items ?? []) {
+    if (item.type !== 'item' || !item.system?.equipped) continue;
+    const rung = levels[item.system?.curseLevel ?? ''];
+    if (!rung) continue;
+    if ((rung.weight ?? 0) > bestWeight) { best = item; bestWeight = rung.weight ?? 0; }
+  }
+  return best;
 }
 
 /* -------------------------------------------- */
@@ -238,9 +261,16 @@ export async function onCurseCast(skill, rollTotal, speaker, rollMode) {
   // Vents empty the vessel and spenders drain it — neither refills itself.
   if (tags.includes('vent-curse') || tags.includes('harness') || tags.includes('spend-curse')) return;
   if (!(cfg.fillTags ?? ['dread', 'curse']).some(t => tags.includes(t))) return;
-  // Per-skill fill override: a weapon conduit trickles (Maia's Lament
-  // 0.03) while a true curse cast banks the full config fraction.
-  const scale = skill.system?.tagConfig?.curseFillScale || (cfg.fillScale ?? 0.1);
+  // Fill scale resolution (curse levels, 2026-08-24): skill override first
+  // (a weapon conduit trickles 0.03 through any vessel), then the equipped
+  // vessel's curse-level fillScale, then the config default. hexed = 0.10
+  // matches the old default, so pre-ladder behavior is byte-identical
+  // through a hexed vessel.
+  const vessel = equippedCursedVessel(skill.actor);
+  const scale = resolveCurseFillScale(
+    skill.system?.tagConfig?.curseFillScale,
+    vessel?.system?.curseLevel ?? '',
+    { curseLevels: CONFIG.ASPECTSOFPOWER?.curseLevels, fillScale: cfg.fillScale });
   const amount = curseFillAmount(rollTotal, scale);
   if (amount <= 0) return;
   await addCurseEnergy(skill.actor, amount, { speaker, rollMode, sourceName: skill.name });

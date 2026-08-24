@@ -2023,6 +2023,28 @@ export function curseFillAmount(rollTotal, fillScale) {
 }
 
 /**
+ * Which fill scale a curse cast banks at (curse levels, shipped 2026-08-24).
+ * Resolution order, first hit wins:
+ *   1. the skill's own tagConfig.curseFillScale — a weapon conduit trickles
+ *      0.03 no matter how vile the vessel it passes through;
+ *   2. the equipped vessel's curse-level fillScale (curseLevels registry) —
+ *      the vessel decides how much of the working lingers;
+ *   3. the config default (curse.fillScale) — pre-ladder behavior, and the
+ *      fallback for a vessel whose level names no registry rung.
+ *
+ * @param {number|null|undefined} skillScale  tagConfig.curseFillScale (falsy = unset)
+ * @param {string} vesselLevel   equipped vessel's system.curseLevel ('' = none)
+ * @param {object} cfg           { curseLevels, fillScale }
+ * @returns {number}
+ */
+export function resolveCurseFillScale(skillScale, vesselLevel, cfg) {
+  if (skillScale) return Number(skillScale);
+  const rung = cfg?.curseLevels?.[vesselLevel];
+  if (rung && Number(rung.fillScale) > 0) return Number(rung.fillScale);
+  return Number(cfg?.fillScale ?? 0.1);
+}
+
+/**
  * Price of one curse-spender cast (`spend-curse` tag, builder/spender
  * rebuild RULED 2026-08-22: "Mind Crush should likely be another spender").
  * A fixed fraction of the wielder's CAPACITY — stat-derived, so the price a

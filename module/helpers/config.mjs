@@ -1394,6 +1394,38 @@ ASPECTSOFPOWER.curse = {
 };
 
 /**
+ * CURSE LEVELS (ruled 2026-08-22/23, shipped 2026-08-24): "Curse implements
+ * should likely require a cursed object... the weight should scale with the
+ * curse that the object holds. Mirror the casting implement weights and
+ * label them with curse levels."
+ *
+ * The cursed VESSEL is an item whose `system.curseLevel` names a rung here —
+ * that field is the single truth (no `cursed` tag; a tag would be a second
+ * writer and retagging statted items clobbers unlocked stats). Curse-tagged
+ * skills REQUIRE an equipped vessel to cast: infection needs a vector.
+ *
+ * Rungs mirror the implement weight ladder (wand 40 ... staff 140) and
+ * extend above it the way spell tiers extend. Two readers today:
+ *   - `fillScale`: how much of a curse cast's roll the vessel banks on the
+ *     meter (resolveCurseFillScale — skill tagConfig override still wins,
+ *     which is how a weapon conduit trickles 0.03 through a hexed vessel).
+ *     hexed = 0.1 matches the pre-ladder config default, so existing curse
+ *     casts through Maia's Lament (hexed) are byte-identical.
+ *   - the vessel REQUIREMENT gate in roll().
+ * `weight` is RESERVED: it is the ruled hook for curse-cast tempo/heft once
+ * the curse-cast speed ruling lands (implements never slow MAGIC casts —
+ * whether a curse, which is an infection rather than a cast, prices tempo
+ * by its vessel is an open ruling). Do not wire a reader without it.
+ */
+ASPECTSOFPOWER.curseLevels = {
+  tainted:  { label: 'Tainted',  weight: 40,  fillScale: 0.03 },
+  blighted: { label: 'Blighted', weight: 90,  fillScale: 0.06 },
+  hexed:    { label: 'Hexed',    weight: 140, fillScale: 0.10 },
+  baneful:  { label: 'Baneful',  weight: 240, fillScale: 0.15 },
+  anathema: { label: 'Anathema', weight: 400, fillScale: 0.25 },
+};
+
+/**
  * DUAL-WIELD TEMPO (design-dual-wield-tempo, ladder RULED 2026-08-15,
  * re-validated under the defence-time budget 2026-08-16).
  *

@@ -11,7 +11,7 @@ import { executeGmAction as executeGmActionImpl } from '../systems/gm-actions.mj
 import { proficiencyDamageMult, proficiencyHitMult, heldWeaponWeight, heldImplementWeight, mainHandWeapon, offHandWeapon, dualWieldEligible, handOf } from '../systems/weapon-styles.mjs';
 import { stackDamageMultiplier, spendableRange, clampSpread, getStackCount, getStackPayload, addStacks, spendStacks, resolveStackCap } from '../systems/stacks.mjs';
 import { resolveCoInvest } from '../systems/co-invest.mjs';
-import { handleSpread, handleTransfer, handleConsume, handleHarness, onCurseCast, ventAllCurse, meterValue as curseMeterValue, spendPriceFor, spendCurse } from '../systems/curse.mjs';
+import { handleSpread, handleTransfer, handleConsume, handleHarness, onCurseCast, ventAllCurse, meterValue as curseMeterValue, spendPriceFor, spendCurse, equippedCursedVessel } from '../systems/curse.mjs';
 import { resolveDamage } from '../systems/damage.mjs';
 
 /**
@@ -6069,6 +6069,24 @@ export class AspectsofPowerItem extends Item {
     // Skipped at fire time (preInvestAmount supplied) since the player already
     // committed at declare time and the target may have moved harmlessly since.
     if (!options.executeDeferred && options.preInvestAmount == null && !this._checkMeleeReach()) {
+      return;
+    }
+
+    // ── CURSE VESSEL GATE (curse levels, ruled 2026-08-22/23) ─────────────
+    // "Curse implements should likely require a cursed object" — a curse is
+    // an infection, not a cast, and infection needs a vector. A curse-tagged
+    // skill fires only while an equipped item carries a curseLevel. Checked
+    // on every invocation (declare AND fire): the vessel is a loadout
+    // constraint, like a bow for a ranged pillar. Toast + chat line, both —
+    // a buried chat line alone reads as "the dialog is broken".
+    if (tags.includes('curse') && this.actor && !equippedCursedVessel(this.actor)) {
+      const msg = `${this.name}: no cursed vessel equipped — a curse needs an object to carry it.`;
+      ui.notifications.warn(msg);
+      ChatMessage.create({
+        speaker, rollMode, ...(whisperGM ? { whisper: whisperGM } : {}),
+        flavor: label,
+        content: `<p><em>${msg}</em></p>`,
+      });
       return;
     }
 

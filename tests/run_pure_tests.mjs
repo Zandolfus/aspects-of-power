@@ -2631,6 +2631,34 @@ eq('junk situational entries are skipped, not NaN',
   eq('curse: empath feels 5% of nearby suffering', F3.curseFillAmount(1000, 0.05), 50);
   eq('curse: shipped empathFillScale 0.05', /empathFillScale:\s*0\.05\b/.test(src), true);
   eq('curse: shipped empathRadiusFt 60', /empathRadiusFt:\s*60\b/.test(src), true);
+
+  // ── CURSE LEVELS (ruled 2026-08-22/23, shipped 2026-08-24) ──
+  // "Mirror the casting implement weights and label them with curse levels":
+  // rungs 40 (wand) .. 140 (staff) extended to 400. The vessel's fillScale
+  // is the live reader; weight is RESERVED for the curse-tempo ruling.
+  eq('curse-levels: shipped ladder weights 40/90/140/240/400',
+     /tainted:\s*\{[^}]*weight:\s*40\b[\s\S]*?blighted:\s*\{[^}]*weight:\s*90\b[\s\S]*?hexed:\s*\{[^}]*weight:\s*140\b[\s\S]*?baneful:\s*\{[^}]*weight:\s*240\b[\s\S]*?anathema:\s*\{[^}]*weight:\s*400\b/.test(src), true);
+  const CL = { curseLevels: {
+    tainted: { weight: 40, fillScale: 0.03 }, hexed: { weight: 140, fillScale: 0.10 },
+    anathema: { weight: 400, fillScale: 0.25 } }, fillScale: 0.1 };
+  // Resolution order: skill override > vessel level > config default.
+  eq('curse-levels: skill override wins through any vessel',
+     F3.resolveCurseFillScale(0.03, 'anathema', CL), 0.03);
+  eq('curse-levels: vessel level drives an unoverridden cast',
+     F3.resolveCurseFillScale(null, 'anathema', CL), 0.25);
+  // THE BYTE-IDENTITY PIN: a hexed vessel banks exactly the pre-ladder
+  // default — Felicia through Maia's Lament (hexed) is unchanged.
+  eq('curse-levels: hexed = the old 0.1 default (Felicia unchanged)',
+     F3.resolveCurseFillScale(null, 'hexed', CL), 0.10);
+  eq('curse-levels: no vessel level falls to config default',
+     F3.resolveCurseFillScale(null, '', CL), 0.1);
+  eq('curse-levels: unknown level falls to config default',
+     F3.resolveCurseFillScale(null, 'madeup', CL), 0.1);
+  // Despair 487 roll: hexed banks 49, anathema 122, tainted conduit 15.
+  eq('curse-levels: Despair through hexed banks 49',
+     F3.curseFillAmount(487, F3.resolveCurseFillScale(null, 'hexed', CL)), 49);
+  eq('curse-levels: Despair through anathema banks 122',
+     F3.curseFillAmount(487, F3.resolveCurseFillScale(null, 'anathema', CL)), 122);
 }
 
 if (failures) { console.error(`\n${failures} FAILURES`); process.exit(1); }

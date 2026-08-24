@@ -32,6 +32,14 @@ export class ItemItemData extends foundry.abstract.TypeDataModel {
       // E.g. a hammer in 'weaponry' (combat) can also be in 'profWeapon' (profession).
       additionalSlots: new fields.ArrayField(new fields.StringField(), { initial: [] }),
       rarity:      new fields.StringField({ initial: 'common' }),
+      // ── CURSE LEVEL (ruled 2026-08-22/23, shipped 2026-08-24) ──
+      // Names a rung in CONFIG.curseLevels; non-empty = this item is a
+      // CURSED VESSEL, the required vector for curse-tagged casts. Single
+      // source of truth — deliberately a field and not a tag, so marking an
+      // item cursed can never trip tag re-derivation over its stats.
+      // ⚠ Plain StringField, NO choices: a choices constraint on a live
+      // world field vaporised the world once (e4c333b). Validate in code.
+      curseLevel:  new fields.StringField({ initial: '' }),
       twoHanded:   new fields.BooleanField({ initial: false }),
 
       // Material type — determines which repair skills can target this item.
