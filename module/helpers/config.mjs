@@ -703,9 +703,22 @@ ASPECTSOFPOWER.celerity = {
   //   Major/Grand: every cast discharges (each banks ≥ threshold)
   // Universal across tiers per design 2026-05-06 — Wand stays the speed
   // king on Basic; Orb is the mana-economy alternative.
-  // Wand implement: Basic-tier spell wait multiplier (−23% per design
-  // 2026-05-06). Lived inline in celerity.mjs before 2026-07-03.
-  WAND_BASIC_WAIT_MULT: 0.77,
+  // Wand implement: Basic-tier spell wait multiplier (−35%, ruled
+  // 2026-08-23 — the int gunslinger). The wand is a pure speed perk: it
+  // never changes what stat casts (speed stays the tier's wis/int blend)
+  // and never touches damage. 0.65 lands the archetype at ~3 basic
+  // casts/round THROUGH investment, not at pickup: John (wis 421/int
+  // 771) picks up a wand at 2.82/rd and crosses 3.0 at int ~860 — and
+  // since casting speed weighs int at 0.4, the gunslinger converges on
+  // the mark by deepening the same stat that grows his basis and aim.
+  // Balance thread (quantified 2026-08-23): at 3/rd the committed lane
+  // beats the staffed-high lane only below ~540 walls — anti-squishy,
+  // wall-gated, never dominant vs armor; casual pickup by balanced
+  // casters caps ~3.3/rd with soft basics and no staff push, so it
+  // doesn't defect. Was 0.77 (−23%) per design 2026-05-06, which never
+  // reached its own stated ~3/round target (live wand users sat at
+  // 2.13-2.45). Lived inline in celerity.mjs before 2026-07-03.
+  WAND_BASIC_WAIT_MULT: 0.65,
   ORB_DISCHARGE_THRESHOLD: 400,
   // Base movement weight per 5ft. Multiplied by the selected mode's
   // `celerityMult` (see MOVEMENT_MODES below). Sprint = 1× baseline (this

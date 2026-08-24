@@ -1002,6 +1002,29 @@ eq('spellweight: windupMin floors the result',
   eq('phil-line: greater windup 2.3', spellWindupMultiplier('greater', 130, SHIPPED), 2.3);
   eq('phil-line: Defiance base cast lands 1034',
      strikeInvestDamage(672, 0.64, spellWindupMultiplier('high', 130, SHIPPED), 80, 40, C05), 1034);
+
+  // ── WAND = THE INT GUNSLINGER (ruled 2026-08-23) ──
+  // "The goal isn't specifically 3 for everyone, just 3 for the specific
+  // wand-type int heavy user." Pure speed perk — the wand never changes
+  // what stat casts and never touches damage. 0.65 puts the 3/round mark
+  // at the END of an int investment, not at pickup (int weighs 0.4 in
+  // casting speed, so deepening int converges on the mark while raising
+  // basis and aim). LIVE ANCHORS (computeActionWait on the real party,
+  // probed 2026-08-23): bare basic waits John 2317 (rr 4248), Valentine
+  // 2490 (rr 4702), Harry Hess 2784 (rr 4566).
+  eq('wand: shipped mult is 0.65', Number(/WAND_BASIC_WAIT_MULT:\s*([\d.]+)/.exec(csrc)?.[1]), 0.65);
+  const wandPr = (bare, rr) => +(rr / Math.max(1, Math.round(bare * 0.65))).toFixed(2);
+  eq('wand: John (the archetype) lands 2.82/rd at pickup', wandPr(2317, 4248), 2.82);
+  eq('wand: Valentine lands 2.90/rd', wandPr(2490, 4702), 2.90);
+  eq('wand: Harry Hess lands 2.52/rd (low wis — the investment gap)', wandPr(2784, 4566), 2.52);
+  // John crosses 3.0 at int ~860: speed 0.6x421 + 0.4x860 = 596.6 vs
+  // today's 561 -> bare wait shrinks proportionally.
+  eq('wand: John crosses 3.0/rd at int ~860',
+     wandPr(2317 * 561 / (0.6 * 421 + 0.4 * 860), 4248) >= 3.0, true);
+  // Negative control: the mark stays out of casual reach — a balanced
+  // fast caster (Willy-grade bare basic 1976, rr 4293) with a wand caps
+  // ~3.3/rd, NOT 3.5+ (the "casual pickup doesn't defect" ceiling).
+  eq('wand: balanced-caster ceiling ~3.34/rd', wandPr(1976, 4293), 3.34);
 }
 
 /* ── STACKS (systems/stacks.mjs) ───────────────────────────────────────── */
