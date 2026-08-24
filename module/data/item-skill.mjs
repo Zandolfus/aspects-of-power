@@ -372,6 +372,11 @@ export class SkillData extends foundry.abstract.TypeDataModel {
         // HP-fraction threshold for `hp_threshold` triggers (Bloodrage etc.).
         // Fires when (HP / maxHP) drops below this value.
         reactionThresholdPct:  new fields.NumberField({ initial: 0, min: 0, max: 1 }),
+        // Dynamic trigger range as a FRACTION of the reactor's castingRange
+        // (ruled 2026-08-24, tome seize: "trigger on enemy cast landing
+        // within .5x casting range" — inherits the Savior's Slash shape).
+        // > 0 replaces the flat reactionTriggerRange in the ally/zone scan.
+        reactionTriggerCastingRangeFrac: new fields.NumberField({ initial: 0, min: 0 }),
         // Reaction cooldown in actor's reference rounds. Default 1 = once
         // per round. Skill can fire once per `reactionCooldown` rounds.
         reactionCooldown:      new fields.NumberField({ initial: 1, min: 0, integer: true }),

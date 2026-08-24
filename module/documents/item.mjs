@@ -1324,7 +1324,11 @@ export class AspectsofPowerItem extends Item {
     const candidates = reactorActor.items.filter(s => {
       if (s.type !== 'skill' || s.system.skillType !== 'Reaction') return false;
       const trig = s.system.tagConfig?.reactionTrigger ?? '';
-      if (trig !== triggerKey) return false; // strict match — no legacy fallback for non-self_attacked
+      // Strict match — no legacy fallback for non-self_attacked. Exception:
+      // `cast_in_range` (tome seize) answers the ally_attacked scan too —
+      // the range gate already ran in the caller.
+      if (trig !== triggerKey
+          && !(triggerKey === 'ally_attacked' && trig === 'cast_in_range')) return false;
       if ((cooldowns[s.id] ?? 0) > 0) return false;
       if (!this.constructor._reactionMatchesAttackType(s, attackerType, ctx?.attackerSkill ?? this)) return false;
       const resKey = s.system.roll?.resource;
@@ -1969,68 +1973,13 @@ export class AspectsofPowerItem extends Item {
           });
         } else if (rType === 'seize') {
           // SEIZE — the tome catches the working out of the air (ruled
-          // 2026-08-24). Judged against the tome's quality cap: under it,
-          // the spell never lands and is BOUND into the book (released
-          // later as the holder's own action; decays at combat end). Over
-          // it, the seize FAILS — the spell lands in full, the reaction is
-          // spent, and any binding already held DESTABILIZES: the caught
-          // magic detonates on the holder after a short delay ("all the
-          // held magic explodes after a short duration, plus it fails").
-          // Reads/writes on the defender's tome route through gmTomeState
-          // (this branch runs on the attacker's client — standard 16).
-          const _tome = equippedTome(targetActor);
-          const _cap = _tome ? tomeSeizeCapFor(_tome) : 0;
-          const _magnitude = Math.max(0, Math.round(incomingDamage));
-          if (_tome && _magnitude <= _cap) {
-            isHit = false;
-            await this._gmAction({
-              type: 'gmTomeState',
-              tomeUuid: _tome.uuid,
-              bound: {
-                label: this.name,
-                amount: _magnitude,
-                affinities: this.effectiveAffinities(),
-                combatId: game.combat?.id ?? '',
-              },
-            });
-            reactionLine = `<p><em>${targetActor.name} seizes the working with <strong>${_tome.name}</strong>! (${_magnitude} bound, cap ${_cap})</em></p>`;
-            ChatMessage.create({ speaker: reactionSpeaker,
-              content: `<p><strong>${targetActor.name}</strong> tears <strong>${this.name}</strong> out of the air — the working is bound into <strong>${_tome.name}</strong> (${_magnitude}).</p>`,
-            });
-          } else {
-            // Failure: the spell lands untouched. A held binding blows.
-            const _held = _tome ? tomeBinding(_tome) : null;
-            reactionLine = `<p><em>${targetActor.name} reaches for the working with <strong>${_tome?.name ?? 'no tome'}</strong> and fails (${_magnitude} vs cap ${_cap}).</em></p>`;
-            ChatMessage.create({ speaker: reactionSpeaker,
-              content: `<p><strong>${targetActor.name}</strong> tries to seize <strong>${this.name}</strong> — the working is beyond the book (${_magnitude} vs cap ${_cap}).</p>`,
-            });
-            if (_held) {
-              const _delay = CONFIG.ASPECTSOFPOWER.tome?.detonateDelayRounds ?? 1;
-              await this._gmAction({ type: 'gmTomeState', tomeUuid: _tome.uuid, bound: null });
-              await this._gmAction({
-                type: 'gmApplyDebuff',
-                targetActorUuid: targetActor.uuid,
-                effectData: {
-                  name: 'Unstable Binding',
-                  img: _tome.img || 'icons/svg/explosion.svg',
-                  duration: { rounds: _delay },
-                  origin: _tome.uuid,
-                  type: 'base',
-                  system: {
-                    debuffDamage: _held.amount,
-                    debuffType: 'unstable-binding',
-                    casterActorUuid: targetActor.uuid,
-                    dot: true, dotDamage: _held.amount,
-                    dotDamageType: (_held.affinities?.[0]) || 'magical',
-                    applierActorUuid: targetActor.uuid,
-                  },
-                },
-              });
-              ChatMessage.create({ speaker: reactionSpeaker,
-                content: `<p><strong>The bound ${_held.label} destabilizes!</strong> The held magic (${_held.amount}) will tear itself free of ${targetActor.name}'s ${_tome.name}.</p>`,
-              });
-            }
-          }
+          // 2026-08-24). One implementation for both flows (self-defence
+          // here; the cast_in_range ally scan in _handleAttackTag) —
+          // _resolveSeizeAttempt does the cap judgment, the binding, and
+          // the over-cap destabilization.
+          const _sz = await this._resolveSeizeAttempt(targetActor, incomingDamage);
+          if (_sz.seized) isHit = false;
+          reactionLine = _sz.line;
         } else if (rType === 'clash') {
           // CLASH — meet the blow with a blow (design-clash-reaction.md).
           //
@@ -2396,6 +2345,10 @@ export class AspectsofPowerItem extends Item {
     // re-applied). Null = no redirect this attack.
     let redirectGuardian = null;
     let redirectPct = 0;
+    // Tome seize from the ally scan (cast_in_range, ruled 2026-08-24):
+    // when a nearby tome-holder catches the working, the attack is OVER —
+    // the short-circuit below skips the defence pipeline entirely.
+    let allySeizeResult = null;
     // ── Ally-attacked passive auto-fire (Phase C) ──
     // Scan friendly actors with `ally_attacked` passives within their
     // configured `reactionTriggerRange` of `targetActor`. Each fires
@@ -2446,9 +2399,17 @@ export class AspectsofPowerItem extends Item {
         const reactiveCandidates = reactor.items.filter(s =>
           s.type === 'skill' &&
           s.system.skillType === 'Reaction' &&
-          (s.system.tagConfig?.reactionTrigger ?? '') === 'ally_attacked'
+          // `cast_in_range` (tome seize, ruled 2026-08-24) rides the same
+          // scan: "trigger on enemy cast landing within .5x casting range"
+          // — the Savior's Slash shape, but the zone is the reactor's own
+          // casting reach rather than a flat authored radius.
+          ['ally_attacked', 'cast_in_range'].includes(s.system.tagConfig?.reactionTrigger ?? '')
         ).filter(s => {
-          const range = s.system.tagConfig?.reactionTriggerRange ?? 0;
+          const tc = s.system.tagConfig ?? {};
+          const frac = tc.reactionTriggerCastingRangeFrac ?? 0;
+          const range = frac > 0
+            ? frac * (reactor.system?.castingRange ?? 0)
+            : (tc.reactionTriggerRange ?? 0);
           return range === 0 || distFt <= range;
         });
         if (reactiveCandidates.length > 0) {
@@ -2456,7 +2417,21 @@ export class AspectsofPowerItem extends Item {
           const chosenId = await this._promptReactiveChoice(reactor, 'ally_attacked', { promptText, attackerToken, attackedActor: targetActor });
           if (chosenId) {
             const chosen = reactor.items.get(chosenId);
-            if (chosen) {
+            if (chosen && chosen.system?.reactionType === 'seize') {
+              // SEIZE from the zone (cast_in_range): the nearby tome-holder
+              // reaches for the working before it lands on the ally. Same
+              // judgment as the self-defence seize — one implementation.
+              await this._gmAction({ type: 'gmConsumeReaction', targetActorUuid: reactor.uuid });
+              const _cd = chosen.system?.tagConfig?.reactionCooldown ?? 1;
+              if (_cd > 0) await reactor.update({ [`flags.aspectsofpower.reactionCooldowns.${chosen.id}`]: _cd });
+              const _sz = await this._resolveSeizeAttempt(reactor, _clashIncoming(dmgRoll, false));
+              if (_sz.seized) {
+                allySeizeResult = _sz;
+                break; // the working is in the book — the attack is over
+              }
+              // Failed reach: the attack proceeds; other reactors may still
+              // guard (no break).
+            } else if (chosen) {
               const gMode = chosen.system?.reactionType === 'guardian'
                 ? (chosen.system?.tagConfig?.guardianMode ?? 'intercept')
                 : null;
@@ -2570,7 +2545,15 @@ export class AspectsofPowerItem extends Item {
     // markedInternal joins them (RULED 2026-08-20): the attacker's mark is
     // already inside the target's body, and you can't dodge your own
     // bloodstream — guaranteed hit, full margin, no defence-time spent.
-    if (bypassPool || skipDefense || markInternalActive) {
+    if (allySeizeResult) {
+      // The working never arrived — a nearby tome-holder tore it out of
+      // the air (cast_in_range seize). No defence, no damage, full stop.
+      primaryResult = { isHit: false, damageMultiplier: 0,
+        defenseLine: allySeizeResult.line, reactionLine: '' };
+      if (hasDualDefense) {
+        secondaryResult = { isHit: false, damageMultiplier: 0, defenseLine: '', reactionLine: '' };
+      }
+    } else if (bypassPool || skipDefense || markInternalActive) {
       const _primaryNote = markInternalActive
         ? `Unavoidable — the mark erupts from within (no defence possible).`
         : bypassPool
@@ -3324,8 +3307,10 @@ export class AspectsofPowerItem extends Item {
       if (s.type !== 'skill' || s.system.skillType !== 'Reaction') return false;
       const trig = s.system.tagConfig?.reactionTrigger ?? '';
       // Empty trigger = legacy; include for back-compat. Specific trigger
-      // must match the current event (`self_attacked`).
-      if (trig && trig !== 'self_attacked') return false;
+      // must match the current event (`self_attacked`). `cast_in_range`
+      // (tome seize) also matches: a cast at YOU lands at distance zero,
+      // trivially inside the reactor's casting reach.
+      if (trig && trig !== 'self_attacked' && trig !== 'cast_in_range') return false;
       // Parries AND blocks are guard-work (blocks ruled their own type
       // 2026-08-21: "a block is a block: it adds armor") — both require
       // the raised stance; the lightning cooldown waiver stays parry-only.
@@ -3939,6 +3924,80 @@ export class AspectsofPowerItem extends Item {
    * labelled by what it does. Mixed skills (attack + restoration rider,
    * e.g. drain heals) keep the attack card: the fight is the headline there.
    */
+  /**
+   * One seize attempt by `holder` against THIS cast (tome, ruled
+   * 2026-08-24). The single implementation behind both triggers — the
+   * self-defence prompt and the cast_in_range ally scan — so cap
+   * judgment, binding shape, and the over-cap destabilization can never
+   * drift between them. Judged against cap = progress x rarity: under it
+   * the working is BOUND into the holder's tome (decays at combat end);
+   * over it the seize fails and any held binding DESTABILIZES — the
+   * caught magic detonates on the holder after detonateDelayRounds
+   * ("all the held magic explodes after a short duration, plus it
+   * fails"). All tome writes route through gmTomeState (this runs on the
+   * attacker's client — standard 16).
+   *
+   * @param {Actor} holder      the tome holder attempting the seize
+   * @param {number} magnitude  the working's rolled magnitude
+   * @returns {Promise<{seized: boolean, line: string}>}
+   */
+  async _resolveSeizeAttempt(holder, magnitude) {
+    const tome = equippedTome(holder);
+    const cap = tome ? tomeSeizeCapFor(tome) : 0;
+    const mag = Math.max(0, Math.round(magnitude));
+    const speaker = ChatMessage.getSpeaker({ actor: holder });
+    if (tome && mag <= cap) {
+      await this._gmAction({
+        type: 'gmTomeState',
+        tomeUuid: tome.uuid,
+        bound: {
+          label: this.name,
+          amount: mag,
+          affinities: this.effectiveAffinities(),
+          combatId: game.combat?.id ?? '',
+        },
+      });
+      ChatMessage.create({ speaker,
+        content: `<p><strong>${holder.name}</strong> tears <strong>${this.name}</strong> out of the air — the working is bound into <strong>${tome.name}</strong> (${mag}).</p>`,
+      });
+      return { seized: true,
+        line: `<p><em>${holder.name} seizes the working with <strong>${tome.name}</strong>! (${mag} bound, cap ${cap})</em></p>` };
+    }
+    // Failure: the spell lands untouched. A held binding blows.
+    const held = tome ? tomeBinding(tome) : null;
+    ChatMessage.create({ speaker,
+      content: `<p><strong>${holder.name}</strong> tries to seize <strong>${this.name}</strong> — the working is beyond the book (${mag} vs cap ${cap}).</p>`,
+    });
+    if (held) {
+      const delay = CONFIG.ASPECTSOFPOWER.tome?.detonateDelayRounds ?? 1;
+      await this._gmAction({ type: 'gmTomeState', tomeUuid: tome.uuid, bound: null });
+      await this._gmAction({
+        type: 'gmApplyDebuff',
+        targetActorUuid: holder.uuid,
+        effectData: {
+          name: 'Unstable Binding',
+          img: tome.img || 'icons/svg/explosion.svg',
+          duration: { rounds: delay },
+          origin: tome.uuid,
+          type: 'base',
+          system: {
+            debuffDamage: held.amount,
+            debuffType: 'unstable-binding',
+            casterActorUuid: holder.uuid,
+            dot: true, dotDamage: held.amount,
+            dotDamageType: (held.affinities?.[0]) || 'magical',
+            applierActorUuid: holder.uuid,
+          },
+        },
+      });
+      ChatMessage.create({ speaker,
+        content: `<p><strong>The bound ${held.label} destabilizes!</strong> The held magic (${held.amount}) will tear itself free of ${holder.name}'s ${tome.name}.</p>`,
+      });
+    }
+    return { seized: false,
+      line: `<p><em>${holder.name} reaches for the working with <strong>${tome?.name ?? 'no tome'}</strong> and fails (${mag} vs cap ${cap}).</em></p>` };
+  }
+
   /**
    * The affinities THIS CAST carries (weave = affinity swap catalyst,
    * ruled 2026-08-24): the skill's own, unless the caster wears an
