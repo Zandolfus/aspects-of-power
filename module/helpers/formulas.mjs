@@ -2058,6 +2058,40 @@ export function tomeSeizeCap(progress, rarityMult) {
 }
 
 /**
+ * ORB — banked cast time (ruled 2026-08-24, from the original design:
+ * "when spell charge = AP cost for casting a spell, it can be cast for one
+ * AP and for free").
+ *
+ * The price of a discharge is the CAST'S OWN tier weight — the cast time it
+ * would otherwise have taken. Bank six basics, spend them on one grand.
+ * Replaces the old flat threshold, under which four cheap casts bought any
+ * spell in the game.
+ *
+ * @param {string} tier          the spell tier being cast
+ * @param {object} tierWeights   CONFIG.spellTierWeights
+ * @returns {number} banked charge required, 0 for an untiered cast
+ */
+export function orbDischargePrice(tier, tierWeights) {
+  return Math.max(0, Math.round(Number(tierWeights?.[tier]) || 0));
+}
+
+/**
+ * Charge after one qualifying cast banks its weight, held under the cap.
+ * The cap is what makes banking a decision rather than an accumulator:
+ * past it, further casts bank nothing and the stored time should be spent.
+ *
+ * @param {number} charge   current banked charge
+ * @param {number} banked   this cast's tier weight
+ * @param {number} cap      celerity.ORB_CHARGE_CAP
+ * @returns {number}
+ */
+export function orbChargeAfterBank(charge, banked, cap) {
+  const next = Math.max(0, Math.round(charge || 0)) + Math.max(0, Math.round(banked || 0));
+  const lim = Math.max(0, Math.round(cap || 0));
+  return lim > 0 ? Math.min(next, lim) : next;
+}
+
+/**
  * Price of one curse-spender cast (`spend-curse` tag, builder/spender
  * rebuild RULED 2026-08-22: "Mind Crush should likely be another spender").
  * A fixed fraction of the wielder's CAPACITY — stat-derived, so the price a

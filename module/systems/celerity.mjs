@@ -17,7 +17,7 @@
  */
 
 import { AspectsofPowerItem } from '../documents/item.mjs';
-import { weaponStatBlend, perceiveGateDecision, spellCastWeight, defenseTimeBudgetMax, dualWieldFloor } from '../helpers/formulas.mjs';
+import { weaponStatBlend, perceiveGateDecision, spellCastWeight, defenseTimeBudgetMax, dualWieldFloor, orbDischargePrice } from '../helpers/formulas.mjs';
 import { dualWieldEligible, dualWieldPassiveRarity, handOf, equippedImplementItems } from './weapon-styles.mjs';
 import { effectiveClockTick, interpolateMovementPosition } from '../helpers/movement-path.mjs';
 import { heldImplementWeight } from './weapon-styles.mjs';
@@ -49,6 +49,18 @@ function _actorSpeedFor(actor, skill) {
   const ability = skill?.system?.roll?.abilities ?? '';
 
   if (_MAGIC_TYPES_FOR_SPEED.has(type)) {
+    // CURSES ARE INT-INDEPENDENT (ruled 2026-08-24: "Curses are int
+    // independent. They are purely wis/will."). Read the curse family from
+    // the same registry that decides what feeds the meter, so a fourth
+    // curse tag inherits the right speed without a second list to update.
+    const _curseCfg = CONFIG.ASPECTSOFPOWER.curse ?? {};
+    const _fillTags = _curseCfg.fillTags ?? ['dread', 'curse'];
+    const _tags = skill?.system?.tags ?? [];
+    if (_fillTags.some(t => _tags.includes(t))) {
+      const cw = CONFIG.ASPECTSOFPOWER.curseCastingSpeed ?? { wil: 0.6, wis: 0.4 };
+      return Math.round((cw.wil ?? 0) * (a.willpower?.mod ?? 0)
+                      + (cw.wis ?? 0) * (a.wisdom?.mod ?? 0));
+    }
     const tier = skill?.system?.roll?.tier ?? '';
     const weights = CONFIG.ASPECTSOFPOWER.castingSpeedWeights ?? {};
     const w = weights[tier] ?? weights[''] ?? { wis: 0.6, int: 0.4 };
@@ -220,11 +232,20 @@ export function computeActionWait(actor, skill, weapon = null, investAmount = nu
   // speed bonus.
   const orbCharge = actor?.flags?.aspectsofpower?.spellCharge ?? 0;
   const isOrbQualifying = isMagic && !!tier;
+  const _tierW = CONFIG.ASPECTSOFPOWER.spellTierWeights ?? {};
   const orbDischarging = isOrbQualifying
     && equippedImplements.has('orb')
-    && orbCharge >= (sc.ORB_DISCHARGE_THRESHOLD ?? 400);
+    && orbCharge >= orbDischargePrice(tier, _tierW);
   if (orbDischarging) {
-    adjustedBaseWait = Math.max(1, Math.round((sc.BASELINE_WEIGHT * multiplier * sc.SCALE) / speed));
+    // A DISCHARGE CASTS AT BASIC RATE (ruled 2026-08-24: "reduce the cast
+    // at all times to a basic cast"), never faster — taken as a MIN so it
+    // can only ever REDUCE a wait. That is what keeps orbs off basic casts
+    // without a gate: a basic discharge is already basic rate and gains
+    // only the free mana, while a grand discharge arrives in a fifth of
+    // its own cast time. A wand's own basic speed-up still wins if lower.
+    const _basicRate = Math.max(1,
+      Math.round(((_tierW.basic ?? 130) * multiplier * sc.SCALE) / speed));
+    adjustedBaseWait = Math.min(adjustedBaseWait, _basicRate);
   }
 
   // Channel wait sources: (a) magic spell with mana invest (investAmount IS

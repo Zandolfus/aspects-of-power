@@ -1,6 +1,6 @@
 import { EquipmentSystem } from '../systems/equipment.mjs';
 import { getPositionalTags } from '../helpers/positioning.mjs';
-import { houseHitFormula, hybridAbilityMod, weaponStatBlend, healStatBlend, spellDamageRef, spellInvestDamage, spellWindupMultiplier, spellCastWeight, strikeInvestDamage, coInvestDamage, investSelfDamage as computeInvestSelfDamage, effectiveDodgeValue, splitEvenlyWithRemainder, parryMassMultiplier, bracedParryWeight, bracedMaxUsefulInvest, defenceMarginMultiplier, defenseTimeCost, dodgeShortfallQuality, dotTickDamage, burnDetonatePayload, bulwarkWallBonus, procStaminaCost, crushFlatAmount, riderMaxInvest, auraRadiusFor, barrierStatBlend, hotTickAmount, effectiveDamageMultiplier, clashOutcome } from '../helpers/formulas.mjs';
+import { houseHitFormula, hybridAbilityMod, weaponStatBlend, healStatBlend, spellDamageRef, spellInvestDamage, spellWindupMultiplier, spellCastWeight, strikeInvestDamage, coInvestDamage, investSelfDamage as computeInvestSelfDamage, effectiveDodgeValue, splitEvenlyWithRemainder, parryMassMultiplier, bracedParryWeight, bracedMaxUsefulInvest, defenceMarginMultiplier, defenseTimeCost, dodgeShortfallQuality, dotTickDamage, burnDetonatePayload, bulwarkWallBonus, procStaminaCost, crushFlatAmount, riderMaxInvest, auraRadiusFor, barrierStatBlend, hotTickAmount, effectiveDamageMultiplier, clashOutcome, orbDischargePrice, orbChargeAfterBank } from '../helpers/formulas.mjs';
 import { resolveSituationalMods } from '../systems/situational-mods.mjs';
 import { recordActionFired, declareAction, isInActiveCombat, computeActionWait, referenceRoundLength, computeWindupMultiplier, getScrambleStacks, addScrambleStack, applyDodgeCost, findCombatantForActor, perceiveGate, getDefenseBudget, spendDefenseBudget, setLastSwungHand, computeActionHeft, actorRoundLength } from '../systems/celerity.mjs';
 import { getThreatRadiusFt, actorIsDashing } from '../systems/engagement-halts.mjs';
@@ -6335,11 +6335,13 @@ export class AspectsofPowerItem extends Item {
     let coInvestCost = 0;
     let coInvestResource = '';
     let coInvestLabel = '';
-    // Orb implement state captured for _commitCastCost. orbBanked: weight to add
-    // on a normal qualifying cast. orbDischargedThisCast: true when the cast
-    // consumed accumulated charge (resets to 0 after commit).
+    // Orb implement state captured for _commitCastCost. orbBanked: weight to
+    // add on a normal qualifying cast (held under ORB_CHARGE_CAP).
+    // orbDischargedThisCast: true when the cast SPENT banked charge;
+    // orbSpentPrice is what it spent (this cast's own tier weight).
     let orbBanked = 0;
     let orbDischargedThisCast = false;
+    let orbSpentPrice = 0;
     let coInvestDmg = 0;            // for chat breakdown
     // Per-cast AOE context for spells with the `aoe` alteration. Captured at
     // invest-commit time, consumed after AOE template placement to recompute
@@ -6596,12 +6598,12 @@ export class AspectsofPowerItem extends Item {
         return;
       }
 
-      // Orb implement: when banked spell-charge meets the threshold, the
-      // next spell cast is a "discharge" — free mana + fast (BASELINE_WEIGHT)
-      // wait. The wait is overridden in computeActionWait; here we skip the
-      // invest dialog and force cost to 0. Damage uses base invest (=
-      // baseMana). After the cast commits, charge resets in _commitCastCost.
-      // Universal across tiers per design 2026-05-06.
+      // Orb implement: when banked charge covers THIS CAST'S PRICE — its
+      // own tier weight, per the design's "charge = AP cost for casting a
+      // spell" (ruled 2026-08-24) — the cast is a "discharge": free mana,
+      // and repriced to basic rate in computeActionWait. Here we skip the
+      // invest dialog and force cost to 0; damage uses base invest (=
+      // baseMana), and the price is deducted in _commitCastCost.
       //
       // At deferred-fire time, honor the discharge decision captured at
       // declare time — the actor's live spellCharge may have changed
@@ -6610,9 +6612,9 @@ export class AspectsofPowerItem extends Item {
       const orbCharge = this.actor?.flags?.aspectsofpower?.spellCharge ?? 0;
       const isOrbQualifying = !!spellTier;
       const hasOrbEquipped = this.actor?.getEquippedImplements?.().has('orb');
+      const orbPrice = orbDischargePrice(spellTier, sc.spellTierWeights ?? {});
       const orbDischarging = options.preOrbDischarging
-        ?? (isOrbQualifying && hasOrbEquipped
-            && orbCharge >= (sc.celerity?.ORB_DISCHARGE_THRESHOLD ?? 400));
+        ?? (isOrbQualifying && hasOrbEquipped && orbCharge >= orbPrice);
 
       // CO-INVEST on the cast path (systems/co-invest.mjs): `effort` (stamina)
       // or `life-drain` (health) beside a mana cast, `infused` beside a blood
@@ -6748,12 +6750,13 @@ export class AspectsofPowerItem extends Item {
       // energy source. Same zero-cost branch as orbDischarging.
       rollData.roll.cost = (orbDischarging || options.ritualActivation) ? 0 : invested;
       rollData.roll.variableSpellInvest = invested;
-      // Persist Orb state for _commitCastCost: discharge resets, normal
-      // qualifying cast banks the spell's tier weight (banking weight, not
-      // wait, per the threshold-400 design — see celerity.mjs ORB_DISCHARGE_THRESHOLD).
+      // Persist Orb state for _commitCastCost: a discharge SPENDS this
+      // cast's own price, a normal qualifying cast BANKS its tier weight
+      // (banking cast time in the weight unit — see celerity.mjs).
       if (isOrbQualifying && this.actor?.getEquippedImplements?.().has('orb')) {
         if (orbDischarging) {
           orbDischargedThisCast = true;
+          orbSpentPrice = orbPrice;
         } else {
           orbBanked = sc.spellTierWeights?.[spellTier] ?? 0;
         }
@@ -7528,13 +7531,16 @@ export class AspectsofPowerItem extends Item {
         const live = this.actor.system[res]?.value ?? 0;
         updates[`system.${res}.value`] = Math.max(0, Math.round(live - amt));
       }
-      // Orb charge: discharge resets charge to 0; normal qualifying cast
-      // banks the spell's tier weight onto the existing charge.
+      // Orb charge: a discharge SPENDS this cast's price (leftover time
+      // carries — banking six basics and spending a greater leaves the
+      // remainder toward the next one); a normal qualifying cast banks its
+      // tier weight, held under ORB_CHARGE_CAP.
+      const _curCharge = this.actor.flags?.aspectsofpower?.spellCharge ?? 0;
       if (orbDischargedThisCast) {
-        updates['flags.aspectsofpower.spellCharge'] = 0;
+        updates['flags.aspectsofpower.spellCharge'] = Math.max(0, _curCharge - orbSpentPrice);
       } else if (orbBanked > 0) {
-        const curCharge = this.actor.flags?.aspectsofpower?.spellCharge ?? 0;
-        updates['flags.aspectsofpower.spellCharge'] = curCharge + orbBanked;
+        updates['flags.aspectsofpower.spellCharge'] =
+          orbChargeAfterBank(_curCharge, orbBanked, sc.celerity?.ORB_CHARGE_CAP ?? 700);
       }
       await this.actor.update(updates);
       if (investSelfDamage > 0) {
@@ -7545,19 +7551,29 @@ export class AspectsofPowerItem extends Item {
         });
       }
       if (orbDischargedThisCast) {
+        // Read the value we just wrote rather than the document — the same
+        // number the flag now holds, with no dependence on when the live
+        // model re-prepares (playbook-live-data-reliability).
+        const _left = updates['flags.aspectsofpower.spellCharge'] ?? 0;
         ChatMessage.create({
           speaker, rollMode, ...(whisperGM ? { whisper: whisperGM } : {}),
           flavor: label,
-          content: `<p><em>Orb discharge:</em> <strong>${this.actor.name}</strong>'s orb releases its accumulated charge — cast for free at minimum wait.</p>`,
+          content: `<p><em>Orb discharge:</em> <strong>${this.actor.name}</strong>'s orb spends <strong>${orbSpentPrice}</strong> banked cast time — free, at basic cast rate. (${_left} left)</p>`,
         });
       } else if (orbBanked > 0) {
-        const newCharge = (this.actor.flags?.aspectsofpower?.spellCharge ?? 0); // already updated above
-        const threshold = sc.celerity?.ORB_DISCHARGE_THRESHOLD ?? 400;
-        const ready = newCharge >= threshold ? ' <strong>(ready to discharge!)</strong>' : '';
+        const newCharge = updates['flags.aspectsofpower.spellCharge'] ?? 0;
+        const cap = sc.celerity?.ORB_CHARGE_CAP ?? 700;
+        // Name the biggest working this charge could now discharge — the
+        // price is per-tier, so a bare number tells the player nothing.
+        const _tw = sc.spellTierWeights ?? {};
+        const _afford = Object.entries(_tw)
+          .filter(([, w]) => newCharge >= w)
+          .sort((a, b) => b[1] - a[1])[0]?.[0];
+        const ready = _afford ? ` <strong>(can discharge: ${_afford})</strong>` : '';
         ChatMessage.create({
           speaker, rollMode, ...(whisperGM ? { whisper: whisperGM } : {}),
           flavor: label,
-          content: `<p><em>Orb charge:</em> ${newCharge} / ${threshold}${ready}</p>`,
+          content: `<p><em>Orb charge:</em> ${newCharge} / ${cap}${ready}</p>`,
         });
       }
       if (coInvestCost > 0 && coInvestDmg > 0) {

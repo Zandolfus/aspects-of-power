@@ -336,11 +336,14 @@ export class AspectsofPowerActorSheet extends foundry.applications.api.Handlebar
       const equippedImplements = this.actor.getEquippedImplements?.() ?? new Set();
       const hasOrb = equippedImplements.has('orb');
       const orbCharge = this.actor.flags?.aspectsofpower?.spellCharge ?? 0;
-      const orbThreshold = CONFIG.ASPECTSOFPOWER.celerity?.ORB_DISCHARGE_THRESHOLD ?? 400;
-      const orbReady = hasOrb && orbCharge >= orbThreshold;
-      if (orbReady) {
+      // PER-SPELL PRICE (ruled 2026-08-24): a discharge costs the cast's own
+      // tier weight, so readiness differs per skill — only the ones the bank
+      // can actually pay for glow.
+      const _tierW = CONFIG.ASPECTSOFPOWER.spellTierWeights ?? {};
+      if (hasOrb) {
         const tagSkill = (s) => {
-          if (s.system?.roll?.tier) s.dischargeReady = true;
+          const t = s.system?.roll?.tier;
+          if (t && orbCharge >= (_tierW[t] ?? Infinity)) s.dischargeReady = true;
         };
         for (const list of Object.values(skillGroups)) {
           list.active.forEach(tagSkill);

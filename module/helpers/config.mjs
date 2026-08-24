@@ -695,14 +695,32 @@ ASPECTSOFPOWER.celerity = {
   // math stay in ticks; this converts for presentation. Published Celerity
   // rating = mod × 1000 / (SCALE × TICK_MS) action-points per second.
   TICK_MS:            0.072,
-  // Orb implement: cumulative spell weight required to discharge the next
-  // spell cast as free + fast. Set at Major-tier weight (400) so:
-  //   Basic spam (banks 130/cast):  every 4th cast discharges
-  //   High spam (banks 150/cast):   every 4th cast discharges
-  //   Greater spam (banks 200/cast): every 3rd cast discharges
-  //   Major/Grand: every cast discharges (each banks ≥ threshold)
-  // Universal across tiers per design 2026-05-06 — Wand stays the speed
-  // king on Basic; Orb is the mana-economy alternative.
+  // ── ORB = BANKED CAST TIME (ruled 2026-08-24) ──
+  // "Each spell cast through the orb generates a spell charge and when
+  // spell charge = AP cost for casting a spell, it can be cast for one AP
+  // and for free... It builds up cast time up to a cap and players can use
+  // the cast time to cast things at basic cast rate."
+  //
+  // Every qualifying cast BANKS its tier weight (its cast time, in the
+  // weight unit) up to ORB_CHARGE_CAP. A discharge SPENDS the price of the
+  // spell being cast — its OWN tier weight, per the design's "charge = AP
+  // cost" — and in return that cast is FREE (mana zeroed) and repriced to
+  // the BASIC tier's wait. Never faster than basic: the reprice is a floor
+  // taken as a min, so a discharged cast can only ever be REDUCED to basic
+  // rate (`reduce the cast at all times to a basic cast`).
+  //
+  // That shape makes "orbs are not for basic casts" EMERGENT rather than a
+  // gate: a basic discharge gains no tempo (it is already basic rate), it
+  // only gains the free mana — the capability the ruling deliberately
+  // keeps. The prize scales with the working: a grand discharged still
+  // hits like a grand (windup rides tier weight, untouched) but arrives at
+  // basic speed for nothing, having cost ~6 banked basics to load.
+  // ⚠ Damage is NOT repriced — only wait. Charge resets at combatStart.
+  ORB_CHARGE_CAP: 700,     // grand weight: bank at most one grand's worth
+  /** @deprecated Replaced 2026-08-24 by the per-spell price (a discharge
+   * costs the CAST'S OWN tier weight, not one flat number). Kept only so a
+   * stale external reader gets the old value rather than undefined. */
+  ORB_DISCHARGE_THRESHOLD: 400,
   // Wand implement: Basic-tier spell wait multiplier (−35%, ruled
   // 2026-08-23 — the int gunslinger). The wand is a pure speed perk: it
   // never changes what stat casts (speed stays the tier's wis/int blend)
@@ -719,7 +737,6 @@ ASPECTSOFPOWER.celerity = {
   // reached its own stated ~3/round target (live wand users sat at
   // 2.13-2.45). Lived inline in celerity.mjs before 2026-07-03.
   WAND_BASIC_WAIT_MULT: 0.65,
-  ORB_DISCHARGE_THRESHOLD: 400,
   // Base movement weight per 5ft. Multiplied by the selected mode's
   // `celerityMult` (see MOVEMENT_MODES below). Sprint = 1× baseline (this
   // value), Walk = 2× (slower per ft).
@@ -1084,6 +1101,26 @@ ASPECTSOFPOWER.singletonDebuffs = ['charm', 'fear', 'taunt', 'enraged'];
  * Major/Grand spells; Int-spec casters retain per-cast damage but pay in
  * cast time. casting_speed = Wis × wis + Int × int.
  */
+/**
+ * CURSE CASTING SPEED (ruled 2026-08-24: "Curses are int independent. They
+ * are purely wis/will.").
+ *
+ * Curse-family casts (the tags in `curse.fillTags` — the same registry that
+ * decides what feeds the meter) bypass `castingSpeedWeights` entirely: no
+ * intellect term, and no tier gradient either. The gradient exists because
+ * a DEEPER working needs more wisdom, and a curse is not a deeper working —
+ * it is an infection (user, 2026-08-22: "They are not cast the same way as
+ * magic, its more of an infection than anything else"). One blend at every
+ * level, willpower-led to match where the curse family already puts its
+ * weight: the meter's capacity is wil+wis, and curse aim is wil-primary.
+ *
+ * Felicia (wil 491 / wis 225): speed 235 -> 385, so her curse kit moves from
+ * 0.82 casts/round to ~1.34. ⚠ Mind Crush carries NEITHER curse nor dread
+ * (mental, not curse — see design-dread-curse-engine) so it keeps the
+ * standard blend; that is a content question, not this dial.
+ */
+ASPECTSOFPOWER.curseCastingSpeed = { wil: 0.60, wis: 0.40 };
+
 ASPECTSOFPOWER.castingSpeedWeights = {
   basic:   { wis: 0.60, int: 0.40 },
   high:    { wis: 0.65, int: 0.35 },

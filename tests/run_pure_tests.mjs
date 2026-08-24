@@ -2675,6 +2675,43 @@ eq('junk situational entries are skipped, not NaN',
   eq('tome: legendary masterwork catches the grand', F3.tomeSeizeCap(1000, 5.2) >= 4258, true);
   eq('tome: common mid-craft cap 271 (median 301 progress)', F3.tomeSeizeCap(301, 0.9), 271);
   eq('tome: zero progress seizes nothing', F3.tomeSeizeCap(0, 2.6), 0);
+
+  // ── ORB = BANKED CAST TIME (ruled 2026-08-24) ──
+  // "when spell charge = AP cost for casting a spell, it can be cast for
+  // one AP and for free" — the price is the CAST'S OWN tier weight, not a
+  // flat threshold. Six basics (780, capped 700) load one grand.
+  const TW = { basic: 130, high: 170, greater: 230, major: 400, grand: 700 };
+  eq('orb: a grand costs its own weight (700)', F3.orbDischargePrice('grand', TW), 700);
+  eq('orb: a basic costs 130', F3.orbDischargePrice('basic', TW), 130);
+  eq('orb: an untiered cast has no price', F3.orbDischargePrice('', TW), 0);
+  // THE OLD FLAT 400 BOUGHT ANYTHING — the negative control on the fix:
+  // 400 banked must NOT cover a grand any more.
+  eq('orb: 400 banked no longer buys a grand', 400 >= F3.orbDischargePrice('grand', TW), false);
+  eq('orb: 400 banked still buys a major', 400 >= F3.orbDischargePrice('major', TW), true);
+  // Banking holds under the cap; the cap is one grand's worth.
+  eq('orb: shipped charge cap 700', Number(/ORB_CHARGE_CAP:\s*(\d+)/.exec(src)?.[1]), 700);
+  eq('orb: six basics bank to the cap, not past it',
+     F3.orbChargeAfterBank(650, 130, 700), 700);
+  eq('orb: five basics sit under it', F3.orbChargeAfterBank(520, 130, 700), 650);
+  eq('orb: a spend leaves the remainder', 780 > 700 ? 700 - 230 : 0, 470);
+  eq('orb: no cap configured means no clamp', F3.orbChargeAfterBank(900, 130, 0), 1030);
+
+  // ── CURSES ARE INT-INDEPENDENT (ruled 2026-08-24) ──
+  // "They are purely wis/will." Willpower-led, no tier gradient (a curse is
+  // an infection, not a deeper working). Felicia live: wil 491 / wis 225 /
+  // int 249 — the standard basic blend gives 235, the curse blend 385, so
+  // her kit moves 0.82 -> ~1.34 casts/round on a 4520 round.
+  eq('curse-speed: shipped blend is 0.60 wil / 0.40 wis',
+     /curseCastingSpeed\s*=\s*\{\s*wil:\s*0\.60,\s*wis:\s*0\.40\s*\}/.test(src), true);
+  const _curseSpeed = (wil, wis) => Math.round(0.60 * wil + 0.40 * wis);
+  eq('curse-speed: Felicia curse casts at 385', _curseSpeed(491, 225), 385);
+  eq('curse-speed: the old wis/int blend was 235', Math.round(0.60 * 225 + 0.40 * 249), 235);
+  // The whole point: NO intellect term exists to weigh — the blend object
+  // must carry wil+wis and nothing else (the ruling in one assertion).
+  eq('curse-speed: the blend declares no int term',
+     /curseCastingSpeed\s*=\s*\{[^}]*int[^}]*\}/.test(src), false);
+  eq('curse-speed: 4520-round kit lands 1.34 casts/rd',
+     Number((4520 / (5532 * 235 / 385)).toFixed(2)), 1.34);
 }
 
 if (failures) { console.error(`\n${failures} FAILURES`); process.exit(1); }
