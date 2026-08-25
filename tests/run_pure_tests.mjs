@@ -2742,6 +2742,37 @@ eq('junk situational entries are skipped, not NaN',
        (weakened - neutral) > (neutral - resisted), true);
   }
 
+  // ── AFFINITY TYPING IS DERIVED FROM TAGS (ruled 2026-08-24) ──
+  // "An affinity is an element; a family is what kind of skill it is."
+  // typingFromTags gates on the ONE dictionary, so family words can never
+  // leak in, and it accepts both conventions (skills carry plain `fire`,
+  // gear carries `fire-affinity`).
+  {
+    globalThis.CONFIG = globalThis.CONFIG ?? {};
+    globalThis.CONFIG.ASPECTSOFPOWER = globalThis.CONFIG.ASPECTSOFPOWER ?? {};
+    const prev = globalThis.CONFIG.ASPECTSOFPOWER.affinities;
+    globalThis.CONFIG.ASPECTSOFPOWER.affinities = {
+      fire: {}, ice: {}, metal: {}, psychic: {}, holy: {}, wind: {},
+    };
+    const AF = await import('../module/systems/affinity.mjs');
+    const t = (tags) => [...AF.typingFromTags(tags)];
+    eq('typing: plain skill tag types the cast', t(['attack', 'fire']), ['fire']);
+    eq('typing: the actor-side suffix form also types',
+       t(['holy-affinity']), ['holy']);
+    eq('typing: both conventions at once dedupe',
+       t(['fire', 'fire-affinity']), ['fire']);
+    // ⚠⚠ THE AUTHORING LAW, as a negative control. Family words are NOT in
+    // the dictionary, so they can never be read as damage typing — this is
+    // what let `physical`/`dread` live in the affinity array for months.
+    eq('typing: FAMILY words never type a cast',
+       t(['physical', 'magical', 'dread', 'attack', 'melee', 'debuff']), []);
+    eq('typing: an unknown word is ignored', t(['sharpness']), []);
+    eq('typing: no tags types nothing', t([]), []);
+    // Multi-element casts keep every element.
+    eq('typing: a fire/ice cast keeps both', t(['fire', 'ice']).sort(), ['fire', 'ice']);
+    globalThis.CONFIG.ASPECTSOFPOWER.affinities = prev;
+  }
+
   // ── CURSES ARE INT-INDEPENDENT (ruled 2026-08-24) ──
   // "They are purely wis/will." Willpower-led, no tier gradient (a curse is
   // an infection, not a deeper working). Felicia live: wil 491 / wis 225 /

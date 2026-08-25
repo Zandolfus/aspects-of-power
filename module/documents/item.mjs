@@ -2670,7 +2670,7 @@ export class AspectsofPowerItem extends Item {
     //   1) Augment-sourced damageBonus from equipped weapons, split per
     //      augment's `affinities` distribution (via the actor's pre-derived
     //      equippedDamageBonusByAffinity map).
-    //   2) This skill's own damage, routed through `this.system.affinities`
+    //   2) This skill's own damage, routed through `effectiveAffinities()`
     //      if the skill declares any. For pure-affinity spells (Ice Spear
     //      → ['ice']) the whole non-augment portion of damage lands in the
     //      skill-affinity bucket and runs through ice DR rather than
@@ -7825,7 +7825,7 @@ export class AspectsofPowerItem extends Item {
           ChatMessage.create({
             speaker, rollMode,
             content: `<p><em>${this.actor.name} draws the released flames back in: `
-                   + `+${Math.round(_kMod * 100)}% ${(this.system.affinities ?? []).join('/') || 'own'}-damage `
+                   + `+${Math.round(_kMod * 100)}% ${this.effectiveAffinities().join('/') || 'own'}-damage `
                    + `for ${_kDur} rounds (${targets.length} target${targets.length > 1 ? 's' : ''} caught).</em></p>`,
           });
         }

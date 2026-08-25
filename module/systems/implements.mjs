@@ -36,6 +36,7 @@
  */
 
 import { tomeSeizeCap } from '../helpers/formulas.mjs';
+import { typingFromTags } from './affinity.mjs';
 
 const FLAG_SCOPE = 'aspects-of-power';
 
@@ -113,7 +114,14 @@ export function equippedAttunedWeave(actor) {
  * typing and buff typing all agree on what the spell now is.
  */
 export function castAffinities(skill) {
-  const own = [...(skill?.system?.affinities ?? [])];
+  // DERIVED FROM TAGS (ruled 2026-08-24). `system.affinities` is no longer
+  // read for typing: it was a denormalised copy of the affinity subset of
+  // tags, synced only by the sheet's toggle handler, so any skill authored by
+  // import/migration/compendium had the tag and not the array (116 of them),
+  // and three encodings existed side by side. Tags are the authored truth;
+  // this projects them. Verified lossless before the switch: 184/184 skills
+  // reproduced exactly, 0 spurious gains.
+  const own = [...typingFromTags(skill?.system?.tags ?? [])];
   if (!skill?.actor) return own;
   // A released binding carries the SEIZED working's affinities — the
   // spell is still whoever's it was; the tome only redirects it.

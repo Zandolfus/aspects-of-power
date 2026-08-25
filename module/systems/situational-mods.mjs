@@ -121,7 +121,10 @@ export const SITUATIONAL_MODS = [
     resolve(item) {
       const actor = item?.actor;
       if (!actor) return 1;
-      const atkAff = item?.system?.affinities ?? [];
+      // Typing is DERIVED from tags (ruled 2026-08-24) — the stored
+      // `system.affinities` is deprecated and out of sync on any skill the
+      // sheet never toggled, which would silently un-scope a kindle.
+      const atkAff = item?.effectiveAffinities?.() ?? item?.system?.affinities ?? [];
       let bonus = 0;
       for (const e of actor.allApplicableEffects?.() ?? []) {
         if (e.disabled) continue;

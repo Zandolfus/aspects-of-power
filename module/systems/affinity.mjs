@@ -70,6 +70,37 @@ export function affinitiesFromTags(tags = []) {
   return found;
 }
 
+/**
+ * DAMAGE-TYPING affinities off a tag list (ruled 2026-08-24: "an affinity is
+ * an element; a family is what kind of skill it is").
+ *
+ * Deliberately SEPARATE from `affinitiesFromTags` above, which reads only the
+ * `x-affinity` suffix because it feeds the usage GATE — an actor "has" fire
+ * because of an affinity passive. Widening that would silently enlarge every
+ * actor's roster and start blocking gear. Typing is the other question: what
+ * IS this damage. Skills carry plain names (`fire`), gear carries either, so
+ * this accepts BOTH conventions and gates on the one dictionary.
+ *
+ * Family words (`physical`, `magical`, `dread`) are not in the dictionary and
+ * so can never leak in — that separation is the whole authoring law.
+ *
+ * ⚠ A tag whose name collides with an affinity (a hypothetical `light`
+ * meaning lightweight) would type the skill. Verified clean world-wide at the
+ * migration: 184/184 skills reproduced with ZERO spurious gains.
+ */
+export function typingFromTags(tags = []) {
+  const aliases = cfg().tagAliases ?? {};
+  const known = knownAffinities();
+  const found = new Set();
+  for (const tag of tags) {
+    const m = AFFINITY_TAG.exec(String(tag));
+    const raw = m ? m[1] : String(tag);
+    const key = aliases[raw] ?? raw;
+    if (known.has(key)) found.add(key);
+  }
+  return found;
+}
+
 /** Affinities an actor can channel: affinity passives + actor-level tags. */
 export function actorAffinities(actor) {
   const found = new Set();

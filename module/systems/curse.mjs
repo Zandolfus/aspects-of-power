@@ -505,7 +505,9 @@ export async function handleHarness(skill, speaker, rollMode) {
     duration: { value: dur, type: 'rounds' },
     system: {
       kindledDmgMod: mod,
-      affinities: [...(skill.system?.affinities ?? [])],
+      // Derived typing (2026-08-24) so a kindle scopes to what the cast
+      // actually IS, including a weave swap.
+      affinities: [...(skill.effectiveAffinities?.() ?? skill.system?.affinities ?? [])],
       casterActorUuid: actor.uuid,
       tags: ['curse'],
     },

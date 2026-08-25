@@ -109,8 +109,18 @@ export class SkillData extends foundry.abstract.TypeDataModel {
       // Tags that define what this skill does when activated (e.g. ["attack","debuff"]).
       tags: new fields.ArrayField(new fields.StringField(), { initial: [] }),
 
-      // Elemental or thematic affinities (e.g. "fire", "lunar", "space").
-      // Used to match against debuffs on the target to reduce toughness DR.
+      /**
+       * @deprecated 2026-08-24 — NO LONGER READ FOR DAMAGE TYPING. Typing is
+       * DERIVED from `tags` (systems/affinity.typingFromTags), because this
+       * was a denormalised copy of the affinity subset of tags that only the
+       * sheet's toggle handler kept in sync: 116 skills had the tag and not
+       * the array, and 10 carried the actor-side `x-affinity` suffix form,
+       * which matched nothing. Kept as a field so existing documents and any
+       * external macro still load; the sheet still writes it. Verified
+       * lossless before the switch (184/184 reproduced from tags).
+       *
+       * AUTHORING: to type a skill, give it the affinity TAG.
+       */
       affinities: new fields.ArrayField(new fields.StringField(), { initial: [] }),
 
       // ID of the item that must be equipped to use this skill. Empty = no requirement.
