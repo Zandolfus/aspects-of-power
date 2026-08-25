@@ -350,7 +350,16 @@ export class AspectsofPowerActorSheet extends foundry.applications.api.Handlebar
           list.reactions.forEach(tagSkill);
         }
       }
-      context.orbState = { hasOrb, charge: orbCharge, threshold: orbThreshold, ready: orbReady };
+      // ⚠ This referenced `orbThreshold`/`orbReady` after the per-spell-price
+      // rework deleted them, which threw a ReferenceError on EVERY actor
+      // sheet render — orb or not. node --check cannot see an undefined
+      // variable; only rendering the sheet does.
+      const _orbCap = CONFIG.ASPECTSOFPOWER.celerity?.ORB_CHARGE_CAP ?? 700;
+      const _cheapest = Math.min(...Object.values(_tierW).filter(Number.isFinite));
+      context.orbState = {
+        hasOrb, charge: orbCharge, cap: _orbCap,
+        ready: hasOrb && Number.isFinite(_cheapest) && orbCharge >= _cheapest,
+      };
     }
 
     context.gear           = gear;
