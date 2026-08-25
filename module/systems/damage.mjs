@@ -134,7 +134,15 @@ export function resolveDamage(input = {}) {
   const mitigation = Math.max(0, n(input.mitigation));
   const effectiveDR = Math.max(0, n(input.drValue) - n(input.affinityDR));
   const augDR = Math.max(0, n(input.augDR));
-  const affinityResist = Math.max(0, n(input.affinityResist));
+  // ⚠ SIGNED (ruled 2026-08-24). Positive = the gear ANSWERS this element and
+  // the wall grows; NEGATIVE = a WEAKNESS and the wall shrinks ("armor that
+  // grants 100 fire resist increases armor effectiveness by 100 points,
+  // weaknesses negative by 100"). It was clamped at 0, which is why a
+  // weakness could not be authored at all. The wall itself still floors at 0
+  // below — a weakness thins armour, it never inverts into a bonus.
+  const affinityResist = n(input.affinityResist);
+  // Constitution multiplier: >1 VULNERABLE, <1 INURED, 1 neutral.
+  const affinityMult = input.affinityMult == null ? 1 : Math.max(0, n(input.affinityMult));
   const _dt = globalThis.CONFIG?.ASPECTSOFPOWER?.defenseTuning ?? {};
   const _ratio = (_dt.armourModel ?? 'ratio') === 'ratio';
 
@@ -150,7 +158,7 @@ export function resolveDamage(input = {}) {
     // Reported as one absorbed figure because that is what actually happened:
     // under this model there is no meaningful "armour took 599 of it, then DR
     // took 208". The wall took a fraction, together.
-    const wall = mitigation + effectiveDR + augDR + affinityResist;
+    const wall = Math.max(0, mitigation + effectiveDR + augDR + affinityResist);
     if (remaining > 0 && wall > 0) {
       const before = remaining;
       remaining = armourRatioApplied(remaining, wall, _dt);
@@ -162,11 +170,14 @@ export function resolveDamage(input = {}) {
       // looked like the model we just replaced. On a 3000 hit it would have
       // said `-1790` against a wall of 1120 and simply looked broken.
       parts.push(`${lane}: −${mitigated} of ${before} (${Math.round(mitigated / before * 100)}% absorbed, wall ${wall})`);
-      if (affinityResist > 0) {
+      if (affinityResist !== 0) {
         affinityResisted = affinityResist;   // its share of the wall, for reporting
-        parts.push(input.affinityResistLabel
-          ? `  incl. affinity resist (${input.affinityResistLabel})`
-          : `  incl. affinity resist ${affinityResist}`);
+        const _lbl = input.affinityResistLabel
+          ? ` (${input.affinityResistLabel})`
+          : ` ${Math.abs(affinityResist)}`;
+        parts.push(affinityResist > 0
+          ? `  incl. affinity resist${_lbl}`
+          : `  WEAKNESS thinned the wall${_lbl}`);
       }
     }
   } else {
@@ -197,12 +208,13 @@ export function resolveDamage(input = {}) {
   // That is the coherent reading — a barrier stands in front of you and
   // intercepts the strike, so your own resistance never gets tested on the
   // portion the ward ate.
-  if (remaining > 0 && affinityResist > 0) {
+  // ⚠ SIGNED since 2026-08-24: a negative value is a WEAKNESS and ADDS.
+  if (remaining > 0 && affinityResist !== 0) {
     affinityResisted = Math.min(affinityResist, remaining);
     remaining = Math.max(0, remaining - affinityResist);
     parts.push(input.affinityResistLabel
-      ? `Affinity resist (${input.affinityResistLabel})`
-      : `Affinity resist: −${affinityResisted}`);
+      ? `Affinity ${affinityResist > 0 ? 'resist' : 'weakness'} (${input.affinityResistLabel})`
+      : `Affinity ${affinityResist > 0 ? 'resist' : 'weakness'}: ${affinityResist > 0 ? '−' : '+'}${Math.abs(affinityResisted)}`);
   }
 
   // ── 3b. Augment-sourced flat resist. ──
@@ -211,6 +223,32 @@ export function resolveDamage(input = {}) {
     remaining = Math.max(0, remaining - augDR);
     parts.push(`${input.augLabel ?? 'Phys'} Resist: −${augReduced}`);
   }
+  }
+
+  // ── 3b-bis. AFFINITY CONSTITUTION (ruled 2026-08-24) ──────────────────
+  // The other half of the symmetric pair. Where resist/weakness modifies the
+  // WALL (armour answering an element — a GEAR property), this multiplies
+  // what got THROUGH it (the creature's own nature — fire simply eats a
+  // fungus). Applied here, alongside the resist, for the reason the resist
+  // sits here at all: a barrier stands in front of you and eats the strike,
+  // so neither your resistance NOR your vulnerability is tested on the
+  // portion the ward absorbed.
+  //
+  // ⚠ BALANCE WATCH: ratio armour is SUPERLINEAR, so equal magnitudes are
+  // NOT equal in effect — a vulnerability outruns the mirrored resistance by
+  // roughly 1.5-1.9x. Symmetric NUMBERS, asymmetric OUTCOMES; that is a
+  // property of the mitigation model, not of this step. Author the vulnerable
+  // side conservatively (1.2-1.5 is already a large swing).
+  let constitutionDelta = 0;
+  if (remaining > 0 && affinityMult !== 1) {
+    const before = remaining;
+    remaining = Math.round(remaining * affinityMult);
+    constitutionDelta = remaining - before;
+    if (constitutionDelta !== 0) {
+      parts.push(constitutionDelta > 0
+        ? `VULNERABLE ${input.affinityMultLabel ?? ''}: +${constitutionDelta} (x${affinityMult})`.replace('  ', ' ')
+        : `Inured ${input.affinityMultLabel ?? ''}: ${constitutionDelta} (x${affinityMult})`.replace('  ', ' '));
+    }
   }
 
   // ── 3c. THE MARGIN RULE — how badly the defender lost scales what survives
@@ -241,7 +279,7 @@ export function resolveDamage(input = {}) {
   if (remaining > 0) parts.push(`Health: −${remaining}`);
 
   return {
-    incoming, markAdded, affinityResisted,
+    incoming, markAdded, affinityResisted, constitutionDelta,
     barrierAbsorbed, barrierBroke, barrierRemaining,
     mitigated, drReduced, augReduced, effectiveDR,
     marginTurned,

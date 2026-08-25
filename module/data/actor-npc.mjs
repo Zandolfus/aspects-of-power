@@ -39,6 +39,19 @@ export class NpcData extends foundry.abstract.TypeDataModel {
       // Base stamina regeneration per turn (percentage of max stamina).
       staminaRegen: new fields.NumberField({ initial: 5, min: 0 }),
 
+      // ── AFFINITY CONSTITUTION (ruled 2026-08-24) ──
+      // { fire: 1.5, ice: 0.7, ... } — a MULTIPLIER on damage of that
+      // affinity after the wall. >1 = VULNERABLE ("fire eats this"),
+      // <1 = INURED. Missing/1.0 = neutral.
+      //
+      // The other half of the pair, resist/weakness, is a FLAT modifier to
+      // the WALL and lives on GEAR (item damageReduction.affinities, summed
+      // into system.damageReduction.affinities). That split is the design:
+      // armour answers an element, constitution IS one. This field is
+      // INTRINSIC — never derived from equipment, so prepareDerivedData
+      // must not overwrite it.
+      affinityMultipliers: new fields.ObjectField({ initial: () => ({}) }),
+
       // Race rank drives the vitality modifier multiplier in derivation.
       attributes: new fields.SchemaField({
         race: new fields.SchemaField({

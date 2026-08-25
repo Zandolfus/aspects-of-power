@@ -2577,10 +2577,36 @@ Hooks.on('renderChatMessageHTML', (message, html) => {
         const sliceNum = Number(sliceVal) || 0;
         if (sliceNum <= 0) continue;
         const resist = Number(affinityDRMap[aff]) || 0;
-        if (resist <= 0) continue;
-        const reduced = Math.min(resist, sliceNum);
+        if (resist === 0) continue;
+        // SIGNED (ruled 2026-08-24): positive answers the element and grows
+        // the wall, negative is a WEAKNESS and thins it. Magnitude is capped
+        // at the slice either way — you can neither resist nor be hurt by
+        // more fire than the blow actually carried.
+        const reduced = Math.sign(resist) * Math.min(Math.abs(resist), sliceNum);
         affinityResistTotal += reduced;
-        affinityResistParts.push(`${aff}: −${reduced}`);
+        affinityResistParts.push(`${aff}: ${reduced > 0 ? '−' : '+'}${Math.abs(reduced)}`);
+      }
+
+      // ── AFFINITY CONSTITUTION (the multiplicative half of the pair) ──
+      // Share-weighted across the hit's affinity slices, so a half-fire blow
+      // on a fire-vulnerable creature takes half the amplification. The
+      // untyped remainder stays neutral by construction.
+      const affinityMultMap = target.system.affinityMultipliers ?? {};
+      let affinityMult = 1;
+      const affinityMultParts = [];
+      if (incomingDmg > 0) {
+        let weighted = 0, typedShare = 0;
+        for (const [aff, sliceVal] of Object.entries(affinityBreakdown)) {
+          const sliceNum = Number(sliceVal) || 0;
+          if (sliceNum <= 0) continue;
+          const m = Number(affinityMultMap[aff]);
+          if (!Number.isFinite(m) || m < 0 || m === 1) continue;
+          const share = Math.min(1, sliceNum / incomingDmg);
+          weighted += (m - 1) * share;
+          typedShare += share;
+          affinityMultParts.push(`${aff} x${m}`);
+        }
+        if (typedShare > 0) affinityMult = Math.max(0, 1 + weighted);
       }
       // ⚠ NOT subtracted here any more (2026-08-10). The total and its
       // per-slice description are handed to resolveDamage, which applies them
@@ -2637,6 +2663,8 @@ Hooks.on('renderChatMessageHTML', (message, html) => {
         markBonus: 0,
         affinityResist: affinityResistTotal,
         affinityResistLabel: affinityResistParts.join(', '),
+        affinityMult,
+        affinityMultLabel: affinityMultParts.join(', '),
         barrier: barrierPool,
         mitigation,
         mitigationLabel: mitigLane === 'armor' ? 'Armor' : 'Veil',

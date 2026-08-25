@@ -2709,6 +2709,39 @@ eq('junk situational entries are skipped, not NaN',
        /rollData\.roll\.cost\s*=\s*options\.ritualActivation\s*\?\s*0\s*:\s*invested/.test(itemSrc), true);
   }
 
+  // ── AFFINITY: TWO SYMMETRIC PAIRS (ruled 2026-08-24) ──
+  // resist/weakness = FLAT on the WALL (gear answers an element);
+  // inured/vulnerable = MULTIPLICATIVE on what got through (constitution).
+  {
+    const DM = await import('../module/systems/damage.mjs');
+    const base = { incoming: 1399, mitigation: 187, drValue: 0, margin: 1, health: 1e9 };
+    const hp = (o) => DM.resolveDamage({ ...base, ...o }).hpLoss;
+    const neutral = hp({});
+    // PAIR 1 — the sign is the direction. A weakness must now WORK: before
+    // this ruling affinityResist clamped at 0, so a negative did nothing.
+    const resisted = hp({ affinityResist: 300 });
+    const weakened = hp({ affinityResist: -300 });
+    eq('affinity: a positive resist thickens the wall', resisted < neutral, true);
+    eq('affinity: a NEGATIVE value is a weakness and thins it', weakened > neutral, true);
+    // The negative control that would have caught the old clamp:
+    eq('affinity: weakness is not silently ignored', weakened !== neutral, true);
+    // The wall floors at 0 — a weakness thins armour, never inverts it.
+    eq('affinity: a huge weakness cannot invert the wall',
+       hp({ affinityResist: -99999 }), hp({ mitigation: 0 }));
+    // PAIR 2 — constitution multiplies what survived the wall.
+    eq('affinity: vulnerable x1.5 amplifies', hp({ affinityMult: 1.5 }) > neutral, true);
+    eq('affinity: inured x0.7 dampens', hp({ affinityMult: 0.7 }) < neutral, true);
+    eq('affinity: mult 1 is a no-op', hp({ affinityMult: 1 }), neutral);
+    eq('affinity: absent mult is a no-op', hp({}), neutral);
+    // ⚠⚠ THE BALANCE CONCERN, PINNED SO IT CANNOT BE FORGOTTEN: ratio armour
+    // is superlinear, so equal magnitudes are NOT equal in outcome — the
+    // vulnerability side outruns the mirrored resistance. Pinned as an
+    // INEQUALITY (the exact ratio may move with tuning; the asymmetry is
+    // structural and must stay visible).
+    eq('affinity: equal-magnitude weakness outruns resistance (asymmetry is REAL)',
+       (weakened - neutral) > (neutral - resisted), true);
+  }
+
   // ── CURSES ARE INT-INDEPENDENT (ruled 2026-08-24) ──
   // "They are purely wis/will." Willpower-led, no tier gradient (a curse is
   // an infection, not a deeper working). Felicia live: wil 491 / wis 225 /

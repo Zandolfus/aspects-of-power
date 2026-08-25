@@ -165,6 +165,14 @@ export class CharacterData extends foundry.abstract.TypeDataModel {
       // Active effects can modify this value via system.staminaRegen.
       staminaRegen: new fields.NumberField({ initial: 5, min: 0 }),
 
+      // ── AFFINITY CONSTITUTION (ruled 2026-08-24) ──
+      // { fire: 1.5, ice: 0.7, ... } — a MULTIPLIER on damage of that
+      // affinity after the wall. >1 = VULNERABLE, <1 = INURED, 1.0/absent
+      // = neutral. Pairs with the FLAT wall modifier on gear
+      // (system.damageReduction.affinities): armour answers an element,
+      // constitution IS one. INTRINSIC — never derived from equipment.
+      affinityMultipliers: new fields.ObjectField({ initial: () => ({}) }),
+
       // Reactions per round (usually 1). Resets at start of combatant's turn.
       reactions: new fields.SchemaField({
         value: new fields.NumberField({ initial: 1, min: 0, integer: true }),
