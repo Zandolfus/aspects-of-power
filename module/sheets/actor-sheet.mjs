@@ -167,6 +167,16 @@ export class AspectsofPowerActorSheet extends foundry.applications.api.Handlebar
     // Build tooltip strings for defense stats. Also derives the Celerity
     // display block (rate, swing, personal round) onto `this._celerity`.
     context.tooltips = this._prepareTooltips(context.system);
+    // Defence TIME is what actually gates melee/ranged dodging since the
+    // roll-always rework; the sheet used to show a dead 0/0 pool instead.
+    // Out of combat this reads full, which is correct — there is no clock.
+    try {
+      const { getDefenseBudget } = await import('../systems/celerity.mjs');
+      const _b = getDefenseBudget(this.actor);
+      context.defenseBudget = { max: Math.round(_b.max), remaining: Math.round(_b.remaining) };
+    } catch (_e) {
+      context.defenseBudget = { max: 0, remaining: 0 };
+    }
     context.celerity = this._celerity ?? null;
 
     // Actor-level tags (design-power-sense): direct grants editable by the GM.
