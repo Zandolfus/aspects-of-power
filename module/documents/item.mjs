@@ -1,6 +1,6 @@
 import { EquipmentSystem } from '../systems/equipment.mjs';
 import { getPositionalTags } from '../helpers/positioning.mjs';
-import { houseHitFormula, hybridAbilityMod, weaponStatBlend, healStatBlend, spellDamageRef, spellInvestDamage, spellWindupMultiplier, spellCastWeight, strikeInvestDamage, coInvestDamage, investSelfDamage as computeInvestSelfDamage, effectiveDodgeValue, splitEvenlyWithRemainder, parryMassMultiplier, bracedParryWeight, bracedMaxUsefulInvest, defenceMarginMultiplier, defenseTimeCost, dodgeShortfallQuality, dotTickDamage, burnDetonatePayload, bulwarkWallBonus, procStaminaCost, crushFlatAmount, riderMaxInvest, auraRadiusFor, barrierStatBlend, hotTickAmount, effectiveDamageMultiplier, clashOutcome, orbDischargePrice, orbChargeAfterBank } from '../helpers/formulas.mjs';
+import { houseHitFormula, hybridAbilityMod, weaponStatBlend, healStatBlend, spellDamageRef, spellInvestDamage, spellWindupMultiplier, spellCastWeight, strikeInvestDamage, coInvestDamage, investSelfDamage as computeInvestSelfDamage, effectiveDodgeValue, splitEvenlyWithRemainder, parryMassMultiplier, bracedParryWeight, bracedMaxUsefulInvest, defenceMarginMultiplier, defenseTimeCost, dodgeShortfallQuality, dotTickDamage, burnDetonatePayload, bulwarkWallBonus, procStaminaCost, crushFlatAmount, riderMaxInvest, auraRadiusFor, barrierStatBlend, hotTickAmount, effectiveDamageMultiplier, clashOutcome, orbDischargePrice, orbChargeAfterBank, affinityAnswer } from '../helpers/formulas.mjs';
 import { resolveSituationalMods } from '../systems/situational-mods.mjs';
 import { recordActionFired, declareAction, isInActiveCombat, computeActionWait, referenceRoundLength, computeWindupMultiplier, getScrambleStacks, addScrambleStack, applyDodgeCost, findCombatantForActor, perceiveGate, getDefenseBudget, spendDefenseBudget, setLastSwungHand, computeActionHeft, actorRoundLength } from '../systems/celerity.mjs';
 import { getThreatRadiusFt, actorIsDashing } from '../systems/engagement-halts.mjs';
@@ -2748,12 +2748,14 @@ export class AspectsofPowerItem extends Item {
     // 24). One implementation, called with the same inputs the apply
     // handler passes. Marks and overhealth stay apply-time — they read
     // live target state at the click and the apply card labels them.
-    const _affResistPreview = (() => {
-      const dr = targetActor.system.damageReduction?.affinities ?? {};
-      let s = 0;
-      for (const [aff, amt] of Object.entries(_previewBreakdown)) s += Math.min(amt, Number(dr[aff]) || 0);
-      return s;
-    })();
+    // Both halves of the target's affinity answer, from the SAME helper the
+    // apply handler calls — they had drifted (the card read 187 while the
+    // click applied 234, because the preview knew nothing of the multiplier).
+    const _affPreview = affinityAnswer(
+      _previewBreakdown, afterDefense,
+      targetActor.system.damageReduction?.affinities ?? {},
+      targetActor.system.affinityMultipliers ?? {});
+    const _affResistPreview = _affPreview.resist;
     // Marks fold into the PREVIEW final (ruled 2026-08-22: "it should
     // appear in the card in damage prior to the apply (no surprises)") —
     // same live-state read the apply handler performs, same seam in
@@ -2774,6 +2776,9 @@ export class AspectsofPowerItem extends Item {
       incoming: afterDefense,
       markBonus: isHit ? _previewMarkBonus : 0,
       affinityResist: _affResistPreview,
+      affinityResistLabel: _affPreview.resistLabel,
+      affinityMult: _affPreview.mult,
+      affinityMultLabel: _affPreview.multLabel,
       barrier: isHit ? barrierValue : 0,
       mitigation,
       drValue: baseDR,
@@ -2826,6 +2831,14 @@ export class AspectsofPowerItem extends Item {
       ? `<p>Halves: ${primaryResult.isHit ? primaryContrib : 0} (${targetDefKey}) + ${secondaryResult.isHit ? secondaryContrib : 0} (${secondaryDefKey}) = <strong>${afterDefense}</strong></p>`
       : '';
 
+    // NO SURPRISES AT THE CLICK (ruled 2026-08-22, the same rule marks
+    // follow): a vulnerability or inurement is already inside the Final
+    // above, so the card says so out loud.
+    const affinityLine = (_previewRes.constitutionDelta ?? 0) !== 0
+      ? `<p><em>${_previewRes.constitutionDelta > 0 ? 'VULNERABLE' : 'Inured'}`
+        + `${_affPreview.multLabel ? ` (${_affPreview.multLabel})` : ''}: `
+        + `${_previewRes.constitutionDelta > 0 ? '+' : ''}${_previewRes.constitutionDelta} included</em></p>`
+      : '';
     const toughnessLine = (_previewRes.drReduced > 0 || _previewRes.augReduced > 0 || _affResistPreview > 0)
       ? `<p>DR: −${_previewRes.drReduced}`
         + `${affinityDR > 0 ? ` <em>(−${affinityDR} affinity strip)</em>` : ''}`
@@ -2935,6 +2948,7 @@ export class AspectsofPowerItem extends Item {
            ${defenseReductionLine}
            ${barrierLine}
            ${toughnessLine}
+           ${affinityLine}
            ${markLine}
            <p><strong>Final damage: ${displayDamage}</strong></p>
            ${redirectLine}

@@ -2058,6 +2058,59 @@ export function tomeSeizeCap(progress, rarityMult) {
 }
 
 /**
+ * THE TARGET'S AFFINITY ANSWER to one hit — both halves of the pair, from
+ * the hit's per-affinity breakdown (ruled 2026-08-24).
+ *
+ * ⚠ ONE IMPLEMENTATION ON PURPOSE. The card preview and the apply handler
+ * MUST produce the same numbers ("card preview IS the pipeline", 26726bc);
+ * they had already drifted — the preview clamped resist with a different
+ * expression and did not know about the multiplier at all, so a card read
+ * 187 while the click applied 234. Both call this now.
+ *
+ * resist:  SIGNED flat, summed per slice and magnitude-capped at that slice
+ *          (you can neither resist nor be hurt by more fire than the blow
+ *          carried). Joins the WALL downstream — positive thickens it,
+ *          negative thins it.
+ * mult:    share-weighted blend of the per-affinity multipliers, so a
+ *          half-fire blow on a fire-vulnerable target takes half the swing.
+ *          Untyped remainder stays neutral by construction.
+ *
+ * @param {object} breakdown  { affinity: damageAmount } for this hit
+ * @param {number} incoming   total damage the breakdown slices
+ * @param {object} drMap      target's damageReduction.affinities
+ * @param {object} multMap    target's affinityMultipliers
+ * @returns {{resist:number, resistLabel:string, mult:number, multLabel:string}}
+ */
+export function affinityAnswer(breakdown, incoming, drMap = {}, multMap = {}) {
+  let resist = 0, weighted = 0, typedShare = 0;
+  const rParts = [], mParts = [];
+  const total = Math.max(0, Number(incoming) || 0);
+  for (const [aff, raw] of Object.entries(breakdown ?? {})) {
+    const slice = Math.max(0, Number(raw) || 0);
+    if (slice <= 0) continue;
+    const dr = Number(drMap?.[aff]) || 0;
+    if (dr !== 0) {
+      const applied = Math.sign(dr) * Math.min(Math.abs(dr), slice);
+      resist += applied;
+      rParts.push(`${aff}: ${applied > 0 ? '−' : '+'}${Math.abs(applied)}`);
+    }
+    const m = Number(multMap?.[aff]);
+    if (Number.isFinite(m) && m >= 0 && m !== 1 && total > 0) {
+      const share = Math.min(1, slice / total);
+      weighted += (m - 1) * share;
+      typedShare += share;
+      mParts.push(`${aff} x${m}`);
+    }
+  }
+  return {
+    resist,
+    resistLabel: rParts.join(', '),
+    mult: typedShare > 0 ? Math.max(0, 1 + weighted) : 1,
+    multLabel: mParts.join(', '),
+  };
+}
+
+/**
  * ORB — banked cast time (ruled 2026-08-24, from the original design:
  * "when spell charge = AP cost for casting a spell, it can be cast for one
  * AP and for free").

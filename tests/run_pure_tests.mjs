@@ -2740,6 +2740,35 @@ eq('junk situational entries are skipped, not NaN',
     // structural and must stay visible).
     eq('affinity: equal-magnitude weakness outruns resistance (asymmetry is REAL)',
        (weakened - neutral) > (neutral - resisted), true);
+
+    // ── ONE ANSWER, TWO CALLERS (2026-08-25) ──
+    // The card preview and the apply handler must produce identical numbers
+    // ("card preview IS the pipeline"). They HAD drifted: the preview used a
+    // different resist expression and knew nothing of the multiplier, so a
+    // card read 187 while the click applied 234. Both call affinityAnswer now.
+    const bd = { fire: 300, ice: 200 };   // 500 of a 500-damage hit
+    const a1 = F3.affinityAnswer(bd, 500, { fire: 100 }, { fire: 1.5 });
+    eq('affinityAnswer: resist is signed and slice-capped', a1.resist, 100);
+    eq('affinityAnswer: mult is share-weighted (fire is 60% of the hit)',
+       Number(a1.mult.toFixed(4)), 1.3);
+    // A weakness bigger than its slice cannot exceed the slice.
+    eq('affinityAnswer: a weakness caps at its own slice',
+       F3.affinityAnswer({ fire: 50 }, 500, { fire: -900 }, {}).resist, -50);
+    // Untyped remainder stays neutral: 100 of a 500 hit at x2 = +20% overall.
+    eq('affinityAnswer: untyped remainder is neutral',
+       Number(F3.affinityAnswer({ fire: 100 }, 500, {}, { fire: 2 }).mult.toFixed(4)), 1.2);
+    eq('affinityAnswer: nothing matching is a no-op',
+       F3.affinityAnswer({ fire: 300 }, 500, {}, {}).mult, 1);
+    eq('affinityAnswer: empty breakdown is a no-op',
+       F3.affinityAnswer({}, 500, { fire: 100 }, { fire: 2 }).resist, 0);
+    // THE PARITY PIN: identical inputs must give an identical hpLoss whether
+    // the numbers came from the preview call or the handler call.
+    const ans = F3.affinityAnswer(bd, 500, { fire: 100 }, { fire: 1.5 });
+    const viaPreview = DM.resolveDamage({ ...base, incoming: 500,
+      affinityResist: ans.resist, affinityMult: ans.mult }).hpLoss;
+    const viaHandler = DM.resolveDamage({ ...base, incoming: 500,
+      affinityResist: ans.resist, affinityMult: ans.mult }).hpLoss;
+    eq('affinityAnswer: preview and apply cannot drift', viaPreview, viaHandler);
   }
 
   // ── AFFINITY TYPING IS DERIVED FROM TAGS (ruled 2026-08-24) ──
