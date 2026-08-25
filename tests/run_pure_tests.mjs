@@ -2695,6 +2695,19 @@ eq('junk situational entries are skipped, not NaN',
   eq('orb: five basics sit under it', F3.orbChargeAfterBank(520, 130, 700), 650);
   eq('orb: a spend leaves the remainder', 780 > 700 ? 700 - 230 : 0, 470);
   eq('orb: no cap configured means no clamp', F3.orbChargeAfterBank(900, 130, 0), 1030);
+  // ⚠⚠ THE ORB BUYS TIME, NEVER MANA (ruled 2026-08-24: "Mana should never
+  // be created via orb"). The discharge branch must NOT zero the cast's
+  // cost — that was net creation (six 20-mana basics bought a 500-mana
+  // grand). Source pin: only ritualActivation may zero a cast, because a
+  // ritual's mana was genuinely paid at prep time.
+  {
+    const { readFileSync: _rfs } = await import('node:fs');
+    const itemSrc = _rfs(new URL('../module/documents/item.mjs', import.meta.url), 'utf8');
+    eq('orb: a discharge no longer zeroes the cast cost',
+       /orbDischarging\s*\|\|\s*options\.ritualActivation\s*\)\s*\?\s*0/.test(itemSrc), false);
+    eq('orb: ritual activation is the only zero-cost cast',
+       /rollData\.roll\.cost\s*=\s*options\.ritualActivation\s*\?\s*0\s*:\s*invested/.test(itemSrc), true);
+  }
 
   // ── CURSES ARE INT-INDEPENDENT (ruled 2026-08-24) ──
   // "They are purely wis/will." Willpower-led, no tier gradient (a curse is

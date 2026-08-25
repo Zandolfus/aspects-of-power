@@ -704,18 +704,26 @@ ASPECTSOFPOWER.celerity = {
   // Every qualifying cast BANKS its tier weight (its cast time, in the
   // weight unit) up to ORB_CHARGE_CAP. A discharge SPENDS the price of the
   // spell being cast — its OWN tier weight, per the design's "charge = AP
-  // cost" — and in return that cast is FREE (mana zeroed) and repriced to
-  // the BASIC tier's wait. Never faster than basic: the reprice is a floor
-  // taken as a min, so a discharged cast can only ever be REDUCED to basic
-  // rate (`reduce the cast at all times to a basic cast`).
+  // cost" — and in return that cast is repriced to the BASIC tier's wait.
+  // Never faster than basic: the reprice is a floor taken as a min, so a
+  // discharged cast can only ever be REDUCED ("reduce the cast at all
+  // times to a basic cast").
   //
-  // That shape makes "orbs are not for basic casts" EMERGENT rather than a
-  // gate: a basic discharge gains no tempo (it is already basic rate), it
-  // only gains the free mana — the capability the ruling deliberately
-  // keeps. The prize scales with the working: a grand discharged still
-  // hits like a grand (windup rides tier weight, untouched) but arrives at
-  // basic speed for nothing, having cost ~6 banked basics to load.
-  // ⚠ Damage is NOT repriced — only wait. Charge resets at combatStart.
+  // ⚠⚠ THE ORB BUYS TIME, NEVER MANA (ruled 2026-08-24: "Mana should never
+  // be created via orb. It's more of a buildup/siphon"). A discharge used
+  // to zero the cast's cost; that was net creation — six 20-mana basics
+  // bought back a 500-mana grand, making the orb the only lane in the game
+  // whose ceiling was not the pool (14,902 damage by round 15 against a
+  // staff's 8,574 pool-bound ceiling; board: migration/local/orb_economy).
+  // A discharged cast now pays its normal base cost.
+  //
+  // What remains is the real identity: a grand delivered in ~1,976 ticks
+  // instead of ~10,646 — inside one round, on demand, instead of a
+  // 2.5-round telegraph everyone can walk out of. "Orbs are not for basic
+  // casts" is emergent: a basic discharge is already basic rate, so it
+  // gains nothing at all.
+  // ⚠ Damage is NOT repriced — only wait, and the DEFENDER still pays the
+  // full tier's dodge price. Charge resets at combatStart.
   ORB_CHARGE_CAP: 700,     // grand weight: bank at most one grand's worth
   /** @deprecated Replaced 2026-08-24 by the per-spell price (a discharge
    * costs the CAST'S OWN tier weight, not one flat number). Kept only so a

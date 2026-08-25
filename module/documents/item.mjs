@@ -6647,7 +6647,10 @@ export class AspectsofPowerItem extends Item {
       let invested;
       let coInvested = 0;
       if (orbDischarging) {
-        // Discharge path: no dialog, base damage, zero cost.
+        // Discharge path: no dialog, base damage, BASE COST. The orb buys
+        // time, never mana (ruled 2026-08-24) — so the cast is priced
+        // exactly as an unpushed cast of its tier and simply arrives at
+        // basic rate.
         invested = baseMana;
       } else if (useCoInvest && options.preInvestAmount == null && !options.aiAutoInvest) {
         // Two sliders: the cast's own resource plus the co-invest pool. Only a
@@ -6747,8 +6750,17 @@ export class AspectsofPowerItem extends Item {
       // ritualActivation: when firing a ritual via a Medium, the mana was
       // already spent at prep time. The stored ritualPower drives invest for
       // damage scaling, but the activator pays nothing — the gem is the
-      // energy source. Same zero-cost branch as orbDischarging.
-      rollData.roll.cost = (orbDischarging || options.ritualActivation) ? 0 : invested;
+      // energy source.
+      //
+      // ⚠ MANA IS NEVER CREATED BY AN ORB (ruled 2026-08-24: "Mana should
+      // never be created via orb. It's more of a buildup/siphon"). A
+      // discharge used to zero the cost, which was net creation: six
+      // 20-mana basics bought back a 500-mana grand, and the orb became the
+      // only lane in the game whose ceiling was not the pool — mana regen
+      // by another name, against a standing hardline. The discharge's prize
+      // is TIME: banked cast time delivers the working at basic rate. The
+      // mana is still paid.
+      rollData.roll.cost = options.ritualActivation ? 0 : invested;
       rollData.roll.variableSpellInvest = invested;
       // Persist Orb state for _commitCastCost: a discharge SPENDS this
       // cast's own price, a normal qualifying cast BANKS its tier weight
@@ -7558,7 +7570,7 @@ export class AspectsofPowerItem extends Item {
         ChatMessage.create({
           speaker, rollMode, ...(whisperGM ? { whisper: whisperGM } : {}),
           flavor: label,
-          content: `<p><em>Orb discharge:</em> <strong>${this.actor.name}</strong>'s orb spends <strong>${orbSpentPrice}</strong> banked cast time — free, at basic cast rate. (${_left} left)</p>`,
+          content: `<p><em>Orb discharge:</em> <strong>${this.actor.name}</strong>'s orb spends <strong>${orbSpentPrice}</strong> banked cast time — the working arrives at basic cast rate. (${_left} left)</p>`,
         });
       } else if (orbBanked > 0) {
         const newCharge = updates['flags.aspectsofpower.spellCharge'] ?? 0;
