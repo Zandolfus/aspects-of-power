@@ -417,6 +417,22 @@ export class AspectsofPowerActor extends Actor {
     systemData.mana.max = systemData.abilities.willpower.mod;
     systemData.stamina.max = systemData.abilities.endurance.mod;
 
+    // A POOL CAN NEVER READ ABOVE ITS OWN MAXIMUM. Every max here is DERIVED
+    // — from a stat mod, from size, from strain — so it moves whenever gear,
+    // a buff or a level does, while the stored `value` does not. The sheet
+    // then prints things like `mana 394/393` or `health 557/495`; found on 6
+    // allies across 9 pools (worst +62). `ki` and `overhealth` below already
+    // clamp exactly like this; the three main pools were simply missed.
+    //
+    // Clamped in DERIVED data on purpose, not written back: a max that dips
+    // (strain, an unequipped item) should make you fragile now and give the
+    // headroom back when it lifts, not permanently burn the difference.
+    for (const key of ['health', 'mana', 'stamina']) {
+      const pool = systemData[key];
+      if (!pool || !Number.isFinite(pool.max)) continue;
+      pool.value = Math.min(Number(pool.value) || 0, pool.max);
+    }
+
     // ── KI (ruled 2026-08-05) ────────────────────────────────────────────
     // A RESOURCE granted by the `ki` ACTOR TAG, not a stack pool: ki carries no
     // per-cast payload and is spent at varying costs by many abilities, so it
