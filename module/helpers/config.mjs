@@ -3068,6 +3068,12 @@ ASPECTSOFPOWER.craftMana = {
  */
 ASPECTSOFPOWER.recipeTuning = {
   overpourCap: 1.5,
+
+  // ⚠ freeformSurcharge (RULED 1.15, 2026-08-26) is deliberately NOT here
+  // yet. The rule is settled — a recipe needing 100 means improvising the
+  // same thing needs 115 — but where the 100 comes from for a product nobody
+  // has written down is a separate open ruling, so the dial would have no
+  // reader. It lands with the discovery path. See design-recipe-system.
 };
 
 /**

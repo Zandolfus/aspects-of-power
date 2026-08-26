@@ -9,7 +9,8 @@
  * byte-identical to its previous class-body form (no object-literal comma
  * surgery); the export collects the prototype methods into a plain mixin.
  */
-import { hybridAbilityMod, itemWeightLb, craftManaQuality } from '../helpers/formulas.mjs';
+import { hybridAbilityMod, itemWeightLb, craftManaQuality, recipeMaterialProgress, recipeVerdict } from '../helpers/formulas.mjs';
+import { eligibleRecipes, resolveIngredients, consumeIngredients, craftBar } from './recipes.mjs';
 import { spatialCapacityFromCraft } from '../helpers/formulas.mjs';
 
 class CraftingSkills {
@@ -35,8 +36,11 @@ class CraftingSkills {
    *          null = the attempt is off (too little mana, or cancelled); the
    *          caller returns without consuming anything else.
    */
-  async _collectProfessionMana(item, actor, speaker, rollMode, { probe = false } = {}) {
-    const minMana = Math.max(0, Math.round(Number(item.system?.tagConfig?.craftMinMana) || 0));
+  async _collectProfessionMana(item, actor, speaker, rollMode, { probe = false, recipe = null } = {}) {
+    // A RECIPE'S floor wins over the skill's: the mana requirement is a
+    // property of the formula being worked, not of the hands working it.
+    const minMana = Math.max(0, Math.round(
+      Number(recipe?.system?.minMana) || Number(item.system?.tagConfig?.craftMinMana) || 0));
     if (minMana <= 0) return { invested: 0, mult: 1, line: '' };
 
     const pool = Math.round(Number(actor.system?.mana?.value) || 0);
@@ -1509,6 +1513,16 @@ class CraftingSkills {
     let typeKey = null;          // chosen craftItemTypes key (sword/chest/ring/etc.)
     let inheritedTypeTags = [];  // static tags from craftItemTypes[typeKey]
 
+    // ── RECIPE STATE ────────────────────────────────────────────────────
+    // A recipe does not craft differently — it KNOWS the answers the dialogs
+    // below would have asked for, and lowers the bar the result must clear.
+    // Everything downstream (progress, stats, armour, naming, durability)
+    // runs on the shipped freehand math untouched, so a recipe-made item and
+    // a freehand item are the same item priced the same way.
+    let recipe = null;
+    let recipeExtraPicks = [];   // ingredients beyond the primary material
+    let recipeBill = null;       // the resolved bill, for the overpour maths
+
     if (isAlchemySkill) {
       // Alchemy: skip slot/category/type — just pick a material.
       const materials = actor.items.filter(i => i.type === 'item' && i.system.isMaterial);
@@ -1531,20 +1545,73 @@ class CraftingSkills {
       materialItem = actor.items.get(matChoice);
       if (!materialItem) return;
     } else {
-      // ── Step 1: Mode (New / Iterative) ──
+      // ── Step 1: Mode (Recipe / New / Iterative) ──
+      const known = eligibleRecipes(actor, item);
+      const modeButtons = [];
+      if (known.length > 0) {
+        modeButtons.push({ action: 'recipe', label: `Work a Recipe (${known.length})`,
+                           icon: 'fas fa-scroll', default: true });
+      }
+      modeButtons.push({ action: 'new',  label: 'Improvise (New Item)', icon: 'fas fa-plus',
+                         default: known.length === 0 });
+      modeButtons.push({ action: 'iter', label: 'Iterative Craft', icon: 'fas fa-redo' });
+      modeButtons.push({ action: 'cancel', label: 'Cancel' });
       const modeChoice = await foundry.applications.api.DialogV2.wait({
         window: { title: `${item.name} — Craft Mode` },
-        content: '<p>Starting a new item or iterating on an existing one?</p>',
-        buttons: [
-          { action: 'new',  label: 'New Item',         icon: 'fas fa-plus', default: true },
-          { action: 'iter', label: 'Iterative Craft',  icon: 'fas fa-redo' },
-          { action: 'cancel', label: 'Cancel' },
-        ],
+        content: '<p>Working a recipe you know, improvising something new, or iterating on an existing piece?</p>',
+        buttons: modeButtons,
         close: () => 'cancel',
       });
       if (modeChoice === 'cancel') return;
 
-      if (modeChoice === 'iter') {
+      if (modeChoice === 'recipe') {
+        // ── Pick the recipe, then let IT answer type/slot/material ──
+        const recipeButtons = known.map(r => {
+          const t = r.system.threshold ?? 0;
+          return { action: r.id,
+                   label: `${r.system.output?.name || r.name}${t ? ` (needs ${t})` : ''}` };
+        });
+        recipeButtons.push({ action: 'cancel', label: 'Cancel' });
+        const pick = await foundry.applications.api.DialogV2.wait({
+          window: { title: `${item.name} — Recipe` },
+          content: '<p>Which recipe are you working?</p>',
+          buttons: recipeButtons,
+          close: () => 'cancel',
+        });
+        if (pick === 'cancel') return;
+        recipe = actor.items.get(pick);
+        if (!recipe) return;
+
+        // Ingredients: refuse BEFORE anything is spent, and say what is short.
+        const bill = resolveIngredients(actor, recipe);
+        if (!bill.ok || !bill.primary) {
+          ChatMessage.create({ speaker, rollMode,
+            content: `<div class="craft-result">
+              <h3>${item.name} — Missing Ingredients</h3><hr>
+              <p><strong>${recipe.system.output?.name || recipe.name}</strong> needs
+              ${bill.missing.join(', ') || 'ingredients this recipe does not name'}.
+              Nothing consumed.</p>
+            </div>` });
+          return;
+        }
+
+        typeKey = recipe.system.output?.typeKey || null;
+        const typeDef = typeKey ? (itemTypesConfig[typeKey] ?? null) : null;
+        if (typeKey && !typeDef) {
+          ui.notifications.warn(`${recipe.name} names an unknown item type (${typeKey}).`);
+          return;
+        }
+        if (typeDef) {
+          outputSlot = typeDef.slot;
+          inheritedTypeTags = typeDef.tags ?? [];
+        }
+        // The best unit of the first row stands in for the freehand path's
+        // single material, so element, output material and image all resolve
+        // through the code that already works. The rest are consumed beside it.
+        materialItem = bill.primary;
+        recipeExtraPicks = bill.picks.filter(p => p.item.id !== bill.primary.id);
+        recipeBill = bill;
+      } else if (modeChoice === 'iter') {
         // ── Iterative: pick rework target, no material ──
         const existing = actor.items.filter(i =>
           i.type === 'item' && !i.system.isMaterial && (i.system.maxProgress ?? 0) > 0
@@ -1668,7 +1735,7 @@ class CraftingSkills {
     // Last gate before anything is spent or mutated: refine below rewrites
     // the material, so the mana question has to be answered while backing out
     // is still free.
-    const manaStep = await this._collectProfessionMana(item, actor, speaker, rollMode);
+    const manaStep = await this._collectProfessionMana(item, actor, speaker, rollMode, { recipe });
     if (!manaStep) return;
     const manaMult = manaStep.mult;
     const manaLine = manaStep.line;
@@ -1829,7 +1896,13 @@ class CraftingSkills {
 
     // 50/50 split: material quality + crafter skill.
     // Iterative reworks have no material; only crafter contributes via the rework formula below.
-    const materialProgress = materialItem ? (materialItem.system.progress ?? 0) : 0;
+    // A recipe's material term is the whole BILL, not just the stand-in
+    // primary: the quantity-weighted mean of what went in, raised by however
+    // much more than the bill demanded came with it. For a one-row, one-unit
+    // recipe this is identical to the freehand line above it, by construction.
+    const materialProgress = recipeBill
+      ? Math.round(recipeMaterialProgress(recipeBill.units, recipeBill.requiredUnits))
+      : (materialItem ? (materialItem.system.progress ?? 0) : 0);
     // materialPotency: flat add on top of the half-of-progress material contribution.
     const materialContribution = Math.round(materialProgress * 0.5) + augMaterialPotency;
 
@@ -1893,6 +1966,34 @@ class CraftingSkills {
       return;
     }
 
+    // ── THE RECIPE GATE (ruled 2026-08-26, threshold failure "much like
+    // rituals"): clear it and the quality is set by how far past you landed;
+    // miss it and the ingredients are gone. Runs BEFORE the absolute quality
+    // ladder because for a recipe the ladder is the wrong question — the
+    // product is named, so what matters is how well you executed THIS
+    // formula, not where the number falls on a universal scale.
+    let recipeQuality = null;
+    if (recipe) {
+      const verdict = recipeVerdict(totalProgress, recipe.system.threshold ?? 0);
+      if (!verdict.success) {
+        // Consume everything, exactly as a failed ritual does. The primary is
+        // eaten by the same path a freehand craft uses; the rest go here.
+        if (recipeExtraPicks.length) await consumeIngredients(actor, recipeExtraPicks);
+        if ((materialItem.system.quantity ?? 1) <= 1) await materialItem.delete();
+        else await materialItem.update({ 'system.quantity': materialItem.system.quantity - 1 });
+        ChatMessage.create({ speaker, rollMode,
+          content: `<div class="craft-result">
+            <h3>${item.name} — ${recipe.system.output?.name || recipe.name} Failed</h3><hr>
+            <p>Progress <strong style="color:#ef5350;">${totalProgress}</strong> against a
+            threshold of ${recipe.system.threshold}. The work does not hold together.</p>
+            ${manaLine}
+            <p><em>Ingredients consumed.</em></p>
+          </div>` });
+        return;
+      }
+      recipeQuality = verdict;
+    }
+
     // Determine quality from thresholds.
     const qualityTiers = Object.entries(CONFIG.ASPECTSOFPOWER.craftQuality)
       .sort((a, b) => b[1].minProgress - a[1].minProgress);
@@ -1904,6 +2005,12 @@ class CraftingSkills {
         qualityData = data;
         break;
       }
+    }
+    // A recipe's quality came from its own threshold, not the absolute
+    // ladder — a barely-managed Skysteel Dagger is a poor Skysteel Dagger.
+    if (recipeQuality) {
+      qualityKey = recipeQuality.key;
+      qualityData = CONFIG.ASPECTSOFPOWER.craftQuality[recipeQuality.key] ?? qualityData;
     }
     // critSuccess: bump quality one tier up. Quality tiers are sorted high-to-low
     // here, so "up" is the entry BEFORE the current one in the sorted list.
@@ -2153,7 +2260,19 @@ class CraftingSkills {
       const elPrefix = element ? `${element.charAt(0).toUpperCase() + element.slice(1)} ` : '';
       const nameRoot = typeKey || outputSlot;
       const niceName = nameRoot.charAt(0).toUpperCase() + nameRoot.slice(1);
-      const itemName = `${elPrefix}${niceName} - ${totalProgress}`;
+      // THE ONE THING A RECIPE CHANGES ABOUT THE PRODUCT: it is a named
+      // thing rather than a description of its parts. Everything else on this
+      // item — stats, armour, durability, weight, augment slots — is the
+      // freehand math untouched, which is what keeps a recipe-made piece and
+      // a hand-made piece on the same power curve.
+      const itemName = recipe?.system?.output?.name
+        ? `${recipe.system.output.name} - ${totalProgress}`
+        : `${elPrefix}${niceName} - ${totalProgress}`;
+      if (recipe) {
+        for (const t of (recipe.system.output?.tags ?? [])) {
+          if (t && !craftedFreeTags.includes(t)) craftedFreeTags.push(t);
+        }
+      }
 
       // ── Material output: refined ingredient that feeds future crafts ──
       // Picked when the chosen item type has `category: 'material'` (gem,
@@ -2271,6 +2390,10 @@ class CraftingSkills {
       // preservation only applies to alchemy/cooking (1 ingredient might cover
       // multiple doses — the "use one leaf where two might be necessary" idea).
       if (!reworkTarget) {
+        // The rest of a recipe's bill goes first, while the primary is still
+        // resolvable — consumeIngredients re-checks live quantities and eats
+        // nothing if stock moved while the dialogs were open.
+        if (recipeExtraPicks.length) await consumeIngredients(actor, recipeExtraPicks);
         if ((materialItem.system.quantity ?? 1) <= 1) {
           await materialItem.delete();
         } else {

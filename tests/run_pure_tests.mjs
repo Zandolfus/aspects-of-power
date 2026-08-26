@@ -2940,6 +2940,70 @@ eq('junk situational entries are skipped, not NaN',
          .map(s => s.key).sort().join(','), 'fire,metal');
   }
 
+  // ── RECIPE INGREDIENT RESOLUTION (2026-08-26) ────────────────────────
+  {
+    const R = await import('../module/systems/recipes.mjs');
+    const mat = (id, name, material, progress, quantity = 1, element = '') =>
+      ({ id, name, type: 'item',
+         system: { isMaterial: true, material, progress, quantity, materialElement: element } });
+
+    // Matching: every declared constraint must hold, unset is a wildcard.
+    const ingot = mat('a', 'Skysteel Ingot', 'metal', 400, 3, 'lightning');
+    eq('recipe: a bare material row matches on kind alone',
+       R.matchesInput(ingot, { material: 'metal', quantity: 1 }), true);
+    eq('recipe: the wrong kind never matches',
+       R.matchesInput(ingot, { material: 'gem', quantity: 1 }), false);
+    eq('recipe: element is honoured when declared',
+       R.matchesInput(ingot, { material: 'metal', element: 'fire' }), false);
+    eq('recipe: minProgress is what demands GOOD steel, not just steel',
+       R.matchesInput(ingot, { material: 'metal', minProgress: 500 }), false);
+    eq('recipe: a name fragment pins a specific material',
+       R.matchesInput(ingot, { itemName: 'skysteel' }), true);
+    eq('recipe: non-materials are never ingredients',
+       R.matchesInput({ ...ingot, system: { ...ingot.system, isMaterial: false } },
+                      { material: 'metal' }), false);
+
+    // Resolution across a bill.
+    const actor = { items: [ingot, mat('b', 'Iron Ingot', 'metal', 100, 5), mat('c', 'Ruby', 'gem', 250, 1)] };
+    const rec = { system: { inputs: [{ material: 'metal', quantity: 2 }, { material: 'gem', quantity: 1 }] } };
+    const bill = R.resolveIngredients(actor, rec);
+    eq('recipe: a satisfiable bill resolves', bill.ok, true);
+    eq('recipe: required units are counted across every row', bill.requiredUnits, 3);
+    // BEST STOCK FIRST - the crafter reaches for their good ingots, and
+    // ingredient quality is the MEAN, so which units are picked matters.
+    eq('recipe: the best stock is taken first', bill.picks[0].item.id, 'a');
+    eq('recipe: the primary stands in for the freehand material', bill.primary.id, 'a');
+
+    // ⚠ RESERVATION ACROSS ROWS: one physical stack must not satisfy two rows
+    // at once, or "2 metal + 2 metal" passes on a single pair.
+    const twoRows = { system: { inputs: [{ material: 'metal', quantity: 2 }, { material: 'metal', quantity: 2 }] } };
+    const lean = { items: [mat('x', 'Ingot', 'metal', 300, 2)] };
+    eq('recipe: one stack cannot satisfy two rows at once',
+       R.resolveIngredients(lean, twoRows).ok, false);
+    eq('recipe: and it says how much is short',
+       R.resolveIngredients(lean, twoRows).missing.length, 1);
+    // The same stack DOES cover a single row asking for the same total.
+    eq('recipe: one stack covers one row of the same size',
+       R.resolveIngredients(lean, { system: { inputs: [{ material: 'metal', quantity: 2 }] } }).ok, true);
+
+    // A recipe with no bill is craftable from nothing - inert, not broken.
+    eq('recipe: an empty bill resolves trivially',
+       R.resolveIngredients(actor, { system: { inputs: [] } }).ok, true);
+
+    // Eligibility is by TAG so any smith can work a smithing recipe.
+    const smith = { system: { tags: ['craft', 'smithing'] } };
+    const cook = { system: { tags: ['craft', 'cooking'] } };
+    const holder = { items: [
+      { type: 'recipe', system: { requiresSkillTags: ['smithing'] } },
+      { type: 'recipe', system: { requiresSkillTags: [] } },
+      { type: 'item', system: {} },
+    ] };
+    eq('recipe: a smith sees the smithing recipe and the universal one',
+       R.eligibleRecipes(holder, smith).length, 2);
+    eq('recipe: a cook sees only the universal one',
+       R.eligibleRecipes(holder, cook).length, 1);
+  }
+
   // ── AFFINITY TYPING IS DERIVED FROM TAGS (ruled 2026-08-24) ──
   // "An affinity is an element; a family is what kind of skill it is."
   // typingFromTags gates on the ONE dictionary, so family words can never
