@@ -2932,6 +2932,12 @@ eq('junk situational entries are skipped, not NaN',
     eq('complex: slices sum back to the parent amount',
        Number(slices.reduce((s, x) => s + x.amount, 0).toFixed(6)), 1000);
     eq('complex: a three-way split yields three slices', slices.length, 3);
+    // ⚠ The cleanse loop reads these slices, not the raw breakdown keys — a
+    // molten bolt is half fire and must still melt Chilled. Pinned because
+    // retyping Pyroblast fire -> molten is exactly what would have broken it.
+    eq('complex: an expanded slice still carries its sub-name for tag matching',
+       F3.expandAffinitySlices({ molten: 500 }, { molten: { fire: 50, metal: 50 } })
+         .map(s => s.key).sort().join(','), 'fire,metal');
   }
 
   // ── AFFINITY TYPING IS DERIVED FROM TAGS (ruled 2026-08-24) ──

@@ -63,7 +63,7 @@ import { registerSummonHud } from './canvas/summon-hud.mjs';
 import { registerMovementHud } from './canvas/movement-hud.mjs';
 import { CelerityCombatTracker, installAopTurnMarkerPatch } from './apps/celerity-combat-tracker.mjs';
 import { resolveDamage, durabilityDamage, applyMarkBonus } from './systems/damage.mjs';
-import { affinityAnswer } from './helpers/formulas.mjs';
+import { affinityAnswer, expandAffinitySlices } from './helpers/formulas.mjs';
 
 /* -------------------------------------------- */
 /*  Debuff Helpers                              */
@@ -2603,9 +2603,15 @@ Hooks.on('renderChatMessageHTML', (message, html) => {
       // incoming damage that matches a debuff's cleanse-affinity strips
       // ONE stack of that debuff. Hardcoded mapping for now (chilled ←
       // fire); promote to CONFIG once we have more pairings.
+      //
+      // ⚠ Reads the EXPANDED slices, not the raw breakdown keys: a molten
+      // bolt is half fire and must still melt Chilled. Retyping John's
+      // Pyroblast from `fire` to `molten` (2026-08-26) is exactly the case
+      // that would otherwise have silently stopped cleansing.
       const cleanseByAffinity = { fire: ['chilled'] };
       const cleansedReports = [];
-      for (const [aff, sliceVal] of Object.entries(affinityBreakdown)) {
+      for (const { key: aff, amount: sliceVal } of
+           expandAffinitySlices(affinityBreakdown, affinityComposition)) {
         if ((Number(sliceVal) || 0) <= 0) continue;
         const cleansableDebuffTypes = cleanseByAffinity[aff];
         if (!cleansableDebuffTypes) continue;
