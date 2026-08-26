@@ -52,6 +52,20 @@ export class AspectsofPowerItemSheet extends foundry.applications.api.Handlebars
     options.parts = [this.item.type];
   }
 
+  /**
+   * Per-type starting size. A recipe row carries six controls side by side;
+   * at the shared 520px default they measured 79px each and the ingredient
+   * name truncated to "Skysteel In...". Only the initial size — the window is
+   * resizable and Foundry remembers what the user drags it to.
+   */
+  _initializeApplicationOptions(options) {
+    const opts = super._initializeApplicationOptions(options);
+    if (options.document?.type === 'recipe') {
+      opts.position = { ...opts.position, width: 680, height: 620 };
+    }
+    return opts;
+  }
+
   /* -------------------------------------------- */
 
   /** @override */

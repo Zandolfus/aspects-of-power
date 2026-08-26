@@ -94,25 +94,33 @@
         </summary>
         <div class='aop-section-body'>
           <div class='equip-section-header flexrow'>
-            <p class='hint'>Quantity is the MINIMUM. Supplying more raises quality on a
-            diminishing curve (capped at x{{@root.config.recipeTuning.overpourCap}}), and
-            ingredient quality is the quantity-weighted MEAN of what went in — so padding a
-            bill with junk drags the result down rather than up.</p>
+            <h4>Bill of materials</h4>
             <a class='recipe-input-add' title='Add Ingredient'><i class='fas fa-plus'></i></a>
           </div>
+          <p class='hint'>Quantity is the MINIMUM. Supplying more raises quality on a
+          diminishing curve (capped at x{{@root.config.recipeTuning.overpourCap}}), and
+          ingredient quality is the quantity-weighted MEAN of what went in — so padding a
+          bill with junk drags the result down rather than up.</p>
           <div class='recipe-input-list'>
             {{#each system.inputs as |row idx|}}
+              {{! ⚠ `row.material`, NOT `../row.material`. A block param is
+                  lexically visible inside the nested each; the `../` form
+                  resolved to nothing, so both selects rendered as their empty
+                  placeholder while real data sat behind them — and because the
+                  collector rebuilds rows from the DOM, the next edit to ANY
+                  field in the row would have silently WIPED material+element.
+                  Caught only by screenshotting the sheet. }}
               <div class='recipe-input-row flexrow' data-index='{{idx}}'>
                 <select class='recipe-input-material' data-index='{{idx}}'>
                   <option value=''>(any kind)</option>
                   {{#each @root.config.materialTypes as |label mKey|}}
-                    <option value='{{mKey}}' {{#if (eq mKey ../row.material)}}selected{{/if}}>{{localize label}}</option>
+                    <option value='{{mKey}}' {{#if (eq mKey row.material)}}selected{{/if}}>{{localize label}}</option>
                   {{/each}}
                 </select>
                 <select class='recipe-input-element' data-index='{{idx}}'>
                   <option value=''>(any element)</option>
                   {{#each @root.config.craftElements as |elDef elKey|}}
-                    <option value='{{elKey}}' {{#if (eq elKey ../row.element)}}selected{{/if}}>{{localize elDef.label}}</option>
+                    <option value='{{elKey}}' {{#if (eq elKey row.element)}}selected{{/if}}>{{localize elDef.label}}</option>
                   {{/each}}
                 </select>
                 <input type='text' class='recipe-input-name' data-index='{{idx}}'
