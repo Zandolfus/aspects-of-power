@@ -2571,13 +2571,22 @@ Hooks.on('renderChatMessageHTML', (message, html) => {
       try {
         affinityBreakdown = btn.dataset.damageBreakdown ? JSON.parse(btn.dataset.damageBreakdown) : {};
       } catch (_) { affinityBreakdown = {}; }
+      // Complex-affinity decompositions, stamped by the CASTER at post time.
+      // Read from the card rather than re-derived from the attacker so a blow
+      // already in the air cannot be retyped by editing the actor.
+      let affinityComposition = {};
+      try {
+        affinityComposition = btn.dataset.affinityComposition
+          ? JSON.parse(btn.dataset.affinityComposition) : {};
+      } catch (_) { affinityComposition = {}; }
       // Both halves of the target's affinity answer — SAME helper the card
       // preview calls, so the number shown and the number applied cannot
       // drift ("card preview IS the pipeline").
       const _aff = affinityAnswer(
         affinityBreakdown, incomingDmg,
         target.system.damageReduction?.affinities ?? {},
-        target.system.affinityMultipliers ?? {});
+        target.system.affinityMultipliers ?? {},
+        affinityComposition);
       const affinityResistTotal = _aff.resist;
       const affinityResistParts = _aff.resistLabel ? [_aff.resistLabel] : [];
       const affinityMult = _aff.mult;

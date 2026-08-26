@@ -13,6 +13,7 @@ import { stackDamageMultiplier, spendableRange, clampSpread, getStackCount, getS
 import { resolveCoInvest } from '../systems/co-invest.mjs';
 import { handleSpread, handleTransfer, handleConsume, handleHarness, onCurseCast, ventAllCurse, meterValue as curseMeterValue, spendPriceFor, spendCurse, equippedCursedVessel } from '../systems/curse.mjs';
 import { equippedTome, tomeSeizeCapFor, tomeBinding, castAffinities } from '../systems/implements.mjs';
+import { compositionsFor } from '../systems/affinity.mjs';
 import { resolveDamage } from '../systems/damage.mjs';
 
 /**
@@ -2679,6 +2680,7 @@ export class AspectsofPowerItem extends Item {
     // through the existing armor/DR/barrier pipeline unchanged.
     let damageBreakdownAttr = '';
     let _previewBreakdown = {};
+    let _previewComp = {};
     {
       const equipped = this.actor?.system?.equippedDamageBonus ?? 0;
       const breakdownRaw = this.actor?.system?.equippedDamageBonusByAffinity ?? {};
@@ -2736,6 +2738,15 @@ export class AspectsofPowerItem extends Item {
         damageBreakdownAttr = ` data-damage-breakdown='${JSON.stringify(scaled)}'`;
       }
       _previewBreakdown = scaled;
+      // Complex affinities: how THIS CASTER decomposes the names in the
+      // breakdown. Rides the card so the apply click answers the blow the
+      // caster actually threw — an actor edited between post and apply must
+      // not silently retype a spell already in the air. Absent for every
+      // atomic cast, which is nearly all of them.
+      _previewComp = compositionsFor(this.actor, Object.keys(scaled));
+      if (Object.keys(_previewComp).length > 0) {
+        damageBreakdownAttr += ` data-affinity-composition='${JSON.stringify(_previewComp)}'`;
+      }
     }
 
     // Barrier absorbs before armor/veil — it takes raw (post-defense-pool) damage.
@@ -2754,7 +2765,8 @@ export class AspectsofPowerItem extends Item {
     const _affPreview = affinityAnswer(
       _previewBreakdown, afterDefense,
       targetActor.system.damageReduction?.affinities ?? {},
-      targetActor.system.affinityMultipliers ?? {});
+      targetActor.system.affinityMultipliers ?? {},
+      _previewComp);
     const _affResistPreview = _affPreview.resist;
     // Marks fold into the PREVIEW final (ruled 2026-08-22: "it should
     // appear in the card in damage prior to the apply (no surprises)") —

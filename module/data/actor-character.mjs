@@ -173,6 +173,16 @@ export class CharacterData extends foundry.abstract.TypeDataModel {
       // constitution IS one. INTRINSIC — never derived from equipment.
       affinityMultipliers: new fields.ObjectField({ initial: () => ({}) }),
 
+      // ── COMPLEX AFFINITIES (ruled 2026-08-24, built 2026-08-25) ──
+      // { solar: { light: 50, fire: 30, life: 20 } } — how THIS actor's
+      // magic decomposes a named affinity into weighted slices. THE ONLY
+      // source: there is no world default, because the same word means
+      // different things to different casters ("a desert native's Solar is
+      // light/fire/death; an earth native's is light/fire/life"). A name
+      // absent here is ATOMIC. CONFIG.complexAffinityPresets is an authoring
+      // menu copied in here, never a fallback.
+      complexAffinities: new fields.ObjectField({ initial: () => ({}) }),
+
       // Reactions per round (usually 1). Resets at start of combatant's turn.
       reactions: new fields.SchemaField({
         value: new fields.NumberField({ initial: 1, min: 0, integer: true }),

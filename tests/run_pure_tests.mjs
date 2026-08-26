@@ -2695,6 +2695,41 @@ eq('junk situational entries are skipped, not NaN',
   eq('orb: five basics sit under it', F3.orbChargeAfterBank(520, 130, 700), 650);
   eq('orb: a spend leaves the remainder', 780 > 700 ? 700 - 230 : 0, 470);
   eq('orb: no cap configured means no clamp', F3.orbChargeAfterBank(900, 130, 0), 1030);
+
+  // ── PROFESSION MANA-INVEST (ruled 2026-08-23, built 2026-08-25) ──
+  // "Mana counts both as a quality thing and a minimum requirement."
+  // Crystalcraft is the first recipe: a floor of 25.
+  {
+    const CM = { invest: { curveExponent: 0.5 }, craftMana: { qualityCap: 2.0 } };
+    // Working at the minimum is NEUTRAL — the same shape as casting a spell
+    // at base cost. If this ever drifts off 1 the floor has become a bonus.
+    eq('craft-mana: the minimum is neutral', F3.craftManaQuality(25, 25, CM), 1);
+    eq('craft-mana: 2x the floor buys sqrt(2)',
+       Number(F3.craftManaQuality(50, 25, CM).toFixed(4)), 1.4142);
+    eq('craft-mana: the cap is reached at 4x the floor (25 -> 100)',
+       F3.craftManaQuality(100, 25, CM), 2);
+    eq('craft-mana: dumping the whole pool cannot beat the cap',
+       F3.craftManaQuality(900, 25, CM), 2);
+    // The floor IS the yardstick: a recipe tunes its own band by its minimum,
+    // which is why there is no second per-recipe dial.
+    eq('craft-mana: a bigger floor costs proportionally more to max',
+       F3.craftManaQuality(400, 100, CM), 2);
+    eq('craft-mana: below the ratio, a bigger floor buys less',
+       F3.craftManaQuality(100, 100, CM) < F3.craftManaQuality(100, 25, CM), true);
+    // ⚠ THE NEGATIVE CONTROL: a recipe with no mana element is untouched, and
+    // so is a zero invest. Every profession skill in the world today is here.
+    eq('craft-mana: no mana element is exactly neutral', F3.craftManaQuality(500, 0, CM), 1);
+    eq('craft-mana: zero invested is exactly neutral', F3.craftManaQuality(0, 25, CM), 1);
+    // Under-investing can never SHRINK the work — the floor gate refuses the
+    // attempt outright, so this path must not become a penalty by accident.
+    eq('craft-mana: under the floor still floors at 1', F3.craftManaQuality(1, 25, CM), 1);
+    // The shipped dials, pinned.
+    eq('craft-mana: shipped cap 2.0',
+       Number(/qualityCap:\s*([\d.]+)/.exec(src)?.[1]), 2.0);
+    eq('craft-mana: rides invest.curveExponent, not a private curve',
+       F3.craftManaQuality(100, 25, { invest: { curveExponent: 0.5 }, craftMana: { qualityCap: 99 } }),
+       Math.pow(4, 0.5));
+  }
   // ⚠⚠ THE ORB BUYS TIME, NEVER MANA (ruled 2026-08-24: "Mana should never
   // be created via orb"). The discharge branch must NOT zero the cast's
   // cost — that was net creation (six 20-mana basics bought a 500-mana
@@ -2769,6 +2804,65 @@ eq('junk situational entries are skipped, not NaN',
     const viaHandler = DM.resolveDamage({ ...base, incoming: 500,
       affinityResist: ans.resist, affinityMult: ans.mult }).hpLoss;
     eq('affinityAnswer: preview and apply cannot drift', viaPreview, viaHandler);
+  }
+
+  // ── COMPLEX AFFINITIES (ruled 2026-08-24, built 2026-08-25) ──
+  // "Solar (Life) = {light 50, fire 30, life 20}. Damage slices by weight;
+  // each slice takes the MOST SPECIFIC multiplier available. A full match IE
+  // Solar attack into a Solar weakness should be a full weakness."
+  {
+    const SOLAR = { solar: { light: 50, fire: 30, life: 20 } };
+    const hit   = { solar: 1000 };
+
+    // THE HEADLINE RULING: the name covers every slice, so a name-level
+    // weakness lands undiluted. If this ever reads 1.0 the fallback is dead.
+    eq('complex: a full name match is a FULL weakness (undiluted)',
+       Number(F3.affinityAnswer(hit, 1000, {}, { solar: 1.25 }, SOLAR).mult.toFixed(4)), 1.25);
+    // A sub-only weakness bites only its share: 0.3 x 1.5 + 0.7 x 1 = 1.15.
+    eq('complex: a sub-only weakness bites only its share',
+       Number(F3.affinityAnswer(hit, 1000, {}, { fire: 1.5 }, SOLAR).mult.toFixed(4)), 1.15);
+    // Both present: fire takes 1.5, the other 70% take solar's 1.25 = 1.325.
+    // No double-counting BY CONSTRUCTION — slice once, answer each slice once.
+    eq('complex: specificity wins per slice, no double-count',
+       Number(F3.affinityAnswer(hit, 1000, {}, { solar: 1.25, fire: 1.5 }, SOLAR).mult.toFixed(4)), 1.325);
+    // Specificity by ?? and not by truthiness: an explicit 1 on a sub is a
+    // deliberate "neutral to me" and SHIELDS that slice from the parent.
+    eq('complex: an explicit sub-neutral shields its slice',
+       Number(F3.affinityAnswer(hit, 1000, {}, { solar: 1.25, fire: 1 }, SOLAR).mult.toFixed(4)), 1.175);
+    // ⚡ THE EMERGENT PROPERTY: a pure specialist out-damages the generalist
+    // into a shared weakness — no hand-tuning anywhere.
+    eq('complex: the specialist beats the generalist into a fire weakness',
+       F3.affinityAnswer({ fire: 1000 }, 1000, {}, { fire: 1.5 }).mult
+       > F3.affinityAnswer(hit, 1000, {}, { fire: 1.5 }, SOLAR).mult, true);
+
+    // FLAT (wall) pair: the parent's flat is spread by weight, so a full
+    // match contributes the authored number ONCE — not once per slice.
+    eq('complex: a parent flat is spread, never multiplied by slice count',
+       F3.affinityAnswer(hit, 1000, { solar: 300 }, {}, SOLAR).resist, 300);
+    // An own-key flat wins on its slice and is NOT reduced by the weight.
+    eq('complex: a sub flat lands in full on its own slice',
+       F3.affinityAnswer(hit, 1000, { fire: 200 }, {}, SOLAR).resist, 200);
+
+    // Weights are proportional, not required to sum to 100.
+    eq('complex: weights are normalised, not assumed to total 100',
+       Number(F3.affinityAnswer({ molten: 1000 }, 1000, {}, { fire: 2 },
+         { molten: { fire: 1, metal: 1 } }).mult.toFixed(4)), 1.5);
+
+    // ⚠ THE NEGATIVE CONTROL. No composition = byte-identical to the atomic
+    // path, which is what every existing cast in the world still does.
+    const atomic = F3.affinityAnswer({ fire: 300, ice: 200 }, 500, { fire: 100 }, { fire: 1.5 });
+    const withEmpty = F3.affinityAnswer({ fire: 300, ice: 200 }, 500, { fire: 100 }, { fire: 1.5 }, {});
+    eq('complex: no composition is byte-identical to the atomic path',
+       JSON.stringify(atomic), JSON.stringify(withEmpty));
+    // An undefined name in the compMap is atomic too (nothing to expand).
+    eq('complex: an unlisted name stays atomic',
+       F3.affinityAnswer({ fire: 500 }, 500, {}, { fire: 1.5 }, SOLAR).mult, 1.5);
+    // Slices sum back to the parent — the guard against rounding drift on a
+    // three-way split.
+    const slices = F3.expandAffinitySlices(hit, SOLAR);
+    eq('complex: slices sum back to the parent amount',
+       Number(slices.reduce((s, x) => s + x.amount, 0).toFixed(6)), 1000);
+    eq('complex: a three-way split yields three slices', slices.length, 3);
   }
 
   // ── AFFINITY TYPING IS DERIVED FROM TAGS (ruled 2026-08-24) ──

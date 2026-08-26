@@ -2045,6 +2045,33 @@ export function resolveCurseFillScale(skillScale, vesselLevel, cfg) {
 }
 
 /**
+ * PROFESSION MANA-INVEST quality multiplier (ruled 2026-08-23: "mana counts
+ * both as a quality thing and a minimum requirement").
+ *
+ * (invested / minimum) ^ invest.curveExponent, floored at 1 and capped by
+ * craftMana.qualityCap. Normalising by the recipe's OWN minimum is the same
+ * move the magic rebuild made for spells (push measured against the spell's
+ * own base cost, not a fixed number): working at the minimum is NEUTRAL, and
+ * a recipe tunes its own band by its floor instead of by a second dial.
+ *
+ * Returns exactly 1 when the recipe has no mana element, so every profession
+ * skill that does not declare one is untouched.
+ *
+ * @param {number} invested  mana actually poured in
+ * @param {number} minMana   tagConfig.craftMinMana
+ * @returns {number} multiplier on the craft's progress contribution
+ */
+export function craftManaQuality(invested, minMana, cfg = null) {
+  const sc = cfg ?? (globalThis.CONFIG?.ASPECTSOFPOWER ?? {});
+  const min = Math.max(0, Number(minMana) || 0);
+  const inv = Math.max(0, Number(invested) || 0);
+  if (min <= 0 || inv <= 0) return 1;
+  const cap = Number(sc.craftMana?.qualityCap);
+  return Math.min(Number.isFinite(cap) && cap >= 1 ? cap : 2.0,
+                  Math.max(1, Math.pow(inv / min, investCurve(sc))));
+}
+
+/**
  * A tome's seize cap (ruled 2026-08-24: "based on item progress but rarity
  * should play into it") — the largest rolled magnitude the book can catch
  * out of the air. progress x the rarity's multiplier, floored at 0.
@@ -2075,39 +2102,96 @@ export function tomeSeizeCap(progress, rarityMult) {
  *          half-fire blow on a fire-vulnerable target takes half the swing.
  *          Untyped remainder stays neutral by construction.
  *
+ * ── COMPLEX AFFINITIES (2026-08-25) ──
+ * `compMap` decomposes named affinities into weighted slices
+ * ({ solar: { light: 50, fire: 30, life: 20 } }, from the CASTER). Each
+ * resulting slice takes the MOST SPECIFIC answer the target has —
+ * `target[sub] ?? target[name] ?? neutral` — so a full name match is a FULL
+ * weakness while a sub-only weakness bites only its share. Passing no compMap
+ * reproduces the atomic behaviour byte-for-byte, which is what every existing
+ * cast still does.
+ *
  * @param {object} breakdown  { affinity: damageAmount } for this hit
  * @param {number} incoming   total damage the breakdown slices
  * @param {object} drMap      target's damageReduction.affinities
  * @param {object} multMap    target's affinityMultipliers
+ * @param {object} compMap    caster's complex-affinity decompositions
  * @returns {{resist:number, resistLabel:string, mult:number, multLabel:string}}
  */
-export function affinityAnswer(breakdown, incoming, drMap = {}, multMap = {}) {
+export function affinityAnswer(breakdown, incoming, drMap = {}, multMap = {}, compMap = {}) {
   let resist = 0, weighted = 0, typedShare = 0;
   const rParts = [], mParts = [];
   const total = Math.max(0, Number(incoming) || 0);
-  for (const [aff, raw] of Object.entries(breakdown ?? {})) {
-    const slice = Math.max(0, Number(raw) || 0);
-    if (slice <= 0) continue;
-    const dr = Number(drMap?.[aff]) || 0;
+  for (const slice of expandAffinitySlices(breakdown, compMap)) {
+    const { key, parent, amount, weight, label } = slice;
+
+    // ── FLAT (the wall pair) ──
+    // Own key wins outright; otherwise the PARENT's flat is spread across its
+    // slices by weight, so a full match contributes exactly the authored
+    // number ONCE rather than once per slice. (A sub authored to literally 0
+    // reads as absent and still inherits — 0 is the neutral value here.)
+    let dr = Number(drMap?.[key]) || 0;
+    if (dr === 0 && parent) dr = (Number(drMap?.[parent]) || 0) * weight;
     if (dr !== 0) {
-      const applied = Math.sign(dr) * Math.min(Math.abs(dr), slice);
+      const applied = Math.sign(dr) * Math.min(Math.abs(dr), amount);
       resist += applied;
-      rParts.push(`${aff}: ${applied > 0 ? '−' : '+'}${Math.abs(applied)}`);
+      rParts.push(`${label}: ${applied > 0 ? '−' : '+'}${Math.round(Math.abs(applied))}`);
     }
-    const m = Number(multMap?.[aff]);
+
+    // ── MULTIPLICATIVE (the constitution pair) ──
+    // Specificity by `??`, not by truthiness: a sub explicitly set to 1 is a
+    // deliberate "this slice is neutral to me" and SHIELDS that slice from
+    // the parent's multiplier.
+    let m = Number(multMap?.[key]);
+    if (!Number.isFinite(m) && parent) m = Number(multMap?.[parent]);
     if (Number.isFinite(m) && m >= 0 && m !== 1 && total > 0) {
-      const share = Math.min(1, slice / total);
+      const share = Math.min(1, amount / total);
       weighted += (m - 1) * share;
       typedShare += share;
-      mParts.push(`${aff} x${m}`);
+      mParts.push(`${label} x${m}`);
     }
   }
   return {
-    resist,
+    resist: Math.round(resist),
     resistLabel: rParts.join(', '),
     mult: typedShare > 0 ? Math.max(0, 1 + weighted) : 1,
     multLabel: mParts.join(', '),
   };
+}
+
+/**
+ * Slice one damage breakdown into the pieces the target actually answers.
+ *
+ * An atomic affinity is one slice carrying its own name. A complex one is N
+ * slices carrying their sub-names and remembering their parent, split by the
+ * composition's weights (normalised, so authored weights need not sum to
+ * 100). Amounts stay fractional on purpose — rounding per slice would let a
+ * three-way split drift off the parent total.
+ *
+ * @returns {Array<{key:string, parent:string|null, amount:number,
+ *                  weight:number, label:string}>}
+ */
+export function expandAffinitySlices(breakdown, compMap = {}) {
+  const out = [];
+  for (const [aff, raw] of Object.entries(breakdown ?? {})) {
+    const amount = Math.max(0, Number(raw) || 0);
+    if (amount <= 0) continue;
+    const comp = compMap?.[aff];
+    const parts = comp
+      ? Object.entries(comp).filter(([, w]) => Number(w) > 0)
+      : [];
+    const totalWeight = parts.reduce((s, [, w]) => s + Number(w), 0);
+    if (!parts.length || totalWeight <= 0) {
+      out.push({ key: aff, parent: null, amount, weight: 1, label: aff });
+      continue;
+    }
+    for (const [sub, w] of parts) {
+      const weight = Number(w) / totalWeight;
+      out.push({ key: sub, parent: aff, amount: amount * weight, weight,
+                 label: `${aff}/${sub}` });
+    }
+  }
+  return out;
 }
 
 /**

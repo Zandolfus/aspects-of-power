@@ -2764,10 +2764,10 @@ ASPECTSOFPOWER.affinities = {
   // ── Authored craftElements (preserved verbatim; 'air' key → 'wind') ──
   fire:        { label: 'ASPECTSOFPOWER.Affinity.fire',        materialStats: ['strength', 'vitality', 'dexterity'],       opposed: ['ice', 'water'],      lane: 'elemental' },
   earth:       { label: 'ASPECTSOFPOWER.Affinity.earth',       materialStats: ['strength', 'endurance', 'vitality'],       opposed: ['lightning', 'wind'], lane: 'elemental' },
-  water:       { label: 'ASPECTSOFPOWER.Affinity.water',       materialStats: ['wisdom', 'willpower', 'endurance'],        opposed: ['fire'],              lane: 'elemental' },
+  water:       { label: 'ASPECTSOFPOWER.Affinity.water',       materialStats: ['wisdom', 'willpower', 'endurance'],        opposed: ['fire', 'molten'],    lane: 'elemental' },
   wind:        { label: 'ASPECTSOFPOWER.Affinity.wind',        materialStats: ['dexterity', 'endurance', 'perception'],    opposed: ['earth'],             lane: 'elemental' },
   lightning:   { label: 'ASPECTSOFPOWER.Affinity.lightning',   materialStats: ['dexterity', 'perception', 'vitality'],     opposed: ['earth'],             lane: 'elemental' },
-  ice:         { label: 'ASPECTSOFPOWER.Affinity.ice',         materialStats: ['intelligence', 'perception', 'toughness'], opposed: ['fire', 'heat'],      lane: 'elemental' },
+  ice:         { label: 'ASPECTSOFPOWER.Affinity.ice',         materialStats: ['intelligence', 'perception', 'toughness'], opposed: ['fire', 'heat', 'molten'], lane: 'elemental' },
   lunar:       { label: 'ASPECTSOFPOWER.Affinity.lunar',       materialStats: ['intelligence', 'willpower', 'wisdom'],     opposed: ['solar'],             lane: 'elemental' },
   solar:       { label: 'ASPECTSOFPOWER.Affinity.solar',       materialStats: ['vitality', 'perception', 'endurance'],     opposed: ['lunar'],             lane: 'elemental' },
   space:       { label: 'ASPECTSOFPOWER.Affinity.space',       materialStats: ['perception', 'willpower', 'endurance'],    opposed: [],                    lane: 'elemental' },
@@ -2778,12 +2778,51 @@ ASPECTSOFPOWER.affinities = {
   shadow:      { label: 'ASPECTSOFPOWER.Affinity.shadow',      materialStats: ['dexterity', 'perception', 'strength'],     opposed: ['light', 'holy'],     lane: 'elemental' },
   nature:      { label: 'ASPECTSOFPOWER.Affinity.nature',      materialStats: ['vitality', 'wisdom', 'toughness'],         opposed: ['necromantic'],       lane: 'elemental' },
   poison:      { label: 'ASPECTSOFPOWER.Affinity.poison',      materialStats: ['dexterity', 'intelligence', 'vitality'],   opposed: ['holy'],              lane: 'elemental' },
-  necromantic: { label: 'ASPECTSOFPOWER.Affinity.necromantic', materialStats: ['intelligence', 'toughness', 'willpower'],  opposed: ['nature', 'holy'],    lane: 'hybrid' },
+  necromantic: { label: 'ASPECTSOFPOWER.Affinity.necromantic', materialStats: ['intelligence', 'toughness', 'willpower'],  opposed: ['nature', 'holy', 'life'], lane: 'hybrid' },
   holy:        { label: 'ASPECTSOFPOWER.Affinity.holy',        materialStats: ['willpower', 'wisdom', 'toughness'],        opposed: ['necromantic', 'shadow', 'blood', 'poison'], lane: 'hybrid' },
   light:       { label: 'ASPECTSOFPOWER.Affinity.light',       materialStats: ['perception', 'wisdom', 'willpower'],       opposed: ['shadow'],            lane: 'elemental' },
   psychic:     { label: 'ASPECTSOFPOWER.Affinity.psychic',     materialStats: ['willpower', 'intelligence', 'perception'], opposed: [],                    lane: 'mental' },
   time:        { label: 'ASPECTSOFPOWER.Affinity.time',        materialStats: ['wisdom', 'intelligence', 'dexterity'],     opposed: [],                    lane: 'hybrid' },
   karma:       { label: 'ASPECTSOFPOWER.Affinity.karma',       materialStats: ['wisdom', 'intelligence', 'toughness'],     opposed: [],                    lane: 'hybrid' },
+  // ── Complex-affinity vocabulary (2026-08-25) ──
+  // These are ordinary dictionary entries — craftable, taggable, and
+  // targetable by a weakness like any other. What makes them "complex" is
+  // that `complexAffinities` below decomposes them into weighted slices.
+  // `life` also exists in its own right as necromantic's true opposite (the
+  // healing element), and is the third of Solar's slices.
+  molten:      { label: 'ASPECTSOFPOWER.Affinity.molten',      materialStats: ['strength', 'toughness', 'dexterity'],      opposed: ['ice', 'water'],      lane: 'elemental' },
+  life:        { label: 'ASPECTSOFPOWER.Affinity.life',        materialStats: ['vitality', 'wisdom', 'willpower'],         opposed: ['necromantic'],       lane: 'hybrid' },
+};
+
+/**
+ * COMPLEX AFFINITY PRESETS — authoring starting points ONLY (ruled
+ * 2026-08-24/25).
+ *
+ * ⚠⚠ THE PIPELINE NEVER READS THIS. A complex affinity lives on the ACTOR
+ * (`actor.system.complexAffinities`), and that is the whole point of the
+ * ruling: "the name may be shared between affinities but have different
+ * sub-affinities" — a desert native's Solar is light/fire/DEATH where an
+ * earth native's is light/fire/LIFE. If this were a world default, every
+ * existing solar- or lunar-typed skill in the world would silently
+ * re-decompose for actors nobody had touched. It is a menu, not a fallback:
+ * an authoring flow copies a row onto an actor, and only what is ON the actor
+ * has any effect. A name the actor does not define stays ATOMIC.
+ *
+ * Weights are proportional (normalised at read time; authoring them to 100
+ * just keeps them readable).
+ *
+ * MATCHING (see formulas.affinityAnswer): damage slices by weight, and each
+ * slice takes the MOST SPECIFIC answer the target has —
+ * `target[sub] ?? target[name] ?? neutral`. Because the NAME covers every
+ * slice, a full match is a FULL weakness (solar x1.25 against a solar cast is
+ * 1.25 flat, undiluted), while a fire-only weakness bites only the fire
+ * share. No double-counting is possible: the blow is sliced once and each
+ * slice is answered once.
+ */
+ASPECTSOFPOWER.complexAffinityPresets = {
+  molten: { fire: 50, metal: 50 },
+  solar:  { light: 50, fire: 30, life: 20 },
+  lunar:  { light: 50, water: 30, ice: 20 },
 };
 
 /**
@@ -2989,6 +3028,28 @@ ASPECTSOFPOWER.craftElements = Object.fromEntries([
   ),
   ['neutral', { stats: [], label: 'ASPECTSOFPOWER.CraftElement.neutral' }],
 ]);
+
+/**
+ * PROFESSION MANA-INVEST (ruled 2026-08-23, built 2026-08-25): "some
+ * profession recipes require mana as an element. Mana counts both as a
+ * quality thing and a minimum requirement."
+ *
+ * The recipe declares its own floor (`tagConfig.craftMinMana`); investing
+ * above it multiplies the work's quality on `invest.curveExponent` (0.5, the
+ * same curve every other invest in the game runs), normalised by that floor.
+ * Casting at the minimum is therefore NEUTRAL — the same shape as a spell
+ * cast at base cost — and the floor doubles as the recipe's yardstick rather
+ * than needing a second per-recipe dial.
+ *
+ * qualityCap 2.0 is reached at 4x the minimum (Crystalcraft: 25 -> 100 mana),
+ * which is the band the choice actually lives in. ⚠ FIRST-PASS DIAL, WATCH
+ * IT: crafting is downtime, so the only real price on repeating a maxed
+ * invest is the mana pool itself. Raising a recipe's minimum raises the cost
+ * of reaching the cap proportionally — that is the authoring lever.
+ */
+ASPECTSOFPOWER.craftMana = {
+  qualityCap: 2.0,
+};
 
 /**
  * Quality thresholds for crafted items (progress → quality).

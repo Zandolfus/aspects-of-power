@@ -52,6 +52,13 @@ export class NpcData extends foundry.abstract.TypeDataModel {
       // must not overwrite it.
       affinityMultipliers: new fields.ObjectField({ initial: () => ({}) }),
 
+      // ── COMPLEX AFFINITIES (ruled 2026-08-24, built 2026-08-25) ──
+      // { solar: { light: 50, fire: 30, life: 20 } } — how THIS actor's magic
+      // decomposes a named affinity. THE ONLY source; a name absent here is
+      // ATOMIC (no world default, by ruling). CONFIG.complexAffinityPresets
+      // is an authoring menu, not a fallback — see it for the matching rule.
+      complexAffinities: new fields.ObjectField({ initial: () => ({}) }),
+
       // Race rank drives the vitality modifier multiplier in derivation.
       attributes: new fields.SchemaField({
         race: new fields.SchemaField({

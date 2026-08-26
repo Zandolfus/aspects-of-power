@@ -9,10 +9,88 @@
  * byte-identical to its previous class-body form (no object-literal comma
  * surgery); the export collects the prototype methods into a plain mixin.
  */
-import { hybridAbilityMod, itemWeightLb } from '../helpers/formulas.mjs';
+import { hybridAbilityMod, itemWeightLb, craftManaQuality } from '../helpers/formulas.mjs';
 import { spatialCapacityFromCraft } from '../helpers/formulas.mjs';
 
 class CraftingSkills {
+  /**
+   * PROFESSION MANA-INVEST (ruled 2026-08-23: "should act like rituals do:
+   * some profession 'recipes' require mana as an element. Mana counts both as
+   * a quality thing and a minimum requirement").
+   *
+   * One collector for every profession handler, so craft and gather can never
+   * disagree about what the mana element costs or buys. Inert — returns a
+   * neutral answer without a single dialog — on any recipe that does not
+   * declare `tagConfig.craftMinMana`, which is all of them today.
+   *
+   * The mana is SPENT HERE, at the moment the work begins, exactly as the
+   * ritual spends it: a botched craft does not give it back. Callers must
+   * therefore call this only once the player can no longer cancel out.
+   *
+   * `probe` answers only "could this be attempted at all", with no dialog and
+   * no spend — so a handler can refuse at the door instead of walking the
+   * player through four pickers first, without a second copy of the rule.
+   *
+   * @returns {Promise<{invested:number, mult:number, line:string}|null>}
+   *          null = the attempt is off (too little mana, or cancelled); the
+   *          caller returns without consuming anything else.
+   */
+  async _collectProfessionMana(item, actor, speaker, rollMode, { probe = false } = {}) {
+    const minMana = Math.max(0, Math.round(Number(item.system?.tagConfig?.craftMinMana) || 0));
+    if (minMana <= 0) return { invested: 0, mult: 1, line: '' };
+
+    const pool = Math.round(Number(actor.system?.mana?.value) || 0);
+    if (pool < minMana) {
+      ChatMessage.create({ speaker, rollMode,
+        content: `<p><em>${actor.name} needs at least ${minMana} mana to work ${item.name} `
+               + `(has ${pool}). Nothing consumed.</em></p>` });
+      return null;
+    }
+    if (probe) return { invested: 0, mult: 1, line: '' };
+
+    const cap = Number(CONFIG.ASPECTSOFPOWER.craftMana?.qualityCap ?? 2);
+    const result = await foundry.applications.api.DialogV2.wait({
+      window: { title: `${item.name} — Mana` },
+      content: `<div class="form-group">
+          <label>Mana to invest (${minMana} – ${pool})</label>
+          <input type="number" name="manaInvest" value="${minMana}" min="${minMana}" max="${pool}" step="1" />
+          <p class="hint">The recipe needs ${minMana}. More mana raises the quality of the
+          work on a diminishing curve, up to x${cap.toFixed(2)}. Spent either way.</p>
+        </div>`,
+      buttons: [
+        { action: 'ok', label: 'Invest', icon: 'fas fa-fire-flame-simple', default: true,
+          callback: (event, button, dialog) => {
+            // Read the live input, not the button's form — the pattern the
+            // ritual slider already proved in this file.
+            const inp = dialog.element.querySelector('[name="manaInvest"]');
+            return { mana: Number(inp?.value) };
+          } },
+        { action: 'cancel', label: 'Cancel' },
+      ],
+      close: () => 'cancel',
+    });
+    if (!result || result === 'cancel') return null;
+
+    const invested = Math.round(Number(result.mana));
+    if (!Number.isFinite(invested) || invested < minMana || invested > pool) {
+      ChatMessage.create({ speaker, rollMode,
+        content: `<p><em>${item.name} aborted: mana invest must be between ${minMana} and ${pool}.</em></p>` });
+      return null;
+    }
+
+    // Re-read the pool at the moment of the write — the dialog was open, and
+    // anything could have drained it in the meantime.
+    const live = Math.round(Number(actor.system?.mana?.value) || 0);
+    await actor.update({ 'system.mana.value': Math.max(0, live - invested) });
+
+    const mult = craftManaQuality(invested, minMana);
+    return {
+      invested, mult,
+      line: `<p><strong>Mana:</strong> ${invested} invested (min ${minMana}) — `
+          + `quality x${mult.toFixed(2)}</p>`,
+    };
+  }
+
   /**
    * Combined "Craft Setup" dialog: refine + prep selection with a live preview of expected outcome.
    * Replaces the old separate refine/prep offer dialogs in _handleCraftTag.
@@ -930,6 +1008,16 @@ class CraftingSkills {
     if (selectedElement === 'cancel') return;
     const element = selectedElement === 'none' ? '' : selectedElement;
 
+    // ── Mana element (inert unless the recipe declares one) ──
+    // The gather path is where a recipe that CONJURES its material rather
+    // than harvesting one lives (Crystalcraft): mana is the raw stock, so the
+    // floor is a real "you cannot do this at all" and the invest above it is
+    // the quality of the stone. Last gate before anything is spent.
+    const manaStep = await this._collectProfessionMana(item, actor, speaker, rollMode);
+    if (!manaStep) return;
+    const manaMult = manaStep.mult;
+    const manaLine = manaStep.line;
+
     // Profession augment bonuses from equipped profession gear (element-filtered).
     const gatherAugBonuses = actor.getProfessionAugmentBonuses(element);
     const gatherD100Bonus = gatherAugBonuses.d100Bonus || 0;
@@ -958,7 +1046,7 @@ class CraftingSkills {
     const d100Pct = effectiveD100 / 100;
 
     const skillRoll = Math.round(dmgRoll.total) + gatherSkillBonus;
-    const gatherProgress = Math.round(skillRoll * d100Pct) + gatherProgressBonus;
+    const gatherProgress = Math.round((Math.round(skillRoll * d100Pct) + gatherProgressBonus) * manaMult);
 
     // Failure check: d100 of 1 ruins the attempt.
     if (d100Roll.total <= 1) {
@@ -968,6 +1056,7 @@ class CraftingSkills {
           <h3>${item.name} — Gathering Failed</h3>
           <hr>
           <p><strong>Skill Roll:</strong> ${skillRoll}</p>
+          ${manaLine}
           <p><strong>d100:</strong> ${d100Roll.total} — <em>Critical failure! Materials ruined.</em></p>
         </div>`,
       });
@@ -1025,9 +1114,10 @@ class CraftingSkills {
       ? `${d100Roll.total} + ${d100Floor} = ${effectiveD100} (cap ${gatherRarityRange.ceiling})`
       : `${d100Roll.total} (cap ${gatherRarityRange.ceiling})`;
     const rawProgress = Math.round(skillRoll * d100Pct);
+    const gatherManaExpr = manaMult !== 1 ? ` × ${manaMult.toFixed(2)} (mana)` : '';
     const progressLine = gatherProgressBonus
-      ? `${skillRoll} × ${d100Pct.toFixed(2)} = ${rawProgress} + ${gatherProgressBonus} (augment) = ${gatherProgress}`
-      : `${skillRoll} × ${d100Pct.toFixed(2)} = ${gatherProgress}`;
+      ? `${skillRoll} × ${d100Pct.toFixed(2)} = ${rawProgress} + ${gatherProgressBonus} (augment)${gatherManaExpr} = ${gatherProgress}`
+      : `${skillRoll} × ${d100Pct.toFixed(2)}${gatherManaExpr} = ${gatherProgress}`;
 
     ChatMessage.create({
       speaker,
@@ -1041,6 +1131,7 @@ class CraftingSkills {
         <p><strong>d100:</strong> ${d100Line}</p>
         <p><strong>Progress:</strong> ${progressLine}</p>
         ${gatherAugLine}
+        ${manaLine}
         <p><em>Created: ${itemName}</em></p>
       </div>`,
     });
@@ -1392,6 +1483,11 @@ class CraftingSkills {
     const craftConfig = item.system.tagConfig;
     const isAlchemySkill = tags.includes('alchemy');
 
+    // Refuse at the door if the recipe has a mana element the crafter cannot
+    // meet — no point walking them through category/type/material first. The
+    // real collection happens after the setup dialog.
+    if (!await this._collectProfessionMana(item, actor, speaker, rollMode, { probe: true })) return;
+
     // Item type registry + skill's allowed types (empty = no restriction, back-compat).
     const itemTypesConfig = CONFIG.ASPECTSOFPOWER.craftItemTypes ?? {};
     const categoryDefs = CONFIG.ASPECTSOFPOWER.craftCategories ?? {};
@@ -1477,6 +1573,20 @@ class CraftingSkills {
         if (reworkChoice === 'cancel') return;
         reworkTarget = actor.items.get(reworkChoice);
         if (!reworkTarget) return;
+        // Refuse a maxed item HERE, before anything is spent. The same check
+        // still runs after the roll (it reads live state), but by then a
+        // mana-element recipe has already paid — and paying into a rework
+        // that was never going to move is not a cost anyone agreed to.
+        if ((reworkTarget.system.maxProgress ?? 0) > 0
+            && (reworkTarget.system.progress ?? 0) >= reworkTarget.system.maxProgress) {
+          ChatMessage.create({ speaker, rollMode,
+            content: `<div class="craft-result">
+              <h3>${item.name} — Rework Blocked</h3>
+              <hr>
+              <p><strong>${reworkTarget.name}</strong> is already at maximum potential (${reworkTarget.system.maxProgress}). No further improvement is possible.</p>
+            </div>` });
+          return;
+        }
         outputSlot = reworkTarget.system.slot;
         // No material for iterative — materialItem stays null.
       } else {
@@ -1553,6 +1663,15 @@ class CraftingSkills {
     if (combinedSetup === 'cancel' || combinedSetup === null || combinedSetup === undefined) return;
     const refineId = combinedSetup?.refineId ?? '';
     const prepId   = combinedSetup?.prepId ?? '';
+
+    // ── Mana element (inert unless the recipe declares one) ──
+    // Last gate before anything is spent or mutated: refine below rewrites
+    // the material, so the mana question has to be answered while backing out
+    // is still free.
+    const manaStep = await this._collectProfessionMana(item, actor, speaker, rollMode);
+    if (!manaStep) return;
+    const manaMult = manaStep.mult;
+    const manaLine = manaStep.line;
 
     // Accumulated pre-craft chat lines — injected into the final craft message.
     let refineLine = '';
@@ -1650,6 +1769,10 @@ class CraftingSkills {
     const profAugLine = augBonusParts.length
       ? `<p><strong>Profession Augments:</strong> ${augBonusParts.join(', ')}</p>`
       : '';
+    // Shown inline in the Total Progress sum so the arithmetic on the card
+    // still reconciles — a multiplied total with an unmultiplied sum beside it
+    // is the kind of card that gets reported as a bug.
+    const manaExpr = manaMult !== 1 ? ` × ${manaMult.toFixed(2)} (mana)` : '';
 
     // Additive d100: floor boosts the roll, ceiling caps it.
     // For iterative reworks (no material), use the existing item's rarity.
@@ -1697,6 +1820,7 @@ class CraftingSkills {
           <hr>
           <p style="color:#ef5350;font-size:1.2em;">&#10008; Natural 1 on d100! &#10008;</p>
           ${materialItem ? `<p><strong>Material:</strong> ${materialItem.name}</p>` : ''}
+          ${manaLine}
           ${failureMsg}
         </div>`,
       });
@@ -1716,9 +1840,16 @@ class CraftingSkills {
     // Theoretical max for THIS craft: what would result if the crafter rolled a perfect d100 (=100).
     // Uses 1.0 instead of rarity ceiling so the cap doesn't swing wildly with material rarity.
     const maxCrafterRoll = skillRoll;
-    const theoreticalMaxProgress = Math.round(materialProgress * 0.5) + augMaterialPotency + Math.round(maxCrafterRoll * 0.5) + prepBonus + progressBonus;
+    // The mana element multiplies the WORK — material, hand, prep and augments
+    // alike — because it is an ingredient of the recipe, not a bonus bolted on
+    // the end. It rides theoreticalMaxProgress too, so the item's ceiling
+    // reflects the mana that actually went into it.
+    const theoreticalMaxProgress = Math.round(
+      (Math.round(materialProgress * 0.5) + augMaterialPotency + Math.round(maxCrafterRoll * 0.5)
+       + prepBonus + progressBonus) * manaMult);
 
-    let totalProgress = materialContribution + crafterContribution + prepBonus + progressBonus;
+    let totalProgress = Math.round(
+      (materialContribution + crafterContribution + prepBonus + progressBonus) * manaMult);
 
     // Iterative rework: crafter-only contribution (no material, no 50/50 split since
     // material isn't being consumed). Apply 1/(reworkCount+2) diminishing returns,
@@ -1740,7 +1871,10 @@ class CraftingSkills {
         // floored at 1.1 to keep the divide stable.
         const divisor = Math.max(1.1, existingCount + 5 - augReworkDecayReduce);
         // Crafter-only — material is not consumed and doesn't contribute on rework.
-        const reworkContribution = crafterRoll + prepBonus + progressBonus;
+        // ⚠ The mana multiplies the ADDED work, never the accumulated total —
+        // multiplying totalProgress here would retroactively inflate progress
+        // earned in earlier sessions.
+        const reworkContribution = (crafterRoll + prepBonus + progressBonus) * manaMult;
         const rawAdd = Math.round(reworkContribution / divisor);
         reworkAddedProgress = Math.min(rawAdd, headroom);
         totalProgress = existingProgress + reworkAddedProgress;
@@ -1909,7 +2043,8 @@ class CraftingSkills {
           <p><strong>d100:</strong> ${d100Roll.total}${d100BonusExprA}${rarityFloorBonusExprA} + ${rarityRange.floor} = ${effectiveD100} (cap ${rarityRange.ceiling})</p>
           <p><strong>Crafter (50%):</strong> ${skillRollDisplayA} × ${d100Pct.toFixed(2)} = ${crafterRoll} × 0.5 = ${crafterContribution}</p>
           ${profAugLine}
-          <p><strong>Total Progress:</strong> ${materialContribution} + ${crafterContribution} + ${prepBonus}${progressBonus ? ` + (${progressBonus})` : ''} = <strong>${totalProgress}</strong></p>
+          ${manaLine}
+          <p><strong>Total Progress:</strong> ${materialContribution} + ${crafterContribution} + ${prepBonus}${progressBonus ? ` + (${progressBonus})` : ''}${manaExpr} = <strong>${totalProgress}</strong></p>
           <p><strong>Quality:</strong> ${qualityKey.charAt(0).toUpperCase() + qualityKey.slice(1)} (${qualityData.rarity})</p>
           <p><strong>Type:</strong> ${typeLabel} (${effectType})</p>
           <p><em>Created: ${createdItem.name}</em></p>
@@ -2074,7 +2209,8 @@ class CraftingSkills {
             <p><strong>d100:</strong> ${d100Roll.total}${d100BonusExprM}${rarityFloorBonusExprM} + ${rarityRange.floor} = ${effectiveD100} (cap ${rarityRange.ceiling})</p>
             <p><strong>Crafter (50%):</strong> ${skillRollDisplayM} × ${d100Pct.toFixed(2)} = ${crafterRoll} × 0.5 = ${crafterContribution}</p>
             ${profAugLine}
-            <p><strong>Total Progress:</strong> ${materialContribution} + ${crafterContribution} + ${prepBonus}${progressBonus ? ` + (${progressBonus})` : ''} = <strong>${totalProgress}</strong></p>
+            ${manaLine}
+          <p><strong>Total Progress:</strong> ${materialContribution} + ${crafterContribution} + ${prepBonus}${progressBonus ? ` + (${progressBonus})` : ''}${manaExpr} = <strong>${totalProgress}</strong></p>
             <p><strong>Quality:</strong> ${qualityKey.charAt(0).toUpperCase() + qualityKey.slice(1)} (${qualityData.rarity})</p>
             <p><strong>Material kind:</strong> ${matKind}${element && element !== 'neutral' ? ` (${element})` : ''}</p>
             <p><em>Refined: ${createdItem.name}</em></p>
@@ -2181,7 +2317,8 @@ class CraftingSkills {
           <p><strong>d100:</strong> ${d100Roll.total}${d100BonusExpr}${rarityFloorBonusExpr} + ${rarityRange.floor} = ${effectiveD100} (cap ${rarityRange.ceiling})</p>
           <p><strong>Crafter (50%):</strong> ${skillRollDisplay} × ${d100Pct.toFixed(2)} = ${crafterRoll} × 0.5 = ${crafterContribution}</p>
           ${profAugLine}
-          <p><strong>Total Progress:</strong> ${materialContribution} + ${crafterContribution} + ${prepBonus}${progressBonus ? ` + (${progressBonus})` : ''} = <strong>${totalProgress}</strong></p>
+          ${manaLine}
+          <p><strong>Total Progress:</strong> ${materialContribution} + ${crafterContribution} + ${prepBonus}${progressBonus ? ` + (${progressBonus})` : ''}${manaExpr} = <strong>${totalProgress}</strong></p>
           <p><strong>Quality:</strong> ${qualityKey.charAt(0).toUpperCase() + qualityKey.slice(1)} (${qualityData.rarity})</p>
           ${armorBonus ? `<p><strong>Armor:</strong> ${armorBonus}</p>` : ''}
           ${veilBonus ? `<p><strong>Veil:</strong> ${veilBonus}</p>` : ''}

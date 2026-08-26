@@ -1540,6 +1540,31 @@
       </details>
       {{/if}}
 
+      {{#if show.manaElement}}
+      <details class='aop-section' data-section='mana-element'
+               {{#if system.tagConfig.craftMinMana}}open{{/if}}>
+        <summary>
+          <span class='aop-section-title'>Mana Element</span>
+          <span class='aop-section-hint'>{{#if system.tagConfig.craftMinMana}}min {{system.tagConfig.craftMinMana}} mana{{else}}none{{/if}}</span>
+        </summary>
+        <div class='aop-section-body'>
+          <div class='aop-field-grid'>
+            <div class='aop-field'>
+              <label class='resource-label'>Minimum Mana</label>
+              <input type='number' name='system.tagConfig.craftMinMana'
+                     value='{{system.tagConfig.craftMinMana}}' min='0' step='1' />
+            </div>
+          </div>
+          <p class='hint'>0 = no mana element; the recipe behaves exactly as it did
+          before. Above 0, mana is an ingredient: the crafter cannot attempt the
+          recipe below this floor, and investing above it multiplies the quality of
+          the work on a diminishing curve (neutral at the floor, capped at
+          x{{@root.config.craftMana.qualityCap}} at 4x it). Spent whether the work
+          succeeds or fails, exactly as a ritual spends it.</p>
+        </div>
+      </details>
+      {{/if}}
+
       {{#if show.repair}}
       <details class='aop-section' data-section='repair' open>
         <summary>

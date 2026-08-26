@@ -934,7 +934,9 @@
       "holy": "Holy",
       "psychic": "Psychic",
       "time": "Time",
-      "karma": "Karma"
+      "karma": "Karma",
+      "molten": "Molten",
+      "life": "Life"
     },
     "CapBehaviour": {
       "stop": "Stop",

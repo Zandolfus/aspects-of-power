@@ -101,6 +101,54 @@ export function typingFromTags(tags = []) {
   return found;
 }
 
+/**
+ * COMPLEX AFFINITIES — how THIS actor decomposes one affinity name into
+ * weighted slices (ruled 2026-08-24, built 2026-08-25).
+ *
+ * ⚠⚠ THE ACTOR IS THE ONLY SOURCE. There is deliberately no world-default
+ * fallback: `CONFIG.ASPECTSOFPOWER.complexAffinityPresets` is an authoring
+ * menu that a stamping flow copies ONTO an actor, and is never read here. A
+ * default would silently re-decompose every existing solar/lunar-typed skill
+ * in the world for actors nobody had touched — and it would contradict the
+ * ruling, which put these on the actor precisely because the same word means
+ * different things to different casters. A name the actor does not define is
+ * ATOMIC, exactly as it was before this feature existed.
+ *
+ * Sub-keys not in the affinity dictionary are DROPPED rather than trusted —
+ * a typo'd slice would otherwise be an affinity nothing can ever answer (the
+ * orphaned-reader pattern, from the target's side).
+ *
+ * @returns {object|null} { sub: weight } with weights > 0, or null if this
+ *                        name is atomic for this actor.
+ */
+export function complexComposition(actor, name) {
+  const raw = actor?.system?.complexAffinities?.[name] ?? null;
+  if (!raw || typeof raw !== 'object') return null;
+  const known = knownAffinities();
+  const out = {};
+  for (const [sub, w] of Object.entries(raw)) {
+    const weight = Number(w);
+    if (!(weight > 0) || !known.has(sub)) continue;
+    out[sub] = weight;
+  }
+  return Object.keys(out).length ? out : null;
+}
+
+/**
+ * The compositions relevant to one hit: { name: {sub: weight} } for every
+ * affinity in `keys` this actor treats as complex. Empty object = nothing to
+ * expand, which is the case for every atomic cast — so the slicing path costs
+ * nothing when it is not in use.
+ */
+export function compositionsFor(actor, keys = []) {
+  const out = {};
+  for (const key of keys) {
+    const comp = complexComposition(actor, key);
+    if (comp) out[key] = comp;
+  }
+  return out;
+}
+
 /** Affinities an actor can channel: affinity passives + actor-level tags. */
 export function actorAffinities(actor) {
   const found = new Set();
@@ -252,6 +300,7 @@ export function checkEquip(actor, item, { notify = true } = {}) {
 }
 
 export const AffinityHelpers = {
-  knownAffinities, affinitiesFromTags, actorAffinities, itemAffinities,
+  knownAffinities, affinitiesFromTags, typingFromTags, actorAffinities,
+  itemAffinities, complexComposition, compositionsFor,
   unifiedSets, isUnified, canUseItem, checkEquip, auditGating,
 };

@@ -915,6 +915,19 @@ export class SkillData extends foundry.abstract.TypeDataModel {
         gatherMaterial: new fields.StringField({ initial: '' }),
         gatherElement:  new fields.StringField({ initial: '' }),
 
+        // ── PROFESSION MANA-INVEST (ruled 2026-08-23, built 2026-08-25) ──
+        // "Some profession recipes require mana as an element. Mana counts
+        // both as a quality thing and a minimum requirement."
+        //
+        // craftMinMana — the floor. Below it the recipe cannot be attempted
+        // at all (nothing consumed, unlike a failed roll). Above it, the
+        // invest multiplies the work's quality on the SAME diminishing curve
+        // the rest of the game invests on (invest.curveExponent), normalised
+        // by this minimum — so the minimum is the recipe's yardstick, not a
+        // second dial. 0 = no mana element, and the recipe behaves exactly as
+        // it did before this field existed. Honoured by craft and gather.
+        craftMinMana: new fields.NumberField({ initial: 0, min: 0, integer: true }),
+
         // Ritual (per design-ritual-subsystem.md Phase 2.5):
         //   ritualChargesProduced — how many charges one successful prep
         //     creates on the resulting Medium. Set per ritual. Default 1

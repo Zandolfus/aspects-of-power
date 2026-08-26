@@ -164,6 +164,11 @@ export class AspectsofPowerItemSheet extends foundry.applications.api.Handlebars
         sustain:     has('sustain'),
         craft:       has('craft'),
         gather:      has('gather'),
+        // The mana element belongs to BOTH profession handlers, and gets its
+        // own section rather than a copy inside each — two inputs sharing one
+        // `name` in a submitOnChange form means the stale one overwrites the
+        // edited one on any skill tagged both.
+        manaElement: has('craft') || has('gather'),
         repair:      has('repair'),
         channel:     has('channel'),
         ritual:      has('ritual'),
