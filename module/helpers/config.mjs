@@ -3069,11 +3069,26 @@ ASPECTSOFPOWER.craftMana = {
 ASPECTSOFPOWER.recipeTuning = {
   overpourCap: 1.5,
 
-  // ⚠ freeformSurcharge (RULED 1.15, 2026-08-26) is deliberately NOT here
-  // yet. The rule is settled — a recipe needing 100 means improvising the
-  // same thing needs 115 — but where the 100 comes from for a product nobody
-  // has written down is a separate open ruling, so the dial would have no
-  // reader. It lands with the discovery path. See design-recipe-system.
+  // freeformSurcharge — RULED 2026-08-26: "freecrafting success and recipe
+  // unlock should be proportional to each other. Say a recipe requires 100
+  // craft quality, freecrafting should take 115 or so quality."
+  //
+  // The 100 comes from the recipe the improviser was UNKNOWINGLY reproducing
+  // ("If a player selects Freehand, Armor, Helm and then puts in 1 iron ingot
+  // and rolls a 115, it should match Armor, Helm, 1 Iron Ingot") — so
+  // discovery needs no invented difficulty ladder, and the recipe library IS
+  // the definition of what can be discovered.
+  //
+  // MEASURED against every craft skill and material in the world
+  // (migration/local/recipe_freeform_sim.mjs): on a mid-difficulty recipe a
+  // holder succeeds 77% and an improviser 67%. The gap peaks near 13 points
+  // on medium-hard work and narrows at both ends — improvising something easy
+  // is nearly as reliable as being told how, which is the right shape. A
+  // successful improviser is RARER, not shoddier: the higher bar leaves them
+  // a slightly better quality mix.
+  // ⚠ REGRESSIVE, WATCH IT: master keeps 95% of their successes, novice 63%.
+  // Raising this to threaten good crafters punishes bad ones far harder.
+  freeformSurcharge: 1.15,
 };
 
 /**

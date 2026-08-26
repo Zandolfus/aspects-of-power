@@ -3002,6 +3002,62 @@ eq('junk situational entries are skipped, not NaN',
        R.eligibleRecipes(holder, smith).length, 2);
     eq('recipe: a cook sees only the universal one',
        R.eligibleRecipes(holder, cook).length, 1);
+
+    // ── DISCOVERY IS MATCHING (ruled 2026-08-26) ──────────────────────
+    // "Freehand, Armor, Helm, 1 iron ingot, roll 115 -> match Armor, Helm,
+    // 1 Iron Ingot." The threshold comes from the recipe the improviser was
+    // unknowingly reproducing, so no invented difficulty ladder is needed.
+    const iron = mat('i', 'Iron Ingot', 'metal', 300, 5);
+    const ruby = mat('r', 'Ruby', 'gem', 250, 2);
+    const helmRecipe = { name: 'Iron Helm',
+      system: { threshold: 200, output: { typeKey: 'head' },
+                inputs: [{ material: 'metal', quantity: 1 }] } };
+
+    eq('discovery: the right combination matches',
+       R.attemptMatchesBill(helmRecipe, [{ item: iron, count: 1 }]), true);
+    // ⚠ BOTH DIRECTIONS. Too little fails, and so does too MUCH - throwing a
+    // ruby in alongside makes it a different working, not a bonus.
+    eq('discovery: too few ingredients does not match',
+       R.attemptMatchesBill(helmRecipe, []), false);
+    eq('discovery: an extra ingredient spoils the match',
+       R.attemptMatchesBill(helmRecipe, [{ item: iron, count: 1 }, { item: ruby, count: 1 }]), false);
+    eq('discovery: too MANY of the right thing also spoils it',
+       R.attemptMatchesBill(helmRecipe, [{ item: iron, count: 2 }]), false);
+
+    // Most-constrained-first: a general row must not eat the stock a specific
+    // row needs. Bill = "1 Skysteel Ingot + 1 any metal", supplied one of each.
+    const skysteel = mat('s', 'Skysteel Ingot', 'metal', 400, 1);
+    const twoMetal = { name: 'Skysteel Helm',
+      system: { threshold: 400, output: { typeKey: 'head' },
+                inputs: [{ material: 'metal', quantity: 1 },
+                         { itemName: 'Skysteel', material: 'metal', quantity: 1 }] } };
+    eq('discovery: a general row does not starve a specific one',
+       R.attemptMatchesBill(twoMetal, [{ item: skysteel, count: 1 }, { item: iron, count: 1 }]), true);
+    // ...and the specific row genuinely has to be satisfied.
+    eq('discovery: the specific row is still required',
+       R.attemptMatchesBill(twoMetal, [{ item: iron, count: 2 }]), false);
+
+    // The product type is part of the signature: same ingredients, different
+    // thing being made, is not the same formula.
+    const library = [helmRecipe];
+    eq('discovery: the library finds the reproduced formula',
+       R.findMatchingRecipe(library, 'head', [{ item: iron, count: 1 }])?.name, 'Iron Helm');
+    eq('discovery: the same ingredients making a SWORD match nothing',
+       R.findMatchingRecipe(library, 'sword', [{ item: iron, count: 1 }]), null);
+    eq('discovery: an unknown combination matches nothing',
+       R.findMatchingRecipe(library, 'head', [{ item: ruby, count: 1 }]), null);
+
+    // THE SURCHARGE (ruled 1.15): knowing the recipe lowers the bar, it does
+    // not change the roll.
+    const CFG = { recipeTuning: { freeformSurcharge: 1.15 } };
+    eq('discovery: improvising needs 115 where a holder needs 100',
+       R.craftBar(100, false, CFG), 115);
+    eq('discovery: the holder needs exactly the threshold',
+       R.craftBar(100, true, CFG), 100);
+    eq('discovery: an ungated recipe has no bar either way',
+       R.craftBar(0, false, CFG), 0);
+    eq('discovery: the surcharge is proportional, not flat',
+       R.craftBar(400, false, CFG), 460);
   }
 
   // ── AFFINITY TYPING IS DERIVED FROM TAGS (ruled 2026-08-24) ──

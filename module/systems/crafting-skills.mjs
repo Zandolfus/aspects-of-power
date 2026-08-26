@@ -10,7 +10,7 @@
  * surgery); the export collects the prototype methods into a plain mixin.
  */
 import { hybridAbilityMod, itemWeightLb, craftManaQuality, recipeMaterialProgress, recipeVerdict } from '../helpers/formulas.mjs';
-import { eligibleRecipes, resolveIngredients, consumeIngredients, craftBar } from './recipes.mjs';
+import { eligibleRecipes, resolveIngredients, consumeIngredients, craftBar, findMatchingRecipe, recipeLibrary, alreadyKnows } from './recipes.mjs';
 import { spatialCapacityFromCraft } from '../helpers/formulas.mjs';
 
 class CraftingSkills {
@@ -1522,6 +1522,7 @@ class CraftingSkills {
     let recipe = null;
     let recipeExtraPicks = [];   // ingredients beyond the primary material
     let recipeBill = null;       // the resolved bill, for the overpour maths
+    let freehandPicks = null;    // what an improviser actually put in, for matching
 
     if (isAlchemySkill) {
       // Alchemy: skip slot/category/type — just pick a material.
@@ -1704,21 +1705,59 @@ class CraftingSkills {
           ui.notifications.warn('No suitable crafting materials in inventory.');
           return;
         }
-        const matButtons = materials.map(m => {
-          const elLabel = m.system.materialElement ? ` [${m.system.materialElement}]` : '';
-          return { action: m.id, label: `${m.name}${elLabel}` };
-        });
-        matButtons.push({ action: 'cancel', label: 'Cancel' });
-        const matChoice = await foundry.applications.api.DialogV2.wait({
-          window: { title: `${item.name} — Select Material` },
-          content: `<p>Choose a material for your ${typeKey}:</p>`,
-          buttons: matButtons,
+        // ── Ingredients, plural (2026-08-26) ──────────────────────────────
+        // Improvising is GUESSING A COMBINATION, so the freehand path has to
+        // let a crafter put in more than one thing — a single-material picker
+        // could never reproduce a multi-ingredient formula, and every such
+        // recipe would be permanently undiscoverable.
+        const matRows = materials.map(m => {
+          const el = m.system.materialElement ? ` [${m.system.materialElement}]` : '';
+          const have = m.system.quantity ?? 1;
+          return `<div class="form-group">
+            <label>${m.name}${el} <span class="hint">(${m.system.progress ?? 0}, have ${have})</span></label>
+            <input type="number" class="aop-mat-qty" data-id="${m.id}" value="0" min="0" max="${have}" step="1" />
+          </div>`;
+        }).join('');
+        const matPick = await foundry.applications.api.DialogV2.wait({
+          window: { title: `${item.name} — Ingredients` },
+          content: `<p>What are you putting into this ${typeKey}?</p>${matRows}
+            <p class="hint">Guessing the right combination is how an unknown recipe
+            gets discovered — and anything extra makes it a different working.</p>`,
+          buttons: [
+            { action: 'ok', label: 'Use These', icon: 'fas fa-hammer', default: true,
+              callback: (event, button, dialog) => {
+                const out = [];
+                for (const inp of dialog.element.querySelectorAll('.aop-mat-qty')) {
+                  const n = Math.max(0, Math.floor(Number(inp.value) || 0));
+                  if (n > 0) out.push({ id: inp.dataset.id, count: n });
+                }
+                return { picks: out };
+              } },
+            { action: 'cancel', label: 'Cancel' },
+          ],
           close: () => 'cancel',
         });
-        if (matChoice === 'cancel') return;
-        materialItem = actor.items.get(matChoice);
-        if (!materialItem) return;
-
+        if (!matPick || matPick === 'cancel') return;
+        const chosen = (matPick.picks ?? [])
+          .map(p => ({ item: actor.items.get(p.id), count: p.count }))
+          .filter(p => p.item);
+        if (!chosen.length) {
+          ui.notifications.warn('No ingredients selected.');
+          return;
+        }
+        // The best unit stands in for the legacy single `materialItem`, so
+        // element, output material and image resolve through code that
+        // already works; the rest ride along as extras.
+        chosen.sort((a, b) => (b.item.system.progress ?? 0) - (a.item.system.progress ?? 0));
+        materialItem = chosen[0].item;
+        freehandPicks = chosen;
+        recipeExtraPicks = chosen.map(p => (p.item.id === materialItem.id
+          ? { item: p.item, count: p.count - 1 } : p)).filter(p => p.count > 0);
+        // Mean-of-what-went-in, with overpour NEUTRAL by construction: an
+        // improviser has no bill to exceed, so required == supplied.
+        const units = chosen.map(p => ({ progress: p.item.system.progress ?? 0, count: p.count }));
+        const supplied = units.reduce((s, u) => s + u.count, 0);
+        recipeBill = { units, requiredUnits: supplied };
       }
     }
 
@@ -1992,6 +2031,48 @@ class CraftingSkills {
         return;
       }
       recipeQuality = verdict;
+    }
+
+    // ── DISCOVERY IS MATCHING (ruled 2026-08-26) ────────────────────────
+    // "If a player selects Freehand, Armor, Helm and then puts in 1 iron
+    // ingot and rolls a 115, it should match Armor, Helm, 1 Iron Ingot."
+    // The improviser was unknowingly reproducing a real formula; THAT recipe
+    // supplies the threshold, and the surcharge is the price of not knowing
+    // it. No invented difficulty ladder is needed — the library is the
+    // definition of what can be discovered.
+    let discovered = null;
+    if (!recipe && freehandPicks && !reworkTarget) {
+      const match = findMatchingRecipe(recipeLibrary(), typeKey, freehandPicks);
+      if (match) {
+        const known = alreadyKnows(actor, match);
+        const bar = craftBar(match.system.threshold ?? 0, known);
+        if (totalProgress >= bar) {
+          const verdict = recipeVerdict(totalProgress, match.system.threshold ?? 0);
+          recipeQuality = verdict.success ? verdict : recipeQuality;
+          // Knowing it already means there is nothing to hand over — the
+          // work simply succeeds at the lower bar.
+          if (!known) discovered = match;
+          recipe = match;              // the product is now a NAMED thing
+        } else {
+          if (recipeExtraPicks.length) await consumeIngredients(actor, recipeExtraPicks);
+          if ((materialItem.system.quantity ?? 1) <= 1) await materialItem.delete();
+          else await materialItem.update({ 'system.quantity': materialItem.system.quantity - 1 });
+          ChatMessage.create({ speaker, rollMode,
+            content: `<div class="craft-result">
+              <h3>${item.name} — The Work Does Not Cohere</h3><hr>
+              <p><strong>${actor.name}</strong> improvises, and something almost takes shape —
+              progress <strong style="color:#ef5350;">${totalProgress}</strong> against the
+              <strong>${bar}</strong> that working blind demands.</p>
+              ${manaLine}
+              <p><em>Ingredients consumed. The combination was right; the execution was not.</em></p>
+            </div>` });
+          return;
+        }
+      }
+      // No match = this combination is nobody's formula. Falls through to the
+      // freehand path unchanged, so nothing in the world breaks before the
+      // recipe library exists. Flipping to strict recipe-only is a later,
+      // deliberate switch.
     }
 
     // Determine quality from thresholds.
@@ -2389,6 +2470,16 @@ class CraftingSkills {
       // → 1 piece, so preservation would just be "free craft". Per user direction,
       // preservation only applies to alchemy/cooking (1 ingredient might cover
       // multiple doses — the "use one leaf where two might be necessary" idea).
+      // THE DISCOVERY ITSELF: a copy of the formula, now known. Granted
+      // before the material is eaten so a failure to write it down cannot
+      // leave the crafter with neither the recipe nor the stock.
+      if (discovered) {
+        const copy = discovered.toObject();
+        delete copy._id;
+        copy.system = { ...copy.system, source: 'discovered', discoveredBy: actor.name };
+        await actor.createEmbeddedDocuments('Item', [copy]);
+      }
+
       if (!reworkTarget) {
         // The rest of a recipe's bill goes first, while the primary is still
         // resolvable — consumeIngredients re-checks live quantities and eats
@@ -2409,9 +2500,20 @@ class CraftingSkills {
         ? `<p><strong>Rework:</strong> ×${reworkTarget.system.reworkCount} → ×${(reworkTarget.system.reworkCount ?? 0) + 1} (added +${reworkAddedProgress} with diminishing returns)</p>`
         : '';
       const headerTitle = reworkTarget ? 'Rework Result' : 'Crafting Result';
-      const createdLine = reworkTarget
+      const createdLine = (reworkTarget
         ? `<p><em>Improved: ${createdItem.name}</em></p>`
-        : `<p><em>Created: ${createdItem.name}</em></p>`;
+        : `<p><em>Created: ${createdItem.name}</em></p>`)
+        // The discovery is the real prize — say so loudly, above the numbers.
+        + (discovered
+          ? `<p style="color:#ffca28;font-size:1.1em;">&#9733; Recipe discovered:
+             <strong>${discovered.name}</strong> &#9733;</p>
+             <p class="hint">${actor.name} can work this deliberately from now on,
+             at a lower bar than improvising it.</p>`
+          : '')
+        + (recipe && !discovered
+          ? `<p class="hint">Worked from <strong>${recipe.name}</strong>
+             (threshold ${recipe.system.threshold ?? 0}).</p>`
+          : '');
 
       const matPotencyExpr = augMaterialPotency
         ? ` + (${augMaterialPotency})`

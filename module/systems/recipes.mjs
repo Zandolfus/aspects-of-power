@@ -129,18 +129,100 @@ export async function consumeIngredients(actor, picks) {
   return true;
 }
 
-/*
- * ⚠ NOT HERE YET — THE FREEFORM SURCHARGE (ruled 2026-08-26: "freecrafting
- * success and recipe unlock should be proportional to each other. Say a
- * recipe requires 100 craft quality, freecrafting should take 115 or so").
+/**
+ * DISCOVERY IS MATCHING (ruled 2026-08-26: "If a player selects Freehand,
+ * Armor, Helm and then puts in 1 iron ingot and rolls a 115, it should match
+ * Armor, Helm, 1 Iron Ingot").
  *
- * The rule is settled and simmed; what is NOT settled is where the 100 comes
- * from when you are improvising, because the recipe that would carry the
- * threshold is the thing you are trying to invent. That needs a baseline
- * difficulty per product, which is a separate ruling. Deliberately left
- * unbuilt rather than shipped as a dial with no reader — see the memo.
+ * This is what supplies the "100" that the freeform surcharge is 15% above,
+ * and it needs no invented difficulty ladder: the threshold comes from the
+ * recipe the improviser was UNKNOWINGLY reproducing. Experimentation is
+ * guessing the combination, and the recipe library is the definition of what
+ * can be guessed.
+ *
+ * Does this pile of ingredients satisfy this recipe's bill EXACTLY?
+ *
+ * Both directions matter. Every row must be covered, and nothing may be left
+ * over — throwing a ruby in alongside the iron is a different working, and
+ * must not match the plain helm. Rows are matched MOST-CONSTRAINED FIRST so a
+ * specific row ("Skysteel Ingot") is not starved by a general one ("any
+ * metal") greedily eating its stock.
  */
+export function attemptMatchesBill(recipe, picks) {
+  const rows = (recipe?.system?.inputs ?? []).map(r => ({
+    row: r,
+    spec: (r.itemName ? 1 : 0) + (r.element ? 1 : 0)
+        + ((r.minProgress ?? 0) > 0 ? 1 : 0) + (r.material ? 1 : 0),
+  })).sort((a, b) => b.spec - a.spec);
+
+  const left = new Map();
+  const byId = new Map();
+  for (const p of (picks ?? [])) {
+    left.set(p.item.id, (left.get(p.item.id) ?? 0) + p.count);
+    byId.set(p.item.id, p.item);
+  }
+  if (!rows.length) return left.size === 0;
+
+  for (const { row } of rows) {
+    let need = Math.max(1, Number(row.quantity) || 1);
+    for (const [id, have] of left) {
+      if (need <= 0) break;
+      if (have <= 0 || !matchesInput(byId.get(id), row)) continue;
+      const take = Math.min(have, need);
+      left.set(id, have - take);
+      need -= take;
+    }
+    if (need > 0) return false;                    // a row went uncovered
+  }
+  for (const have of left.values()) if (have > 0) return false;  // extras spoil it
+  return true;
+}
+
+/**
+ * The recipe an improvised attempt just reproduced, if any: same product
+ * type, same bill. Null means this combination is not a formula anyone has
+ * written down — there is nothing to discover, and nothing to price against.
+ */
+export function findMatchingRecipe(library, typeKey, picks) {
+  const want = typeKey || '';
+  return (library ?? []).find(r =>
+    (r.system?.output?.typeKey || '') === want && attemptMatchesBill(r, picks)) ?? null;
+}
+
+/**
+ * The bar this attempt must clear (ruled 2026-08-26: "freecrafting success
+ * and recipe unlock should be proportional to each other — say a recipe
+ * requires 100 craft quality, freecrafting should take 115 or so").
+ *
+ * Knowing the recipe does not change what you roll; it lowers the bar. One
+ * number, in the same units as everything else in crafting.
+ *
+ * ⚠ MEASURED REGRESSIVE (sim 2026-08-26): at 1.15 a master keeps 95% of their
+ * successes when improvising, a novice only 63%. Defensible — a master can
+ * wing it, and recipes matter most to those who have the least — but raising
+ * the surcharge to threaten good crafters punishes bad ones several times
+ * harder.
+ */
+export function craftBar(threshold, known, cfg = null) {
+  const sc = cfg ?? (globalThis.CONFIG?.ASPECTSOFPOWER ?? {});
+  const t = Math.max(0, Number(threshold) || 0);
+  if (t <= 0 || known) return t;
+  const surcharge = Number(sc.recipeTuning?.freeformSurcharge);
+  return Math.round(t * (Number.isFinite(surcharge) && surcharge >= 1 ? surcharge : 1.15));
+}
+
+/** Every recipe that exists in the world — the library of what CAN be made. */
+export function recipeLibrary() {
+  return (globalThis.game?.items ?? []).filter(i => i.type === 'recipe');
+}
+
+/** Does this actor already know this recipe? Matched by NAME, since a granted
+ *  copy is a different document from the library original. */
+export function alreadyKnows(actor, recipe) {
+  return (actor?.items ?? []).some(i => i.type === 'recipe' && i.name === recipe?.name);
+}
 
 export const RecipeHelpers = {
   eligibleRecipes, matchesInput, resolveIngredients, consumeIngredients,
+  attemptMatchesBill, findMatchingRecipe, craftBar, recipeLibrary, alreadyKnows,
 };
