@@ -24,6 +24,7 @@ import { ClassData } from './data/item-class.mjs';
 import { ProfessionData } from './data/item-profession.mjs';
 import { AugmentData } from './data/item-augment.mjs';
 import { ConsumableData } from './data/item-consumable.mjs';
+import { RecipeData } from './data/item-recipe.mjs';
 import { AopEffectData } from './data/effect-base.mjs';
 // Import helper/utility classes and constants.
 import { preloadHandlebarsTemplates } from './helpers/templates.mjs';
@@ -289,6 +290,7 @@ Hooks.once('init', function () {
     profession:    ProfessionData,
     augment:       AugmentData,
     consumable:    ConsumableData,
+    recipe:        RecipeData,
   };
 
   // Register sheet application classes

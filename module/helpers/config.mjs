@@ -3052,6 +3052,43 @@ ASPECTSOFPOWER.craftMana = {
 };
 
 /**
+ * RECIPES (design-recipe-system, RULED 2026-08-26). Crafting is recipe-only:
+ * every output is an authored recipe, professions grant a starter set, and
+ * freeform work survives only as EXPERIMENTATION that can discover one.
+ *
+ * overpourCap — ceiling on what supplying MORE than the bill demands is
+ * worth ("recipes allow for greater input, much like rituals, to increase
+ * the quality of the final item"). Rides invest.curveExponent normalised by
+ * the recipe's own requirement, so 1.5 is reached at 2.25x the bill.
+ *
+ * ⚠ Deliberately LOWER than the mana element's 2.0: mana is a pool the
+ * crafter regenerates, while material overpour spends finite goods that also
+ * raise the material MEAN when they are good — two levers on the same term.
+ * FIRST-PASS DIAL, unsimmed.
+ */
+ASPECTSOFPOWER.recipeTuning = {
+  overpourCap: 1.5,
+};
+
+/**
+ * Recipe quality as a MULTIPLE OF THE RECIPE'S OWN THRESHOLD, not of the
+ * absolute progress ladder — a recipe names a specific product, so the
+ * question is how well you executed THIS formula. Below 1.0 the attempt
+ * fails outright and the ingredients are gone (the ritual shape).
+ *
+ * Tier keys must exist in craftQuality below; the rarity comes from there,
+ * so the two ladders cannot disagree about what "uncommon" means.
+ * `cracked` is deliberately absent: clearing a threshold at all is never the
+ * worst possible outcome, and it stays reachable through the ungated path.
+ */
+ASPECTSOFPOWER.recipeQualityRatios = {
+  inferior: 1.00,
+  common:   1.20,
+  uncommon: 1.50,
+  rare:     2.00,
+};
+
+/**
  * Quality thresholds for crafted items (progress → quality).
  */
 ASPECTSOFPOWER.craftQuality = {

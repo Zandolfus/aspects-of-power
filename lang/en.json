@@ -957,7 +957,8 @@
       "class": "Class",
       "profession": "Profession",
       "augment": "Augment",
-      "consumable": "Consumable"
+      "consumable": "Consumable",
+      "recipe": "Recipe"
     }
   }
 }

@@ -43,6 +43,7 @@ export class AspectsofPowerItemSheet extends foundry.applications.api.Handlebars
     profession:    { template: 'systems/aspects-of-power/templates/item/item-profession-sheet.hbs', scrollable: ['.sheet-body'] },
     augment:       { template: 'systems/aspects-of-power/templates/item/item-augment-sheet.hbs', scrollable: ['.sheet-body'] },
     consumable:    { template: 'systems/aspects-of-power/templates/item/item-consumable-sheet.hbs', scrollable: ['.sheet-body'] },
+    recipe:        { template: 'systems/aspects-of-power/templates/item/item-recipe-sheet.hbs', scrollable: ['.sheet-body'] },
   };
 
   /** Render only the part that matches this item's type. */
@@ -987,6 +988,27 @@ export class AspectsofPowerItemSheet extends foundry.applications.api.Handlebars
       await this.document.update({ [t.name]: value });
       return;
     }
+    // --- Recipe: the DOM-driven collections, then named fields ---
+    // The ingredient rows and the two comma-separated tag lists carry no
+    // `name`, so they can only be collected explicitly. Named fields take the
+    // same direct dot-path route as skills, for the same reason: a full-form
+    // submit is not reliable here and would serialize the rows as an object
+    // with numeric keys, which an ArrayField rejects.
+    if (this.item.type === 'recipe') {
+      const t = event.target;
+      if (t?.closest?.('.recipe-input-row') || t?.classList?.contains('recipe-skill-tags')
+          || t?.classList?.contains('recipe-output-tags')) {
+        await this._saveRecipeArrays();
+        return;
+      }
+      if (t?.name?.startsWith('system.')) {
+        const value = t.type === 'checkbox' ? t.checked
+          : t.type === 'number' ? Number(t.value)
+          : t.value;
+        await this.document.update({ [t.name]: value });
+        return;
+      }
+    }
     // --- Consumable fields: direct update for simple fields ---
     if (this.item.type === 'consumable' && event.target?.name?.startsWith('system.')) {
       const name = event.target.name;
@@ -1014,6 +1036,43 @@ export class AspectsofPowerItemSheet extends foundry.applications.api.Handlebars
       statBonuses.push({ ability, value });
     });
     await this.document.update({ 'system.statBonuses': statBonuses });
+  }
+
+  /**
+   * Collect a recipe's DOM-driven collections: the ingredient rows and the
+   * two comma-separated tag lists. One write, so a change to any of them
+   * cannot leave the others stale.
+   *
+   * Stored-fallback rule (b2c4e57): a row absent from the DOM is a row the
+   * author deleted, but a SECTION that never rendered must not wipe its
+   * field — so each list is only rebuilt when its container is actually
+   * present.
+   */
+  async _saveRecipeArrays() {
+    const form = this.element.querySelector('form');
+    const update = {};
+
+    if (form.querySelector('.recipe-input-list')) {
+      const inputs = [];
+      form.querySelectorAll('.recipe-input-row').forEach(row => {
+        inputs.push({
+          material:    row.querySelector('.recipe-input-material')?.value ?? '',
+          element:     row.querySelector('.recipe-input-element')?.value ?? '',
+          itemName:    row.querySelector('.recipe-input-name')?.value ?? '',
+          quantity:    Math.max(1, Number(row.querySelector('.recipe-input-qty')?.value) || 1),
+          minProgress: Math.max(0, Number(row.querySelector('.recipe-input-minprog')?.value) || 0),
+        });
+      });
+      update['system.inputs'] = inputs;
+    }
+
+    const csv = (el) => (el?.value ?? '').split(',').map(s => s.trim()).filter(Boolean);
+    const skillTags = form.querySelector('.recipe-skill-tags');
+    if (skillTags) update['system.requiresSkillTags'] = csv(skillTags);
+    const outTags = form.querySelector('.recipe-output-tags');
+    if (outTags) update['system.output.tags'] = csv(outTags);
+
+    if (Object.keys(update).length) await this.document.update(update);
   }
 
   /**
@@ -1219,6 +1278,25 @@ export class AspectsofPowerItemSheet extends foundry.applications.api.Handlebars
         const bonuses = [...(this.item.system.statBonuses ?? [])];
         bonuses.splice(idx, 1);
         await this.document.update({ 'system.statBonuses': bonuses });
+      });
+    });
+
+    // --- Recipe: Add / Delete ingredient rows ---
+    // Read `_source`, not the live array: system.<ArrayField> is a SHARED
+    // reference, and a read-modify-write over it is what corrupted 22 skills
+    // on 08-24.
+    this.element.querySelector('.recipe-input-add')?.addEventListener('click', async () => {
+      const inputs = foundry.utils.deepClone(this.item._source.system.inputs ?? []);
+      inputs.push({ material: '', itemName: '', element: '', quantity: 1, minProgress: 0 });
+      await this.document.update({ 'system.inputs': inputs });
+    });
+
+    this.element.querySelectorAll('.recipe-input-delete').forEach(el => {
+      el.addEventListener('click', async () => {
+        const idx = Number(el.dataset.index);
+        const inputs = foundry.utils.deepClone(this.item._source.system.inputs ?? []);
+        inputs.splice(idx, 1);
+        await this.document.update({ 'system.inputs': inputs });
       });
     });
 

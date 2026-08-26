@@ -2063,12 +2063,124 @@ export function resolveCurseFillScale(skillScale, vesselLevel, cfg) {
  */
 export function craftManaQuality(invested, minMana, cfg = null) {
   const sc = cfg ?? (globalThis.CONFIG?.ASPECTSOFPOWER ?? {});
-  const min = Math.max(0, Number(minMana) || 0);
-  const inv = Math.max(0, Number(invested) || 0);
-  if (min <= 0 || inv <= 0) return 1;
   const cap = Number(sc.craftMana?.qualityCap);
-  return Math.min(Number.isFinite(cap) && cap >= 1 ? cap : 2.0,
-                  Math.max(1, Math.pow(inv / min, investCurve(sc))));
+  return investQuality(invested, minMana, Number.isFinite(cap) && cap >= 1 ? cap : 2.0, sc);
+}
+
+/**
+ * THE OVERPOUR CURVE — what pouring in MORE than a recipe demands is worth
+ * (ruled 2026-08-26: "recipes allow for greater input, much like rituals, to
+ * increase the quality of the final item").
+ *
+ * (actual / required) ^ invest.curveExponent, floored at 1 and capped.
+ * Normalising by the requirement is the house shape, shared with spells
+ * pushed past base cost and with the mana element: working at the minimum is
+ * NEUTRAL, and each recipe tunes its own band by what it asks for rather than
+ * by a private dial.
+ *
+ * Returns exactly 1 when nothing is required or nothing was supplied, so
+ * every path that does not use an ingredient is untouched.
+ *
+ * @param {number} actual    what was actually supplied
+ * @param {number} required  what the recipe demands
+ * @param {number} cap       ceiling on the multiplier (Infinity for none)
+ * @returns {number}
+ */
+export function investQuality(actual, required, cap, cfg = null) {
+  const req = Math.max(0, Number(required) || 0);
+  const act = Math.max(0, Number(actual) || 0);
+  if (req <= 0 || act <= 0) return 1;
+  const ceiling = Number(cap);
+  return Math.min(Number.isFinite(ceiling) && ceiling >= 1 ? ceiling : Infinity,
+                  Math.max(1, Math.pow(act / req, investCurve(cfg))));
+}
+
+/**
+ * The quality of a pile of ingredients: the quantity-weighted MEAN of their
+ * progress.
+ *
+ * ⚠ MEAN, NOT SUM, and that is the whole design. A sum would mean five cheap
+ * offcuts beat one good ingot, which is both wrong as fiction and an
+ * arbitrage. The house already rules this way for covens ("power is the mean
+ * of each hand's solo contribution... grouping never increases power"), and
+ * the same logic holds for a bill of materials: adding lesser stuff drags the
+ * work toward the middle. Quantity BEYOND the requirement is rewarded
+ * separately, by the overpour curve, so "more" still helps — it just cannot
+ * launder quality.
+ *
+ * @param {Array<{progress:number, count:number}>} units
+ * @returns {number} 0 when nothing was supplied
+ */
+export function weightedMeanProgress(units = []) {
+  let total = 0, count = 0;
+  for (const u of units) {
+    const c = Math.max(0, Number(u?.count) || 0);
+    if (c <= 0) continue;
+    total += (Number(u?.progress) || 0) * c;
+    count += c;
+  }
+  return count > 0 ? total / count : 0;
+}
+
+/**
+ * A recipe's material contribution: the mean quality of what went in, raised
+ * by however much MORE than the bill demanded went in with it.
+ *
+ * Collapses exactly to today's freehand behaviour for a one-unit,
+ * one-ingredient recipe — the mean of one thing is that thing, and supplying
+ * exactly the requirement is neutral — so the recipe path and the legacy path
+ * agree on the simple case by construction.
+ *
+ * @param {Array<{progress:number, count:number}>} units  what was consumed
+ * @param {number} requiredUnits  total units the bill demands
+ * @returns {number} progress, before the craft's own 50% material split
+ */
+export function recipeMaterialProgress(units = [], requiredUnits = 0, cfg = null) {
+  const sc = cfg ?? (globalThis.CONFIG?.ASPECTSOFPOWER ?? {});
+  const supplied = units.reduce((s, u) => s + Math.max(0, Number(u?.count) || 0), 0);
+  return weightedMeanProgress(units)
+       * investQuality(supplied, requiredUnits, Number(sc.recipeTuning?.overpourCap), sc);
+}
+
+/**
+ * THE VERDICT on one recipe attempt (ruled 2026-08-26, threshold failure
+ * "much like rituals": clear it and you get the item at a quality set by how
+ * far past you landed; miss and the ingredients are gone).
+ *
+ * Quality is measured as a RATIO of the recipe's own threshold, not on the
+ * absolute progress ladder, because a recipe names a specific product: a
+ * Skysteel Dagger you barely managed is a poor Skysteel Dagger, and one you
+ * crushed is a masterwork of the same thing. The item's STATS still derive
+ * from absolute progress exactly as they do today, so nothing on the power
+ * curve moves — only the label does.
+ *
+ * An ungated recipe (threshold 0) falls back to the absolute craftQuality
+ * ladder, which is what the freehand path has always used.
+ *
+ * @returns {{success:boolean, ratio:number, key:string, rarity:string}}
+ */
+export function recipeVerdict(progress, threshold, cfg = null) {
+  const sc = cfg ?? (globalThis.CONFIG?.ASPECTSOFPOWER ?? {});
+  const p = Math.max(0, Number(progress) || 0);
+  const gate = Math.max(0, Number(threshold) || 0);
+  const quality = sc.craftQuality ?? {};
+
+  if (gate <= 0) {
+    // Ungated: the absolute ladder, highest tier whose floor we clear.
+    const tiers = Object.entries(quality).sort((a, b) => b[1].minProgress - a[1].minProgress);
+    const hit = tiers.find(([, d]) => p >= d.minProgress) ?? tiers[tiers.length - 1];
+    return { success: true, ratio: 0, key: hit?.[0] ?? 'cracked',
+             rarity: hit?.[1]?.rarity ?? 'inferior' };
+  }
+
+  const ratio = p / gate;
+  if (ratio < 1) return { success: false, ratio, key: '', rarity: '' };
+
+  const ladder = Object.entries(sc.recipeQualityRatios ?? {})
+    .sort((a, b) => b[1] - a[1]);
+  const hit = ladder.find(([, min]) => ratio >= min) ?? ladder[ladder.length - 1];
+  const key = hit?.[0] ?? 'inferior';
+  return { success: true, ratio, key, rarity: quality[key]?.rarity ?? 'inferior' };
 }
 
 /**

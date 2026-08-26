@@ -2726,6 +2726,75 @@ eq('junk situational entries are skipped, not NaN',
     // The shipped dials, pinned.
     eq('craft-mana: shipped cap 2.0',
        Number(/qualityCap:\s*([\d.]+)/.exec(src)?.[1]), 2.0);
+    // ── RECIPES (ruled 2026-08-26) ──
+    // "A known sequence of ingredients that results in a product."
+    const RC = { invest: { curveExponent: 0.5 },
+                 craftMana: { qualityCap: 2.0 },
+                 recipeTuning: { overpourCap: 1.5 },
+                 recipeQualityRatios: { inferior: 1.00, common: 1.20, uncommon: 1.50, rare: 2.00 },
+                 craftQuality: {
+                   cracked:  { minProgress: 0,    rarity: 'inferior' },
+                   inferior: { minProgress: 50,   rarity: 'inferior' },
+                   common:   { minProgress: 200,  rarity: 'common' },
+                   uncommon: { minProgress: 500,  rarity: 'uncommon' },
+                   rare:     { minProgress: 1000, rarity: 'rare' },
+                 } };
+
+    // ⚠ MEAN, NOT SUM. Five cheap offcuts must not beat one good ingot -
+    // the coven rule ("grouping never increases power") applied to a bill of
+    // materials. If this ever sums, quality can be laundered with junk.
+    eq('recipe: ingredient quality is the quantity-weighted MEAN',
+       F3.weightedMeanProgress([{ progress: 400, count: 2 }, { progress: 100, count: 1 }]), 300);
+    eq('recipe: junk cannot launder quality upward',
+       F3.weightedMeanProgress([{ progress: 400, count: 1 }, { progress: 50, count: 4 }]) < 400, true);
+    eq('recipe: nothing supplied is zero, not NaN', F3.weightedMeanProgress([]), 0);
+
+    // Supplying exactly the bill is NEUTRAL; more is worth more, on a curve.
+    eq('recipe: meeting the bill exactly is neutral',
+       F3.recipeMaterialProgress([{ progress: 400, count: 2 }], 2, RC), 400);
+    eq('recipe: overpour raises the material term',
+       Number(F3.recipeMaterialProgress([{ progress: 400, count: 4 }], 2, RC).toFixed(2)),
+       Number((400 * Math.SQRT2).toFixed(2)));
+    eq('recipe: overpour is capped at 1.5x',
+       F3.recipeMaterialProgress([{ progress: 400, count: 40 }], 2, RC), 600);
+    // THE COMPATIBILITY PIN: one ingredient, one unit must behave exactly as
+    // the freehand path always has - the mean of one thing is that thing.
+    eq('recipe: a one-unit bill collapses to the legacy material progress',
+       F3.recipeMaterialProgress([{ progress: 583, count: 1 }], 1, RC), 583);
+
+    // Threshold failure, ritual-shaped, with quality measured against the
+    // recipe's OWN threshold - a barely-managed Skysteel Dagger is a poor
+    // Skysteel Dagger, not a different item.
+    eq('recipe: below the threshold the attempt FAILS',
+       F3.recipeVerdict(499, 500, RC).success, false);
+    eq('recipe: exactly at the threshold succeeds, at the bottom tier',
+       F3.recipeVerdict(500, 500, RC).key, 'inferior');
+    eq('recipe: 1.2x the threshold is common', F3.recipeVerdict(600, 500, RC).key, 'common');
+    eq('recipe: 1.5x is uncommon', F3.recipeVerdict(750, 500, RC).key, 'uncommon');
+    eq('recipe: 2x is rare', F3.recipeVerdict(1000, 500, RC).key, 'rare');
+    eq('recipe: quality never exceeds the top of the ladder',
+       F3.recipeVerdict(50000, 500, RC).key, 'rare');
+    // ⚠ SCALE-FREE ON PURPOSE: the same execution of a HARDER recipe reads
+    // the same quality. A hard recipe is hard to attempt, not doomed to
+    // produce junk.
+    eq('recipe: quality is relative, so a harder recipe is not punished',
+       F3.recipeVerdict(2400, 2000, RC).key, F3.recipeVerdict(600, 500, RC).key);
+    // Rarity comes from craftQuality so the two ladders cannot disagree.
+    eq('recipe: rarity is read from the craftQuality ladder',
+       F3.recipeVerdict(1000, 500, RC).rarity, 'rare');
+    // An UNGATED recipe falls back to the absolute ladder the freehand path
+    // has always used - the negative control on the whole ratio model.
+    eq('recipe: ungated falls back to the absolute ladder',
+       F3.recipeVerdict(600, 0, RC).key, 'uncommon');
+    eq('recipe: ungated never fails', F3.recipeVerdict(0, 0, RC).success, true);
+    eq('recipe: ungated bottoms out at cracked', F3.recipeVerdict(10, 0, RC).key, 'cracked');
+
+    // The overpour curve IS the mana curve - one implementation, so a recipe
+    // and a mana element can never drift apart about what "more" is worth.
+    eq('recipe: overpour and mana ride the same curve',
+       F3.investQuality(100, 25, 99, RC), F3.craftManaQuality(100, 25,
+         { ...RC, craftMana: { qualityCap: 99 } }));
+
     eq('craft-mana: rides invest.curveExponent, not a private curve',
        F3.craftManaQuality(100, 25, { invest: { curveExponent: 0.5 }, craftMana: { qualityCap: 99 } }),
        Math.pow(4, 0.5));

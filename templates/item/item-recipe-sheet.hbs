@@ -1,0 +1,195 @@
+{{!-- RECIPE SHEET (design-recipe-system, RULED 2026-08-26).
+      "A known sequence of ingredients that results in a product."
+      Authoring surface for the bill of materials, the threshold gate, and
+      the product's identity. output.augments / output.grantedSkills are
+      script-only by choice for now (UUID lists; phase 4 gives them a picker). --}}
+<form class='{{cssClass}} flexcol' autocomplete='off'>
+  <header class='sheet-header'>
+    <img class='profile-img' src='{{item.img}}' data-edit='img' title='{{item.name}}' />
+    <div class='header-fields'>
+      <h1 class='charname'>
+        <input name='name' type='text' value='{{item.name}}' placeholder='Recipe Name' />
+      </h1>
+      <div class='grid grid-3col'>
+        <div class='resource'>
+          <label class='resource-label'>Profession</label>
+          <input type='text' name='system.profession' value='{{system.profession}}' placeholder='smithing' />
+        </div>
+        <div class='resource'>
+          <label class='resource-label'>Rarity</label>
+          <select name='system.rarity'>
+            {{#each @root.config.craftRarityRanges as |range rKey|}}
+              <option value='{{rKey}}' {{#if (eq rKey ../system.rarity)}}selected{{/if}}>{{rKey}}</option>
+            {{/each}}
+          </select>
+        </div>
+        <div class='resource'>
+          <label class='resource-label'>Source</label>
+          <input type='text' name='system.source' value='{{system.source}}'
+                 placeholder='authored' title='authored, or discovered by experiment' />
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <nav class='sheet-tabs tabs' data-group='primary'>
+    <a class='item' data-tab='description'>Description</a>
+    <a class='item' data-tab='recipe'>Recipe</a>
+  </nav>
+
+  <section class='sheet-body scrollable' data-scrollable>
+
+    <div class='tab' data-group='primary' data-tab='description'>
+      <prose-mirror name='system.description' value='{{system.description}}' compact>
+        {{{enrichedDescription}}}
+      </prose-mirror>
+      {{#if system.discoveredBy}}
+        <p class='hint'>Discovered by {{system.discoveredBy}}.</p>
+      {{/if}}
+    </div>
+
+    <div class='tab' data-group='primary' data-tab='recipe'>
+
+      {{!-- ── WHO MAY WORK IT ── --}}
+      <details class='aop-section' data-section='recipe-requires' open>
+        <summary>
+          <span class='aop-section-title'>Requirements</span>
+          <span class='aop-section-hint'>{{#if system.requiresSkillTags.length}}{{join system.requiresSkillTags ', '}}{{else}}any craft skill{{/if}}</span>
+        </summary>
+        <div class='aop-section-body'>
+          <div class='aop-field'>
+            <label class='resource-label'>Required Skill Tags</label>
+            <input type='text' class='recipe-skill-tags' value='{{join system.requiresSkillTags ", "}}'
+                   placeholder='smithing, weaponsmith' />
+            <p class='hint'>Comma-separated, matched against the executing craft skill's tags.
+            Empty = any craft skill may attempt it. Matched by TAG rather than by skill name so
+            any smith can work a smithing recipe.</p>
+          </div>
+          <div class='aop-field-grid'>
+            <div class='aop-field'>
+              <label class='resource-label'>Minimum Skill Roll</label>
+              <input type='number' name='system.requiresSkillProgress'
+                     value='{{system.requiresSkillProgress}}' min='0' step='1' />
+            </div>
+            <div class='aop-field'>
+              <label class='resource-label'>Minimum Mana</label>
+              <input type='number' name='system.minMana' value='{{system.minMana}}' min='0' step='1' />
+            </div>
+            <div class='aop-field'>
+              <label class='resource-label'>Threshold</label>
+              <input type='number' name='system.threshold' value='{{system.threshold}}' min='0' step='1' />
+            </div>
+          </div>
+          <p class='hint'>Below the threshold the attempt FAILS and the ingredients are gone.
+          Above it, quality is how far past you landed: {{#each @root.config.recipeQualityRatios as |mult qKey|}}{{qKey}} at {{mult}}x{{#unless @last}}, {{/unless}}{{/each}}.
+          A threshold of 0 leaves the recipe ungated and falls back to the absolute quality ladder.</p>
+        </div>
+      </details>
+
+      {{!-- ── THE BILL OF MATERIALS ── --}}
+      <details class='aop-section' data-section='recipe-inputs' open>
+        <summary>
+          <span class='aop-section-title'>Ingredients</span>
+          <span class='aop-section-hint'>{{#if system.inputs.length}}{{system.inputs.length}} row(s){{else}}none{{/if}}</span>
+        </summary>
+        <div class='aop-section-body'>
+          <div class='equip-section-header flexrow'>
+            <p class='hint'>Quantity is the MINIMUM. Supplying more raises quality on a
+            diminishing curve (capped at x{{@root.config.recipeTuning.overpourCap}}), and
+            ingredient quality is the quantity-weighted MEAN of what went in — so padding a
+            bill with junk drags the result down rather than up.</p>
+            <a class='recipe-input-add' title='Add Ingredient'><i class='fas fa-plus'></i></a>
+          </div>
+          <div class='recipe-input-list'>
+            {{#each system.inputs as |row idx|}}
+              <div class='recipe-input-row flexrow' data-index='{{idx}}'>
+                <select class='recipe-input-material' data-index='{{idx}}'>
+                  <option value=''>(any kind)</option>
+                  {{#each @root.config.materialTypes as |label mKey|}}
+                    <option value='{{mKey}}' {{#if (eq mKey ../row.material)}}selected{{/if}}>{{localize label}}</option>
+                  {{/each}}
+                </select>
+                <select class='recipe-input-element' data-index='{{idx}}'>
+                  <option value=''>(any element)</option>
+                  {{#each @root.config.craftElements as |elDef elKey|}}
+                    <option value='{{elKey}}' {{#if (eq elKey ../row.element)}}selected{{/if}}>{{localize elDef.label}}</option>
+                  {{/each}}
+                </select>
+                <input type='text' class='recipe-input-name' data-index='{{idx}}'
+                       value='{{row.itemName}}' placeholder='specific material (optional)' />
+                <input type='number' class='recipe-input-qty' data-index='{{idx}}'
+                       value='{{row.quantity}}' min='1' step='1' title='Units required' />
+                <input type='number' class='recipe-input-minprog' data-index='{{idx}}'
+                       value='{{row.minProgress}}' min='0' step='1' title='Minimum progress per unit' />
+                <a class='recipe-input-delete' data-index='{{idx}}' title='Remove'>
+                  <i class='fas fa-trash'></i>
+                </a>
+              </div>
+            {{/each}}
+          </div>
+        </div>
+      </details>
+
+      {{!-- ── THE PRODUCT ── --}}
+      <details class='aop-section' data-section='recipe-output' open>
+        <summary>
+          <span class='aop-section-title'>Product</span>
+          <span class='aop-section-hint'>{{#if system.output.name}}{{system.output.name}}{{else}}unnamed{{/if}}{{#if system.output.typeKey}} &middot; {{system.output.typeKey}}{{/if}}</span>
+        </summary>
+        <div class='aop-section-body'>
+          <div class='aop-field-grid'>
+            <div class='aop-field'>
+              <label class='resource-label'>Product Name</label>
+              <input type='text' name='system.output.name' value='{{system.output.name}}'
+                     placeholder='Skysteel Dagger' />
+            </div>
+            <div class='aop-field'>
+              <label class='resource-label'>Item Type</label>
+              <select name='system.output.typeKey'>
+                <option value=''>(none)</option>
+                {{#each @root.config.craftItemTypes as |def tKey|}}
+                  <option value='{{tKey}}' {{#if (eq tKey ../system.output.typeKey)}}selected{{/if}}>{{tKey}}</option>
+                {{/each}}
+              </select>
+            </div>
+            <div class='aop-field'>
+              <label class='resource-label'>Material</label>
+              <select name='system.output.material'>
+                <option value=''>(from ingredients)</option>
+                {{#each @root.config.materialTypes as |label mKey|}}
+                  <option value='{{mKey}}' {{#if (eq mKey ../system.output.material)}}selected{{/if}}>{{localize label}}</option>
+                {{/each}}
+              </select>
+            </div>
+            <div class='aop-field'>
+              <label class='resource-label'>Element</label>
+              <select name='system.output.element'>
+                <option value=''>(from ingredients)</option>
+                {{#each @root.config.craftElements as |elDef elKey|}}
+                  <option value='{{elKey}}' {{#if (eq elKey ../system.output.element)}}selected{{/if}}>{{localize elDef.label}}</option>
+                {{/each}}
+              </select>
+            </div>
+            <div class='aop-field'>
+              <label class='resource-label'>Quantity Produced</label>
+              <input type='number' name='system.output.quantity' value='{{system.output.quantity}}' min='1' step='1' />
+            </div>
+            <div class='aop-field'>
+              <label class='resource-label'>Product Image</label>
+              <input type='text' name='system.output.img' value='{{system.output.img}}'
+                     placeholder='(inherits the recipe icon)' />
+            </div>
+          </div>
+          <div class='aop-field'>
+            <label class='resource-label'>Extra Tags</label>
+            <input type='text' class='recipe-output-tags' value='{{join system.output.tags ", "}}'
+                   placeholder='masterwork, fire-affinity' />
+            <p class='hint'>Comma-separated, stamped on the product on top of its type's own tags.
+            The recipe fixes what the item IS; progress still decides how good this copy is.</p>
+          </div>
+        </div>
+      </details>
+
+    </div>
+  </section>
+</form>
