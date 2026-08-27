@@ -13,6 +13,14 @@
     {{/each}}
   </nav>
 
+  {{#if busy}}
+    <div class="recipe-busy">
+      <i class="fas fa-hourglass-half"></i>
+      Working: <strong>{{busy.label}}</strong> &mdash; {{busy.display}}.
+      The piece finishes when the clock reaches it.
+    </div>
+  {{/if}}
+
   <div class="recipe-search-row">
     <i class="fas fa-search"></i>
     <input type="text" class="recipe-search" value="{{search}}"

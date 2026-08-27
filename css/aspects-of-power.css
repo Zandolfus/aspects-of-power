@@ -2393,6 +2393,14 @@ body.aop-targeting #board canvas {
   opacity: 0.6;
   font-size: 11px;
 }
+.recipe-book-app .recipe-busy {
+  padding: 4px 8px;
+  border: 1px solid var(--aop-border-darker);
+  border-left: 3px solid #c9a227;
+  border-radius: 3px;
+  background: var(--aop-overlay);
+  font-size: 12px;
+}
 .recipe-book-app .recipe-search-row {
   display: flex;
   align-items: center;
@@ -2459,6 +2467,16 @@ body.aop-targeting #board canvas {
   margin: 0;
   border: none;
   font-size: 16px;
+}
+/* The window inherits the sheet's heading scale, where h3 is display-sized —
+   "Reagents" rendered visibly LARGER than the product name above it, which
+   reads as a broken hierarchy. Pin both. */
+.recipe-book-app .recipe-detail h3 {
+  font-size: 13px;
+  font-weight: bold;
+  margin: 10px 0 2px;
+  border-bottom: 1px solid var(--aop-border-darker);
+  padding-bottom: 2px;
 }
 .recipe-book-app .recipe-reagents {
   list-style: none;

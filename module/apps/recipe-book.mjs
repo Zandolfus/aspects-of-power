@@ -117,6 +117,15 @@ export class RecipeBook extends foundry.applications.api.HandlebarsApplicationMi
         open: !this.collapsed.has(key),
         recipes: list.map(r => ({ ...r, selected: r.id === this.selectedId })),
       }));
+    // ⚠ CRAFTING A THING IS DOWNTIME, NOT AN INSTANT (professions-as-
+    // activities). A craft skill carrying the `activity` tag DECLARES a block
+    // on the clock and resolves when the clock reaches it — so clicking Craft
+    // correctly produces no item yet. Live-tested 2026-08-27: the button
+    // worked and the window said nothing, which reads exactly like a dead
+    // button. Surface the block instead.
+    const dt = this.actor.flags?.aspectsofpower?.downtime ?? null;
+    context.busy = dt?.label ? { label: dt.label, display: dt.display } : null;
+
     context.hasAny = all.length > 0;
     context.hasShown = shown.length > 0;
     context.selected = shown.find(r => r.id === this.selectedId)
@@ -185,7 +194,14 @@ export class RecipeBook extends foundry.applications.api.HandlebarsApplicationMi
       // button that appears dead. Crafting is downtime work and should run
       // now; out of combat this changes nothing.
       await skill.roll({ preRecipeId: recipeId, executeDeferred: true });
-      this.render();                              // inventory moved
+      this.render();                              // inventory moved, or a block was declared
+      // A craft skill tagged `activity` declares downtime instead of
+      // resolving now. Say so out loud — the window alone is too quiet for
+      // "your smith is booked for the next forty minutes".
+      const dt = this.actor.flags?.aspectsofpower?.downtime;
+      if (dt?.label) {
+        ui.notifications?.info(`${this.actor.name} begins ${dt.label} (${dt.display}).`);
+      }
     });
   }
 }
