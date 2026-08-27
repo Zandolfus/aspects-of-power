@@ -83,6 +83,11 @@ export async function syncTemplateGrants(actor, { dryRun = false, tracks = TRACK
 
   const ownedSkillNames = new Set(
     actor.items.filter(i => i.type === 'skill').map(i => i.name));
+  // Recipes dedupe by name in their own namespace — a formula and a skill can
+  // share a name (Smithing the skill, "Smithing" nothing), and collapsing them
+  // into one set would have one silently suppress the other.
+  const ownedRecipeNames = new Set(
+    actor.items.filter(i => i.type === 'recipe').map(i => i.name));
   const toCreate = [];
   const allTemplates = [];
 
@@ -105,6 +110,26 @@ export async function syncTemplateGrants(actor, { dryRun = false, tracks = TRACK
         foundry.utils.setProperty(data, `flags.${FLAG_SCOPE}.grantedFrom`, uuid);
         toCreate.push(data);
         report.skills.push(`${src.name} (from ${tpl.name})`);
+      }
+
+      // Starter recipes (ruled 2026-08-26). Same shape as the skill grant
+      // above deliberately — a formula arrives the way a skill does.
+      for (const uuid of (tpl.system?.grantedRecipes ?? [])) {
+        if (!uuid) continue;
+        let src = null;
+        try { src = await fromUuid(uuid); } catch { /* broken link */ }
+        if (!src || src.type !== 'recipe') {
+          report.skipped.push(`broken recipe grant on ${tpl.name}: ${uuid}`);
+          continue;
+        }
+        if (ownedRecipeNames.has(src.name)) continue;
+        ownedRecipeNames.add(src.name);
+        const data = src.toObject();
+        delete data._id;
+        foundry.utils.setProperty(data, `flags.${FLAG_SCOPE}.grantedByTemplate`, tpl.uuid);
+        foundry.utils.setProperty(data, `flags.${FLAG_SCOPE}.grantedFrom`, uuid);
+        toCreate.push(data);
+        (report.recipes ??= []).push(`${src.name} (from ${tpl.name})`);
       }
     }
   }

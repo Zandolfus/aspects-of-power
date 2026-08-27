@@ -2990,18 +2990,41 @@ eq('junk situational entries are skipped, not NaN',
     eq('recipe: an empty bill resolves trivially',
        R.resolveIngredients(actor, { system: { inputs: [] } }).ok, true);
 
-    // Eligibility is by TAG so any smith can work a smithing recipe.
-    const smith = { system: { tags: ['craft', 'smithing'] } };
-    const cook = { system: { tags: ['craft', 'cooking'] } };
+    // Eligibility is by TAG so any smith can work a smithing recipe. The
+    // world's craft skills carry a MATERIAL vocabulary (metal, leather,
+    // clothing...) and that is what recipes demand — nothing carries a
+    // profession-name tag, so requiring one makes a recipe unworkable.
+    const smith = { type: 'skill', system: { tags: ['craft', 'metal'] } };
+    const cook = { type: 'skill', system: { tags: ['craft', 'alchemy'] } };
     const holder = { items: [
-      { type: 'recipe', system: { requiresSkillTags: ['smithing'] } },
+      { type: 'recipe', system: { requiresSkillTags: ['metal'] } },
       { type: 'recipe', system: { requiresSkillTags: [] } },
       { type: 'item', system: {} },
     ] };
-    eq('recipe: a smith sees the smithing recipe and the universal one',
+    eq('recipe: a smith sees the metal recipe and the universal one',
        R.eligibleRecipes(holder, smith).length, 2);
     eq('recipe: a cook sees only the universal one',
        R.eligibleRecipes(holder, cook).length, 1);
+    // ⚠ A non-skill must never satisfy the gate — the fixture that caught
+    // this was looser than the real document.
+    eq('recipe: a non-skill can never work a recipe',
+       R.skillCanWork({ type: 'item', system: { tags: ['craft', 'metal'] } },
+                      holder.items[0]), false);
+
+    // THE SECOND GATE: craftAllowedTypes. The recipe path sets typeKey
+    // directly and never passes the type picker's filter, so without this a
+    // tailor whose tags happened to match could work a greatsword.
+    const swordRecipe = { system: { requiresSkillTags: ['metal'],
+                                    output: { typeKey: 'greatsword' } } };
+    const narrowSmith = { type: 'skill',
+      system: { tags: ['craft', 'metal'], craftAllowedTypes: ['head', 'chest'] } };
+    eq('recipe: a skill that cannot make the TYPE cannot work the recipe',
+       R.skillCanWork(narrowSmith, swordRecipe), false);
+    eq('recipe: the same skill can work one it IS allowed to make',
+       R.skillCanWork(narrowSmith, { system: { requiresSkillTags: ['metal'],
+                                               output: { typeKey: 'head' } } }), true);
+    eq('recipe: an empty allowed-types list still means no restriction',
+       R.skillCanWork(smith, swordRecipe), true);
 
     // ── DISCOVERY IS MATCHING (ruled 2026-08-26) ──────────────────────
     // "Freehand, Armor, Helm, 1 iron ingot, roll 115 -> match Armor, Helm,

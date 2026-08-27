@@ -23,12 +23,39 @@
  * per-character artifact. A recipe with no required tags is universal.
  */
 export function eligibleRecipes(actor, skill) {
-  const skillTags = new Set(skill?.system?.tags ?? []);
-  return (actor?.items ?? []).filter(i => {
-    if (i.type !== 'recipe') return false;
-    const req = i.system?.requiresSkillTags ?? [];
-    return req.every(t => skillTags.has(t));
-  });
+  return (actor?.items ?? []).filter(i => i.type === 'recipe' && skillCanWork(skill, i));
+}
+
+/**
+ * May this craft skill work this recipe? TWO gates, and both are needed.
+ *
+ * 1. TAGS — the discipline. Matched against the skill's tags rather than its
+ *    name, so any smith can work a smithing recipe. The world's craft skills
+ *    already carry a consistent MATERIAL vocabulary (metal, leather,
+ *    clothing, jewelry, gem, wood, alchemy), and that is the vocabulary
+ *    recipes should demand: a metal helm wants someone who works metal. No
+ *    skill in the world carries a profession-name tag, so requiring one would
+ *    make every recipe unworkable (found live 2026-08-27).
+ *
+ * 2. ALLOWED TYPES — the structure. `craftAllowedTypes` already declares what
+ *    a skill can physically produce; without this a tailor whose tags happened
+ *    to match could work a greatsword recipe, because the recipe path sets
+ *    typeKey directly and never passes through the type picker's filter.
+ *    Empty list = no restriction, which is the existing back-compat meaning.
+ *
+ * ONE predicate for the craft dialog and the Recipe Book both, so what the
+ * book offers and what the handler accepts cannot drift apart.
+ */
+export function skillCanWork(skill, recipe) {
+  if (skill?.type !== 'skill') return false;
+  const tags = skill.system?.tags ?? [];
+  if (!tags.includes('craft')) return false;
+  const req = recipe?.system?.requiresSkillTags ?? [];
+  if (!req.every(t => tags.includes(t))) return false;
+  const allowed = skill.system?.craftAllowedTypes ?? [];
+  const typeKey = recipe?.system?.output?.typeKey || '';
+  if (allowed.length && typeKey && !allowed.includes(typeKey)) return false;
+  return true;
 }
 
 /**
@@ -111,13 +138,7 @@ export function resolveIngredients(actor, recipe) {
  * still worth SEEING, greyed out, so "I need to train that" is legible.
  */
 export function skillsFor(actor, recipe) {
-  const req = recipe?.system?.requiresSkillTags ?? [];
-  return (actor?.items ?? []).filter(i => {
-    if (i.type !== 'skill') return false;
-    const tags = i.system?.tags ?? [];
-    if (!tags.includes('craft')) return false;
-    return req.every(t => tags.includes(t));
-  });
+  return (actor?.items ?? []).filter(i => skillCanWork(i, recipe));
 }
 
 /**
@@ -242,5 +263,5 @@ export function alreadyKnows(actor, recipe) {
 export const RecipeHelpers = {
   eligibleRecipes, matchesInput, resolveIngredients, consumeIngredients,
   attemptMatchesBill, findMatchingRecipe, craftBar, recipeLibrary, alreadyKnows,
-  skillsFor,
+  skillsFor, skillCanWork,
 };

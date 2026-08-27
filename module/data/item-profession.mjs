@@ -44,6 +44,16 @@ export class ProfessionData extends foundry.abstract.TypeDataModel {
       // sync_granted_skills.js). Mirrors the equipment-item grantedSkills
       // pattern in item-item.mjs:66.
       grantedSkills: new fields.ArrayField(new fields.StringField(), { initial: [] }),
+
+      // ── STARTER RECIPES (ruled 2026-08-26: "obtaining a profession will
+      // grant a series of built-in recipes") ──
+      // UUIDs of recipe items this profession teaches on being taken. This is
+      // the answer to the recipe-only migration cliff: crafting is gated on
+      // knowing formulas, and a profession is how you come to know your
+      // trade's basics. Walked by systems/template-grants alongside
+      // grantedSkills, and name-deduped the same way, so re-syncing an actor
+      // never doubles their book.
+      grantedRecipes: new fields.ArrayField(new fields.StringField(), { initial: [] }),
     };
   }
 }
