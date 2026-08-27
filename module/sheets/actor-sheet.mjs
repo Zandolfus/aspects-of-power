@@ -279,6 +279,7 @@ export class AspectsofPowerActorSheet extends foundry.applications.api.Handlebar
   _prepareItems(context) {
     const gear           = [];
     const consumables    = [];
+    const recipes        = [];
     const features       = [];
     const skills         = { Active: [], Reaction: [], Passive: [] };
     const skillGroups    = {
@@ -318,6 +319,23 @@ export class AspectsofPowerActorSheet extends foundry.applications.api.Handlebar
           ? `${ch.value}/${ch.max} (×${i.system.quantity})`
           : `${i.system.quantity}`;
         consumables.push(i);
+      } else if (i.type === 'recipe') {
+        // The recipe BOOK (phase 4, 2026-08-26): a known formula is a thing
+        // you own, so it has to be visible somewhere. Everything a player
+        // needs to decide "can I make this" is precomputed here — the bill in
+        // words, the bar, the mana — so the template stays a list and the
+        // shelf can render closed without paying for its own contents.
+        const sys = i.system ?? {};
+        i.productName = sys.output?.name || i.name;
+        i.thresholdLabel = (sys.threshold ?? 0) > 0 ? `needs ${sys.threshold}` : 'ungated';
+        i.billLines = (sys.inputs ?? []).map(row => {
+          const what = row.itemName || row.material || 'any material';
+          const el = row.element ? ` (${row.element})` : '';
+          const floor = (row.minProgress ?? 0) > 0 ? `, ${row.minProgress}+` : '';
+          return `${row.quantity ?? 1} x ${what}${el}${floor}`;
+        });
+        i.isDiscovered = sys.source === 'discovered';
+        recipes.push(i);
       } else if (i.type === 'feature') {
         features.push(i);
       } else if (i.type === 'skill') {
@@ -375,6 +393,25 @@ export class AspectsofPowerActorSheet extends foundry.applications.api.Handlebar
     context.gear           = gear;
     context.consumables    = consumables;
     context.features       = features;
+
+    // Shelved by profession, alphabetically, so the book reads like a book.
+    // Nothing here is open by default (ruled 2026-08-26: "something like
+    // compendiums: not open unless they open it") — a crafter with sixty
+    // formulas should see sixty formulas' worth of SPINES, not sixty
+    // formulas.
+    const shelves = new Map();
+    for (const r of recipes.sort((a, b) => a.productName.localeCompare(b.productName))) {
+      const key = r.system?.profession || 'Unsorted';
+      if (!shelves.has(key)) shelves.set(key, []);
+      shelves.get(key).push(r);
+    }
+    context.recipeShelves = [...shelves.entries()]
+      .sort((a, b) => a[0].localeCompare(b[0]))
+      .map(([label, list]) => ({
+        label: label.charAt(0).toUpperCase() + label.slice(1),
+        recipes: list,
+      }));
+    context.recipeCount = recipes.length;
     context.skills         = skills;
     context.skillGroups    = skillGroups;
 
@@ -654,6 +691,13 @@ export class AspectsofPowerActorSheet extends foundry.applications.api.Handlebar
     // Add Inventory Item
     this.element.querySelectorAll('.item-create').forEach(el => {
       el.addEventListener('click', this._onItemCreate.bind(this));
+    });
+
+    // A control inside a <summary> would ALSO toggle the disclosure, so
+    // clicking Edit on a recipe would open its entry as a side effect.
+    // Suppress the default toggle; the edit/delete listeners still fire.
+    this.element.querySelectorAll('.recipe-entry > summary .item-control').forEach(el => {
+      el.addEventListener('click', ev => ev.preventDefault());
     });
 
     // Delete Inventory Item

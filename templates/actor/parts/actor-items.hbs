@@ -69,6 +69,61 @@
     {{/each}}
   </ol>
 
+  {{!-- Recipe Book — closed shelves, opened on demand (ruled 2026-08-26:
+        "something like compendiums: not open unless they open it"). A crafter
+        with sixty formulas should see sixty SPINES, not sixty formulas. --}}
+  <ol class='items-list'>
+    <li class='item flexrow items-header'>
+      <div class='item-name'>Recipes</div>
+      <span class='item-prop'>{{#if recipeCount}}{{recipeCount}} known{{else}}none known{{/if}}</span>
+      <div class='item-controls'>
+        <a class='item-control item-create' title='New Recipe' data-type='recipe'>
+          <i class='fas fa-plus'></i> New Recipe
+        </a>
+      </div>
+    </li>
+  </ol>
+  {{#each recipeShelves as |shelf|}}
+    <details class='aop-section recipe-shelf'>
+      <summary>
+        <span class='aop-section-title'>{{shelf.label}}</span>
+        <span class='aop-section-hint'>{{shelf.recipes.length}}</span>
+      </summary>
+      <div class='aop-section-body'>
+        {{#each shelf.recipes as |r|}}
+          <details class='item recipe-entry' data-item-id='{{r._id}}'>
+            <summary class='flexrow'>
+              <div class='item-image'>
+                <img src='{{r.img}}' title='{{r.productName}}' width='20' height='20' />
+              </div>
+              <h4>{{r.productName}}</h4>
+              <span class='item-prop'>{{r.thresholdLabel}}</span>
+              {{#if r.isDiscovered}}
+                <span class='item-prop' title='Discovered by {{r.system.discoveredBy}}'>discovered</span>
+              {{/if}}
+              <div class='item-controls'>
+                <a class='item-control item-edit' title='Edit'><i class='fas fa-edit'></i></a>
+                <a class='item-control item-delete' title='Forget'><i class='fas fa-trash'></i></a>
+              </div>
+            </summary>
+            <div class='recipe-entry-body'>
+              {{#if r.billLines.length}}
+                <p><strong>Needs:</strong> {{#each r.billLines as |line|}}{{line}}{{#unless @last}} &middot; {{/unless}}{{/each}}</p>
+              {{else}}
+                <p class='hint'>No ingredients listed.</p>
+              {{/if}}
+              {{#if r.system.minMana}}<p><strong>Mana:</strong> at least {{r.system.minMana}}</p>{{/if}}
+              {{#if r.system.output.typeKey}}<p><strong>Makes:</strong> {{r.system.output.typeKey}}</p>{{/if}}
+              {{#if r.system.requiresSkillTags.length}}
+                <p class='hint'>Requires a craft skill tagged {{join r.system.requiresSkillTags ', '}}.</p>
+              {{/if}}
+            </div>
+          </details>
+        {{/each}}
+      </div>
+    </details>
+  {{/each}}
+
   {{!-- Features Section --}}
   <ol class='items-list'>
     <li class='item flexrow items-header'>

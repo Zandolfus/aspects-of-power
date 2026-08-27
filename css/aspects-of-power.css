@@ -2310,6 +2310,42 @@ body.aop-targeting #board canvas {
   padding: 6px 8px 8px;
 }
 
+/* Recipe book (actor sheet, Items tab). Shelves and entries are both closed
+   by default — "something like compendiums: not open unless they open it" —
+   so a crafter with sixty formulas sees sixty spines, not sixty formulas. */
+.aspects-of-power details.recipe-entry {
+  border-bottom: 1px solid var(--aop-border-darker);
+}
+.aspects-of-power details.recipe-entry:last-child {
+  border-bottom: none;
+}
+.aspects-of-power details.recipe-entry > summary {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 4px;
+  cursor: pointer;
+  user-select: none;
+}
+.aspects-of-power details.recipe-entry > summary h4 {
+  flex: 1 1 auto;
+  margin: 0;
+  font-size: 13px;
+  border: none;
+}
+.aspects-of-power details.recipe-entry > summary .item-prop {
+  flex: 0 0 auto;
+  font-size: 11px;
+  color: var(--aop-text-muted);
+}
+.aspects-of-power .recipe-entry-body {
+  padding: 2px 8px 8px 30px;
+  font-size: 12px;
+}
+.aspects-of-power .recipe-entry-body p {
+  margin: 2px 0;
+}
+
 .aspects-of-power .aop-subblock {
   margin-top: 8px;
   padding: 6px 8px;
