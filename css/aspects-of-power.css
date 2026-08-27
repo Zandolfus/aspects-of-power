@@ -2332,6 +2332,22 @@ body.aop-targeting #board canvas {
   margin: 0;
   font-size: 13px;
   border: none;
+  text-align: left;
+}
+/* ⚠ .item-image and .item-controls GROW by default on this sheet — inside a
+   flex summary they took 182px each, shoving the title into the middle of the
+   row while every other row on the tab reads from the left margin. It looked
+   exactly like a stray text-align, and the computed style said `start`: the
+   geometry was the culprit, not the typography. Found by screenshotting and
+   then measuring the child boxes; fix confirmed by injecting it live before
+   it was written down. */
+.aspects-of-power details.recipe-entry > summary .item-image {
+  flex: 0 0 auto;
+  width: auto;
+  min-width: 0;
+}
+.aspects-of-power details.recipe-entry > summary .item-controls {
+  flex: 0 0 auto;
 }
 .aspects-of-power details.recipe-entry > summary .item-prop {
   flex: 0 0 auto;
