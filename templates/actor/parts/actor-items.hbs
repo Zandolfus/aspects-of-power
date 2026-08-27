@@ -69,14 +69,18 @@
     {{/each}}
   </ol>
 
-  {{!-- Recipe Book — closed shelves, opened on demand (ruled 2026-08-26:
-        "something like compendiums: not open unless they open it"). A crafter
-        with sixty formulas should see sixty SPINES, not sixty formulas. --}}
+  {{!-- Recipes. The inventory question ("do I own it") gets shelves here; the
+        crafting question ("what can I make right now, and with what") gets
+        the Recipe Book window, which is where search, categories and reagent
+        counts live. --}}
   <ol class='items-list'>
     <li class='item flexrow items-header'>
       <div class='item-name'>Recipes</div>
       <span class='item-prop'>{{#if recipeCount}}{{recipeCount}} known{{else}}none known{{/if}}</span>
       <div class='item-controls'>
+        <a class='item-control open-recipe-book' title='Open the Recipe Book'>
+          <i class='fas fa-book-open'></i> Open Book
+        </a>
         <a class='item-control item-create' title='New Recipe' data-type='recipe'>
           <i class='fas fa-plus'></i> New Recipe
         </a>

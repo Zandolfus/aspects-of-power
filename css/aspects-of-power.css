@@ -2362,6 +2362,132 @@ body.aop-targeting #board canvas {
   margin: 2px 0;
 }
 
+/* ── Recipe Book window ──────────────────────────────────────────────── */
+.recipe-book-app .recipe-book {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  gap: 6px;
+}
+.recipe-book-app .recipe-professions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  border-bottom: 1px solid var(--aop-border-darker);
+  padding-bottom: 6px;
+}
+.recipe-book-app .recipe-prof {
+  padding: 3px 10px;
+  border: 1px solid var(--aop-border-darker);
+  border-radius: 3px;
+  cursor: pointer;
+  font-size: 12px;
+  white-space: nowrap;
+}
+.recipe-book-app .recipe-prof.active {
+  background: var(--aop-overlay);
+  border-color: var(--aop-accent, #c9a227);
+  font-weight: bold;
+}
+.recipe-book-app .recipe-prof-count {
+  opacity: 0.6;
+  font-size: 11px;
+}
+.recipe-book-app .recipe-search-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.recipe-book-app .recipe-search {
+  flex: 1 1 auto;
+}
+/* The two panes scroll independently: a long formula list must not push the
+   Craft button off the bottom of the window. */
+.recipe-book-app .recipe-body {
+  display: flex;
+  gap: 8px;
+  flex: 1 1 auto;
+  min-height: 0;
+}
+.recipe-book-app .recipe-list {
+  flex: 1 1 55%;
+  overflow-y: auto;
+  min-height: 0;
+}
+.recipe-book-app .recipe-detail {
+  flex: 1 1 45%;
+  overflow-y: auto;
+  min-height: 0;
+  border-left: 1px solid var(--aop-border-darker);
+  padding-left: 8px;
+}
+.recipe-book-app .recipe-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 4px;
+  border-radius: 3px;
+  cursor: pointer;
+}
+.recipe-book-app .recipe-row:hover {
+  background: var(--aop-overlay);
+}
+.recipe-book-app .recipe-row.selected {
+  background: var(--aop-overlay);
+  outline: 1px solid var(--aop-accent, #c9a227);
+}
+/* Not-ready formulas stay VISIBLE and dimmed rather than hidden — "I know
+   this but I am two ingots short" is information the player needs. */
+.recipe-book-app .recipe-row.not-ready {
+  opacity: 0.55;
+}
+.recipe-book-app .recipe-row-name {
+  flex: 1 1 auto;
+  font-size: 13px;
+}
+.recipe-book-app .recipe-row-state {
+  flex: 0 0 auto;
+  font-size: 12px;
+  opacity: 0.8;
+}
+.recipe-book-app .recipe-detail-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.recipe-book-app .recipe-detail-head h2 {
+  margin: 0;
+  border: none;
+  font-size: 16px;
+}
+.recipe-book-app .recipe-reagents {
+  list-style: none;
+  margin: 4px 0;
+  padding: 0;
+}
+.recipe-book-app .recipe-reagents li {
+  display: flex;
+  gap: 8px;
+  padding: 2px 0;
+  font-size: 12px;
+}
+.recipe-book-app .reagent-count {
+  flex: 0 0 52px;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.recipe-book-app .recipe-reagents li.have .reagent-count { color: #7ec97e; }
+.recipe-book-app .recipe-reagents li.short .reagent-count { color: #ef5350; }
+.recipe-book-app .recipe-detail-foot {
+  margin-top: 10px;
+}
+.recipe-book-app .recipe-craft {
+  width: 100%;
+}
+.recipe-book-app .recipe-empty {
+  padding: 12px 4px;
+}
+
 .aspects-of-power .aop-subblock {
   margin-top: 8px;
   padding: 6px 8px;

@@ -700,6 +700,11 @@ export class AspectsofPowerActorSheet extends foundry.applications.api.Handlebar
       el.addEventListener('click', ev => ev.preventDefault());
     });
 
+    this.element.querySelector('.open-recipe-book')?.addEventListener('click', async () => {
+      const { RecipeBook } = await import('../apps/recipe-book.mjs');
+      new RecipeBook(this.actor).render(true);
+    });
+
     // Delete Inventory Item
     this.element.querySelectorAll('.item-delete').forEach(el => {
       el.addEventListener('click', ev => {

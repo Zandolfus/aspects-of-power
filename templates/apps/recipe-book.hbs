@@ -1,0 +1,111 @@
+{{!-- Recipe Book — profession window. Professions across the top, search,
+      collapsible categories on the left, the selected formula on the right
+      with its reagents counted against live inventory. --}}
+<div class="recipe-book">
+
+  <nav class="recipe-professions">
+    {{#each professions as |p|}}
+      <a class="recipe-prof {{#if p.active}}active{{/if}}" data-profession="{{p.key}}">
+        {{p.label}} <span class="recipe-prof-count">{{p.count}}</span>
+      </a>
+    {{else}}
+      <span class="hint">No professions yet.</span>
+    {{/each}}
+  </nav>
+
+  <div class="recipe-search-row">
+    <i class="fas fa-search"></i>
+    <input type="text" class="recipe-search" value="{{search}}"
+           placeholder="Search formulas, products, reagents..." />
+  </div>
+
+  <div class="recipe-body">
+
+    <div class="recipe-list">
+      {{#if hasShown}}
+        {{#each groups as |g|}}
+          <details class="aop-section recipe-category" data-category="{{g.key}}" {{#if g.open}}open{{/if}}>
+            <summary>
+              <span class="aop-section-title">{{g.label}}</span>
+              <span class="aop-section-hint">{{g.readyCount}} / {{g.count}} ready</span>
+            </summary>
+            <div class="aop-section-body">
+              {{#each g.recipes as |r|}}
+                <a class="recipe-row {{#if r.selected}}selected{{/if}} {{#unless r.ready}}not-ready{{/unless}}"
+                   data-recipe-id="{{r.id}}" title="{{#if r.ready}}Ready to craft{{else}}{{#if r.missing.length}}Short: {{#each r.missing as |m|}}{{m}}{{#unless @last}}, {{/unless}}{{/each}}{{else}}No craft skill for this{{/if}}{{/if}}">
+                  <img src="{{r.img}}" width="20" height="20" />
+                  <span class="recipe-row-name">{{r.productName}}</span>
+                  {{#if r.discovered}}<i class="fas fa-lightbulb" title="Discovered by {{r.discoveredBy}}"></i>{{/if}}
+                  <span class="recipe-row-state">{{#if r.ready}}&#10003;{{else}}&mdash;{{/if}}</span>
+                </a>
+              {{/each}}
+            </div>
+          </details>
+        {{/each}}
+      {{else}}
+        <p class="hint recipe-empty">{{emptyReason}}</p>
+      {{/if}}
+    </div>
+
+    <div class="recipe-detail">
+      {{#if selected}}
+        <header class="recipe-detail-head">
+          <img src="{{selected.img}}" width="36" height="36" />
+          <div>
+            <h2>{{selected.productName}}</h2>
+            <span class="hint">
+              {{#if selected.typeKey}}{{selected.typeKey}} &middot; {{/if}}
+              {{#if selected.threshold}}needs {{selected.threshold}}{{else}}ungated{{/if}}
+              {{#if selected.minMana}} &middot; {{selected.minMana}} mana{{/if}}
+            </span>
+          </div>
+        </header>
+
+        {{#if selected.discovered}}
+          <p class="hint recipe-provenance">
+            <i class="fas fa-lightbulb"></i> Discovered by {{selected.discoveredBy}}.
+          </p>
+        {{/if}}
+
+        <h3>Reagents</h3>
+        {{#if selected.lines.length}}
+          <ul class="recipe-reagents">
+            {{#each selected.lines as |line|}}
+              <li class="{{#if line.ok}}have{{else}}short{{/if}}">
+                <span class="reagent-count">{{line.have}} / {{line.need}}</span>
+                <span class="reagent-name">{{line.label}}</span>
+              </li>
+            {{/each}}
+          </ul>
+        {{else}}
+          <p class="hint">This formula names no reagents.</p>
+        {{/if}}
+
+        {{#if selected.requiresTags.length}}
+          <p class="hint">Worked with a craft skill tagged {{join selected.requiresTags ', '}}.</p>
+        {{/if}}
+
+        <footer class="recipe-detail-foot">
+          <button type="button" class="recipe-craft"
+                  data-skill-id="{{selected.skillId}}" data-recipe-id="{{selected.id}}"
+                  {{#unless selected.ready}}disabled{{/unless}}>
+            <i class="fas fa-hammer"></i>
+            {{#if selected.ready}}Craft with {{selected.skillName}}{{else}}Cannot craft{{/if}}
+          </button>
+          {{#unless selected.ready}}
+            <p class="hint">
+              {{#if selected.missing.length}}
+                Short: {{#each selected.missing as |m|}}{{m}}{{#unless @last}}, {{/unless}}{{/each}}.
+              {{else}}
+                You know the formula but have no craft skill that can work it.
+              {{/if}}
+            </p>
+          {{/unless}}
+        </footer>
+      {{else}}
+        <p class="hint recipe-empty">Pick a formula to see what it takes.</p>
+      {{/if}}
+    </div>
+
+  </div>
+</div>

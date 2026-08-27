@@ -67,6 +67,7 @@ export function resolveIngredients(actor, recipe) {
   const picks = [];
   const missing = [];
   const units = [];
+  const lines = [];                         // per-row have/need, for the UI
   let requiredUnits = 0;
 
   for (const row of rows) {
@@ -87,20 +88,36 @@ export function resolveIngredients(actor, recipe) {
       units.push({ progress: item.system.progress ?? 0, count: take });
       left -= take;
     }
-    if (left > 0) {
-      const what = [row.itemName || row.material || 'material',
-                    row.element ? `(${row.element})` : '',
-                    (row.minProgress ?? 0) > 0 ? `progress ${row.minProgress}+` : '']
-        .filter(Boolean).join(' ');
-      missing.push(`${left} more ${what}`);
-    }
+    const what = [row.itemName || row.material || 'material',
+                  row.element ? `(${row.element})` : '',
+                  (row.minProgress ?? 0) > 0 ? `${row.minProgress}+` : '']
+      .filter(Boolean).join(' ');
+    // Counted AFTER reservation, so a bill whose rows compete for one stack
+    // reports the shortfall on the row that actually went without.
+    lines.push({ label: what, need, have: need - left, ok: left <= 0 });
+    if (left > 0) missing.push(`${left} more ${what}`);
   }
 
   // The PRIMARY ingredient is the best unit of the first row — it stands in
   // for the freehand path's single `materialItem`, so element, output
   // material and image all resolve exactly as they always have.
   const primary = picks[0]?.item ?? null;
-  return { ok: missing.length === 0, picks, missing, units, requiredUnits, primary };
+  return { ok: missing.length === 0, picks, missing, units, requiredUnits, primary, lines };
+}
+
+/**
+ * The craft skills this actor could execute a recipe with. The inverse of
+ * eligibleRecipes, for the book: a recipe you know but have no skill for is
+ * still worth SEEING, greyed out, so "I need to train that" is legible.
+ */
+export function skillsFor(actor, recipe) {
+  const req = recipe?.system?.requiresSkillTags ?? [];
+  return (actor?.items ?? []).filter(i => {
+    if (i.type !== 'skill') return false;
+    const tags = i.system?.tags ?? [];
+    if (!tags.includes('craft')) return false;
+    return req.every(t => tags.includes(t));
+  });
 }
 
 /**
@@ -225,4 +242,5 @@ export function alreadyKnows(actor, recipe) {
 export const RecipeHelpers = {
   eligibleRecipes, matchesInput, resolveIngredients, consumeIngredients,
   attemptMatchesBill, findMatchingRecipe, craftBar, recipeLibrary, alreadyKnows,
+  skillsFor,
 };

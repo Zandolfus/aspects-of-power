@@ -1479,7 +1479,7 @@ class CraftingSkills {
    * Step 4: Offer preparation buffs if actor has preparation skills
    * Step 5: Roll and create the item
    */
-  async _handleCraftTag(item, rollData, dmgRoll, speaker, rollMode, label) {
+  async _handleCraftTag(item, rollData, dmgRoll, speaker, rollMode, label, opts = {}) {
     const actor = this.actor;
     if (!actor) return;
 
@@ -1547,7 +1547,10 @@ class CraftingSkills {
       if (!materialItem) return;
     } else {
       // ── Step 1: Mode (Recipe / New / Iterative) ──
+      // The Recipe Book answers this and the picker for us; jump straight to
+      // resolving that formula's bill.
       const known = eligibleRecipes(actor, item);
+      const preset = opts?.preRecipeId ? actor.items.get(opts.preRecipeId) : null;
       const modeButtons = [];
       if (known.length > 0) {
         modeButtons.push({ action: 'recipe', label: `Work a Recipe (${known.length})`,
@@ -1557,7 +1560,7 @@ class CraftingSkills {
                          default: known.length === 0 });
       modeButtons.push({ action: 'iter', label: 'Iterative Craft', icon: 'fas fa-redo' });
       modeButtons.push({ action: 'cancel', label: 'Cancel' });
-      const modeChoice = await foundry.applications.api.DialogV2.wait({
+      const modeChoice = preset ? 'recipe' : await foundry.applications.api.DialogV2.wait({
         window: { title: `${item.name} — Craft Mode` },
         content: '<p>Working a recipe you know, improvising something new, or iterating on an existing piece?</p>',
         buttons: modeButtons,
@@ -1573,7 +1576,7 @@ class CraftingSkills {
                    label: `${r.system.output?.name || r.name}${t ? ` (needs ${t})` : ''}` };
         });
         recipeButtons.push({ action: 'cancel', label: 'Cancel' });
-        const pick = await foundry.applications.api.DialogV2.wait({
+        const pick = preset ? preset.id : await foundry.applications.api.DialogV2.wait({
           window: { title: `${item.name} — Recipe` },
           content: '<p>Which recipe are you working?</p>',
           buttons: recipeButtons,

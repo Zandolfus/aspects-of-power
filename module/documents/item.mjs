@@ -8154,7 +8154,11 @@ export class AspectsofPowerItem extends Item {
           await this._handleCleanseTag(item, rollData, dmgRoll, speaker, rollMode, label);
           break;
         case 'craft':
-          await this._handleCraftTag(item, rollData, dmgRoll, speaker, rollMode, label);
+          // `options` carries preRecipeId when the Recipe Book drives the
+          // craft — the book has already answered the mode and picker, but
+          // the roll still runs its normal course so the skill pays its own
+          // costs and timing.
+          await this._handleCraftTag(item, rollData, dmgRoll, speaker, rollMode, label, options);
           break;
         case 'gather':
           await this._handleGatherTag(item, rollData, dmgRoll, speaker, rollMode, label);
