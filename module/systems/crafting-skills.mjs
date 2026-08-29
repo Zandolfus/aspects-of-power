@@ -9,7 +9,7 @@
  * byte-identical to its previous class-body form (no object-literal comma
  * surgery); the export collects the prototype methods into a plain mixin.
  */
-import { hybridAbilityMod, itemWeightLb, craftManaQuality, recipeMaterialProgress, recipeVerdict, materialCap, derivedRecipeThreshold, workmanshipMult } from '../helpers/formulas.mjs';
+import { hybridAbilityMod, itemWeightLb, craftManaQuality, recipeMaterialProgress, recipeVerdict, materialCap, derivedRecipeThreshold, workmanshipMult, clampQualityToSubstance } from '../helpers/formulas.mjs';
 import { eligibleRecipes, resolveIngredients, consumeIngredients, craftBar, findMatchingRecipe, recipeLibrary, alreadyKnows, isGenericRecipe, specializationOf } from './recipes.mjs';
 import { spatialCapacityFromCraft } from '../helpers/formulas.mjs';
 
@@ -2218,6 +2218,21 @@ class CraftingSkills {
     if (recipeQuality) {
       qualityKey = recipeQuality.key;
       qualityData = CONFIG.ASPECTSOFPOWER.craftQuality[recipeQuality.key] ?? qualityData;
+    }
+    // ── THE SUBSTANCE CLAMP (ruled 2026-08-28/29): the label can never
+    // exceed what the thing is made of. Reachable bars made masterwork on
+    // capped uncommon stock read RARE again — the exact door the scarcity
+    // ruling closed. You make a PERFECT uncommon piece; a rare piece needs
+    // rare stock. Applies to bills and to single-material freehand alike.
+    {
+      const _units = recipeBill?.units?.length
+        ? recipeBill.units
+        : (materialItem ? [{ rarity: materialItem.system.rarity || 'common', count: 1 }] : []);
+      const _clamped = clampQualityToSubstance(qualityKey, _units);
+      if (_clamped !== qualityKey) {
+        qualityKey = _clamped;
+        qualityData = CONFIG.ASPECTSOFPOWER.craftQuality[_clamped] ?? qualityData;
+      }
     }
     // critSuccess: bump quality one tier up. Quality tiers are sorted high-to-low
     // here, so "up" is the entry BEFORE the current one in the sorted list.

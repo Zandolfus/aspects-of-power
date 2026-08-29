@@ -3102,6 +3102,18 @@ ASPECTSOFPOWER.recipeTuning = {
   // base ~0.63 for a helm; 0.6 keeps the number legible.
   thresholdBase: 0.6,
 
+  // How much of the product's size factor lands on the CRAFTSMAN (ruled
+  // 2026-08-29: "it doesn't make sense that 3 ingots can't make a
+  // chestpiece, only that a craftsman failed"). The slot factor prices how
+  // much item a piece is, but the BILL already pays for size in material —
+  // a chest eats 3 units — so difficulty carries only half the size premium.
+  // At 1.0 the old model made big pieces arithmetically UNREACHABLE at
+  // standard time for every crafter alive (chest bar 330 vs a hard supply
+  // ceiling of 297 on uncommon stock): the impossibility read as the
+  // material's fault, when a failed piece should always be the craftsman's.
+  // At 0.5 every met bill is reachable at every tier and failure is a roll.
+  slotDifficultyShare: 0.5,
+
   // Base block for a craft whose skill carries NO activity timing yet (246
   // profession skills, 1 timed — the standing content debt). The workmanship
   // tier multiplies this and advances the world clock directly, ritual-prep

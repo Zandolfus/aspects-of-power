@@ -3155,21 +3155,24 @@ eq('junk situational entries are skipped, not NaN',
     // worked and the product made ARE the difficulty, so repeat crafts of a
     // solved material cannot inflate into permanent rare-quality.
     const DCFG = { materialCaps: { uncommon: 300, rare: 500, epic: 800 },
-                   recipeTuning: { thresholdBase: 0.6 },
+                   recipeTuning: { thresholdBase: 0.6, slotDifficultyShare: 0.5 },
                    craftSlotValues: { head: 0.2, chest: 0.5, greatsword: 0.5 } };
-    eq('difficulty: a fulgurite helm derives 240',
-       F3.derivedRecipeThreshold([{ rarity: 'uncommon', count: 1 }], 'head', DCFG), 240);
-    eq('difficulty: a bigger piece is harder in the same substance',
-       F3.derivedRecipeThreshold([{ rarity: 'uncommon', count: 3 }], 'chest', DCFG), 330);
+    eq('difficulty: a fulgurite helm derives 210',
+       F3.derivedRecipeThreshold([{ rarity: 'uncommon', count: 1 }], 'head', DCFG), 210);
+    // Ruled 2026-08-29: only half the size premium is the craftsman's — the
+    // bill already paid for size in material. At full share the chest bar
+    // (330) sat ABOVE the supply ceiling (297) for every crafter alive.
+    eq('difficulty: a bigger piece is harder, but always REACHABLE',
+       F3.derivedRecipeThreshold([{ rarity: 'uncommon', count: 3 }], 'chest', DCFG), 255);
     eq('difficulty: a better substance is harder for the same piece',
-       F3.derivedRecipeThreshold([{ rarity: 'rare', count: 1 }], 'head', DCFG), 400);
+       F3.derivedRecipeThreshold([{ rarity: 'rare', count: 1 }], 'head', DCFG), 350);
     // Mixed bills use the quantity-weighted MEAN of the caps.
     eq('difficulty: mixed substances blend by unit',
        F3.derivedRecipeThreshold([{ rarity: 'uncommon', count: 1 },
-                                  { rarity: 'rare', count: 1 }], 'head', DCFG), 320);
+                                  { rarity: 'rare', count: 1 }], 'head', DCFG), 280);
     // Unknown product types price at the 1H-weapon default, never zero.
     eq('difficulty: an unpriced product falls back, not to zero',
-       F3.derivedRecipeThreshold([{ rarity: 'uncommon', count: 1 }], 'mystery', DCFG), 255);
+       F3.derivedRecipeThreshold([{ rarity: 'uncommon', count: 1 }], 'mystery', DCFG), 218);
     eq('difficulty: no units means no derived bar',
        F3.derivedRecipeThreshold([], 'head', DCFG), 0);
     // ── WORKMANSHIP (ruled 2026-08-29: quality = workmanship, materials,
@@ -3181,8 +3184,9 @@ eq('junk situational entries are skipped, not NaN',
     eq('workmanship: tiers read their craftMult', F3.workmanshipMult('fine', WCFG), 1.25);
     eq('workmanship: an unknown tier is standard', F3.workmanshipMult('??', WCFG), 1);
     eq('workmanship: absent config is standard', F3.workmanshipMult('fine', {}), 1);
-    // THE POINT, pinned end to end against John's live numbers (typical 355
-    // vs the derived fulgurite-helm bar of 240): stats alone stop at COMMON.
+    // THE POINT, pinned end to end against John's UNMULTIPLIED numbers (355
+    // vs a 240 bar; the live x0.6 rarity mult shifts both sides — the SHAPE
+    // is what this pins): stats alone stop at COMMON.
     // Fine work (x4 time) buys uncommon; RARE exists only behind masterwork
     // (x25 time); and a rush job can fail the threshold outright.
     const VQ = { craftQuality: { cracked: { minProgress: 0, rarity: 'inferior' } },
@@ -3195,12 +3199,36 @@ eq('junk situational entries are skipped, not NaN',
     eq('workmanship: a rush job can fail outright',
        F3.recipeVerdict(Math.round(330 * 0.7), 240, VQ).success, false);
 
-    // ⚠ THE INFLATION PIN: against the OLD static 150, a typical master roll
-    // of 355 was ratio 2.37 = RARE on every repeat craft. Against the
-    // derived 240 the same roll is ratio ~1.48 = common. Quality now means
-    // "how well was THIS substance worked".
+    // ── THE SUBSTANCE CLAMP (ruled 2026-08-28/29) ─────────────────────
+    // Reachable bars + masterwork reopened rare-from-uncommon; the clamp is
+    // what keeps the scarcity ruling true: the label can never exceed what
+    // the thing is made of.
+    const CCFG = { materialCaps: { common: 200, uncommon: 300, rare: 500, epic: 800 } };
+    eq('clamp: rare work on uncommon stock is a PERFECT uncommon',
+       F3.clampQualityToSubstance('rare', [{ rarity: 'uncommon', count: 1 }], CCFG), 'uncommon');
+    eq('clamp: at-tier work passes untouched',
+       F3.clampQualityToSubstance('uncommon', [{ rarity: 'uncommon', count: 3 }], CCFG), 'uncommon');
+    eq('clamp: work BELOW the substance is not raised (a floor is the door back open)',
+       F3.clampQualityToSubstance('common', [{ rarity: 'epic', count: 1 }], CCFG), 'common');
+    eq('clamp: rare stock allows rare',
+       F3.clampQualityToSubstance('rare', [{ rarity: 'rare', count: 2 }], CCFG), 'rare');
+    // An alloy is as good as its blend: 1 rare + 2 uncommon means a mean cap
+    // below rare, so the blend clamps at uncommon.
+    eq('clamp: a blend is as good as its mean',
+       F3.clampQualityToSubstance('rare', [{ rarity: 'rare', count: 1 },
+                                           { rarity: 'uncommon', count: 2 }], CCFG), 'uncommon');
+    eq('clamp: nothing consumed means no clamp',
+       F3.clampQualityToSubstance('rare', [], CCFG), 'rare');
+
+    // ⚠ THE INFLATION PIN, on the REAL roll (the x0.6 rarity mult applies on
+    // the live path — measured 2026-08-29 after quoting unmultiplied rolls
+    // twice): John's true typical total on capped fulgurite is ~265. Against
+    // the OLD static 150 that was ratio 1.77 = uncommon-forever; against the
+    // derived 210 it is ~1.26 = common, and rare stays behind proficiency
+    // growth and workmanship. Quality means "how well was THIS substance
+    // worked".
     eq('difficulty: the repeat-craft inflation is dead',
-       F3.recipeVerdict(355, F3.derivedRecipeThreshold(
+       F3.recipeVerdict(265, F3.derivedRecipeThreshold(
          [{ rarity: 'uncommon', count: 1 }], 'head', DCFG),
          { craftQuality: { cracked: { minProgress: 0, rarity: 'inferior' } },
            recipeQualityRatios: { inferior: 1.00, common: 1.20, uncommon: 1.50, rare: 2.00 } }

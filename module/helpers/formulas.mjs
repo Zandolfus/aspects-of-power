@@ -2192,9 +2192,62 @@ export function derivedRecipeThreshold(units, typeKey, cfg = null) {
   if (n <= 0) return 0;
   const base = Number(sc.recipeTuning?.thresholdBase);
   const slotFactor = Number(sc.craftSlotValues?.[typeKey]);
+  // Only PART of the size premium is the craftsman's to clear — the bill
+  // already paid for size in material units (ruled 2026-08-29: "it doesn't
+  // make sense that 3 ingots can't make a chestpiece, only that a craftsman
+  // failed"). At full share the chest bar sat above the hard supply ceiling
+  // for every crafter alive — a structural impossibility wearing the
+  // material's colors, where failure must always be the craftsman's roll.
+  const share = Number(sc.recipeTuning?.slotDifficultyShare);
   return Math.round((capSum / n)
     * ((Number.isFinite(base) && base > 0 ? base : 0.6)
-     + (Number.isFinite(slotFactor) && slotFactor > 0 ? slotFactor : 0.25)));
+     + (Number.isFinite(slotFactor) && slotFactor > 0 ? slotFactor : 0.25)
+       * (Number.isFinite(share) && share > 0 ? share : 0.5)));
+}
+
+/**
+ * THE SUBSTANCE CLAMP (ruled 2026-08-28/29: "I don't want rare pieces
+ * everywhere, that defeats the purpose" + "it doesn't make sense that 3
+ * ingots can't make a chestpiece, only that a craftsman failed").
+ *
+ * The two rulings compose: every met bill is REACHABLE and failure is the
+ * craftsman's roll — but the label can never exceed what the thing is made
+ * of. You cannot craft a rare piece from uncommon stock, no matter how long
+ * you take; you make a PERFECT uncommon piece. Scarcity that survives long
+ * lives must live in consumed inputs: rare items are exactly as common as
+ * rare substances, and gathering holds the throttle at the source.
+ *
+ * The substance tier is the highest rarity whose cap the bill's weighted
+ * mean cap actually reaches — a single-substance bill is simply that
+ * substance; an alloy is as good as its blend.
+ *
+ * @returns {string} the quality KEY, clamped
+ */
+export function clampQualityToSubstance(qualityKey, units, cfg = null) {
+  const sc = cfg ?? (globalThis.CONFIG?.ASPECTSOFPOWER ?? {});
+  const order = ['inferior', 'common', 'uncommon', 'rare', 'epic', 'legendary', 'mythic', 'divine'];
+  let capSum = 0, n = 0;
+  for (const u of units ?? []) {
+    const c = Math.max(0, Number(u?.count) || 0);
+    if (c <= 0) continue;
+    capSum += materialCap(u.rarity, sc) * c;
+    n += c;
+  }
+  if (n <= 0) return qualityKey;                     // nothing consumed — no clamp
+  const mean = capSum / n;
+  let tier = 'inferior';
+  for (const r of order) {
+    // Only rarities the caps table actually DEFINES may vote — materialCap's
+    // unknown-rarity fallback (the common cap) would otherwise make every
+    // missing high tier read as trivially reached and hand the walk to the
+    // last entry in the order. Caught by the pure suite before it shipped.
+    if (!Number.isFinite(Number(sc.materialCaps?.[r]))) continue;
+    if (materialCap(r, sc) <= mean + 0.5) tier = r;  // highest tier the blend reaches
+  }
+  const qi = order.indexOf(qualityKey);
+  const ti = order.indexOf(tier);
+  if (qi < 0 || ti < 0) return qualityKey;
+  return qi > ti ? tier : qualityKey;
 }
 
 /**
