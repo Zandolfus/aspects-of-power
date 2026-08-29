@@ -119,7 +119,8 @@ export function resolveIngredients(actor, recipe) {
       const take = Math.min(have, left);
       reserved.set(item.id, (reserved.get(item.id) ?? 0) + take);
       picks.push({ item, count: take });
-      units.push({ progress: item.system.progress ?? 0, count: take });
+      units.push({ progress: item.system.progress ?? 0, count: take,
+                   rarity: item.system.rarity || 'common' });
       left -= take;
     }
     const what = [row.itemName || row.material || 'material',

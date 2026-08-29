@@ -9,7 +9,7 @@
  * byte-identical to its previous class-body form (no object-literal comma
  * surgery); the export collects the prototype methods into a plain mixin.
  */
-import { hybridAbilityMod, itemWeightLb, craftManaQuality, recipeMaterialProgress, recipeVerdict, materialCap } from '../helpers/formulas.mjs';
+import { hybridAbilityMod, itemWeightLb, craftManaQuality, recipeMaterialProgress, recipeVerdict, materialCap, derivedRecipeThreshold } from '../helpers/formulas.mjs';
 import { eligibleRecipes, resolveIngredients, consumeIngredients, craftBar, findMatchingRecipe, recipeLibrary, alreadyKnows, isGenericRecipe, specializationOf } from './recipes.mjs';
 import { spatialCapacityFromCraft } from '../helpers/formulas.mjs';
 
@@ -1767,7 +1767,8 @@ class CraftingSkills {
           ? { item: p.item, count: p.count - 1 } : p)).filter(p => p.count > 0);
         // Mean-of-what-went-in, with overpour NEUTRAL by construction: an
         // improviser has no bill to exceed, so required == supplied.
-        const units = chosen.map(p => ({ progress: p.item.system.progress ?? 0, count: p.count }));
+        const units = chosen.map(p => ({ progress: p.item.system.progress ?? 0, count: p.count,
+                                          rarity: p.item.system.rarity || 'common' }));
         const supplied = units.reduce((s, u) => s + u.count, 0);
         recipeBill = { units, requiredUnits: supplied };
       }
@@ -2024,8 +2025,20 @@ class CraftingSkills {
     // product is named, so what matters is how well you executed THIS
     // formula, not where the number falls on a universal scale.
     let recipeQuality = null;
+    // DERIVED DIFFICULTY (ruled 2026-08-29): an authored threshold (> 0)
+    // overrides; otherwise the bar comes from the substances actually worked
+    // and the product being made, at craft time. Same rule everywhere a
+    // threshold is read below, so the gate, the discovery bar and the
+    // quality ratio can never disagree about how hard this work was.
+    const effThreshold = (r) => {
+      const t = r?.system?.threshold ?? 0;
+      if (t > 0) return t;
+      return derivedRecipeThreshold(recipeBill?.units ?? [],
+        r?.system?.output?.typeKey || typeKey || '');
+    };
     if (recipe) {
-      const verdict = recipeVerdict(totalProgress, recipe.system.threshold ?? 0);
+      const _t = effThreshold(recipe);
+      const verdict = recipeVerdict(totalProgress, _t);
       if (!verdict.success) {
         // Consume everything, exactly as a failed ritual does. The primary is
         // eaten by the same path a freehand craft uses; the rest go here.
@@ -2036,7 +2049,7 @@ class CraftingSkills {
           content: `<div class="craft-result">
             <h3>${item.name} — ${recipe.system.output?.name || recipe.name} Failed</h3><hr>
             <p>Progress <strong style="color:#ef5350;">${totalProgress}</strong> against a
-            threshold of ${recipe.system.threshold}. The work does not hold together.</p>
+            threshold of ${_t}. The work does not hold together.</p>
             ${manaLine}
             <p><em>Ingredients consumed.</em></p>
           </div>` });
@@ -2070,9 +2083,10 @@ class CraftingSkills {
       const spec = match && isGenericRecipe(match)
         ? specializationOf(match, freehandPicks) : null;
       if (spec) {
-        const bar = craftBar(match.system.threshold ?? 0, false);
+        const _mt = effThreshold(match);
+        const bar = craftBar(_mt, false);
         if (totalProgress >= bar) {
-          const verdict = recipeVerdict(totalProgress, match.system.threshold ?? 0);
+          const verdict = recipeVerdict(totalProgress, _mt);
           recipeQuality = verdict.success ? verdict : recipeQuality;
           spec.system.discoveredBy = actor.name;
           // Whose CLIENT runs this line? (code standard 16). A GM's can put
@@ -2107,9 +2121,10 @@ class CraftingSkills {
         }
       } else if (match) {
         const known = alreadyKnows(actor, match);
-        const bar = craftBar(match.system.threshold ?? 0, known);
+        const _mt = effThreshold(match);
+        const bar = craftBar(_mt, known);
         if (totalProgress >= bar) {
-          const verdict = recipeVerdict(totalProgress, match.system.threshold ?? 0);
+          const verdict = recipeVerdict(totalProgress, _mt);
           recipeQuality = verdict.success ? verdict : recipeQuality;
           // Knowing it already means there is nothing to hand over — the
           // work simply succeeds at the lower bar.

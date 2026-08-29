@@ -2143,6 +2143,49 @@ export function recipeMaterialProgress(units = [], requiredUnits = 0, cfg = null
 }
 
 /**
+ * DERIVED RECIPE DIFFICULTY (ruled 2026-08-29: "build the math for recipe
+ * difficulty based on the materials used and final product").
+ *
+ * threshold = meanCap x (thresholdBase + slotFactor)
+ *
+ * meanCap is the quantity-weighted mean of the worked substances' CEILINGS
+ * (materialCaps by rarity) — difficulty is about the substance, not the
+ * specimen, so a badly-gathered fulgurite is exactly as hard to work as a
+ * capped one. slotFactor is the product's craftSlotValues entry: the same
+ * number that sets its stat budget prices its difficulty, so "how much item
+ * it is" is one fact, not two.
+ *
+ * Consequences worth knowing:
+ * - Quality (ratio to threshold) now measures how well the crafter worked
+ *   THIS substance. A master spamming fulgurite helms sits at common/
+ *   uncommon; rare labels demand genuinely great rolls. No repeat-craft
+ *   inflation.
+ * - Higher-tier substances read closer to their own threshold, so frontier
+ *   work yields merely-sound pieces — the tier flows through to the label.
+ *
+ * @param {Array<{rarity:string, count:number}>} units  substances worked
+ * @param {string} typeKey  product type (craftSlotValues key; slot fallback)
+ * @returns {number} 0 when nothing usable was supplied (caller keeps its
+ *          authored threshold or stays ungated)
+ */
+export function derivedRecipeThreshold(units, typeKey, cfg = null) {
+  const sc = cfg ?? (globalThis.CONFIG?.ASPECTSOFPOWER ?? {});
+  let capSum = 0, n = 0;
+  for (const u of units ?? []) {
+    const c = Math.max(0, Number(u?.count) || 0);
+    if (c <= 0) continue;
+    capSum += materialCap(u.rarity, sc) * c;
+    n += c;
+  }
+  if (n <= 0) return 0;
+  const base = Number(sc.recipeTuning?.thresholdBase);
+  const slotFactor = Number(sc.craftSlotValues?.[typeKey]);
+  return Math.round((capSum / n)
+    * ((Number.isFinite(base) && base > 0 ? base : 0.6)
+     + (Number.isFinite(slotFactor) && slotFactor > 0 ? slotFactor : 0.25)));
+}
+
+/**
  * THE VERDICT on one recipe attempt (ruled 2026-08-26, threshold failure
  * "much like rituals": clear it and you get the item at a quality set by how
  * far past you landed; miss and the ingredients are gone).

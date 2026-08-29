@@ -327,7 +327,7 @@ export class AspectsofPowerActorSheet extends foundry.applications.api.Handlebar
         // shelf can render closed without paying for its own contents.
         const sys = i.system ?? {};
         i.productName = sys.output?.name || i.name;
-        i.thresholdLabel = (sys.threshold ?? 0) > 0 ? `needs ${sys.threshold}` : 'ungated';
+        i.thresholdLabel = (sys.threshold ?? 0) > 0 ? `needs ${sys.threshold}` : 'by material';
         i.billLines = (sys.inputs ?? []).map(row => {
           const what = row.itemName || row.material || 'any material';
           const el = row.element ? ` (${row.element})` : '';

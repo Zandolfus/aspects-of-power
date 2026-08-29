@@ -1,4 +1,5 @@
 import { resolveIngredients, skillsFor } from '../systems/recipes.mjs';
+import { derivedRecipeThreshold } from '../helpers/formulas.mjs';
 
 /**
  * THE RECIPE BOOK — a profession window (ruled 2026-08-27: "something more
@@ -59,7 +60,13 @@ export class RecipeBook extends foundry.applications.api.HandlebarsApplicationMi
           profession: r.system.profession || 'Unsorted',
           category: types[typeKey]?.category || 'other',
           typeKey,
-          threshold: r.system.threshold ?? 0,
+          // Authored threshold wins; 0 means difficulty DERIVES from the
+          // substances worked — so show what the bar would be against the
+          // stock this crafter would actually reach for.
+          threshold: (r.system.threshold ?? 0) > 0
+            ? r.system.threshold
+            : (bill.units.length ? derivedRecipeThreshold(bill.units, typeKey) : 0),
+          thresholdDerived: (r.system.threshold ?? 0) <= 0,
           minMana: r.system.minMana ?? 0,
           discovered: r.system.source === 'discovered',
           discoveredBy: r.system.discoveredBy || '',

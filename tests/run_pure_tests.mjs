@@ -3149,6 +3149,39 @@ eq('junk situational entries are skipped, not NaN',
     // material is exactly the bug this exists to prevent.
     eq('caps: unknown rarity falls back to common', F3.materialCap('??', CAPCFG), 200);
     eq('caps: a bare config still yields a finite cap', F3.materialCap('rare', { }), 200);
+
+    // ── DERIVED DIFFICULTY (ruled 2026-08-29) ─────────────────────────
+    // threshold = meanCap x (thresholdBase + slotFactor): the substances
+    // worked and the product made ARE the difficulty, so repeat crafts of a
+    // solved material cannot inflate into permanent rare-quality.
+    const DCFG = { materialCaps: { uncommon: 300, rare: 500, epic: 800 },
+                   recipeTuning: { thresholdBase: 0.6 },
+                   craftSlotValues: { head: 0.2, chest: 0.5, greatsword: 0.5 } };
+    eq('difficulty: a fulgurite helm derives 240',
+       F3.derivedRecipeThreshold([{ rarity: 'uncommon', count: 1 }], 'head', DCFG), 240);
+    eq('difficulty: a bigger piece is harder in the same substance',
+       F3.derivedRecipeThreshold([{ rarity: 'uncommon', count: 3 }], 'chest', DCFG), 330);
+    eq('difficulty: a better substance is harder for the same piece',
+       F3.derivedRecipeThreshold([{ rarity: 'rare', count: 1 }], 'head', DCFG), 400);
+    // Mixed bills use the quantity-weighted MEAN of the caps.
+    eq('difficulty: mixed substances blend by unit',
+       F3.derivedRecipeThreshold([{ rarity: 'uncommon', count: 1 },
+                                  { rarity: 'rare', count: 1 }], 'head', DCFG), 320);
+    // Unknown product types price at the 1H-weapon default, never zero.
+    eq('difficulty: an unpriced product falls back, not to zero',
+       F3.derivedRecipeThreshold([{ rarity: 'uncommon', count: 1 }], 'mystery', DCFG), 255);
+    eq('difficulty: no units means no derived bar',
+       F3.derivedRecipeThreshold([], 'head', DCFG), 0);
+    // ⚠ THE INFLATION PIN: against the OLD static 150, a typical master roll
+    // of 355 was ratio 2.37 = RARE on every repeat craft. Against the
+    // derived 240 the same roll is ratio ~1.48 = common. Quality now means
+    // "how well was THIS substance worked".
+    eq('difficulty: the repeat-craft inflation is dead',
+       F3.recipeVerdict(355, F3.derivedRecipeThreshold(
+         [{ rarity: 'uncommon', count: 1 }], 'head', DCFG),
+         { craftQuality: { cracked: { minProgress: 0, rarity: 'inferior' } },
+           recipeQualityRatios: { inferior: 1.00, common: 1.20, uncommon: 1.50, rare: 2.00 } }
+       ).key, 'common');
   }
 
   // ── AFFINITY TYPING IS DERIVED FROM TAGS (ruled 2026-08-24) ──

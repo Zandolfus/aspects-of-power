@@ -3069,6 +3069,29 @@ ASPECTSOFPOWER.craftMana = {
 ASPECTSOFPOWER.recipeTuning = {
   overpourCap: 1.5,
 
+  // ── DERIVED DIFFICULTY (ruled 2026-08-29: "build the math for recipe
+  // difficulty based on the materials used and final product") ──
+  // threshold = meanMaterialCap x (thresholdBase + slotFactor), where the
+  // mean cap comes from the SUBSTANCES actually worked (materialCaps by
+  // rarity) and slotFactor is the product's craftSlotValues entry — the same
+  // number that sets its stat budget, so a bigger piece is harder exactly in
+  // proportion to how much item it is. A recipe with an authored threshold
+  // (> 0) overrides; 0 means derive at craft time.
+  //
+  // Why derive: static thresholds INFLATE repeat crafts — the generic Helm's
+  // authored 150 against a master's ~355 typical roll is ratio 2.4, i.e. a
+  // RARE-quality helm every single time, forever. Deriving from the
+  // substance makes quality mean "how well did you work THIS material":
+  // fulgurite helm threshold 240 -> the same roll reads ~1.5, common
+  // brushing uncommon, and rare only on genuinely great work.
+  //
+  // thresholdBase 0.6 calibrated against live rolls (John craft blend 771):
+  // uncommon helm ~90% success, cuirass ~69%, rare helm ~86%, epic helm
+  // ~75% — routine pieces succeed, big pieces challenge, frontier substances
+  // yield merely-sound results. The sim's 0.75x-typical-output rule lands at
+  // base ~0.63 for a helm; 0.6 keeps the number legible.
+  thresholdBase: 0.6,
+
   // freeformSurcharge — RULED 2026-08-26: "freecrafting success and recipe
   // unlock should be proportional to each other. Say a recipe requires 100
   // craft quality, freecrafting should take 115 or so quality."
@@ -3174,7 +3197,12 @@ ASPECTSOFPOWER.craftSlotValues = {
   // ── Weapons (per type — 1H/shields = 25%, 2H = 50%) ──
   sword: 0.25, axe: 0.25, spear: 0.25, dagger: 0.25, hammer: 0.25, rapier: 0.25,
   greatsword: 0.50, greataxe: 0.50, polearm: 0.50, staff: 0.50, bow: 0.50,
+  greathammer: 0.50, quarterstaff: 0.50,
+  wand: 0.25, throwing: 0.25, gauntlet: 0.25,
   buckler: 0.25, shield: 0.25, greatshield: 0.25,
+  // ── Trade goods (no stat budget in practice — slot '' zeroes it — but the
+  // key doubles as the recipe DIFFICULTY factor, see recipeTuning) ──
+  food: 0.25, potion: 0.25, trap: 0.25, drum: 0.25,
   // Slot fallback (used by legacy non-flow callers; only relevant for weaponry slot now)
   weaponry: 0.25,
 };
