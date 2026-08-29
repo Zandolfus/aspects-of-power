@@ -6071,6 +6071,16 @@ export class AspectsofPowerItem extends Item {
         });
         if (!picked || picked === 'cancel') return;
         _timeInvest = picked.mult;
+        // ⚠ THE CLOCK HALF IGNORES opts.multiplier BY DESIGN — quality must
+        // not speed a clock ("glue does not cure faster for a fast smith"),
+        // so activityTicks scales only the celerity part. Time-INVEST is the
+        // opposite direction: deliberately spending MORE clock. Scale the
+        // inline block directly, or a x16 declaration prices at x1 and buys
+        // sixteenfold quality for one block of time (caught live 2026-08-29:
+        // declared 40m, verdict x1.50).
+        if (inline && inline.clockSeconds > 0) {
+          inline.clockSeconds = Math.round(inline.clockSeconds * _timeInvest);
+        }
       }
       return DowntimeHelpers.declare(this.actor, key, {
         inline,
