@@ -9,8 +9,8 @@
  * byte-identical to its previous class-body form (no object-literal comma
  * surgery); the export collects the prototype methods into a plain mixin.
  */
-import { hybridAbilityMod, itemWeightLb, craftManaQuality, recipeMaterialProgress, recipeVerdict } from '../helpers/formulas.mjs';
-import { eligibleRecipes, resolveIngredients, consumeIngredients, craftBar, findMatchingRecipe, recipeLibrary, alreadyKnows } from './recipes.mjs';
+import { hybridAbilityMod, itemWeightLb, craftManaQuality, recipeMaterialProgress, recipeVerdict, materialCap } from '../helpers/formulas.mjs';
+import { eligibleRecipes, resolveIngredients, consumeIngredients, craftBar, findMatchingRecipe, recipeLibrary, alreadyKnows, isGenericRecipe, specializationOf } from './recipes.mjs';
 import { spatialCapacityFromCraft } from '../helpers/formulas.mjs';
 
 class CraftingSkills {
@@ -109,7 +109,7 @@ class CraftingSkills {
         i.type === 'skill' && (i.system.tags ?? []).includes('refine')
       );
       const cur = materialItem.system.progress ?? 0;
-      const max = materialItem.system.maxProgress ?? Math.round(cur * 1.2);
+      const max = materialItem.system.maxProgress ?? materialCap(materialItem.system.rarity);
       refineHeadroom = Math.max(0, max - cur);
     }
     const showRefine = refineSkills.length > 0 && refineHeadroom > 0;
@@ -890,7 +890,7 @@ class CraftingSkills {
     const materials = actor.items.filter(i => {
       if (i.type !== 'item' || !i.system.isMaterial) return false;
       const cur = i.system.progress ?? 0;
-      const max = i.system.maxProgress ?? Math.round(cur * 1.2);
+      const max = i.system.maxProgress ?? materialCap(i.system.rarity);
       return cur < max;
     });
     if (materials.length === 0) {
@@ -901,7 +901,7 @@ class CraftingSkills {
     const matButtons = materials.map(m => {
       const elLabel = m.system.materialElement ? ` [${m.system.materialElement}]` : '';
       const cur = m.system.progress ?? 0;
-      const max = m.system.maxProgress ?? Math.round(cur * 1.2);
+      const max = m.system.maxProgress ?? materialCap(m.system.rarity);
       return { action: m.id, label: `${m.name}${elLabel} — ${cur}/${max}` };
     });
     matButtons.push({ action: 'cancel', label: 'Cancel' });
@@ -924,7 +924,12 @@ class CraftingSkills {
     const d100Pct = d100Roll.total / 100;
     const rawGain = Math.round(skillRoll * d100Pct);
     const oldProgress = materialItem.system.progress ?? 0;
-    const maxProgress = materialItem.system.maxProgress ?? Math.round(oldProgress * 1.2);
+    // The substance ceiling wins even over a stored maxProgress — pre-cap
+    // materials carry roll-derived values that can exceed what the substance
+    // IS (ruled 2026-08-28).
+    const maxProgress = Math.min(
+      materialItem.system.maxProgress ?? Infinity,
+      materialCap(materialItem.system.rarity));
     const headroom = Math.max(0, maxProgress - oldProgress);
     const refineGain = Math.min(rawGain, headroom);
 
@@ -1097,8 +1102,12 @@ class CraftingSkills {
         material: materialType,
         materialElement: element,
         rarity: selectedRarity,
-        progress: gatherProgress,
-        maxProgress: Math.round(gatherProgress * 1.2),
+        // A substance has a CEILING (materialCaps, ruled 2026-08-28): gather
+        // cannot roll past it, and the old roll-derived 1.2x headroom is gone
+        // for materials — the cap IS the headroom, so a poorly-gathered piece
+        // of a good substance can still be refined to what the substance is.
+        progress: Math.min(gatherProgress, materialCap(selectedRarity)),
+        maxProgress: materialCap(selectedRarity),
         tags: matFreeTags,
       },
     }]);
@@ -1797,7 +1806,7 @@ class CraftingSkills {
         const refineD100 = new Roll('1d100');
         await refineD100.evaluate();
         const cur = materialItem.system.progress ?? 0;
-        const max = materialItem.system.maxProgress ?? Math.round(cur * 1.2);
+        const max = materialItem.system.maxProgress ?? materialCap(materialItem.system.rarity);
         const headroom = Math.max(0, max - cur);
         const rawGain = Math.round(Math.round(refRoll.total) * (refineD100.total / 100));
         const refineGain = Math.min(rawGain, headroom);
@@ -2046,7 +2055,57 @@ class CraftingSkills {
     let discovered = null;
     if (!recipe && freehandPicks && !reworkTarget) {
       const match = findMatchingRecipe(recipeLibrary(), typeKey, freehandPicks);
-      if (match) {
+      // ── SPECIALIZATION MINT (ruled 2026-08-28: generics "should be the
+      // baseline for other recipes... each subtype of base material requires
+      // a recipe or a freeform craft to GENERATE their specific recipe").
+      // When the best match is a GENERIC — a baseline like "Helm: 1 base
+      // material" — and the pile is one concrete substance, the improviser is
+      // not working the generic: they are attempting the SPECIALIZATION that
+      // does not exist yet. Succeed at the improvising bar and the world
+      // gains the formula: "Fulgurite Helm" enters the LIBRARY (so others can
+      // discover it) and the crafter learns a copy. A specific recipe already
+      // in the library outranks the generic in findMatchingRecipe, so a
+      // formula is only ever minted once. A mixed pile cannot specialize and
+      // simply works as the generic.
+      const spec = match && isGenericRecipe(match)
+        ? specializationOf(match, freehandPicks) : null;
+      if (spec) {
+        const bar = craftBar(match.system.threshold ?? 0, false);
+        if (totalProgress >= bar) {
+          const verdict = recipeVerdict(totalProgress, match.system.threshold ?? 0);
+          recipeQuality = verdict.success ? verdict : recipeQuality;
+          spec.system.discoveredBy = actor.name;
+          // Whose CLIENT runs this line? (code standard 16). A GM's can put
+          // the formula in the world library, where others can discover it; a
+          // player's may lack ITEM_CREATE, so the mint lands on their own
+          // actor instead and the library copy is owed to a GM pass. Either
+          // way the crafter walks away knowing the formula.
+          if (game.user.can('ITEM_CREATE')) {
+            const [minted] = await Item.createDocuments([spec]);
+            discovered = minted;
+            recipe = minted;
+          } else {
+            const [minted] = await actor.createEmbeddedDocuments('Item', [spec]);
+            discovered = minted;   // announced on the card; the grant block
+            recipe = minted;       // skips it because it already lives here
+          }
+        } else {
+          if (recipeExtraPicks.length) await consumeIngredients(actor, recipeExtraPicks);
+          if ((materialItem.system.quantity ?? 1) <= 1) await materialItem.delete();
+          else await materialItem.update({ 'system.quantity': materialItem.system.quantity - 1 });
+          ChatMessage.create({ speaker, rollMode,
+            content: `<div class="craft-result">
+              <h3>${item.name} — The Work Does Not Cohere</h3><hr>
+              <p><strong>${actor.name}</strong> tries to work ${spec.name.toLowerCase()}
+              from first principles — progress
+              <strong style="color:#ef5350;">${totalProgress}</strong> against the
+              <strong>${bar}</strong> that working blind demands.</p>
+              ${manaLine}
+              <p><em>Ingredients consumed. The pattern is sound; this attempt was not.</em></p>
+            </div>` });
+          return;
+        }
+      } else if (match) {
         const known = alreadyKnows(actor, match);
         const bar = craftBar(match.system.threshold ?? 0, known);
         if (totalProgress >= bar) {
@@ -2378,8 +2437,8 @@ class CraftingSkills {
             material: matKind,
             materialElement: element && element !== 'neutral' ? element : '',
             rarity: qualityData.rarity,
-            progress: totalProgress,
-            maxProgress: theoreticalMaxProgress,
+            progress: Math.min(totalProgress, materialCap(qualityData.rarity)),
+            maxProgress: Math.min(theoreticalMaxProgress, materialCap(qualityData.rarity)),
             quantity: 1,
             weight: 1,
             tags: [...staticTypeTags],
@@ -2476,7 +2535,7 @@ class CraftingSkills {
       // THE DISCOVERY ITSELF: a copy of the formula, now known. Granted
       // before the material is eaten so a failure to write it down cannot
       // leave the crafter with neither the recipe nor the stock.
-      if (discovered) {
+      if (discovered && discovered.parent !== actor) {
         const copy = discovered.toObject();
         delete copy._id;
         copy.system = { ...copy.system, source: 'discovered', discoveredBy: actor.name };

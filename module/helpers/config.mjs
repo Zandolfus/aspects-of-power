@@ -3110,6 +3110,36 @@ ASPECTSOFPOWER.recipeQualityRatios = {
 };
 
 /**
+ * MATERIAL CAPS (ruled 2026-08-28: "give them caps. Fulgurite, for example,
+ * should be completely capped out at this point. Smiths should basically be
+ * capping it as a material every time at John and Khalids level").
+ *
+ * A substance has a CEILING, and rarity is the substance's tier — so the cap
+ * is keyed by rarity and covers every material in the world with no
+ * per-substance authoring. A material's progress and maxProgress both clamp
+ * here: gather cannot roll past it, refine cannot push past it, and once a
+ * crafter's refine gain dwarfs the headroom the material is simply SOLVED
+ * for them. Better work then requires better substances, which is the point.
+ *
+ * ANCHORS ARE LIVE (2026-08-28): John's Metal Purification rolls ~802 (mean
+ * refine gain ~405), Khalid's ~278 (mean ~141). Fulgurite is uncommon at
+ * ~221: cap 300 means John caps it in one refine ~91% of the time and Khalid
+ * ~72% (always in two) — "basically capping it every time". Masters also
+ * one-refine rare stock from ~400 (gain needed 100); epic takes a few; the
+ * top rungs are beyond current hands, as the top rungs should be.
+ */
+ASPECTSOFPOWER.materialCaps = {
+  inferior:  100,
+  common:    200,
+  uncommon:  300,
+  rare:      500,
+  epic:      800,
+  legendary: 1300,
+  mythic:    2000,
+  divine:    3000,
+};
+
+/**
  * Quality thresholds for crafted items (progress → quality).
  */
 ASPECTSOFPOWER.craftQuality = {

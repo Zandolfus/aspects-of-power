@@ -50,6 +50,13 @@ export function skillCanWork(skill, recipe) {
   if (skill?.type !== 'skill') return false;
   const tags = skill.system?.tags ?? [];
   if (!tags.includes('craft')) return false;
+  // Alchemy skills BRANCH TO THE BREW FLOW before the recipe picker ever
+  // runs (_handleCraftTag's isAlchemySkill short-circuit), so an alchemist
+  // holding an equipment formula has a recipe their skill structurally
+  // cannot execute — and the Book would offer a Craft button that opens a
+  // potion dialog. Found 2026-08-28 when the predicate-driven grant handed
+  // Cuirass to the alchemists.
+  if (tags.includes('alchemy')) return false;
   const req = recipe?.system?.requiresSkillTags ?? [];
   if (!req.every(t => tags.includes(t))) return false;
   const allowed = skill.system?.craftAllowedTypes ?? [];
@@ -223,8 +230,100 @@ export function attemptMatchesBill(recipe, picks) {
  */
 export function findMatchingRecipe(library, typeKey, picks) {
   const want = typeKey || '';
-  return (library ?? []).find(r =>
-    (r.system?.output?.typeKey || '') === want && attemptMatchesBill(r, picks)) ?? null;
+  // MOST SPECIFIC WINS (ruled 2026-08-28, the generic-baseline model): one
+  // fulgurite ingot matches both the generic Helm (1 any material) and the
+  // Fulgurite Helm (1 Fulgurite) — the improviser reproduced the SPECIFIC
+  // formula, and the generic must never shadow it.
+  const hits = (library ?? []).filter(r =>
+    (r.system?.output?.typeKey || '') === want && attemptMatchesBill(r, picks));
+  hits.sort((a, b) => recipeSpecificity(b) - recipeSpecificity(a));
+  return hits[0] ?? null;
+}
+
+/** How constrained a recipe's bill is — the tiebreak when one pile matches
+ *  several formulas. A wildcard row scores 0; itemName, element, minProgress
+ *  and material each add a point per row. */
+export function recipeSpecificity(recipe) {
+  return (recipe?.system?.inputs ?? []).reduce((s, r) =>
+    s + (r.itemName ? 1 : 0) + (r.element ? 1 : 0)
+      + ((r.minProgress ?? 0) > 0 ? 1 : 0) + (r.material ? 1 : 0), 0);
+}
+
+/**
+ * The SUBSTANCE a material item is a piece of: its name shorn of the
+ * bookkeeping — the ` - 221` progress suffix and the `(Uncommon)` rarity
+ * annotation. "Fulgurite - 221" and "Fulgurite - 180" are the same substance
+ * at different quality, and a minted recipe must treat them as one thing.
+ */
+export function substanceName(name) {
+  return String(name ?? '')
+    .replace(/ - \d+$/, '')
+    .replace(/\s*\((inferior|common|uncommon|rare|epic|legendary|mythic|divine)\)/i, '')
+    .trim();
+}
+
+/** A generic recipe is a BASELINE: a single bill row with no pinned
+ *  substance. It defines the structure of a product ("a helm is 1 base
+ *  material") and exists to be specialized. */
+export function isGenericRecipe(recipe) {
+  const rows = recipe?.system?.inputs ?? [];
+  return rows.length === 1 && !rows[0].itemName;
+}
+
+/**
+ * SPECIALIZATION (ruled 2026-08-28: "generic recipes... should be the
+ * baseline for other recipes... Each subtype of base material requires a
+ * recipe or a freeform craft to GENERATE their specific recipe").
+ *
+ * Improvise a generic's structure with one concrete substance and succeed,
+ * and the world gains the specialized formula: Helm worked with Fulgurite
+ * mints "Fulgurite Helm" — same threshold, same structure, the substance
+ * pinned into the bill. Returns plain recipe DATA (no document side effects)
+ * or null when the pile cannot specialize: mixed substances make a plain
+ * generic product, not a formula.
+ *
+ * v1 limitation, on purpose: only single-row generics mint. Specializing a
+ * multi-row bill needs a per-row allocation of the pile, and no authored
+ * generic has more than one row yet.
+ */
+export function specializationOf(generic, picks) {
+  if (!isGenericRecipe(generic) || !(picks?.length)) return null;
+  const first = picks[0].item;
+  const sub = substanceName(first.name);
+  if (!sub) return null;
+  const kind = first.system?.material ?? '';
+  const element = first.system?.materialElement ?? '';
+  for (const p of picks) {
+    if (substanceName(p.item.name) !== sub) return null;
+    if ((p.item.system?.material ?? '') !== kind) return null;
+    if ((p.item.system?.materialElement ?? '') !== element) return null;
+  }
+  const row = generic.system.inputs[0];
+  const productBase = generic.system.output?.name || generic.system.output?.typeKey || 'Work';
+  const productName = `${sub} ${productBase}`;
+  return {
+    name: productName,
+    type: 'recipe',
+    img: generic.img,
+    system: {
+      description: `<p>The ${String(productBase).toLowerCase()} pattern, worked in ${sub}.</p>`,
+      profession: generic.system.profession ?? '',
+      rarity: first.system?.rarity ?? generic.system.rarity ?? 'common',
+      requiresSkillTags: [...(generic.system.requiresSkillTags ?? [])],
+      threshold: generic.system.threshold ?? 0,
+      minMana: generic.system.minMana ?? 0,
+      inputs: [{ material: kind, itemName: sub, element,
+                 quantity: row.quantity ?? 1, minProgress: 0 }],
+      output: {
+        ...structuredClone(generic.system.output ?? {}),
+        name: productName,
+        material: kind || (generic.system.output?.material ?? ''),
+        element,
+      },
+      source: 'discovered',
+      discoveredBy: '',
+    },
+  };
 }
 
 /**
@@ -263,5 +362,6 @@ export function alreadyKnows(actor, recipe) {
 export const RecipeHelpers = {
   eligibleRecipes, matchesInput, resolveIngredients, consumeIngredients,
   attemptMatchesBill, findMatchingRecipe, craftBar, recipeLibrary, alreadyKnows,
-  skillsFor, skillCanWork,
+  skillsFor, skillCanWork, recipeSpecificity, substanceName, isGenericRecipe,
+  specializationOf,
 };

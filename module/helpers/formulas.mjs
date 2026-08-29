@@ -2184,6 +2184,22 @@ export function recipeVerdict(progress, threshold, cfg = null) {
 }
 
 /**
+ * The quality ceiling of a material SUBSTANCE (ruled 2026-08-28). Keyed by
+ * rarity — rarity IS the substance's tier — so every material in the world
+ * has a cap with no per-substance authoring. An unknown rarity gets the
+ * common cap rather than infinity: an unbounded material is exactly the bug
+ * this exists to prevent.
+ */
+export function materialCap(rarity, cfg = null) {
+  const sc = cfg ?? (globalThis.CONFIG?.ASPECTSOFPOWER ?? {});
+  const caps = sc.materialCaps ?? {};
+  const v = Number(caps[rarity]);
+  if (Number.isFinite(v) && v > 0) return v;
+  const fallback = Number(caps.common);
+  return Number.isFinite(fallback) && fallback > 0 ? fallback : 200;
+}
+
+/**
  * A tome's seize cap (ruled 2026-08-24: "based on item progress but rarity
  * should play into it") — the largest rolled magnitude the book can catch
  * out of the air. progress x the rarity's multiplier, floored at 0.

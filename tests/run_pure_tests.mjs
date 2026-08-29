@@ -2995,7 +2995,7 @@ eq('junk situational entries are skipped, not NaN',
     // clothing...) and that is what recipes demand — nothing carries a
     // profession-name tag, so requiring one makes a recipe unworkable.
     const smith = { type: 'skill', system: { tags: ['craft', 'metal'] } };
-    const cook = { type: 'skill', system: { tags: ['craft', 'alchemy'] } };
+    const cook = { type: 'skill', system: { tags: ['craft', 'cloth'] } };
     const holder = { items: [
       { type: 'recipe', system: { requiresSkillTags: ['metal'] } },
       { type: 'recipe', system: { requiresSkillTags: [] } },
@@ -3010,6 +3010,12 @@ eq('junk situational entries are skipped, not NaN',
     eq('recipe: a non-skill can never work a recipe',
        R.skillCanWork({ type: 'item', system: { tags: ['craft', 'metal'] } },
                       holder.items[0]), false);
+    // Alchemy skills branch to the brew flow before the recipe picker runs,
+    // so they can never execute an equipment formula — the Book must not
+    // offer them one.
+    eq('recipe: alchemy skills never work equipment recipes',
+       R.skillCanWork({ type: 'skill', system: { tags: ['craft', 'alchemy', 'metal'] } },
+                      holder.items[1]), false);
 
     // THE SECOND GATE: craftAllowedTypes. The recipe path sets typeKey
     // directly and never passes the type picker's filter, so without this a
@@ -3081,6 +3087,68 @@ eq('junk situational entries are skipped, not NaN',
        R.craftBar(0, false, CFG), 0);
     eq('discovery: the surcharge is proportional, not flat',
        R.craftBar(400, false, CFG), 460);
+
+    // ── GENERIC BASELINES + SPECIALIZATION (ruled 2026-08-28) ─────────
+    // "Making a helm costs 1 base material. Each subtype of base material
+    // requires a recipe or a freeform craft to generate their specific
+    // recipe." The generic is the STRUCTURE; specializing pins a substance.
+    const genericHelm = { img: 'x.webp', system: { profession: 'smithing',
+      rarity: 'common', requiresSkillTags: [], threshold: 150, minMana: 0,
+      inputs: [{ material: '', itemName: '', element: '', quantity: 1, minProgress: 0 }],
+      output: { name: 'Helm', typeKey: 'head', material: '', element: '',
+                quantity: 1, tags: [] } } };
+    const fulgHelm = { name: 'Fulgurite Helm', system: { threshold: 150,
+      inputs: [{ material: 'metal', itemName: 'Fulgurite', quantity: 1 }],
+      output: { typeKey: 'head' } } };
+    const fulg = mat('f1', 'Fulgurite - 221', 'metal', 221, 3, 'lightning');
+
+    // ⚠ MOST SPECIFIC WINS, regardless of library order — the generic must
+    // never shadow the formula the improviser actually reproduced.
+    eq('specialize: the specific recipe outranks the generic',
+       R.findMatchingRecipe([genericHelm, fulgHelm], 'head',
+         [{ item: fulg, count: 1 }])?.name, 'Fulgurite Helm');
+    eq('specialize: ...in either library order',
+       R.findMatchingRecipe([fulgHelm, genericHelm], 'head',
+         [{ item: fulg, count: 1 }])?.name, 'Fulgurite Helm');
+
+    // The mint: one substance specializes the generic's structure.
+    const minted = R.specializationOf(genericHelm, [{ item: fulg, count: 1 }]);
+    eq('specialize: substance + product names the formula',
+       minted?.name, 'Fulgurite Helm');
+    eq('specialize: the bill pins the substance',
+       minted?.system.inputs[0].itemName, 'Fulgurite');
+    eq('specialize: the bill keeps the generic quantity',
+       minted?.system.inputs[0].quantity, 1);
+    eq('specialize: element rides along',
+       minted?.system.inputs[0].element, 'lightning');
+    eq('specialize: threshold is the generic threshold',
+       minted?.system.threshold, 150);
+    eq('specialize: minted formulas are marked discovered',
+       minted?.system.source, 'discovered');
+    // Substance names are the item name shorn of bookkeeping.
+    eq('specialize: progress suffix is not part of a substance',
+       R.substanceName('Fulgurite - 221'), 'Fulgurite');
+    eq('specialize: rarity annotation is not either',
+       R.substanceName('Lightning Metal (Uncommon) - 256'), 'Lightning Metal');
+    // ⚠ A MIXED PILE CANNOT SPECIALIZE — it works as the plain generic.
+    eq('specialize: mixed substances mint nothing',
+       R.specializationOf(genericHelm,
+         [{ item: fulg, count: 1 }, { item: iron, count: 1 }]), null);
+    // Only single-row generics mint (v1, documented); a pinned bill is not
+    // a generic at all.
+    eq('specialize: a specific recipe is not a generic',
+       R.isGenericRecipe(fulgHelm), false);
+    eq('specialize: the baseline is',
+       R.isGenericRecipe(genericHelm), true);
+
+    // ── MATERIAL CAPS (ruled 2026-08-28) ──────────────────────────────
+    const CAPCFG = { materialCaps: { common: 200, uncommon: 300, rare: 500 } };
+    eq('caps: rarity keys the substance ceiling', F3.materialCap('uncommon', CAPCFG), 300);
+    eq('caps: rare is higher', F3.materialCap('rare', CAPCFG), 500);
+    // ⚠ An unknown rarity gets the COMMON cap, never infinity — an unbounded
+    // material is exactly the bug this exists to prevent.
+    eq('caps: unknown rarity falls back to common', F3.materialCap('??', CAPCFG), 200);
+    eq('caps: a bare config still yields a finite cap', F3.materialCap('rare', { }), 200);
   }
 
   // ── AFFINITY TYPING IS DERIVED FROM TAGS (ruled 2026-08-24) ──
