@@ -90,6 +90,8 @@ export class AspectsofPowerItemSheet extends foundry.applications.api.Handlebars
     context.system  = this.item.system;
     context.flags   = itemData.flags;
     context.config  = CONFIG.ASPECTSOFPOWER;
+    // Visibility, not mutation — plain isGM by the standing rule.
+    context.isGM    = game.user.isGM;
     context.effects = prepareActiveEffectCategories(this.item.effects);
 
     // Tag editor context for items that support systemTags.

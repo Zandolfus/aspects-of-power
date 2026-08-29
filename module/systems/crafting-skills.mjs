@@ -9,7 +9,7 @@
  * byte-identical to its previous class-body form (no object-literal comma
  * surgery); the export collects the prototype methods into a plain mixin.
  */
-import { hybridAbilityMod, itemWeightLb, craftManaQuality, recipeMaterialProgress, recipeVerdict, materialCap, derivedRecipeThreshold, craftTimeQuality, clampQualityToSubstance } from '../helpers/formulas.mjs';
+import { hybridAbilityMod, itemWeightLb, craftManaQuality, recipeMaterialProgress, recipeVerdict, materialCap, materialCapFor, derivedRecipeThreshold, craftTimeQuality, clampQualityToSubstance } from '../helpers/formulas.mjs';
 import { eligibleRecipes, resolveIngredients, consumeIngredients, craftBar, findMatchingRecipe, recipeLibrary, alreadyKnows, isGenericRecipe, specializationOf } from './recipes.mjs';
 import { spatialCapacityFromCraft } from '../helpers/formulas.mjs';
 
@@ -109,7 +109,7 @@ class CraftingSkills {
         i.type === 'skill' && (i.system.tags ?? []).includes('refine')
       );
       const cur = materialItem.system.progress ?? 0;
-      const max = materialItem.system.maxProgress ?? materialCap(materialItem.system.rarity);
+      const max = materialItem.system.maxProgress ?? materialCapFor(materialItem.system);
       refineHeadroom = Math.max(0, max - cur);
     }
     const showRefine = refineSkills.length > 0 && refineHeadroom > 0;
@@ -890,7 +890,7 @@ class CraftingSkills {
     const materials = actor.items.filter(i => {
       if (i.type !== 'item' || !i.system.isMaterial) return false;
       const cur = i.system.progress ?? 0;
-      const max = i.system.maxProgress ?? materialCap(i.system.rarity);
+      const max = i.system.maxProgress ?? materialCapFor(i.system);
       return cur < max;
     });
     if (materials.length === 0) {
@@ -901,7 +901,7 @@ class CraftingSkills {
     const matButtons = materials.map(m => {
       const elLabel = m.system.materialElement ? ` [${m.system.materialElement}]` : '';
       const cur = m.system.progress ?? 0;
-      const max = m.system.maxProgress ?? materialCap(m.system.rarity);
+      const max = m.system.maxProgress ?? materialCapFor(m.system);
       return { action: m.id, label: `${m.name}${elLabel} — ${cur}/${max}` };
     });
     matButtons.push({ action: 'cancel', label: 'Cancel' });
@@ -929,7 +929,7 @@ class CraftingSkills {
     // IS (ruled 2026-08-28).
     const maxProgress = Math.min(
       materialItem.system.maxProgress ?? Infinity,
-      materialCap(materialItem.system.rarity));
+      materialCapFor(materialItem.system));
     const headroom = Math.max(0, maxProgress - oldProgress);
     const refineGain = Math.min(rawGain, headroom);
 
@@ -1108,6 +1108,11 @@ class CraftingSkills {
         // of a good substance can still be refined to what the substance is.
         progress: Math.min(gatherProgress, materialCap(selectedRarity)),
         maxProgress: materialCap(selectedRarity),
+        // Substance identity (2026-08-30): everything gathered today is
+        // E-band; the gathering rework decides where higher grades come
+        // from. materialCap 0 = derive; authored caps are GM content.
+        materialGrade: 'E',
+        materialCap: 0,
         tags: matFreeTags,
       },
     }]);
@@ -1852,7 +1857,7 @@ class CraftingSkills {
         const refineD100 = new Roll('1d100');
         await refineD100.evaluate();
         const cur = materialItem.system.progress ?? 0;
-        const max = materialItem.system.maxProgress ?? materialCap(materialItem.system.rarity);
+        const max = materialItem.system.maxProgress ?? materialCapFor(materialItem.system);
         const headroom = Math.max(0, max - cur);
         const rawGain = Math.round(Math.round(refRoll.total) * (refineD100.total / 100));
         const refineGain = Math.min(rawGain, headroom);
@@ -2470,12 +2475,13 @@ class CraftingSkills {
       const _defUnits = recipeBill?.units?.length
         ? recipeBill.units
         : (materialItem
-          ? [{ rarity: materialItem.system.rarity || 'common', count: 1 }]
+          ? [{ rarity: materialItem.system.rarity || 'common', count: 1,
+               cap: materialCapFor(materialItem.system) }]
           : (reworkTarget ? [{ rarity: reworkTarget.system.rarity || 'common', count: 1 }] : []));
       let _subCap = Infinity;
       if (_defUnits.length) {
         let cs = 0, cn = 0;
-        for (const u of _defUnits) { cs += materialCap(u.rarity) * u.count; cn += u.count; }
+        for (const u of _defUnits) { cs += (u.cap ?? materialCap(u.rarity)) * u.count; cn += u.count; }
         if (cn > 0) _subCap = cs / cn;
       }
       const defenseValue = Math.round(Math.min(totalProgress, _subCap) * slotValue * matValue);

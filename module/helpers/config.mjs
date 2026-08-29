@@ -3199,6 +3199,11 @@ ASPECTSOFPOWER.recipeQualityRatios = {
  * one-refine rare stock from ~400 (gain needed 100); epic takes a few; the
  * top rungs are beyond current hands, as the top rungs should be.
  */
+// ⚠ These are E-BAND BASE VALUES (ruled 2026-08-30, answering "300 is a
+// magic number?"): only the uncommon rung is measured (John/Khalid refine
+// anchors); higher grades multiply by materialGradeStep^gradeIndex, the
+// ritual precedent, and an item's authored `materialCap` overrides
+// everything. Rarity is the LABEL axis; grade is the MAGNITUDE axis.
 ASPECTSOFPOWER.materialCaps = {
   inferior:  100,
   common:    200,
@@ -3583,6 +3588,14 @@ ASPECTSOFPOWER.ritualScale = {
  * existing rituals are E-grade (gradeIndex 0 → multiplier 1).
  */
 ASPECTSOFPOWER.ritualGradeStep = 2.5;
+
+/**
+ * Per-grade multiplier on materialCaps (2026-08-30). Same reasoning as
+ * ritualGradeStep directly above: measured E->D mod growth is ~2.75x, so a
+ * D-band substance's ceiling must track same-grade rolls or higher-grade
+ * materials are useless in their own band's hands. G/F/E = x1 (index 0).
+ */
+ASPECTSOFPOWER.materialGradeStep = 2.5;
 
 /**
  * Group ritual + prep-time tuning (design-ritual-subsystem.md, RULED

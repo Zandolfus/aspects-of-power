@@ -1,3 +1,4 @@
+import { materialCapFor } from '../helpers/formulas.mjs';
 /**
  * RECIPES — "a known sequence of ingredients that results in a product"
  * (design-recipe-system, RULED 2026-08-26).
@@ -120,7 +121,8 @@ export function resolveIngredients(actor, recipe) {
       reserved.set(item.id, (reserved.get(item.id) ?? 0) + take);
       picks.push({ item, count: take });
       units.push({ progress: item.system.progress ?? 0, count: take,
-                   rarity: item.system.rarity || 'common' });
+                   rarity: item.system.rarity || 'common',
+                   cap: materialCapFor(item.system) });
       left -= take;
     }
     const what = [row.itemName || row.material || 'material',

@@ -237,6 +237,21 @@ export class ItemItemData extends foundry.abstract.TypeDataModel {
       materialElement: new fields.StringField({ initial: '' }),
       maxProgress:     new fields.NumberField({ initial: 0, min: 0, integer: true }),
 
+      // ── SUBSTANCE IDENTITY (ruled 2026-08-30: "Materials need a grade
+      // field and a hidden cap field") ──
+      // materialGrade: which BAND this substance belongs to (G..S, the
+      // statCurve.gradeIndex vocabulary; G/F/E all read as index 0, exactly
+      // like ritual grades). The derived ceiling scales by
+      // materialGradeStep^index, which is what stops the E-anchored cap
+      // table from silently declaring every material in existence E-band.
+      // ⚠ Plain StringField, NO choices — a choices list vaporised the
+      // world once (e4c333b).
+      materialGrade:   new fields.StringField({ initial: 'E' }),
+      // materialCap: the AUTHORED per-substance ceiling. 0 = derive from
+      // rarity x grade. GM-ONLY on the sheet — players discover a
+      // substance's limit by refining into the wall, not by reading it.
+      materialCap:     new fields.NumberField({ initial: 0, min: 0, integer: true }),
+
       // Crafting iteration tracking — 0 = freshly crafted, increments per rework.
       reworkCount:     new fields.NumberField({ initial: 0, min: 0, integer: true }),
 

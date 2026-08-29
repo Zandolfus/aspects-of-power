@@ -215,6 +215,24 @@
             {{/each}}
           </select>
         </div>
+        {{!-- Substance identity — GM ONLY (ruled 2026-08-30: "a grade field
+             and a HIDDEN cap field"). Players discover a substance's limit
+             by refining into the wall, not by reading it. --}}
+        {{#if isGM}}
+        <div class="equip-field">
+          <label>Grade (GM)</label>
+          <select name="system.materialGrade">
+            {{#each @root.config.statCurve.gradeIndex as |gi gKey|}}
+              <option value="{{gKey}}" {{#if (eq gKey @root.system.materialGrade)}}selected{{/if}}>{{gKey}}</option>
+            {{/each}}
+          </select>
+        </div>
+        <div class="equip-field">
+          <label>Substance Cap (GM)</label>
+          <input type="number" name="system.materialCap" value="{{system.materialCap}}" min="0" step="1"
+                 title="0 = derived from rarity x grade. An authored value is this substance's hidden ceiling." />
+        </div>
+        {{/if}}
         {{/if}}
 
         {{!-- Two-Handed (only for weaponry slot) --}}

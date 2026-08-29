@@ -2192,7 +2192,9 @@ export function derivedRecipeThreshold(units, typeKey, cfg = null) {
   for (const u of units ?? []) {
     const c = Math.max(0, Number(u?.count) || 0);
     if (c <= 0) continue;
-    capSum += materialCap(u.rarity, sc) * c;
+    // Per-item resolved cap wins (authored / grade-scaled, 2026-08-30);
+    // rarity base is the fallback for callers that predate it.
+    capSum += (Number(u?.cap) > 0 ? Number(u.cap) : materialCap(u.rarity, sc)) * c;
     n += c;
   }
   if (n <= 0) return 0;
@@ -2230,26 +2232,23 @@ export function derivedRecipeThreshold(units, typeKey, cfg = null) {
  * @returns {string} the quality KEY, clamped
  */
 export function clampQualityToSubstance(qualityKey, units, cfg = null) {
-  const sc = cfg ?? (globalThis.CONFIG?.ASPECTSOFPOWER ?? {});
   const order = ['inferior', 'common', 'uncommon', 'rare', 'epic', 'legendary', 'mythic', 'divine'];
-  let capSum = 0, n = 0;
+  // RARITY IS THE LABEL AXIS, GRADE IS MAGNITUDE (2026-08-30). The clamp
+  // reads the units' RARITIES directly — a D-band uncommon ore has a far
+  // higher numeric cap than fulgurite, but it is still an UNCOMMON
+  // substance and still ceilings the label at uncommon. (The first version
+  // walked the numeric caps table, which would have let grade quietly buy
+  // labels.) An alloy takes the quantity-weighted mean rarity, floored.
+  let idxSum = 0, n = 0;
   for (const u of units ?? []) {
     const c = Math.max(0, Number(u?.count) || 0);
     if (c <= 0) continue;
-    capSum += materialCap(u.rarity, sc) * c;
+    const ri = order.indexOf(u?.rarity);
+    idxSum += (ri >= 0 ? ri : order.indexOf('common')) * c;
     n += c;
   }
   if (n <= 0) return qualityKey;                     // nothing consumed — no clamp
-  const mean = capSum / n;
-  let tier = 'inferior';
-  for (const r of order) {
-    // Only rarities the caps table actually DEFINES may vote — materialCap's
-    // unknown-rarity fallback (the common cap) would otherwise make every
-    // missing high tier read as trivially reached and hand the walk to the
-    // last entry in the order. Caught by the pure suite before it shipped.
-    if (!Number.isFinite(Number(sc.materialCaps?.[r]))) continue;
-    if (materialCap(r, sc) <= mean + 0.5) tier = r;  // highest tier the blend reaches
-  }
+  const tier = order[Math.floor(idxSum / n)];
   const qi = order.indexOf(qualityKey);
   const ti = order.indexOf(tier);
   if (qi < 0 || ti < 0) return qualityKey;
@@ -2304,6 +2303,25 @@ export function recipeVerdict(progress, threshold, cfg = null) {
  * common cap rather than infinity: an unbounded material is exactly the bug
  * this exists to prevent.
  */
+/**
+ * The RESOLVED ceiling of one material item (ruled 2026-08-30: per-material
+ * caps, authored where it matters). Precedence:
+ *   1. an authored `materialCap` on the item — the hidden per-substance
+ *      truth, GM-set;
+ *   2. the E-band rarity base x materialGradeStep^gradeIndex — so a D-band
+ *      uncommon ore is NOT capped at fulgurite's 300.
+ * Rarity stays the LABEL axis (the substance clamp keys on it); grade is
+ * pure magnitude.
+ */
+export function materialCapFor(sysData, cfg = null) {
+  const sc = cfg ?? (globalThis.CONFIG?.ASPECTSOFPOWER ?? {});
+  const authored = Number(sysData?.materialCap);
+  if (Number.isFinite(authored) && authored > 0) return authored;
+  const idx = sc.statCurve?.gradeIndex?.[sysData?.materialGrade ?? 'E'] ?? 0;
+  const step = Number(sc.materialGradeStep) > 0 ? Number(sc.materialGradeStep) : 2.5;
+  return Math.round(materialCap(sysData?.rarity, sc) * Math.pow(step, idx));
+}
+
 export function materialCap(rarity, cfg = null) {
   const sc = cfg ?? (globalThis.CONFIG?.ASPECTSOFPOWER ?? {});
   const caps = sc.materialCaps ?? {};

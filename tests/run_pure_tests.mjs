@@ -3238,6 +3238,34 @@ eq('junk situational entries are skipped, not NaN',
     eq('clamp: nothing consumed means no clamp',
        F3.clampQualityToSubstance('rare', [], CCFG), 'rare');
 
+    // ── PER-MATERIAL CAPS + THE GRADE AXIS (ruled 2026-08-30: "I agree
+    // with a per-material cap... Materials need a grade field and a hidden
+    // cap field") ──
+    const GCFG = { materialCaps: { uncommon: 300, rare: 500 },
+                   materialGradeStep: 2.5,
+                   statCurve: { gradeIndex: { G: 0, F: 0, E: 0, D: 1, C: 2 } } };
+    eq('grade: an E-band substance reads the base table',
+       F3.materialCapFor({ rarity: 'uncommon', materialGrade: 'E' }, GCFG), 300);
+    eq('grade: a D-band uncommon is x2.5 — not capped at fulgurite',
+       F3.materialCapFor({ rarity: 'uncommon', materialGrade: 'D' }, GCFG), 750);
+    eq('grade: C-band compounds', 
+       F3.materialCapFor({ rarity: 'uncommon', materialGrade: 'C' }, GCFG), 1875);
+    eq('grade: G and F read as E (index 0), like ritual grades',
+       F3.materialCapFor({ rarity: 'uncommon', materialGrade: 'G' }, GCFG), 300);
+    eq('grade: an unknown grade is E, never a crash',
+       F3.materialCapFor({ rarity: 'uncommon', materialGrade: '??' }, GCFG), 300);
+    // The AUTHORED cap is the hidden per-substance truth and beats the math.
+    eq('grade: an authored materialCap overrides everything',
+       F3.materialCapFor({ rarity: 'uncommon', materialGrade: 'D', materialCap: 425 }, GCFG), 425);
+    // Per-item caps flow into the derived bar...
+    eq('grade: the derived bar reads the resolved per-item cap',
+       F3.derivedRecipeThreshold([{ rarity: 'uncommon', count: 1, cap: 750 }], 'head', DCFG), 525);
+    // ...but NOT into the label: rarity is the label axis, grade is
+    // magnitude. A D-band uncommon still ceilings at uncommon.
+    eq('grade: grade cannot buy labels — D-band uncommon clamps uncommon',
+       F3.clampQualityToSubstance('rare',
+         [{ rarity: 'uncommon', count: 1, cap: 750 }], CCFG), 'uncommon');
+
     // ⚠ THE INFLATION PIN, on the REAL roll (the x0.6 rarity mult applies on
     // the live path — measured 2026-08-29 after quoting unmultiplied rolls
     // twice): John's true typical total on capped fulgurite is ~265. Against
