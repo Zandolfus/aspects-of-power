@@ -9,7 +9,7 @@
  * byte-identical to its previous class-body form (no object-literal comma
  * surgery); the export collects the prototype methods into a plain mixin.
  */
-import { hybridAbilityMod, itemWeightLb, craftManaQuality, recipeMaterialProgress, recipeVerdict, materialCap, derivedRecipeThreshold, workmanshipMult, clampQualityToSubstance } from '../helpers/formulas.mjs';
+import { hybridAbilityMod, itemWeightLb, craftManaQuality, recipeMaterialProgress, recipeVerdict, materialCap, derivedRecipeThreshold, craftTimeQuality, clampQualityToSubstance } from '../helpers/formulas.mjs';
 import { eligibleRecipes, resolveIngredients, consumeIngredients, craftBar, findMatchingRecipe, recipeLibrary, alreadyKnows, isGenericRecipe, specializationOf } from './recipes.mjs';
 import { spatialCapacityFromCraft } from '../helpers/formulas.mjs';
 
@@ -1783,47 +1783,49 @@ class CraftingSkills {
     const refineId = combinedSetup?.refineId ?? '';
     const prepId   = combinedSetup?.prepId ?? '';
 
-    // ── WORKMANSHIP (ruled 2026-08-29: "quality derived from workmanship,
-    // materials, and time... an investment in time and resources, not
-    // something you simply get from pure stats") ──
-    // A TIMED craft chose its tier at declaration and arrives here with the
-    // block already spent. An UNTIMED one chooses now, and the world clock
+    // ── TIME INVEST (ruled 2026-08-29: "time scales quality: taking your
+    // time results in better stuff" — continuous, the same invest grammar as
+    // mana and overpour; the rough/fine/masterwork tier vocabulary is GONE
+    // per the same ruling: the rarity ladder is the only quality language) ──
+    // A TIMED craft chose its multiple at declaration and arrives with the
+    // block already spent. An UNTIMED one chooses now and the world clock
     // advances ritual-prep style — time is spent whether or not the work
     // succeeds, which is what makes it an investment rather than a dial.
-    let craftTier = 'standard';
+    let timeInvest = 1;
     if (opts?.fromActivityCompletion) {
-      craftTier = opts.craftQuality ?? 'standard';
+      timeInvest = Math.max(1, Number(opts.craftTimeInvest) || 1);
     } else if (!(item.system.tags ?? []).includes('activity') && !actor.inCombat) {
-      const tiers = CONFIG.ASPECTSOFPOWER.activityQuality ?? {};
       const base = CONFIG.ASPECTSOFPOWER.recipeTuning?.untimedCraftBaseSeconds ?? 3600;
+      const maxMult = CONFIG.ASPECTSOFPOWER.recipeTuning?.timeQuality?.maxMult ?? 16;
       const fmt = (sec) => sec >= 3600
         ? `${Math.floor(sec / 3600)}h ${Math.round((sec % 3600) / 60)}m`
         : `${Math.round(sec / 60)}m`;
-      const tierButtons = Object.entries(tiers).map(([k, t]) => ({
-        action: k,
-        label: `${t.label} (${fmt(Math.max(base * (t.mult ?? 1), t.clockFloorSeconds ?? 0))})`,
-        default: k === 'standard',
-      }));
-      tierButtons.push({ action: 'cancel', label: 'Cancel' });
       const pick = await foundry.applications.api.DialogV2.wait({
-        window: { title: `${item.name} — Workmanship` },
-        content: `<p>How carefully is this piece worked? Patient work costs real
-          time and is judged kinder; rushed work can fail outright.</p>`,
-        buttons: tierButtons, close: () => 'cancel',
+        window: { title: `${item.name} — Time` },
+        content: `<div class="form-group">
+            <label>Time to invest (1 = ${fmt(base)}, up to ${maxMult})</label>
+            <input type="number" name="timeInvest" value="1" min="1" max="${maxMult}" step="1" />
+            <p class="hint">Taking your time results in better work, on a steep curve
+            of diminishing returns. The clock advances either way.</p>
+          </div>`,
+        buttons: [
+          { action: 'ok', label: 'Begin', default: true,
+            callback: (event, button, dialog) => {
+              const v = Number(dialog.element.querySelector('[name=timeInvest]')?.value);
+              return { mult: Math.min(Math.max(1, Math.floor(v) || 1), maxMult) };
+            } },
+          { action: 'cancel', label: 'Cancel' },
+        ],
+        close: () => 'cancel',
       });
-      if (pick === 'cancel') return;
-      craftTier = pick;
-      const t = tiers[craftTier] ?? {};
-      const seconds = Math.round(Math.max(base * (t.mult ?? 1), t.clockFloorSeconds ?? 0));
-      if (seconds > 0) {
-        const { ActivityHelpers } = await import('./activities.mjs');
-        await ActivityHelpers.advanceWorldTime(seconds);
-      }
+      if (!pick || pick === 'cancel') return;
+      timeInvest = pick.mult;
+      const { ActivityHelpers } = await import('./activities.mjs');
+      await ActivityHelpers.advanceWorldTime(Math.round(base * timeInvest));
     }
-    const workmanship = workmanshipMult(craftTier);
-    const workLine = workmanship !== 1
-      ? `<p><strong>Workmanship:</strong> ${CONFIG.ASPECTSOFPOWER.activityQuality?.[craftTier]?.label ?? craftTier}
-         — verdict x${workmanship}</p>`
+    const timeQ = craftTimeQuality(timeInvest);
+    const workLine = timeQ !== 1
+      ? `<p><strong>Time:</strong> x${timeInvest} — quality x${timeQ.toFixed(2)}</p>`
       : '';
 
     // ── Mana element (inert unless the recipe declares one) ──
@@ -2061,11 +2063,11 @@ class CraftingSkills {
       return;
     }
 
-    // The workmanship tier multiplies the JUDGED total — the gate, the
-    // discovery bars and the quality ratio all read this — while the stored
-    // progress (the item's stats) stays the raw work. Time buys the label
-    // and its augment slots, never raw power.
-    const effTotal = Math.round(totalProgress * workmanship);
+    // Time-invest multiplies the JUDGED total — the gate, the discovery
+    // bars and the quality ratio all read this — while the stored progress
+    // (the item's stats) stays the raw work. Time buys the label and its
+    // augment slots, never raw power.
+    const effTotal = Math.round(totalProgress * timeQ);
 
     // ── THE RECIPE GATE (ruled 2026-08-26, threshold failure "much like
     // rituals"): clear it and the quality is set by how far past you landed;
@@ -2457,13 +2459,32 @@ class CraftingSkills {
       // Defense routing: armor slots → armor bonus, jewelry → veil, shields → armor (separate value), other weapons → neither.
       const isArmorSlot   = slotCategory === 'armor';
       const isJewelrySlot = slotCategory === 'jewelry';
-      const defenseValue = Math.round(totalProgress * slotValue * matValue);
+      // ── THE ARMOR/VEIL CAP IS CREATED BY THE MATERIAL (ruled 2026-08-29:
+      // "craftsmanship drives a large, uncapped portion with the materials
+      // driving a similarly large, capped portion. When it comes to
+      // defensive equipment, the armor/veil cap is created by the
+      // material"). Stats above keep riding raw progress — that is the
+      // uncapped craftsmanship half — but defence clamps at what the
+      // SUBSTANCE can be: a fulgurite cuirass protects like fulgurite no
+      // matter whose hands shaped it. Better armour requires better stock.
+      const _defUnits = recipeBill?.units?.length
+        ? recipeBill.units
+        : (materialItem
+          ? [{ rarity: materialItem.system.rarity || 'common', count: 1 }]
+          : (reworkTarget ? [{ rarity: reworkTarget.system.rarity || 'common', count: 1 }] : []));
+      let _subCap = Infinity;
+      if (_defUnits.length) {
+        let cs = 0, cn = 0;
+        for (const u of _defUnits) { cs += materialCap(u.rarity) * u.count; cn += u.count; }
+        if (cn > 0) _subCap = cs / cn;
+      }
+      const defenseValue = Math.round(Math.min(totalProgress, _subCap) * slotValue * matValue);
       let armorBonus = isArmorSlot ? defenseValue : 0;
       const veilBonus  = isJewelrySlot ? defenseValue : 0;
       // Shields use a separate armor value table (small/medium/large = 30/40/50%).
       if (isShield) {
         const shieldArmorValue = CONFIG.ASPECTSOFPOWER.craftShieldArmorValues?.[effectiveTypeKey] ?? 0.30;
-        armorBonus = Math.round(totalProgress * shieldArmorValue * matValue);
+        armorBonus = Math.round(Math.min(totalProgress, _subCap) * shieldArmorValue * matValue);
       }
 
       const rarityDef = CONFIG.ASPECTSOFPOWER.rarities?.[qualityData.rarity];

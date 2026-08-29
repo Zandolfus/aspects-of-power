@@ -2153,21 +2153,17 @@ ASPECTSOFPOWER.conversions = {
  * craft-flow rework sim; the floors are what stop mastery collapsing to
  * instant.
  */
-// `mult` prices the TIME; `craftMult` is what that time buys (ruled
-// 2026-08-29: "quality derived from workmanship, materials, and time...
-// an investment in time and resources, not something you simply get from
-// pure stats"). The craft verdict multiplies by craftMult BEFORE quality is
-// judged, so rushing can fail a threshold outright and only patient work
-// reaches the top labels — against live rolls, a master's typical fulgurite
-// helm reads inferior rushed, common at standard, uncommon at fine (x4
-// time), and RARE only at masterwork (x25 time, ~a full day at the forge).
-// Stored progress (the item's stats) stays the raw work: time buys the
-// LABEL and its augment slots, never raw power.
+// ⚠ CRAFTING NO LONGER READS THIS (ruled 2026-08-29: "get rid of the fine
+// and masterwork stuff. Stick with the actual rarity system. Anything else
+// adds confusion."). The tier vocabulary was a second quality language
+// beside the rarity ladder; craft time is now a CONTINUOUS invest
+// (recipeTuning.timeQuality), the same grammar as mana and overpour. This
+// registry remains for the non-craft activities that always used it.
 ASPECTSOFPOWER.activityQuality = {
-  rough:      { label: 'Rough',      mult: 0.25, clockFloorSeconds: 0,    craftMult: 0.7 },
-  standard:   { label: 'Standard',   mult: 1,    clockFloorSeconds: 0,    craftMult: 1 },
-  fine:       { label: 'Fine',       mult: 4,    clockFloorSeconds: 600,  craftMult: 1.25 },
-  masterwork: { label: 'Masterwork', mult: 25,   clockFloorSeconds: 7200, craftMult: 1.5 },
+  rough:      { label: 'Rough',      mult: 0.25, clockFloorSeconds: 0 },
+  standard:   { label: 'Standard',   mult: 1,    clockFloorSeconds: 0 },
+  fine:       { label: 'Fine',       mult: 4,    clockFloorSeconds: 600 },
+  masterwork: { label: 'Masterwork', mult: 25,   clockFloorSeconds: 7200 },
 };
 
 ASPECTSOFPOWER.referenceRoundLength = {
@@ -3120,6 +3116,16 @@ ASPECTSOFPOWER.recipeTuning = {
   // style, so the time lever works table-wide today instead of waiting on
   // the durations pass. A timed skill's own block wins when it exists.
   untimedCraftBaseSeconds: 3600,
+
+  // ── TIME INVEST (ruled 2026-08-29: "time scales quality: taking your
+  // time results in better stuff") ──
+  // Continuous, not tiered: spend a MULTIPLE of the base block and the
+  // verdict scales by mult^exponent, capped. The curve is deliberately
+  // shallow — x4 time buys ~x1.23, and the x1.5 cap needs ~x16 time — so
+  // patience closes the gap to the substance's ceiling but can never
+  // manufacture a tier the substance clamp would forbid anyway (reaching
+  // rare from a common verdict needs x1.58, ABOVE the cap: double-guarded).
+  timeQuality: { exponent: 0.15, cap: 1.5, maxMult: 16 },
 
   // freeformSurcharge — RULED 2026-08-26: "freecrafting success and recipe
   // unlock should be proportional to each other. Say a recipe requires 100

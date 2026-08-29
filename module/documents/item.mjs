@@ -6039,37 +6039,43 @@ export class AspectsofPowerItem extends Item {
         return;
       }
       const { DowntimeHelpers } = await import('../systems/downtime.mjs');
-      // ── WORKMANSHIP (ruled 2026-08-29): a quality-scaled CRAFT block asks
-      // how carefully the work is done BEFORE the clock is committed. The
-      // tier prices the block (activityQuality.mult) and rides the
-      // declaration; resolution hands it back to the craft as craftQuality,
-      // where it multiplies the verdict. Time is spent whether or not the
-      // work succeeds — that is what makes it an investment.
-      let _quality;
+      // ── TIME INVEST (ruled 2026-08-29: "time scales quality: taking your
+      // time results in better stuff" — continuous, not the retired
+      // rough/fine/masterwork tiers). A CRAFT block asks how many multiples
+      // of the base block to spend BEFORE the clock is committed; the
+      // multiplier prices the block and rides the declaration, and
+      // resolution hands it back as craftTimeInvest, where it scales the
+      // verdict. Time is spent whether or not the work succeeds.
+      let _timeInvest = 1;
       if ((item.system.tags ?? []).includes('craft')) {
         const { ActivityHelpers } = await import('../systems/activities.mjs');
         const probe = ActivityHelpers.computeActivityTime(this.actor, key, { inline, skill: this });
-        if (probe?.qualityScaled) {
-          const tiers = CONFIG.ASPECTSOFPOWER.activityQuality ?? {};
-          const buttons = Object.entries(tiers).map(([k, t]) => {
-            const timed = ActivityHelpers.computeActivityTime(this.actor, key,
-              { inline, skill: this, quality: k });
-            return { action: k, label: `${t.label} (${timed?.display ?? '?'})`,
-                     default: k === 'standard' };
-          });
-          buttons.push({ action: 'cancel', label: 'Cancel' });
-          _quality = await foundry.applications.api.DialogV2.wait({
-            window: { title: `${item.name} — Workmanship` },
-            content: `<p>How carefully is this piece worked? Patient work costs real
-              time and is judged kinder; rushed work can fail outright.</p>`,
-            buttons, close: () => 'cancel',
-          });
-          if (_quality === 'cancel') return;
-        }
+        const maxMult = CONFIG.ASPECTSOFPOWER.recipeTuning?.timeQuality?.maxMult ?? 16;
+        const picked = await foundry.applications.api.DialogV2.wait({
+          window: { title: `${item.name} — Time` },
+          content: `<div class="form-group">
+              <label>Time to invest (multiples of ${probe?.display ?? 'the base block'})</label>
+              <input type="number" name="timeInvest" value="1" min="1" max="${maxMult}" step="1" />
+              <p class="hint">Taking your time results in better work, on a steep
+              curve of diminishing returns. The clock advances either way.</p>
+            </div>`,
+          buttons: [
+            { action: 'ok', label: 'Begin', default: true,
+              callback: (event, button, dialog) => {
+                const v = Number(dialog.element.querySelector('[name=timeInvest]')?.value);
+                return { mult: Math.min(Math.max(1, Math.floor(v) || 1), maxMult) };
+              } },
+            { action: 'cancel', label: 'Cancel' },
+          ],
+          close: () => 'cancel',
+        });
+        if (!picked || picked === 'cancel') return;
+        _timeInvest = picked.mult;
       }
       return DowntimeHelpers.declare(this.actor, key, {
         inline,
-        quality: _quality,
+        multiplier: _timeInvest,
+        timeInvest: _timeInvest,
         sourceSkillUuid: this.uuid,
         // The activity's stat falls back to this skill's own roll ability, so
         // a smithing skill is paced by the smith's stat with nothing authored.

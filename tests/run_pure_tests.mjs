@@ -3175,29 +3175,28 @@ eq('junk situational entries are skipped, not NaN',
        F3.derivedRecipeThreshold([{ rarity: 'uncommon', count: 1 }], 'mystery', DCFG), 218);
     eq('difficulty: no units means no derived bar',
        F3.derivedRecipeThreshold([], 'head', DCFG), 0);
-    // ── WORKMANSHIP (ruled 2026-08-29: quality = workmanship, materials,
-    // TIME — "an investment in time and resources, not something you simply
-    // get from pure stats") ──
-    const WCFG = { activityQuality: {
-      rough: { craftMult: 0.7 }, standard: { craftMult: 1 },
-      fine: { craftMult: 1.25 }, masterwork: { craftMult: 1.5 } } };
-    eq('workmanship: tiers read their craftMult', F3.workmanshipMult('fine', WCFG), 1.25);
-    eq('workmanship: an unknown tier is standard', F3.workmanshipMult('??', WCFG), 1);
-    eq('workmanship: absent config is standard', F3.workmanshipMult('fine', {}), 1);
-    // THE POINT, pinned end to end against John's UNMULTIPLIED numbers (355
-    // vs a 240 bar; the live x0.6 rarity mult shifts both sides — the SHAPE
-    // is what this pins): stats alone stop at COMMON.
-    // Fine work (x4 time) buys uncommon; RARE exists only behind masterwork
-    // (x25 time); and a rush job can fail the threshold outright.
+    // ── TIME INVEST (ruled 2026-08-29: "time scales quality: taking your
+    // time results in better stuff" — CONTINUOUS; the rough/fine/masterwork
+    // tier vocabulary is retired per the same ruling: the rarity ladder is
+    // the only quality language) ──
+    const TCFG = { recipeTuning: { timeQuality: { exponent: 0.15, cap: 1.5, maxMult: 16 } } };
+    eq('time: the base block is neutral', F3.craftTimeQuality(1, TCFG), 1);
+    eq('time: x4 buys ~1.23',
+       Number(F3.craftTimeQuality(4, TCFG).toFixed(2)), 1.23);
+    eq('time: the cap arrives near x16',
+       F3.craftTimeQuality(16, TCFG), 1.5);
+    eq('time: nothing past the cap', F3.craftTimeQuality(400, TCFG), 1.5);
+    // No rushing discount — "get rid of the fine and masterwork stuff"
+    // retired the rough tier too; below the base floors at neutral.
+    eq('time: below base floors at neutral', F3.craftTimeQuality(0.25, TCFG), 1);
+    // ⚠ THE DOUBLE GUARD: raising a common-band verdict (~1.26) to rare
+    // (2.0) needs x1.58 — ABOVE the time cap — and the substance clamp sits
+    // behind it. Time closes the gap to the substance ceiling; it cannot
+    // manufacture a tier.
     const VQ = { craftQuality: { cracked: { minProgress: 0, rarity: 'inferior' } },
                  recipeQualityRatios: { inferior: 1.00, common: 1.20, uncommon: 1.50, rare: 2.00 } };
-    const judge = (tier) => F3.recipeVerdict(
-      Math.round(355 * F3.workmanshipMult(tier, WCFG)), 240, VQ);
-    eq('workmanship: pure stats top out at common', judge('standard').key, 'common');
-    eq('workmanship: fine work buys uncommon', judge('fine').key, 'uncommon');
-    eq('workmanship: rare demands masterwork time', judge('masterwork').key, 'rare');
-    eq('workmanship: a rush job can fail outright',
-       F3.recipeVerdict(Math.round(330 * 0.7), 240, VQ).success, false);
+    eq('time: max time on a common verdict cannot reach rare',
+       F3.recipeVerdict(Math.round(265 * F3.craftTimeQuality(16, TCFG)), 210, VQ).key, 'uncommon');
 
     // ── THE SUBSTANCE CLAMP (ruled 2026-08-28/29) ─────────────────────
     // Reachable bars + masterwork reopened rare-from-uncommon; the clamp is

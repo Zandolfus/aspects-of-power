@@ -2143,15 +2143,21 @@ export function recipeMaterialProgress(units = [], requiredUnits = 0, cfg = null
 }
 
 /**
- * What a workmanship tier is WORTH at the verdict (ruled 2026-08-29). The
- * activityQuality registry prices the tier's time; this reads what that time
- * buys. Unknown or absent tier is standard — the craft paths that predate
- * the lever keep behaving exactly as they did.
+ * TIME INVEST at the craft verdict (ruled 2026-08-29: "time scales quality:
+ * taking your time results in better stuff" — and the tier vocabulary is
+ * gone; the rarity ladder is the only quality language). Continuous, the
+ * same invest grammar as mana and overpour: spend a multiple of the base
+ * block, quality scales by mult^exponent, capped. Below x1 floors at 1 —
+ * there is no rushing discount, only patience.
  */
-export function workmanshipMult(tier, cfg = null) {
+export function craftTimeQuality(timeMult, cfg = null) {
   const sc = cfg ?? (globalThis.CONFIG?.ASPECTSOFPOWER ?? {});
-  const v = Number(sc.activityQuality?.[tier]?.craftMult);
-  return Number.isFinite(v) && v > 0 ? v : 1;
+  const t = sc.recipeTuning?.timeQuality ?? {};
+  const maxMult = Number(t.maxMult) > 1 ? Number(t.maxMult) : 16;
+  const exp = Number(t.exponent) > 0 ? Number(t.exponent) : 0.15;
+  const cap = Number(t.cap) >= 1 ? Number(t.cap) : 1.5;
+  const m = Math.min(Math.max(1, Number(timeMult) || 1), maxMult);
+  return Math.min(cap, Math.pow(m, exp));
 }
 
 /**

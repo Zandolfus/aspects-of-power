@@ -98,6 +98,9 @@ export async function declare(actor, activityKey, opts = {}) {
     // activity's `restore` block — which is the entire payload for meditation
     // and none of it for a craft.
     sourceSkillUuid: opts.sourceSkillUuid ?? null,
+    // Craft time-invest: how many base blocks this declaration spends. The
+    // verdict multiplier is derived from it at resolution (craftTimeQuality).
+    timeInvest: opts.timeInvest ?? 1,
     // The inline activity shape, if this was not a registry key — resolution
     // happens later and has to be able to price the same block again.
     inline: opts.inline ?? null,
@@ -175,7 +178,7 @@ export async function advance({ force = false, seconds = null } = {}) {
       try {
         const skill = await fromUuid(d.sourceSkillUuid);
         if (skill) await skill.roll({ executeDeferred: true, fromActivityCompletion: true,
-          craftQuality: d.quality ?? 'standard' });
+          craftTimeInvest: d.timeInvest ?? 1 });
       } catch (err) {
         console.error('Aspects of Power | downtime: source skill failed to resolve', err);
       }
