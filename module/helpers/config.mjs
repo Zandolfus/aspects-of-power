@@ -3161,10 +3161,23 @@ ASPECTSOFPOWER.recipeTuning = {
  * worst possible outcome, and it stays reachable through the ungated path.
  */
 ASPECTSOFPOWER.recipeQualityRatios = {
-  inferior: 1.00,
-  common:   1.20,
-  uncommon: 1.50,
-  rare:     2.00,
+  inferior:  1.00,
+  common:    1.20,
+  uncommon:  1.50,
+  rare:      2.00,
+  // ── The high rungs (ruled 2026-08-29: "we can create higher ranks, they
+  // just increase slots" — the label's whole payload is augment slots,
+  // 0..8 across the rarity table). Spacing continues the ladder's ~x1.33
+  // growth, and the SUBSTANCE CLAMP still gates every rung: an epic label
+  // requires epic stock AND a 2.7x execution of its bar — at current
+  // blends that means near-divine proficiency plus max time plus overpour
+  // or mana on top. Deliberately a mountain: the top slots are the top of
+  // the whole crafting game. (`ancient` is skipped — it exists only in the
+  // item-rarity table, not in caps, bands, or the skill ladder.)
+  epic:      2.70,
+  legendary: 3.60,
+  mythic:    4.80,
+  divine:    6.40,
 };
 
 /**
@@ -3206,6 +3219,14 @@ ASPECTSOFPOWER.craftQuality = {
   common:   { minProgress: 200, rarity: 'common',    label: 'ASPECTSOFPOWER.CraftQuality.common' },
   uncommon: { minProgress: 500, rarity: 'uncommon',  label: 'ASPECTSOFPOWER.CraftQuality.uncommon' },
   rare:     { minProgress: 1000, rarity: 'rare',     label: 'ASPECTSOFPOWER.CraftQuality.rare' },
+  // High rungs (2026-08-29): the recipe ratio ladder needs these to resolve
+  // a rarity, and the freehand absolute ladder inherits them — reachable
+  // there only at progress totals no living crafter approaches, which is
+  // the point. Spacing ~x1.75 like the rungs below.
+  epic:      { minProgress: 2000,  rarity: 'epic',      label: 'ASPECTSOFPOWER.CraftQuality.epic' },
+  legendary: { minProgress: 3500,  rarity: 'legendary', label: 'ASPECTSOFPOWER.CraftQuality.legendary' },
+  mythic:    { minProgress: 6000,  rarity: 'mythic',    label: 'ASPECTSOFPOWER.CraftQuality.mythic' },
+  divine:    { minProgress: 10000, rarity: 'divine',    label: 'ASPECTSOFPOWER.CraftQuality.divine' },
 };
 
 /**

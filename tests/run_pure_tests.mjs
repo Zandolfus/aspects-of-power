@@ -2772,6 +2772,25 @@ eq('junk situational entries are skipped, not NaN',
     eq('recipe: 1.2x the threshold is common', F3.recipeVerdict(600, 500, RC).key, 'common');
     eq('recipe: 1.5x is uncommon', F3.recipeVerdict(750, 500, RC).key, 'uncommon');
     eq('recipe: 2x is rare', F3.recipeVerdict(1000, 500, RC).key, 'rare');
+    // High rungs (ruled 2026-08-29: "we can create higher ranks, they just
+    // increase slots"): epic 2.7 / legendary 3.6 / mythic 4.8 / divine 6.4.
+    const RC2 = { ...RC, recipeQualityRatios: { ...RC.recipeQualityRatios,
+        epic: 2.70, legendary: 3.60, mythic: 4.80, divine: 6.40 },
+      craftQuality: { ...RC.craftQuality,
+        epic: { minProgress: 2000, rarity: 'epic' },
+        legendary: { minProgress: 3500, rarity: 'legendary' },
+        mythic: { minProgress: 6000, rarity: 'mythic' },
+        divine: { minProgress: 10000, rarity: 'divine' } } };
+    eq('recipe: 2.7x the threshold is epic', F3.recipeVerdict(1350, 500, RC2).key, 'epic');
+    eq('recipe: 6.4x is divine, the top of everything',
+       F3.recipeVerdict(3200, 500, RC2).key, 'divine');
+    eq('recipe: the extended ladder still tops out cleanly',
+       F3.recipeVerdict(99999, 500, RC2).key, 'divine');
+    // ⚠ AND THE CLAMP STILL GATES EVERY RUNG: an epic-ratio execution on
+    // rare stock is a perfect RARE — the high labels need high substances.
+    eq('recipe: an epic ratio on rare stock clamps to rare',
+       F3.clampQualityToSubstance('epic', [{ rarity: 'rare', count: 1 }],
+         { materialCaps: { rare: 500, epic: 800 } }), 'rare');
     eq('recipe: quality never exceeds the top of the ladder',
        F3.recipeVerdict(50000, 500, RC).key, 'rare');
     // ⚠ SCALE-FREE ON PURPOSE: the same execution of a HARDER recipe reads

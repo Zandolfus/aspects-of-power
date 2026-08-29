@@ -754,7 +754,11 @@
       "inferior": "Inferior",
       "common": "Common",
       "uncommon": "Uncommon",
-      "rare": "Rare"
+      "rare": "Rare",
+      "epic": "Epic",
+      "legendary": "Legendary",
+      "mythic": "Mythic",
+      "divine": "Divine"
     },
     "Chain": {
       "label": "Skill Chains",
