@@ -3265,6 +3265,20 @@ ASPECTSOFPOWER.craftItemTypes = {
   thread: { category: 'material', tags: ['material', 'cloth'],   slot: '' },
   hide:   { category: 'material', tags: ['material', 'leather'], slot: '' },
   plank:  { category: 'material', tags: ['material', 'wood'],    slot: '' },
+
+  // ── Trade goods (ruled 2026-08-28, the restrictions pass: "author types:
+  // food, potions... trapping should be deployables (traps), Drums are a
+  // leatherworking type"). These give the non-equipment trades REAL output
+  // types instead of a lockout, and give recipes a typeKey to target.
+  // ⚠ For now they come out of the equipment branch as plain goods — slot ''
+  // means zero stat budget and zero armour, so nothing here is wearable
+  // power. What each DOES (nourishing, deploying as a trap, drumming an
+  // aura) is behaviour still owed to its trade; the type existing first is
+  // what lets that content land without another registry migration.
+  food:   { category: 'goods', tags: ['food'],              slot: '' },
+  potion: { category: 'goods', tags: ['potion'],            slot: '' },
+  trap:   { category: 'goods', tags: ['trap', 'deployable'], slot: '' },
+  drum:   { category: 'goods', tags: ['drum', 'leather'],   slot: '' },
 };
 
 /**
@@ -3276,6 +3290,7 @@ ASPECTSOFPOWER.craftCategories = {
   jewelry:    { label: 'Jewelry' },
   profession: { label: 'Profession' },
   material:   { label: 'Refined Material' },
+  goods:      { label: 'Trade Goods' },
 };
 
 /**
