@@ -6047,7 +6047,7 @@ export class AspectsofPowerItem extends Item {
       // resolution hands it back as craftTimeInvest, where it scales the
       // verdict. Time is spent whether or not the work succeeds.
       let _timeInvest = 1;
-      if ((item.system.tags ?? []).includes('craft')) {
+      if (['craft', 'refine', 'gather'].some(t => (item.system.tags ?? []).includes(t))) {
         const { ActivityHelpers } = await import('../systems/activities.mjs');
         const probe = ActivityHelpers.computeActivityTime(this.actor, key, { inline, skill: this });
         const maxMult = CONFIG.ASPECTSOFPOWER.recipeTuning?.timeQuality?.maxMult ?? 16;
@@ -8206,10 +8206,10 @@ export class AspectsofPowerItem extends Item {
           await this._handleCraftTag(item, rollData, dmgRoll, speaker, rollMode, label, options);
           break;
         case 'gather':
-          await this._handleGatherTag(item, rollData, dmgRoll, speaker, rollMode, label);
+          await this._handleGatherTag(item, rollData, dmgRoll, speaker, rollMode, label, options);
           break;
         case 'refine':
-          await this._handleRefineTag(item, rollData, dmgRoll, speaker, rollMode, label);
+          await this._handleRefineTag(item, rollData, dmgRoll, speaker, rollMode, label, options);
           break;
         case 'inscribe':
           await this._handleInscribeTag(item, rollData, dmgRoll, speaker, rollMode, label);

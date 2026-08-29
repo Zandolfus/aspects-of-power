@@ -2161,6 +2161,54 @@ export function craftTimeQuality(timeMult, cfg = null) {
 }
 
 /**
+ * CRAFT BASE TIME (ruled 2026-08-31: the untimed base block DERIVES from the
+ * difficulty bar — "1h per 200 points" where 200 is materialCaps.common, the
+ * E-band common base). One number already drives success; the same number
+ * drives duration, so epic work is slow work and cheap cooking is fast, with
+ * zero new content: an uncommon helm (bar 210) runs just over the old flat
+ * hour, an epic cuirass (bar 680) runs ~3.4h, a common potion ~44m.
+ *
+ * The flat untimedCraftBaseSeconds survives as the ANCHOR (seconds per
+ * anchor-cap of bar) and as the fallback when no bar exists (legacy crafts
+ * with no bill). Invest multiplies this base; a timed skill's own authored
+ * block still wins over the derivation entirely.
+ *
+ * @param {number} bar  the craft's effective threshold (authored or derived)
+ * @returns {number} seconds for the x1 block
+ */
+export function craftBaseSeconds(bar, cfg = null) {
+  const sc = cfg ?? (globalThis.CONFIG?.ASPECTSOFPOWER ?? {});
+  const base = Number(sc.recipeTuning?.untimedCraftBaseSeconds) > 0
+    ? Number(sc.recipeTuning.untimedCraftBaseSeconds) : 3600;
+  const anchor = Number(sc.materialCaps?.common) > 0 ? Number(sc.materialCaps.common) : 200;
+  const b = Number(bar) || 0;
+  if (b <= 0) return base;
+  return Math.round(base * b / anchor);
+}
+
+/**
+ * MATERIAL PREP TIME (ruled 2026-08-31: "full invest model" — refine and
+ * gather advance the clock like crafts do, closing the leak where the
+ * material half of every craft was prepared for free; John capped Fulgurite
+ * 221 -> 300 in one clockless click).
+ *
+ * Prep has no product, so its bar is the material-only slice of the craft
+ * derivation: cap x thresholdBase, i.e. derivedRecipeThreshold with the slot
+ * term at zero. Refining fulgurite (cap 300) runs ~54m; an epic substance
+ * (800) ~2.4h — harder stuff takes longer to work, same as crafting it.
+ *
+ * @param {number} cap  the substance ceiling being worked (materialCapFor /
+ *                      materialCap by rarity for not-yet-created gathers)
+ * @returns {number} seconds for the x1 block
+ */
+export function prepBaseSeconds(cap, cfg = null) {
+  const sc = cfg ?? (globalThis.CONFIG?.ASPECTSOFPOWER ?? {});
+  const tb = Number(sc.recipeTuning?.thresholdBase) > 0
+    ? Number(sc.recipeTuning.thresholdBase) : 0.6;
+  return craftBaseSeconds((Number(cap) || 0) * tb, sc);
+}
+
+/**
  * DERIVED RECIPE DIFFICULTY (ruled 2026-08-29: "build the math for recipe
  * difficulty based on the materials used and final product").
  *

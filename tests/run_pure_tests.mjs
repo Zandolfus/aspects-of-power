@@ -3217,6 +3217,32 @@ eq('junk situational entries are skipped, not NaN',
     eq('time: max time on a common verdict cannot reach rare',
        F3.recipeVerdict(Math.round(265 * F3.craftTimeQuality(16, TCFG)), 210, VQ).key, 'uncommon');
 
+    // ── BASE TIME DERIVES FROM THE BAR (ruled 2026-08-31: "difficulty bar"
+    // — 1h per materialCaps.common of bar, so epic work is slow work and
+    // cheap cooking is fast; the flat 3600 survives as anchor + fallback) ──
+    const BTCFG = { recipeTuning: { untimedCraftBaseSeconds: 3600, thresholdBase: 0.6 },
+                    materialCaps: { common: 200, uncommon: 300, epic: 800 } };
+    eq('base time: an uncommon helm (bar 210) runs just over the old hour',
+       F3.craftBaseSeconds(210, BTCFG), 3780);
+    eq('base time: an epic cuirass (bar 680) runs ~3.4h',
+       F3.craftBaseSeconds(680, BTCFG), 12240);
+    eq('base time: a common potion (bar 145) runs under the hour',
+       F3.craftBaseSeconds(145, BTCFG), 2610);
+    eq('base time: no bar falls back to the flat block, never zero',
+       F3.craftBaseSeconds(0, BTCFG), 3600);
+    // Negative control: the anchor is materialCaps.common, not a constant —
+    // halve the anchor and the same bar prices twice the hours.
+    eq('base time: the anchor is the common cap, not a literal',
+       F3.craftBaseSeconds(210, { ...BTCFG, materialCaps: { common: 100 } }), 7560);
+    // ── PREP TIME (ruled 2026-08-31: refine/gather join the invest model;
+    // the bar is the material-only slice, cap x thresholdBase) ──
+    eq('prep time: refining fulgurite (cap 300) runs ~54m',
+       F3.prepBaseSeconds(300, BTCFG), 3240);
+    eq('prep time: an epic substance (cap 800) runs ~2.4h',
+       F3.prepBaseSeconds(800, BTCFG), 8640);
+    eq('prep time: no cap still costs the flat block, never zero',
+       F3.prepBaseSeconds(0, BTCFG), 3600);
+
     // ── THE SUBSTANCE CLAMP (ruled 2026-08-28/29) ─────────────────────
     // Reachable bars + masterwork reopened rare-from-uncommon; the clamp is
     // what keeps the scarcity ruling true: the label can never exceed what

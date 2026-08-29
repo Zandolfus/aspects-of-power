@@ -9,9 +9,14 @@
  * byte-identical to its previous class-body form (no object-literal comma
  * surgery); the export collects the prototype methods into a plain mixin.
  */
-import { hybridAbilityMod, itemWeightLb, craftManaQuality, recipeMaterialProgress, recipeVerdict, materialCap, materialCapFor, derivedRecipeThreshold, craftTimeQuality, clampQualityToSubstance } from '../helpers/formulas.mjs';
+import { hybridAbilityMod, itemWeightLb, craftManaQuality, recipeMaterialProgress, recipeVerdict, materialCap, materialCapFor, derivedRecipeThreshold, craftTimeQuality, craftBaseSeconds, prepBaseSeconds, clampQualityToSubstance } from '../helpers/formulas.mjs';
 import { eligibleRecipes, resolveIngredients, consumeIngredients, craftBar, findMatchingRecipe, recipeLibrary, alreadyKnows, isGenericRecipe, specializationOf } from './recipes.mjs';
 import { spatialCapacityFromCraft } from '../helpers/formulas.mjs';
+
+/** Seconds -> "2h 30m" / "45m" — the one formatter every time-invest surface uses. */
+const fmtCraftTime = (sec) => sec >= 3600
+  ? `${Math.floor(sec / 3600)}h ${Math.round((sec % 3600) / 60)}m`
+  : `${Math.round(sec / 60)}m`;
 
 class CraftingSkills {
   /**
@@ -879,10 +884,40 @@ class CraftingSkills {
   }
 
   /**
+   * TIME INVEST prompt shared by craft, refine and gather (ruled 2026-08-31:
+   * "full invest model" — one grammar everywhere a profession spends the
+   * clock). Returns the chosen multiple, or null on cancel. The caller owns
+   * the actual clock advance, so it can sit behind its own last gate (mana).
+   */
+  async _promptTimeInvest(title, baseSeconds, extraHint = '') {
+    const maxMult = CONFIG.ASPECTSOFPOWER.recipeTuning?.timeQuality?.maxMult ?? 16;
+    const pick = await foundry.applications.api.DialogV2.wait({
+      window: { title: `${title} — Time` },
+      content: `<div class="form-group">
+          <label>Time to invest (1 = ${fmtCraftTime(baseSeconds)}, up to ${maxMult})</label>
+          <input type="number" name="timeInvest" value="1" min="1" max="${maxMult}" step="1" />
+          <p class="hint">Taking your time results in better work, on a steep curve
+          of diminishing returns. The clock advances either way.${extraHint}</p>
+        </div>`,
+      buttons: [
+        { action: 'ok', label: 'Begin', default: true,
+          callback: (event, button, dialog) => {
+            const v = Number(dialog.element.querySelector('[name=timeInvest]')?.value);
+            return { mult: Math.min(Math.max(1, Math.floor(v) || 1), maxMult) };
+          } },
+        { action: 'cancel', label: 'Cancel' },
+      ],
+      close: () => 'cancel',
+    });
+    if (!pick || pick === 'cancel') return null;
+    return pick.mult;
+  }
+
+  /**
    * Refine tag: select a material from inventory and improve its progress.
    * Can be used standalone or as part of the craft pipeline.
    */
-  async _handleRefineTag(item, rollData, dmgRoll, speaker, rollMode, label) {
+  async _handleRefineTag(item, rollData, dmgRoll, speaker, rollMode, label, opts = {}) {
     const actor = this.actor;
     if (!actor) return;
 
@@ -917,12 +952,32 @@ class CraftingSkills {
     const materialItem = actor.items.get(selectedMat);
     if (!materialItem) return;
 
-    // Roll refine: skill × d100%, capped at remaining headroom toward maxProgress.
+    // ── TIME (ruled 2026-08-31: prep joins the full invest model — the
+    // material half of a craft is no longer prepared for free; John capped
+    // Fulgurite 221 -> 300 in one clockless click). The block prices off the
+    // substance ceiling being worked, and taking longer works more of the
+    // potential in. In combat: x1, no clock, same convention as craft.
+    let timeInvest = 1;
+    let refineClock = 0;
+    if (opts?.fromActivityCompletion) {
+      timeInvest = Math.max(1, Number(opts.craftTimeInvest) || 1);
+    } else if (!(item.system.tags ?? []).includes('activity') && !actor.inCombat) {
+      const base = prepBaseSeconds(materialCapFor(materialItem.system));
+      const mult = await this._promptTimeInvest(item.name, base);
+      if (mult === null) return;
+      timeInvest = mult;
+      refineClock = Math.round(base * timeInvest);
+      const { ActivityHelpers } = await import('./activities.mjs');
+      await ActivityHelpers.advanceWorldTime(refineClock);
+    }
+    const timeQ = craftTimeQuality(timeInvest);
+
+    // Roll refine: skill × d100% × time quality, capped at remaining headroom.
     const skillRoll = Math.round(dmgRoll.total);
     const d100Roll = new Roll('1d100');
     await d100Roll.evaluate();
     const d100Pct = d100Roll.total / 100;
-    const rawGain = Math.round(skillRoll * d100Pct);
+    const rawGain = Math.round(skillRoll * d100Pct * timeQ);
     const oldProgress = materialItem.system.progress ?? 0;
     // The substance ceiling wins even over a stored maxProgress — pre-cap
     // materials carry roll-derived values that can exceed what the substance
@@ -959,7 +1014,10 @@ class CraftingSkills {
         <hr>
         ${natLine}
         <p><strong>Material:</strong> ${materialItem.name}</p>
-        <p><strong>Skill Roll:</strong> ${skillRoll} × d100 (${d100Roll.total}) = ${rawGain}</p>
+        ${refineClock > 0 || timeInvest !== 1
+          ? `<p><strong>Time:</strong> ${refineClock > 0 ? fmtCraftTime(refineClock) : `x${timeInvest}`}${timeQ !== 1 ? ` — quality x${timeQ.toFixed(2)}` : ''}</p>`
+          : ''}
+        <p><strong>Skill Roll:</strong> ${skillRoll} × d100 (${d100Roll.total})${timeQ !== 1 ? ` × ${timeQ.toFixed(2)} (time)` : ''} = ${rawGain}</p>
         ${capLine}
         <p><strong>Progress:</strong> ${oldProgress} → <strong>${newProgress}</strong> / ${maxProgress} (+${refineGain})</p>
         ${maxLine}
@@ -971,7 +1029,7 @@ class CraftingSkills {
    * Gather tag: roll to create a material item in the actor's inventory.
    * Progress = skillRoll × d100%. Determines material quality.
    */
-  async _handleGatherTag(item, rollData, dmgRoll, speaker, rollMode, label) {
+  async _handleGatherTag(item, rollData, dmgRoll, speaker, rollMode, label, opts = {}) {
     const actor = this.actor;
     if (!actor) return;
 
@@ -1017,6 +1075,24 @@ class CraftingSkills {
     if (selectedElement === 'cancel') return;
     const element = selectedElement === 'none' ? '' : selectedElement;
 
+    // ── TIME (ruled 2026-08-31: prep joins the full invest model). The block
+    // prices off the CHOSEN substance tier — everything gathered today is
+    // E-band, so the rarity base cap is the ceiling (the item does not exist
+    // yet to resolve an authored cap from). The clock itself advances only
+    // after the mana gate below, so a cancel there stays free.
+    let timeInvest = 1;
+    let gatherClock = 0;
+    if (opts?.fromActivityCompletion) {
+      timeInvest = Math.max(1, Number(opts.craftTimeInvest) || 1);
+    } else if (!tags.includes('activity') && !actor.inCombat) {
+      const base = prepBaseSeconds(materialCap(selectedRarity));
+      const mult = await this._promptTimeInvest(item.name, base);
+      if (mult === null) return;
+      timeInvest = mult;
+      gatherClock = Math.round(base * timeInvest);
+    }
+    const timeQ = craftTimeQuality(timeInvest);
+
     // ── Mana element (inert unless the recipe declares one) ──
     // The gather path is where a recipe that CONJURES its material rather
     // than harvesting one lives (Crystalcraft): mana is the raw stock, so the
@@ -1026,6 +1102,16 @@ class CraftingSkills {
     if (!manaStep) return;
     const manaMult = manaStep.mult;
     const manaLine = manaStep.line;
+
+    // Every gate is passed — the time is committed now, and it stays spent
+    // whether the harvest succeeds or the d100 ruins it.
+    if (gatherClock > 0) {
+      const { ActivityHelpers } = await import('./activities.mjs');
+      await ActivityHelpers.advanceWorldTime(gatherClock);
+    }
+    const timeLine = gatherClock > 0 || timeInvest !== 1
+      ? `<p><strong>Time:</strong> ${gatherClock > 0 ? fmtCraftTime(gatherClock) : `x${timeInvest}`}${timeQ !== 1 ? ` — quality x${timeQ.toFixed(2)}` : ''}</p>`
+      : '';
 
     // Profession augment bonuses from equipped profession gear (element-filtered).
     const gatherAugBonuses = actor.getProfessionAugmentBonuses(element);
@@ -1055,7 +1141,7 @@ class CraftingSkills {
     const d100Pct = effectiveD100 / 100;
 
     const skillRoll = Math.round(dmgRoll.total) + gatherSkillBonus;
-    const gatherProgress = Math.round((Math.round(skillRoll * d100Pct) + gatherProgressBonus) * manaMult);
+    const gatherProgress = Math.round((Math.round(skillRoll * d100Pct) + gatherProgressBonus) * manaMult * timeQ);
 
     // Failure check: d100 of 1 ruins the attempt.
     if (d100Roll.total <= 1) {
@@ -1066,6 +1152,7 @@ class CraftingSkills {
           <hr>
           <p><strong>Skill Roll:</strong> ${skillRoll}</p>
           ${manaLine}
+          ${timeLine}
           <p><strong>d100:</strong> ${d100Roll.total} — <em>Critical failure! Materials ruined.</em></p>
         </div>`,
       });
@@ -1133,9 +1220,10 @@ class CraftingSkills {
       : `${d100Roll.total} (cap ${gatherRarityRange.ceiling})`;
     const rawProgress = Math.round(skillRoll * d100Pct);
     const gatherManaExpr = manaMult !== 1 ? ` × ${manaMult.toFixed(2)} (mana)` : '';
+    const gatherTimeExpr = timeQ !== 1 ? ` × ${timeQ.toFixed(2)} (time)` : '';
     const progressLine = gatherProgressBonus
-      ? `${skillRoll} × ${d100Pct.toFixed(2)} = ${rawProgress} + ${gatherProgressBonus} (augment)${gatherManaExpr} = ${gatherProgress}`
-      : `${skillRoll} × ${d100Pct.toFixed(2)}${gatherManaExpr} = ${gatherProgress}`;
+      ? `${skillRoll} × ${d100Pct.toFixed(2)} = ${rawProgress} + ${gatherProgressBonus} (augment)${gatherManaExpr}${gatherTimeExpr} = ${gatherProgress}`
+      : `${skillRoll} × ${d100Pct.toFixed(2)}${gatherManaExpr}${gatherTimeExpr} = ${gatherProgress}`;
 
     ChatMessage.create({
       speaker,
@@ -1150,6 +1238,7 @@ class CraftingSkills {
         <p><strong>Progress:</strong> ${progressLine}</p>
         ${gatherAugLine}
         ${manaLine}
+        ${timeLine}
         <p><em>Created: ${itemName}</em></p>
       </div>`,
     });
@@ -1773,7 +1862,8 @@ class CraftingSkills {
         // Mean-of-what-went-in, with overpour NEUTRAL by construction: an
         // improviser has no bill to exceed, so required == supplied.
         const units = chosen.map(p => ({ progress: p.item.system.progress ?? 0, count: p.count,
-                                          rarity: p.item.system.rarity || 'common' }));
+                                          rarity: p.item.system.rarity || 'common',
+                                          cap: materialCapFor(p.item.system) }));
         const supplied = units.reduce((s, u) => s + u.count, 0);
         recipeBill = { units, requiredUnits: supplied };
       }
@@ -1800,33 +1890,27 @@ class CraftingSkills {
     if (opts?.fromActivityCompletion) {
       timeInvest = Math.max(1, Number(opts.craftTimeInvest) || 1);
     } else if (!(item.system.tags ?? []).includes('activity') && !actor.inCombat) {
-      const base = CONFIG.ASPECTSOFPOWER.recipeTuning?.untimedCraftBaseSeconds ?? 3600;
-      const maxMult = CONFIG.ASPECTSOFPOWER.recipeTuning?.timeQuality?.maxMult ?? 16;
-      const fmt = (sec) => sec >= 3600
-        ? `${Math.floor(sec / 3600)}h ${Math.round((sec % 3600) / 60)}m`
-        : `${Math.round(sec / 60)}m`;
-      const pick = await foundry.applications.api.DialogV2.wait({
-        window: { title: `${item.name} — Time` },
-        content: `<div class="form-group">
-            <label>Time to invest (1 = ${fmt(base)}, up to ${maxMult})</label>
-            <input type="number" name="timeInvest" value="1" min="1" max="${maxMult}" step="1" />
-            <p class="hint">Taking your time results in better work, on a steep curve
-            of diminishing returns. The clock advances either way.</p>
-          </div>`,
-        buttons: [
-          { action: 'ok', label: 'Begin', default: true,
-            callback: (event, button, dialog) => {
-              const v = Number(dialog.element.querySelector('[name=timeInvest]')?.value);
-              return { mult: Math.min(Math.max(1, Math.floor(v) || 1), maxMult) };
-            } },
-          { action: 'cancel', label: 'Cancel' },
-        ],
-        close: () => 'cancel',
-      });
-      if (!pick || pick === 'cancel') return;
-      timeInvest = pick.mult;
+      // The base block DERIVES from the difficulty bar (ruled 2026-08-31) —
+      // the same authored-wins-else-derive rule as effThreshold below, priced
+      // on the bill as declared, so epic work is slow work and a cheap potion
+      // is quick. The freeform surcharge is a SUCCESS penalty, not extra
+      // hours, so the bar here is the unsurcharged one.
+      const authoredBar = Number(recipe?.system?.threshold) || 0;
+      const bar = authoredBar > 0 ? authoredBar
+        : derivedRecipeThreshold(recipeBill?.units ?? [], typeKey || '');
+      const base = craftBaseSeconds(bar);
+      // An in-craft refine is still a refine (ruled 2026-08-31: prep costs
+      // time): its prep block rides the same advance, at x1 — the invest
+      // below buys CRAFT quality, never refine gain.
+      const prepExtra = (refineId && materialItem)
+        ? prepBaseSeconds(materialCapFor(materialItem.system)) : 0;
+      const hint = prepExtra
+        ? ` Refining the stock first adds ${fmtCraftTime(prepExtra)}.` : '';
+      const mult = await this._promptTimeInvest(item.name, base, hint);
+      if (mult === null) return;
+      timeInvest = mult;
       const { ActivityHelpers } = await import('./activities.mjs');
-      await ActivityHelpers.advanceWorldTime(Math.round(base * timeInvest));
+      await ActivityHelpers.advanceWorldTime(Math.round(base * timeInvest) + prepExtra);
     }
     const timeQ = craftTimeQuality(timeInvest);
     const workLine = timeQ !== 1

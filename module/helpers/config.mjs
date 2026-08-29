@@ -3110,11 +3110,13 @@ ASPECTSOFPOWER.recipeTuning = {
   // At 0.5 every met bill is reachable at every tier and failure is a roll.
   slotDifficultyShare: 0.5,
 
-  // Base block for a craft whose skill carries NO activity timing yet (246
-  // profession skills, 1 timed — the standing content debt). The workmanship
-  // tier multiplies this and advances the world clock directly, ritual-prep
-  // style, so the time lever works table-wide today instead of waiting on
-  // the durations pass. A timed skill's own block wins when it exists.
+  // ANCHOR for the untimed craft block (ruled 2026-08-31: the base DERIVES
+  // from the difficulty bar — craftBaseSeconds gives this many seconds per
+  // materialCaps.common of bar, so an uncommon helm runs ~1h, an epic
+  // cuirass ~3.4h, a common potion ~44m; prepBaseSeconds prices refine/
+  // gather off the substance ceiling alone). Also the flat fallback for a
+  // craft with no bar (legacy, no bill). A timed skill's own authored block
+  // wins over the whole derivation.
   untimedCraftBaseSeconds: 3600,
 
   // ── TIME INVEST (ruled 2026-08-29: "time scales quality: taking your

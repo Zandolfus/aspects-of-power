@@ -1,5 +1,9 @@
 import { resolveIngredients, skillsFor } from '../systems/recipes.mjs';
-import { derivedRecipeThreshold } from '../helpers/formulas.mjs';
+import { derivedRecipeThreshold, craftBaseSeconds } from '../helpers/formulas.mjs';
+
+const fmtTime = (sec) => sec >= 3600
+  ? `${Math.floor(sec / 3600)}h ${Math.round((sec % 3600) / 60)}m`
+  : `${Math.round(sec / 60)}m`;
 
 /**
  * THE RECIPE BOOK — a profession window (ruled 2026-08-27: "something more
@@ -52,6 +56,9 @@ export class RecipeBook extends foundry.applications.api.HandlebarsApplicationMi
         const bill = resolveIngredients(this.actor, r);
         const skills = skillsFor(this.actor, r);
         const typeKey = r.system.output?.typeKey || '';
+        const bar = (r.system.threshold ?? 0) > 0
+          ? r.system.threshold
+          : (bill.units.length ? derivedRecipeThreshold(bill.units, typeKey) : 0);
         return {
           id: r.id,
           name: r.name,
@@ -63,11 +70,12 @@ export class RecipeBook extends foundry.applications.api.HandlebarsApplicationMi
           // Authored threshold wins; 0 means difficulty DERIVES from the
           // substances worked — so show what the bar would be against the
           // stock this crafter would actually reach for.
-          threshold: (r.system.threshold ?? 0) > 0
-            ? r.system.threshold
-            : (bill.units.length ? derivedRecipeThreshold(bill.units, typeKey) : 0),
+          threshold: bar,
           thresholdDerived: (r.system.threshold ?? 0) <= 0,
           minMana: r.system.minMana ?? 0,
+          // The x1 block this bar prices (craftBaseSeconds, ruled 2026-08-31)
+          // — the book should answer "how long is this" before the dialog does.
+          baseTime: bar > 0 ? fmtTime(craftBaseSeconds(bar)) : '',
           discovered: r.system.source === 'discovered',
           discoveredBy: r.system.discoveredBy || '',
           requiresTags: r.system.requiresSkillTags ?? [],

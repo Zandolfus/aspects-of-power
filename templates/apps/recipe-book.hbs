@@ -64,6 +64,7 @@
             <span class="hint">
               {{#if selected.typeKey}}{{selected.typeKey}} &middot; {{/if}}
               {{#if selected.threshold}}needs {{selected.threshold}}{{#if selected.thresholdDerived}} (by material){{/if}}{{else}}scales with materials{{/if}}
+              {{#if selected.baseTime}} &middot; ~{{selected.baseTime}} at x1{{/if}}
               {{#if selected.minMana}} &middot; {{selected.minMana}} mana{{/if}}
             </span>
           </div>
