@@ -174,7 +174,8 @@ export async function advance({ force = false, seconds = null } = {}) {
     if (d.sourceSkillUuid) {
       try {
         const skill = await fromUuid(d.sourceSkillUuid);
-        if (skill) await skill.roll({ executeDeferred: true, fromActivityCompletion: true });
+        if (skill) await skill.roll({ executeDeferred: true, fromActivityCompletion: true,
+          craftQuality: d.quality ?? 'standard' });
       } catch (err) {
         console.error('Aspects of Power | downtime: source skill failed to resolve', err);
       }

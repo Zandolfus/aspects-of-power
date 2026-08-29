@@ -2153,11 +2153,21 @@ ASPECTSOFPOWER.conversions = {
  * craft-flow rework sim; the floors are what stop mastery collapsing to
  * instant.
  */
+// `mult` prices the TIME; `craftMult` is what that time buys (ruled
+// 2026-08-29: "quality derived from workmanship, materials, and time...
+// an investment in time and resources, not something you simply get from
+// pure stats"). The craft verdict multiplies by craftMult BEFORE quality is
+// judged, so rushing can fail a threshold outright and only patient work
+// reaches the top labels — against live rolls, a master's typical fulgurite
+// helm reads inferior rushed, common at standard, uncommon at fine (x4
+// time), and RARE only at masterwork (x25 time, ~a full day at the forge).
+// Stored progress (the item's stats) stays the raw work: time buys the
+// LABEL and its augment slots, never raw power.
 ASPECTSOFPOWER.activityQuality = {
-  rough:      { label: 'Rough',      mult: 0.25, clockFloorSeconds: 0 },
-  standard:   { label: 'Standard',   mult: 1,    clockFloorSeconds: 0 },
-  fine:       { label: 'Fine',       mult: 4,    clockFloorSeconds: 600 },
-  masterwork: { label: 'Masterwork', mult: 25,   clockFloorSeconds: 7200 },
+  rough:      { label: 'Rough',      mult: 0.25, clockFloorSeconds: 0,    craftMult: 0.7 },
+  standard:   { label: 'Standard',   mult: 1,    clockFloorSeconds: 0,    craftMult: 1 },
+  fine:       { label: 'Fine',       mult: 4,    clockFloorSeconds: 600,  craftMult: 1.25 },
+  masterwork: { label: 'Masterwork', mult: 25,   clockFloorSeconds: 7200, craftMult: 1.5 },
 };
 
 ASPECTSOFPOWER.referenceRoundLength = {
@@ -3091,6 +3101,13 @@ ASPECTSOFPOWER.recipeTuning = {
   // yield merely-sound results. The sim's 0.75x-typical-output rule lands at
   // base ~0.63 for a helm; 0.6 keeps the number legible.
   thresholdBase: 0.6,
+
+  // Base block for a craft whose skill carries NO activity timing yet (246
+  // profession skills, 1 timed — the standing content debt). The workmanship
+  // tier multiplies this and advances the world clock directly, ritual-prep
+  // style, so the time lever works table-wide today instead of waiting on
+  // the durations pass. A timed skill's own block wins when it exists.
+  untimedCraftBaseSeconds: 3600,
 
   // freeformSurcharge — RULED 2026-08-26: "freecrafting success and recipe
   // unlock should be proportional to each other. Say a recipe requires 100

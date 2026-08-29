@@ -6039,8 +6039,37 @@ export class AspectsofPowerItem extends Item {
         return;
       }
       const { DowntimeHelpers } = await import('../systems/downtime.mjs');
+      // ── WORKMANSHIP (ruled 2026-08-29): a quality-scaled CRAFT block asks
+      // how carefully the work is done BEFORE the clock is committed. The
+      // tier prices the block (activityQuality.mult) and rides the
+      // declaration; resolution hands it back to the craft as craftQuality,
+      // where it multiplies the verdict. Time is spent whether or not the
+      // work succeeds — that is what makes it an investment.
+      let _quality;
+      if ((item.system.tags ?? []).includes('craft')) {
+        const { ActivityHelpers } = await import('../systems/activities.mjs');
+        const probe = ActivityHelpers.computeActivityTime(this.actor, key, { inline, skill: this });
+        if (probe?.qualityScaled) {
+          const tiers = CONFIG.ASPECTSOFPOWER.activityQuality ?? {};
+          const buttons = Object.entries(tiers).map(([k, t]) => {
+            const timed = ActivityHelpers.computeActivityTime(this.actor, key,
+              { inline, skill: this, quality: k });
+            return { action: k, label: `${t.label} (${timed?.display ?? '?'})`,
+                     default: k === 'standard' };
+          });
+          buttons.push({ action: 'cancel', label: 'Cancel' });
+          _quality = await foundry.applications.api.DialogV2.wait({
+            window: { title: `${item.name} — Workmanship` },
+            content: `<p>How carefully is this piece worked? Patient work costs real
+              time and is judged kinder; rushed work can fail outright.</p>`,
+            buttons, close: () => 'cancel',
+          });
+          if (_quality === 'cancel') return;
+        }
+      }
       return DowntimeHelpers.declare(this.actor, key, {
         inline,
+        quality: _quality,
         sourceSkillUuid: this.uuid,
         // The activity's stat falls back to this skill's own roll ability, so
         // a smithing skill is paced by the smith's stat with nothing authored.

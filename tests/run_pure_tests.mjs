@@ -3172,6 +3172,29 @@ eq('junk situational entries are skipped, not NaN',
        F3.derivedRecipeThreshold([{ rarity: 'uncommon', count: 1 }], 'mystery', DCFG), 255);
     eq('difficulty: no units means no derived bar',
        F3.derivedRecipeThreshold([], 'head', DCFG), 0);
+    // ── WORKMANSHIP (ruled 2026-08-29: quality = workmanship, materials,
+    // TIME — "an investment in time and resources, not something you simply
+    // get from pure stats") ──
+    const WCFG = { activityQuality: {
+      rough: { craftMult: 0.7 }, standard: { craftMult: 1 },
+      fine: { craftMult: 1.25 }, masterwork: { craftMult: 1.5 } } };
+    eq('workmanship: tiers read their craftMult', F3.workmanshipMult('fine', WCFG), 1.25);
+    eq('workmanship: an unknown tier is standard', F3.workmanshipMult('??', WCFG), 1);
+    eq('workmanship: absent config is standard', F3.workmanshipMult('fine', {}), 1);
+    // THE POINT, pinned end to end against John's live numbers (typical 355
+    // vs the derived fulgurite-helm bar of 240): stats alone stop at COMMON.
+    // Fine work (x4 time) buys uncommon; RARE exists only behind masterwork
+    // (x25 time); and a rush job can fail the threshold outright.
+    const VQ = { craftQuality: { cracked: { minProgress: 0, rarity: 'inferior' } },
+                 recipeQualityRatios: { inferior: 1.00, common: 1.20, uncommon: 1.50, rare: 2.00 } };
+    const judge = (tier) => F3.recipeVerdict(
+      Math.round(355 * F3.workmanshipMult(tier, WCFG)), 240, VQ);
+    eq('workmanship: pure stats top out at common', judge('standard').key, 'common');
+    eq('workmanship: fine work buys uncommon', judge('fine').key, 'uncommon');
+    eq('workmanship: rare demands masterwork time', judge('masterwork').key, 'rare');
+    eq('workmanship: a rush job can fail outright',
+       F3.recipeVerdict(Math.round(330 * 0.7), 240, VQ).success, false);
+
     // ⚠ THE INFLATION PIN: against the OLD static 150, a typical master roll
     // of 355 was ratio 2.37 = RARE on every repeat craft. Against the
     // derived 240 the same roll is ratio ~1.48 = common. Quality now means

@@ -2143,6 +2143,18 @@ export function recipeMaterialProgress(units = [], requiredUnits = 0, cfg = null
 }
 
 /**
+ * What a workmanship tier is WORTH at the verdict (ruled 2026-08-29). The
+ * activityQuality registry prices the tier's time; this reads what that time
+ * buys. Unknown or absent tier is standard — the craft paths that predate
+ * the lever keep behaving exactly as they did.
+ */
+export function workmanshipMult(tier, cfg = null) {
+  const sc = cfg ?? (globalThis.CONFIG?.ASPECTSOFPOWER ?? {});
+  const v = Number(sc.activityQuality?.[tier]?.craftMult);
+  return Number.isFinite(v) && v > 0 ? v : 1;
+}
+
+/**
  * DERIVED RECIPE DIFFICULTY (ruled 2026-08-29: "build the math for recipe
  * difficulty based on the materials used and final product").
  *

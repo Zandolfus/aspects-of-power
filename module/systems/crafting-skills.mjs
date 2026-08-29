@@ -9,7 +9,7 @@
  * byte-identical to its previous class-body form (no object-literal comma
  * surgery); the export collects the prototype methods into a plain mixin.
  */
-import { hybridAbilityMod, itemWeightLb, craftManaQuality, recipeMaterialProgress, recipeVerdict, materialCap, derivedRecipeThreshold } from '../helpers/formulas.mjs';
+import { hybridAbilityMod, itemWeightLb, craftManaQuality, recipeMaterialProgress, recipeVerdict, materialCap, derivedRecipeThreshold, workmanshipMult } from '../helpers/formulas.mjs';
 import { eligibleRecipes, resolveIngredients, consumeIngredients, craftBar, findMatchingRecipe, recipeLibrary, alreadyKnows, isGenericRecipe, specializationOf } from './recipes.mjs';
 import { spatialCapacityFromCraft } from '../helpers/formulas.mjs';
 
@@ -1783,6 +1783,49 @@ class CraftingSkills {
     const refineId = combinedSetup?.refineId ?? '';
     const prepId   = combinedSetup?.prepId ?? '';
 
+    // ── WORKMANSHIP (ruled 2026-08-29: "quality derived from workmanship,
+    // materials, and time... an investment in time and resources, not
+    // something you simply get from pure stats") ──
+    // A TIMED craft chose its tier at declaration and arrives here with the
+    // block already spent. An UNTIMED one chooses now, and the world clock
+    // advances ritual-prep style — time is spent whether or not the work
+    // succeeds, which is what makes it an investment rather than a dial.
+    let craftTier = 'standard';
+    if (opts?.fromActivityCompletion) {
+      craftTier = opts.craftQuality ?? 'standard';
+    } else if (!(item.system.tags ?? []).includes('activity') && !actor.inCombat) {
+      const tiers = CONFIG.ASPECTSOFPOWER.activityQuality ?? {};
+      const base = CONFIG.ASPECTSOFPOWER.recipeTuning?.untimedCraftBaseSeconds ?? 3600;
+      const fmt = (sec) => sec >= 3600
+        ? `${Math.floor(sec / 3600)}h ${Math.round((sec % 3600) / 60)}m`
+        : `${Math.round(sec / 60)}m`;
+      const tierButtons = Object.entries(tiers).map(([k, t]) => ({
+        action: k,
+        label: `${t.label} (${fmt(Math.max(base * (t.mult ?? 1), t.clockFloorSeconds ?? 0))})`,
+        default: k === 'standard',
+      }));
+      tierButtons.push({ action: 'cancel', label: 'Cancel' });
+      const pick = await foundry.applications.api.DialogV2.wait({
+        window: { title: `${item.name} — Workmanship` },
+        content: `<p>How carefully is this piece worked? Patient work costs real
+          time and is judged kinder; rushed work can fail outright.</p>`,
+        buttons: tierButtons, close: () => 'cancel',
+      });
+      if (pick === 'cancel') return;
+      craftTier = pick;
+      const t = tiers[craftTier] ?? {};
+      const seconds = Math.round(Math.max(base * (t.mult ?? 1), t.clockFloorSeconds ?? 0));
+      if (seconds > 0) {
+        const { ActivityHelpers } = await import('./activities.mjs');
+        await ActivityHelpers.advanceWorldTime(seconds);
+      }
+    }
+    const workmanship = workmanshipMult(craftTier);
+    const workLine = workmanship !== 1
+      ? `<p><strong>Workmanship:</strong> ${CONFIG.ASPECTSOFPOWER.activityQuality?.[craftTier]?.label ?? craftTier}
+         — verdict x${workmanship}</p>`
+      : '';
+
     // ── Mana element (inert unless the recipe declares one) ──
     // Last gate before anything is spent or mutated: refine below rewrites
     // the material, so the mana question has to be answered while backing out
@@ -2018,6 +2061,12 @@ class CraftingSkills {
       return;
     }
 
+    // The workmanship tier multiplies the JUDGED total — the gate, the
+    // discovery bars and the quality ratio all read this — while the stored
+    // progress (the item's stats) stays the raw work. Time buys the label
+    // and its augment slots, never raw power.
+    const effTotal = Math.round(totalProgress * workmanship);
+
     // ── THE RECIPE GATE (ruled 2026-08-26, threshold failure "much like
     // rituals"): clear it and the quality is set by how far past you landed;
     // miss it and the ingredients are gone. Runs BEFORE the absolute quality
@@ -2038,7 +2087,7 @@ class CraftingSkills {
     };
     if (recipe) {
       const _t = effThreshold(recipe);
-      const verdict = recipeVerdict(totalProgress, _t);
+      const verdict = recipeVerdict(effTotal, _t);
       if (!verdict.success) {
         // Consume everything, exactly as a failed ritual does. The primary is
         // eaten by the same path a freehand craft uses; the rest go here.
@@ -2048,9 +2097,9 @@ class CraftingSkills {
         ChatMessage.create({ speaker, rollMode,
           content: `<div class="craft-result">
             <h3>${item.name} — ${recipe.system.output?.name || recipe.name} Failed</h3><hr>
-            <p>Progress <strong style="color:#ef5350;">${totalProgress}</strong> against a
+            <p>Progress <strong style="color:#ef5350;">${effTotal}</strong> against a
             threshold of ${_t}. The work does not hold together.</p>
-            ${manaLine}
+            ${workLine}${manaLine}
             <p><em>Ingredients consumed.</em></p>
           </div>` });
         return;
@@ -2085,8 +2134,8 @@ class CraftingSkills {
       if (spec) {
         const _mt = effThreshold(match);
         const bar = craftBar(_mt, false);
-        if (totalProgress >= bar) {
-          const verdict = recipeVerdict(totalProgress, _mt);
+        if (effTotal >= bar) {
+          const verdict = recipeVerdict(effTotal, _mt);
           recipeQuality = verdict.success ? verdict : recipeQuality;
           spec.system.discoveredBy = actor.name;
           // Whose CLIENT runs this line? (code standard 16). A GM's can put
@@ -2112,9 +2161,9 @@ class CraftingSkills {
               <h3>${item.name} — The Work Does Not Cohere</h3><hr>
               <p><strong>${actor.name}</strong> tries to work ${spec.name.toLowerCase()}
               from first principles — progress
-              <strong style="color:#ef5350;">${totalProgress}</strong> against the
+              <strong style="color:#ef5350;">${effTotal}</strong> against the
               <strong>${bar}</strong> that working blind demands.</p>
-              ${manaLine}
+              ${workLine}${manaLine}
               <p><em>Ingredients consumed. The pattern is sound; this attempt was not.</em></p>
             </div>` });
           return;
@@ -2123,8 +2172,8 @@ class CraftingSkills {
         const known = alreadyKnows(actor, match);
         const _mt = effThreshold(match);
         const bar = craftBar(_mt, known);
-        if (totalProgress >= bar) {
-          const verdict = recipeVerdict(totalProgress, _mt);
+        if (effTotal >= bar) {
+          const verdict = recipeVerdict(effTotal, _mt);
           recipeQuality = verdict.success ? verdict : recipeQuality;
           // Knowing it already means there is nothing to hand over — the
           // work simply succeeds at the lower bar.
@@ -2138,9 +2187,9 @@ class CraftingSkills {
             content: `<div class="craft-result">
               <h3>${item.name} — The Work Does Not Cohere</h3><hr>
               <p><strong>${actor.name}</strong> improvises, and something almost takes shape —
-              progress <strong style="color:#ef5350;">${totalProgress}</strong> against the
+              progress <strong style="color:#ef5350;">${effTotal}</strong> against the
               <strong>${bar}</strong> that working blind demands.</p>
-              ${manaLine}
+              ${workLine}${manaLine}
               <p><em>Ingredients consumed. The combination was right; the execution was not.</em></p>
             </div>` });
           return;
@@ -2158,7 +2207,7 @@ class CraftingSkills {
     let qualityKey = 'cracked';
     let qualityData = qualityTiers[qualityTiers.length - 1][1];
     for (const [key, data] of qualityTiers) {
-      if (totalProgress >= data.minProgress) {
+      if (effTotal >= data.minProgress) {
         qualityKey = key;
         qualityData = data;
         break;
@@ -2308,7 +2357,7 @@ class CraftingSkills {
           <p><strong>d100:</strong> ${d100Roll.total}${d100BonusExprA}${rarityFloorBonusExprA} + ${rarityRange.floor} = ${effectiveD100} (cap ${rarityRange.ceiling})</p>
           <p><strong>Crafter (50%):</strong> ${skillRollDisplayA} × ${d100Pct.toFixed(2)} = ${crafterRoll} × 0.5 = ${crafterContribution}</p>
           ${profAugLine}
-          ${manaLine}
+          ${workLine}${manaLine}
           <p><strong>Total Progress:</strong> ${materialContribution} + ${crafterContribution} + ${prepBonus}${progressBonus ? ` + (${progressBonus})` : ''}${manaExpr} = <strong>${totalProgress}</strong></p>
           <p><strong>Quality:</strong> ${qualityKey.charAt(0).toUpperCase() + qualityKey.slice(1)} (${qualityData.rarity})</p>
           <p><strong>Type:</strong> ${typeLabel} (${effectType})</p>
@@ -2486,7 +2535,7 @@ class CraftingSkills {
             <p><strong>d100:</strong> ${d100Roll.total}${d100BonusExprM}${rarityFloorBonusExprM} + ${rarityRange.floor} = ${effectiveD100} (cap ${rarityRange.ceiling})</p>
             <p><strong>Crafter (50%):</strong> ${skillRollDisplayM} × ${d100Pct.toFixed(2)} = ${crafterRoll} × 0.5 = ${crafterContribution}</p>
             ${profAugLine}
-            ${manaLine}
+            ${workLine}${manaLine}
           <p><strong>Total Progress:</strong> ${materialContribution} + ${crafterContribution} + ${prepBonus}${progressBonus ? ` + (${progressBonus})` : ''}${manaExpr} = <strong>${totalProgress}</strong></p>
             <p><strong>Quality:</strong> ${qualityKey.charAt(0).toUpperCase() + qualityKey.slice(1)} (${qualityData.rarity})</p>
             <p><strong>Material kind:</strong> ${matKind}${element && element !== 'neutral' ? ` (${element})` : ''}</p>
@@ -2619,7 +2668,7 @@ class CraftingSkills {
           <p><strong>d100:</strong> ${d100Roll.total}${d100BonusExpr}${rarityFloorBonusExpr} + ${rarityRange.floor} = ${effectiveD100} (cap ${rarityRange.ceiling})</p>
           <p><strong>Crafter (50%):</strong> ${skillRollDisplay} × ${d100Pct.toFixed(2)} = ${crafterRoll} × 0.5 = ${crafterContribution}</p>
           ${profAugLine}
-          ${manaLine}
+          ${workLine}${manaLine}
           <p><strong>Total Progress:</strong> ${materialContribution} + ${crafterContribution} + ${prepBonus}${progressBonus ? ` + (${progressBonus})` : ''}${manaExpr} = <strong>${totalProgress}</strong></p>
           <p><strong>Quality:</strong> ${qualityKey.charAt(0).toUpperCase() + qualityKey.slice(1)} (${qualityData.rarity})</p>
           ${armorBonus ? `<p><strong>Armor:</strong> ${armorBonus}</p>` : ''}
