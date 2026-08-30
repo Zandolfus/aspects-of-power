@@ -15,11 +15,41 @@
  */
 
 /**
+ * The single designated acting GM for this table.
+ *
+ * ⚠⚠ THE AUTOMATION LOGIN MUST NEVER OUTRANK THE HUMAN (found 2026-08-30,
+ * a full live session's worth of pain): Foundry's `game.users.activeGM`
+ * picks the active GM with the LOWEST id, and the Claude automation user's
+ * id sorts before the Gamemaster's — so whenever the automation browser was
+ * connected it silently became the acting GM. During that session it was
+ * bulk-importing scenes, reloading between chunks, and crashed once; every
+ * isActingGM-gated engine loop (persistent-zone reticks, DoT ticks, aura
+ * ticks) and every player socket op was routed to a client that was not
+ * listening. The table felt it as "persistent aoes not applying damage",
+ * missing dot ticks, stuck hex travel, and dead reaction prompts.
+ *
+ * Resolution is deterministic on every client from the same data (active +
+ * isGM + name + id), exactly like Foundry's own arbiter: active GMs,
+ * automation logins LAST, then id order. When the human GM is offline the
+ * automation login still acts — overnight ops depend on that.
+ * @returns {User|null}
+ */
+const AUTOMATION_USERS = new Set(['Claude']);
+export function actingGM() {
+  const gms = game.users.filter(u => u.active && u.isGM).sort((a, b) => {
+    const auto = (AUTOMATION_USERS.has(a.name) ? 1 : 0) - (AUTOMATION_USERS.has(b.name) ? 1 : 0);
+    return auto || (a.id < b.id ? -1 : 1);
+  });
+  return gms[0] ?? null;
+}
+
+/**
  * True when this client is the single designated acting GM.
  * @returns {boolean}
  */
 export function isActingGM() {
-  return !!game.users.activeGM && game.user.id === game.users.activeGM.id;
+  const gm = actingGM();
+  return !!gm && game.user.id === gm.id;
 }
 
 /**

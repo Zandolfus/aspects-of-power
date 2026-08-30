@@ -1053,7 +1053,7 @@ Hooks.once('ready', async function () {
   // start of a fight so stale charge from a prior encounter doesn't leak
   // into a new one. Per-actor flag at flags.aspectsofpower.spellCharge.
   Hooks.on('combatStart', async (combat, _options) => {
-    if (game.users.activeGM !== game.user) return; // GM-only
+    if (!isActingGM()) return; // GM-only
     for (const c of combat.combatants) {
       const actor = c.actor;
       if (!actor) continue;
@@ -1108,7 +1108,7 @@ Hooks.once('ready', async function () {
   // writes hit the defender's combatant. The active GM applies it.
   game.socket.on('system.aspects-of-power', (data) => {
     if (data?.action !== 'gmCombatantUpdate') return;
-    if (game.users.activeGM !== game.user) return;
+    if (!isActingGM()) return;
     const combatant = game.combats.get(data.combatId)?.combatants.get(data.combatantId);
     if (combatant) combatant.update(data.data, data.options ?? {}).catch(err =>
       console.warn('[aop] gmCombatantUpdate failed:', err)
@@ -1119,7 +1119,7 @@ Hooks.once('ready', async function () {
   // game.time.advance is GM-only at the server level. The active GM applies it.
   game.socket.on('system.aspects-of-power', (data) => {
     if (data?.action !== 'gmAdvanceTime') return;
-    if (game.users.activeGM !== game.user) return;
+    if (!isActingGM()) return;
     const seconds = Math.round(Number(data.seconds) || 0);
     if (seconds > 0) game.time.advance(seconds).catch(err =>
       console.warn('[aop] gmAdvanceTime failed:', err)
@@ -1302,7 +1302,7 @@ Hooks.once('ready', async function () {
     }
 
     // --- GM-side handlers ---
-    if (game.users.activeGM !== game.user) return;
+    if (!isActingGM()) return;
 
     if (payload.type === 'gmCombatResult') {
       await ChatMessage.create({
@@ -1956,7 +1956,7 @@ Hooks.on('combatStart', combat => resetFirstContactSeen(combat));
 // clients. game.users.activeGM is Foundry's canonical "the GM that
 // handles GM-only actions" (typically the first/oldest active GM).
 Hooks.on('createRegion', async (region, options, userId) => {
-  if (game.user.id !== game.users.activeGM?.id) return;
+  if (!isActingGM()) return;
   const flags = region.flags?.['aspects-of-power'];
   if (!flags?.persistent || !flags.persistentData) return;
   const scene = region.parent;
@@ -3105,7 +3105,7 @@ Hooks.on('updateActor', async (actor, changes, _options, userId) => {
   // these effects. Plain `game.user.isGM` lets every connected GM client
   // run the hook in parallel, which double-fired death blooms in the
   // 2026-05-10 combat log (Claude + Gamemaster accounts both connected).
-  if (game.users.activeGM !== game.user) return;
+  if (!isActingGM()) return;
   if (game.userId !== userId && !changes.system?.health) return;
 
   // Only react to health value changes.

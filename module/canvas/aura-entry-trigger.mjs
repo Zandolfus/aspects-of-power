@@ -66,7 +66,7 @@ function _withinRadius(pos, center, radiusFt) {
 export async function onPreUpdateTokenForAuras(tokenDoc, changes, _options, _userId) {
   // Only fire for the GM (or whoever has authority) — avoid double-fires
   // in multiplayer.
-  if (!game.users.activeGM || game.user.id !== game.users.activeGM.id) return;
+  if (!isActingGM()) return;
   // Only relevant during active combat (auras are a combat mechanic).
   if (!game.combat?.started) return;
   // Position must actually change.
