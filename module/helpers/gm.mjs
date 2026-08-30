@@ -17,21 +17,25 @@
 /**
  * The single designated acting GM for this table.
  *
- * ⚠⚠ THE AUTOMATION LOGIN MUST NEVER OUTRANK THE HUMAN (found 2026-08-30,
- * a full live session's worth of pain): Foundry's `game.users.activeGM`
- * picks the active GM with the LOWEST id, and the Claude automation user's
- * id sorts before the Gamemaster's — so whenever the automation browser was
- * connected it silently became the acting GM. During that session it was
- * bulk-importing scenes, reloading between chunks, and crashed once; every
- * isActingGM-gated engine loop (persistent-zone reticks, DoT ticks, aura
- * ticks) and every player socket op was routed to a client that was not
- * listening. The table felt it as "persistent aoes not applying damage",
- * missing dot ticks, stuck hex travel, and dead reaction prompts.
+ * ⚠⚠ THE AUTOMATION LOGIN MUST NEVER OUTRANK THE HUMAN. History: cf90981
+ * shipped this claiming the automation login had been winning
+ * `game.users.activeGM` by id sort during the 08-30 session. That diagnosis
+ * was REFUTED the next day against core v14 source: `Users#getDesignatedUser`
+ * orders by ROLE first and id only on ties, and the automation login is an
+ * Assistant (role 3) under a full Gamemaster (role 4) - the human held
+ * acting-GM all session, and the tick failures had other causes. The sort
+ * below is kept anyway, now as a STRUCTURAL guarantee: nothing pins the
+ * automation login's role, and a promotion to full GM would silently hand
+ * it every arbiter (its id sorts first). This helper plus
+ * patchCoreDesignation() below make automation-last true regardless of
+ * role, and keep OUR arbiter and CORE's from ever disagreeing about who
+ * acts (a disagreement is double execution on one side, silence on the
+ * other).
  *
  * Resolution is deterministic on every client from the same data (active +
- * isGM + name + id), exactly like Foundry's own arbiter: active GMs,
- * automation logins LAST, then id order. When the human GM is offline the
- * automation login still acts — overnight ops depend on that.
+ * isGM + name + id): active GMs, automation logins LAST, then id order.
+ * When the human GM is offline the automation login still acts - overnight
+ * ops depend on that.
  * @returns {User|null}
  */
 const AUTOMATION_USERS = new Set(['Claude']);
@@ -41,6 +45,34 @@ export function actingGM() {
     return auto || (a.id < b.id ? -1 : 1);
   });
   return gms[0] ?? null;
+}
+
+/**
+ * Extend the automation-last guarantee into CORE's own arbiter.
+ * `Users#getDesignatedUser` backs both `users.activeGM` and
+ * `User#isDesignated`, and core routes real work through them - notably
+ * `TeleportTokenRegionBehaviorType.#shouldTeleport` designates which client
+ * EXECUTES a player's cross-scene hex travel (players lack
+ * TOKEN_CREATE/TOKEN_DELETE, so a GM client performs the delete+create and
+ * pulls the mover's view). Core orders by role, then lowest id.
+ *
+ * Today the automation login is role 3 and loses on role everywhere, so
+ * this wrap changes nothing - but nothing pins that role, and a promotion
+ * to full GM would silently hand a thrashing pipeline client every core
+ * designation (teleport execution included) by id sort, while actingGM()
+ * above kept pointing OUR gates at the human: two arbiters disagreeing.
+ * The wrap keeps core's ordering untouched among non-automation users and
+ * lets an automation login qualify only when NO other user matches - the
+ * same overnight-ops guarantee actingGM() gives. Applied to the class
+ * prototype at init, before any collection exists.
+ */
+export function patchCoreDesignation() {
+  const proto = foundry.documents.collections.Users.prototype;
+  const original = proto.getDesignatedUser;
+  proto.getDesignatedUser = function (condition) {
+    return original.call(this, u => !AUTOMATION_USERS.has(u.name) && condition(u))
+      ?? original.call(this, condition);
+  };
 }
 
 /**

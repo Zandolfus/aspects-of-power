@@ -29,7 +29,7 @@ import { AopEffectData } from './data/effect-base.mjs';
 // Import helper/utility classes and constants.
 import { preloadHandlebarsTemplates } from './helpers/templates.mjs';
 import { ASPECTSOFPOWER } from './helpers/config.mjs';
-import { isActingGM } from './helpers/gm.mjs';
+import { isActingGM, patchCoreDesignation } from './helpers/gm.mjs';
 import { deriveItemStats } from './systems/item-derivation.mjs';
 import { conditionalFor, hasSystemTag } from './helpers/tags.mjs';
 import { getPositionalTags } from './helpers/positioning.mjs';
@@ -88,6 +88,11 @@ function getActiveDebuff(actor, types) {
 /* -------------------------------------------- */
 
 Hooks.once('init', function () {
+  // Core designation arbiter: automation logins must never outrank the human
+  // (see patchCoreDesignation — core's getDesignatedUser backs activeGM AND
+  // the client that executes player cross-scene teleports).
+  patchCoreDesignation();
+
   // Calendar & downtime tracker: scene-control button + refresh hooks.
   // ⚠ MUST be here, not in `ready`. v14 only runs SceneControls##prepareControls
   // — the one place `getSceneControlButtons` is called — on the first render or
