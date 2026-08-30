@@ -3803,7 +3803,7 @@ export class AspectsofPowerItem extends Item {
       // DR-strip is now OPT-IN (armor-answer system): only dedicated stripper
       // debuffs (drStrip:true) melt DR — a generic affinity DoT no longer does.
       if (!sys.drStrip) continue;
-      if (!sys.debuffDamage || !sys.dot) continue;
+      if (!(sys.dotDamage > 0) || !sys.dot) continue;
 
       const effectAffinities = sys.affinities ?? [];
       const effectMagicType  = sys.magicType ?? '';
@@ -3815,7 +3815,18 @@ export class AspectsofPowerItem extends Item {
 
       if (effectDirections.length > 0 && !currentPositions.some(p => effectDirections.includes(p))) continue;
 
-      total += sys.debuffDamage;
+      // RULED 2026-08-30: "the dr strip should be based on the dot damage."
+      // The melt is the WOUND — the effect's per-round tick — not the full
+      // attack roll it used to read (debuffDamage: rollTotal), which
+      // exceeded every wall in the band and turned one stripper into total
+      // DR deletion (+139% vs the heaviest tanks; sim:
+      // migration/local/dr_strip_economy_sim.mjs). Strips still SUM across
+      // stacks, so a committed bleed plan genuinely breaches the wall —
+      // one Hemorrhage dents it, three nearly melt it — and under the
+      // prepaid dot model later stacks seed bigger through the breach they
+      // widen. Legacy raw-seeded dots in flight strip their (larger) stored
+      // tick until they expire.
+      total += sys.dotDamage;
     }
     return total;
   }
