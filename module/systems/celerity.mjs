@@ -459,6 +459,10 @@ export function getScrambleStacks(actor) {
  * attacks an NPC that dodges, the player can't update the NPC's combatant
  * (live bug 2026-06-14: "Gabriel lacks permission to update Combatant").
  */
+export async function safeCombatantUpdate(combatant, data, options = {}) {
+  return _safeCombatantUpdate(combatant, data, options);
+}
+
 async function _safeCombatantUpdate(combatant, data, options = {}) {
   // Combatant updates are GM-only at the SERVER level — even a combatant whose
   // actor the player owns is rejected ("User X lacks permission to update

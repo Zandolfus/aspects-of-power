@@ -8,7 +8,7 @@
  * Wired by setting `CONFIG.ui.combat = CelerityCombatTracker` at init.
  */
 
-import { getClockTick, referenceRoundLength, runRoundStart, MOVEMENT_ITEM_ID, BREAK_FREE_ITEM_ID, separateOverlappingTokens, formatTicksAsTime, fastestReferenceRound, realtimeTicksPerMs } from '../systems/celerity.mjs';
+import { getClockTick, referenceRoundLength, runRoundStart, MOVEMENT_ITEM_ID, BREAK_FREE_ITEM_ID, separateOverlappingTokens, formatTicksAsTime, fastestReferenceRound, realtimeTicksPerMs, safeCombatantUpdate } from '../systems/celerity.mjs';
 import { jumpMovementsTo, stopDeclaredMove, runAllDeclaredMoves, pauseAllDeclaredMoves, runDeclaredMove } from '../systems/movement.mjs';
 import { isActingGM } from '../helpers/gm.mjs';
 import { isAiDriven } from '../systems/ai.mjs';
@@ -573,7 +573,13 @@ async function _onCelCancel(event, target) {
   // token holds wherever the last checkpoint left it (sunk celerity, no
   // stamina charge, per design).
   if (!clearingAction && c.token) await stopDeclaredMove(c.token);
-  await c.update({
+  // ⚠ ROUTED (triage 2026-08-30: "cancel button on aoe does not function"):
+  // combatant writes are GM-only at the SERVER, so a player's cancel click
+  // was silently rejected — the declaration stayed, and the pre-placed AOE
+  // region with it (its cleanup rides the preUpdateCombatant orphan hook,
+  // which never saw an update). The GM cancelling worked, which is why it
+  // never showed on the GM-side harness.
+  await safeCombatantUpdate(c, {
     [`flags.${FLAG_NS}.${clearingAction ? 'declaredAction' : 'declaredMovement'}`]: null,
     [`flags.${FLAG_NS}.nextActionTick`]:
       (typeof other?.scheduledTick === 'number') ? other.scheduledTick : null,
