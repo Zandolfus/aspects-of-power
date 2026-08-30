@@ -7572,8 +7572,13 @@ export class AspectsofPowerItem extends Item {
     // Reads the live resource value at commit time (not the cached
     // rollData.roll.resourcevalue) so a state change between formula-build
     // and commit can't cause an overspend.
+    let _castCostCommitted = false;
     const _commitCastCost = async () => {
       if (isBarrier) return;
+      // Idempotent: profession tasks receive this closure and fire it at
+      // their own commit point — a stray second call must never double-bill.
+      if (_castCostCommitted) return;
+      _castCostCommitted = true;
       const updates = {};
 
       // ── ACCUMULATE SPENDS, THEN WRITE ONCE ─────────────────────────────
@@ -8046,7 +8051,20 @@ export class AspectsofPowerItem extends Item {
 
     // ── Deduct resource cost (non-AOE) ──────────────────────────────────
     // Barrier skills defer cost until after the target accepts.
-    await _commitCastCost();
+    // Profession TASKS defer further (ruled 2026-08-31: "All resource
+    // consumption should occur at the completion of a task"): their handlers
+    // hold multi-dialog flows the player can cancel out of, and a cancel
+    // must cost nothing — the live find was Crystalcraft eating its 25 mana
+    // on a cancelled gather. The commit closure rides `options` and each
+    // handler fires it at its own last gate; a handler path that never
+    // commits is a cancel. Affordability is still checked upfront above.
+    // (Interrupts of committed tasks are deferred by the same ruling.
+    // Inscribe/augment flows still charge here — mapping their last gates
+    // is owed.)
+    const _deferCostToTask = ['craft', 'gather', 'refine']
+      .some(t => (item.system.tags ?? []).includes(t));
+    if (_deferCostToTask) options._commitCost = _commitCastCost;
+    else await _commitCastCost();
 
     // Curse meter fill (design-dread-curse-engine): every curse cast
     // channels a fraction of its roll onto the caster's meter.

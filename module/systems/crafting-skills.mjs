@@ -968,6 +968,11 @@ class CraftingSkills {
       if (mult === null) return;
       timeInvest = mult;
       refineClock = Math.round(base * timeInvest);
+    }
+    // ── COMMIT (ruled 2026-08-31) — the time pick was the last cancel
+    // point; the deferred roll cost and the clock land together.
+    await opts?._commitCost?.();
+    if (refineClock > 0) {
       const { ActivityHelpers } = await import('./activities.mjs');
       await ActivityHelpers.advanceWorldTime(refineClock);
     }
@@ -1105,8 +1110,11 @@ class CraftingSkills {
     const manaMult = manaStep.mult;
     const manaLine = manaStep.line;
 
-    // Every gate is passed — the time is committed now, and it stays spent
-    // whether the harvest succeeds or the d100 ruins it.
+    // Every gate is passed — the task commits now (ruled 2026-08-31: all
+    // consumption at completion): the deferred roll cost and the time land
+    // together, and both stay spent whether the harvest succeeds or the
+    // d100 ruins it.
+    await opts?._commitCost?.();
     if (gatherClock > 0) {
       const { ActivityHelpers } = await import('./activities.mjs');
       await ActivityHelpers.advanceWorldTime(gatherClock);
@@ -1893,6 +1901,7 @@ class CraftingSkills {
     // advances ritual-prep style — time is spent whether or not the work
     // succeeds, which is what makes it an investment rather than a dial.
     let timeInvest = 1;
+    let craftClock = 0;
     if (opts?.fromActivityCompletion) {
       timeInvest = Math.max(1, Number(opts.craftTimeInvest) || 1);
     } else if (!(item.system.tags ?? []).includes('activity') && !actor.inCombat) {
@@ -1917,8 +1926,7 @@ class CraftingSkills {
       const mult = await this._promptTimeInvest(item.name, base, hint);
       if (mult === null) return;
       timeInvest = mult;
-      const { ActivityHelpers } = await import('./activities.mjs');
-      await ActivityHelpers.advanceWorldTime(Math.round(base * timeInvest) + prepExtra);
+      craftClock = Math.round(base * timeInvest) + prepExtra;
     }
     const timeQ = craftTimeQuality(timeInvest);
     const workLine = timeQ !== 1
@@ -1931,6 +1939,17 @@ class CraftingSkills {
     // is still free.
     const manaStep = await this._collectProfessionMana(item, actor, speaker, rollMode, { recipe });
     if (!manaStep) return;
+    // ── COMMIT (ruled 2026-08-31: "All resource consumption should occur
+    // at the completion of a task") — the mana gate was the LAST cancel
+    // point; the task is committed from here. The skill's own roll cost
+    // (deferred by roll() onto opts._commitCost) and the clock both land
+    // now, and everything downstream spends for real. A failed roll is
+    // still a completed task — failure keeps paying, as ruled.
+    await opts?._commitCost?.();
+    if (craftClock > 0) {
+      const { ActivityHelpers } = await import('./activities.mjs');
+      await ActivityHelpers.advanceWorldTime(craftClock);
+    }
     const manaMult = manaStep.mult;
     const manaLine = manaStep.line;
 
