@@ -5906,13 +5906,30 @@ export class AspectsofPowerItem extends Item {
     // builder/spender rebuild). HARD gate: the cast exists only if the
     // meter can pay spendFraction x capacity. The spent energy is stashed
     // on the item for THIS cast and joins the hit basis in _handleAttackTag
-    // (contest power, bought with banked curses). Deducted here, before
-    // any other cost commits — an unpayable spender fizzles cleanly.
+    // (contest power, bought with banked curses).
+    //
+    // ⚠ DECLARE vs FIRE (2026-08-30, Felicia's Mind Crush at the table):
+    // this gate sits ABOVE the celerity declaration gate, and roll() runs
+    // top-down on BOTH passes. Deducting unconditionally paid the meter at
+    // declare, the declare pass then bailed at the celerity gate (the
+    // stashed spend evaporated), and the deferred fire re-entered roll()
+    // to find the meter already drained — "gutters out — not enough curse
+    // energy" on energy the skill itself had eaten (235 -> 92, need 143).
+    // Same principle as the crafting ruling: resource consumption happens
+    // at COMPLETION. The declare pass now only affordability-checks (a
+    // hopeless declare still fizzles cleanly); the deduction lands on the
+    // fire pass, where _curseSpend joins the hit basis. The meter can
+    // legitimately move during the wait — the fire-pass re-check is the
+    // real gate, and a vent or transformation in the gap rightly kills
+    // the cast.
     this._curseSpend = null;
     if (this.type === 'skill' && this.actor
         && (this.system.tags ?? []).includes('spend-curse')) {
       const _price = spendPriceFor(this);
-      const _paid = await spendCurse(this.actor, _price);
+      const _willDefer = !options.executeDeferred && isInActiveCombat(this.actor);
+      const _paid = _willDefer
+        ? (curseMeterValue(this.actor) >= _price ? _price : null)
+        : await spendCurse(this.actor, _price);
       if (_paid === null) {
         ChatMessage.create({
           speaker: ChatMessage.getSpeaker({ actor: this.actor }),
@@ -5921,7 +5938,7 @@ export class AspectsofPowerItem extends Item {
         });
         return;
       }
-      this._curseSpend = _paid;
+      if (!_willDefer) this._curseSpend = _paid;
     }
 
     // Combination / weapon-type / STYLE gate (design-weapon-proficiencies.md).
