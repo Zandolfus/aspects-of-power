@@ -53,6 +53,13 @@ export class AopEffectData extends foundry.data.ActiveEffectTypeDataModel {
 
       dot:              new fields.BooleanField({ initial: false }),
       dotDamage:        new fields.NumberField({ initial: 0 }),
+      // DOT POTENCY (ruled 2026-08-30: "dots should hit harder... originally
+      // ~10% additional damage per turn"). true = dotDamage was seeded from
+      // the seed roll's THROUGH-damage (toughness DR paid once, at
+      // application) and ticks land FLAT. false/absent = legacy raw-seeded
+      // dot; ticks still face DR (double jeopardy, kept only so in-flight
+      // effects resolve under the rules they were applied under).
+      dotPrepaid:       new fields.BooleanField({ initial: false }),
       dotDamageType:    new fields.StringField({ initial: 'physical' }),
       applierActorUuid: new fields.StringField({ initial: '' }),
 

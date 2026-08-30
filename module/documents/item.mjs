@@ -4673,6 +4673,12 @@ export class AspectsofPowerItem extends Item {
     // `parentDamage` is present only when _executeChainedSkills spawned this
     // rider, and makes the bleed size off the strike that caused it rather
     // than off its own roll — see formulas.dotTickDamage for why.
+    // DOT POTENCY (ruled 2026-08-30: "dots should hit harder ... angle
+    // towards them being valuable additions"): the seed pays the victim's
+    // toughness lane ONCE, here, and ticks land flat (dotPrepaid). At
+    // dotScale 0.1 a dot is EXACTLY 10% of the seed's through-damage per
+    // round at every DR — the original authored meaning — instead of the
+    // 1-3% the double-jeopardy shape delivered (sim: dot_potency_sim.mjs).
     const dotDmg = dealsDmg
       ? dotTickDamage({
           ownDamage: dmgRoll?.total ?? 0,
@@ -4682,6 +4688,7 @@ export class AspectsofPowerItem extends Item {
           investAmount: _investAmt,
           investScale: _investScale,
           defenseMultiplier,
+          tickDR: targetActor.system.defense?.dr?.value ?? 0,
         })
       : 0;
 
@@ -4799,7 +4806,7 @@ export class AspectsofPowerItem extends Item {
       // it was designed for exactly this dispel-by-tag shape.
       tags: [...(this.system.tags ?? [])],
       ...(dismemberedSlot ? { dismemberedSlot } : {}),
-      ...(dealsDmg ? { dot: true, dotDamage: dotDmg, dotDamageType: dmgType, applierActorUuid: this.actor.uuid, drStrip: hasShred || !!this.system.tagConfig?.debuffDRStrip } : {}),
+      ...(dealsDmg ? { dot: true, dotDamage: dotDmg, dotPrepaid: true, dotDamageType: dmgType, applierActorUuid: this.actor.uuid, drStrip: hasShred || !!this.system.tagConfig?.debuffDRStrip } : {}),
       ...(armorCrushVal > 0 ? { armorCrush: armorCrushVal, armorCrushFlat } : {}),
       ...(armorMeltRate > 0 ? { armorMeltRate } : {}),
       ...(markActive ? {

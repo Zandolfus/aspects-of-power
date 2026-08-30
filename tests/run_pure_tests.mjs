@@ -3264,6 +3264,23 @@ eq('junk situational entries are skipped, not NaN',
     }
     eq('installments: k clamps into range', F3.dotInstallment(13, 9, 4),
        F3.dotInstallment(13, 4, 4));
+    // ── DOT POTENCY (ruled 2026-08-30: "originally ~10% additional damage
+    // per turn... angle towards valuable additions") — the seed pays the
+    // toughness lane ONCE; dotScale slices the THROUGH-damage. ──
+    const RC_ = { armourRatioCoef: 3.96 };
+    // 560 roll vs DR104: attack-through 323; the dot is exactly 10% of it.
+    eq('dot potency: 10% of the through-damage, not 2%',
+       F3.dotTickDamage({ ownDamage: 560, dotScale: 0.1, tickDR: 104 }),
+       Math.round(0.1 * F3.armourRatioApplied(560, 104, RC_)));
+    eq('dot potency: the worked case seeds 32/round',
+       F3.dotTickDamage({ ownDamage: 560, dotScale: 0.1, tickDR: 104 }), 32);
+    // Negative control: no tickDR = the legacy raw seed, unchanged.
+    eq('dot potency: without tickDR the legacy seed stands',
+       F3.dotTickDamage({ ownDamage: 560, dotScale: 0.1 }), 56);
+    // Tanks still matter: DR277 shrinks the seed (19), never inverts into
+    // anti-tank chip the way a flat bypass would (56 = 30% of a 189 hit).
+    eq('dot potency: a heavy wall shrinks the seed',
+       F3.dotTickDamage({ ownDamage: 560, dotScale: 0.1, tickDR: 277 }), 19);
     // ── WORK PACE (ruled 2026-08-31: "Will conjures the gems out of thin
     // air via bloodline so it's relatively fast" — the METHOD prices time,
     // per-skill, while the bar still scales it) ──

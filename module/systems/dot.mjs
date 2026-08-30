@@ -45,8 +45,13 @@ export function poolDots(targetActor, applierUuid) {
     const raw = sys.dotDamage ?? 0;
     if (raw <= 0) continue;
     const type = sys.dotDamageType ?? 'physical';
-    const pool = pools.get(type) ?? { total: 0, stacks: 0, names: [] };
+    const pool = pools.get(type) ?? { total: 0, prepaid: 0, legacy: 0, stacks: 0, names: [] };
     pool.total += raw;
+    // DOT POTENCY (2026-08-30): prepaid seeds already paid the toughness
+    // lane at application and tick FLAT; legacy seeds still face DR at
+    // tick, resolving under the rules they were applied under.
+    if (sys.dotPrepaid) pool.prepaid += raw;
+    else pool.legacy += raw;
     pool.stacks += 1;
     if (!pool.names.includes(effect.name)) pool.names.push(effect.name);
     pools.set(type, pool);
@@ -78,14 +83,13 @@ export async function tickDotsFor(combat, applierUuid, k = 1, n = 1) {
       // per slice collapses delivery under the superlinear ratio model
       // (sim: tick_cadence_sim.mjs — a 56 Hemorrhage pays 0 at n=4 the
       // naive way, exactly its full 7/round this way).
-      const roundThrough = dotTickThrough(pool.total, drValue);
+      const roundThrough = (pool.prepaid ?? 0)
+        + dotTickThrough(pool.legacy ?? pool.total, drValue);
       const damage = dotInstallment(roundThrough, k, n);
       totalDamage += damage;
       lines.push(`<strong>${damage}</strong> ${type} from ${pool.names.join(', ')}`
         + (n > 1 ? ` (tick ${k}/${n} of ${roundThrough})` : '')
-        + (pool.stacks > 1
-          ? ` (${pool.stacks} stacks pooled: ${pool.total} vs DR ${drValue})`
-          : ` (vs DR ${drValue})`));
+        + (pool.stacks > 1 ? ` (${pool.stacks} stacks pooled)` : ''));
     }
     if (totalDamage <= 0) continue;
 

@@ -1102,12 +1102,21 @@ export function riderDamageBase(parentDamage = 0, ownDamage = 0) {
 
 export function dotTickDamage({
   ownDamage = 0, parentDamage = 0, dotScale = 0.1, hasInvestTag = false,
-  investAmount = 0, investScale = 1, defenseMultiplier = 1,
+  investAmount = 0, investScale = 1, defenseMultiplier = 1, tickDR = null,
 } = {}) {
   if (hasInvestTag) {
     return Math.max(0, Math.round(investScale * Math.max(0, investAmount) * defenseMultiplier));
   }
-  const base = riderDamageBase(parentDamage, ownDamage);
+  let base = riderDamageBase(parentDamage, ownDamage);
+  // DOT POTENCY (ruled 2026-08-30): with a tickDR, the seed pays the tick's
+  // toughness lane ONCE — dotScale then slices the THROUGH-damage, so a dot
+  // is exactly its fraction of what the seed hit delivered, at every DR.
+  // The old shape (slice the raw, then DR every tick) paid double jeopardy:
+  // the superlinear ratio model crushed the small slice to 1-3% of the
+  // attack (sim: migration/local/dot_potency_sim.mjs).
+  if (Number.isFinite(tickDR) && tickDR !== null) {
+    base = armourRatioApplied(base, Math.max(0, tickDR));
+  }
   return Math.max(0, Math.round(base * dotScale * defenseMultiplier));
 }
 
