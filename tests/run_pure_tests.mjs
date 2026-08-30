@@ -1557,9 +1557,11 @@ eq('cap declares what it qualifies', T.TAG_REGISTRY.cap.qualifies, 'stacking');
 // Resource auras pay in thirds of the caster's reference round, sampling
 // position at each moment. The moments matter more than the count, so these
 // assert the MOMENTS.
-const AURA_CFG = { auras: { ticksPerReferenceRound: 3, maxCatchUpTicks: 12 } };
+// 2026-08-30: auras moved onto the SHARED tickCadence knob (one cadence
+// function governs all tick rates — ruled). The old auras-only knob is dead.
+const AURA_CFG = { tickCadence: { ticksPerReferenceRound: 3 }, auras: { maxCatchUpTicks: 12 } };
 eq('period is a third of the reference round', F2.auraTickPeriod(4702, AURA_CFG), 4702 / 3);
-eq('cadence disabled -> no period', F2.auraTickPeriod(4702, { auras: { ticksPerReferenceRound: 0 } }), 0);
+eq('cadence disabled -> no period', F2.auraTickPeriod(4702, { tickCadence: { ticksPerReferenceRound: 0 } }), 0);
 eq('a zero-length round has no period', F2.auraTickPeriod(0, AURA_CFG), 0);
 
 const P = 100;   // round numbers so the moments are readable
@@ -3242,6 +3244,26 @@ eq('junk situational entries are skipped, not NaN',
        F3.prepBaseSeconds(800, BTCFG), 8640);
     eq('prep time: no cap still costs the flat block, never zero',
        F3.prepBaseSeconds(0, BTCFG), 3600);
+
+    // ── THE TICK CADENCE (ruled 2026-08-30: one function governs all tick
+    // rates — round/N for dots, zones and auras alike) ──
+    const TKCFG = { tickCadence: { ticksPerReferenceRound: 4 } };
+    eq('cadence: a quarter of the reference round',
+       F3.tickCadence(4202, TKCFG), 1050.5);
+    eq('cadence: disabled knob disables the cadence',
+       F3.tickCadence(4202, { tickCadence: { ticksPerReferenceRound: 0 } }), 0);
+    eq('cadence: auras read the same function',
+       F3.auraTickPeriod(4202, TKCFG), 1050.5);
+    // Installments: DR at round scale, paid in N slices, EXACTLY invariant —
+    // the naive per-slice model pays a 56 Hemorrhage 0 at N=4 (sim
+    // tick_cadence_sim.mjs); this one pays its full 7.
+    for (const [T, N] of [[13, 4], [7, 4], [57, 4], [3, 4], [50, 6], [1, 4]]) {
+      let sum = 0;
+      for (let k = 1; k <= N; k++) sum += F3.dotInstallment(T, k, N);
+      eq(`installments: ${T} through in ${N} slices sums exactly`, sum, T);
+    }
+    eq('installments: k clamps into range', F3.dotInstallment(13, 9, 4),
+       F3.dotInstallment(13, 4, 4));
     // ── WORK PACE (ruled 2026-08-31: "Will conjures the gems out of thin
     // air via bloodline so it's relatively fast" — the METHOD prices time,
     // per-skill, while the bar still scales it) ──

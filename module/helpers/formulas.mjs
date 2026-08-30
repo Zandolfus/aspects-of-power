@@ -1293,19 +1293,52 @@ export function auraRadiusFor(authoredRadius, perMod, cfg = null) {
 }
 
 /**
- * Aura tick period in clock ticks: one Nth of the caster's reference round.
+ * THE tick cadence (ruled 2026-08-30: "a single cadence function that
+ * governs all tick rates"). One Nth of the owner's reference round — a
+ * fast actor's ticks come more often in absolute time, exactly as their
+ * actions do. Zones derived round/4 since 2026-05-10 and auras round/3;
+ * dots sat at the FULL round, which is why a typical skirmish ended
+ * before a single bleed tick (live 2026-08-30: John's round at RL61 is
+ * 4,202 ticks; his Pyroblasts sat at roundsAfflicted 0 all fight).
+ * All three now read this one function and one knob.
  *
- * @param {number} refRoundLen  referenceRoundLength(casterRL)
+ * @param {number} refRoundLen  referenceRoundLength(ownerRL)
  * @param {object|null} cfg
- * @returns {number}  0 when the cadence is disabled or nonsensical
+ * @returns {number}  period in clock ticks; 0 when disabled/nonsensical
  */
-export function auraTickPeriod(refRoundLen, cfg = null) {
+export function tickCadence(refRoundLen, cfg = null) {
   const sc = cfg ?? (globalThis.CONFIG?.ASPECTSOFPOWER ?? {});
-  const n = Number(sc.auras?.ticksPerReferenceRound);
+  const n = Number(sc.tickCadence?.ticksPerReferenceRound);
   const per = Number(refRoundLen);
   if (!Number.isFinite(n) || n <= 0) return 0;
   if (!Number.isFinite(per) || per <= 0) return 0;
   return per / n;
+}
+
+/**
+ * A DoT's k-th installment of its round-equivalent through-damage.
+ * DR is evaluated at ROUND scale and paid in N slices (sim 2026-08-30,
+ * migration/local/tick_cadence_sim.mjs): evaluating DR per-slice instead
+ * collapses delivery under the superlinear ratio model (79-pool Pyroblast
+ * 13/round -> 4; a 56 Hemorrhage -> 0), while this split is EXACTLY
+ * invariant: sum over k of (round(T*k/N) - round(T*(k-1)/N)) == T.
+ * Stateless by construction - no carry field to persist or desync.
+ *
+ * @param {number} roundThrough  dotTickThrough(pool, DR) at this moment
+ * @param {number} k             1-based installment index within the round
+ * @param {number} n             installments per round
+ * @returns {number}
+ */
+export function dotInstallment(roundThrough, k, n) {
+  const T = Math.max(0, Math.round(Number(roundThrough) || 0));
+  const N = Math.max(1, Math.round(Number(n) || 1));
+  const K = Math.min(Math.max(1, Math.round(Number(k) || 1)), N);
+  return Math.round(T * K / N) - Math.round(T * (K - 1) / N);
+}
+
+/** Back-compat alias: auras adopted the shared cadence (was auras-only). */
+export function auraTickPeriod(refRoundLen, cfg = null) {
+  return tickCadence(refRoundLen, cfg);
 }
 
 /**

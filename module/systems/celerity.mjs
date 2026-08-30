@@ -21,7 +21,6 @@ import { weaponStatBlend, perceiveGateDecision, spellCastWeight, defenseTimeBudg
 import { dualWieldEligible, dualWieldPassiveRarity, handOf, equippedImplementItems } from './weapon-styles.mjs';
 import { effectiveClockTick, interpolateMovementPosition } from '../helpers/movement-path.mjs';
 import { heldImplementWeight } from './weapon-styles.mjs';
-import { tickDotsFor } from './dot.mjs';
 import { declarePlannedMove, stopDeclaredMove, priceMovementPath } from './movement.mjs';
 
 // Re-export for the existing consumers (overlay, tracker, aura-ticks,
@@ -1093,15 +1092,13 @@ export async function runRoundStart(combat, combatant) {
     ...(isPC ? {} : { whisper: ChatMessage.getWhisperRecipients('GM') }),
   });
 
-  // 1. DoTs: any effect placed by this actor on any combatant ticks now.
-  //    Fired BEFORE the caster's own onStartTurn so debuff DoTs land at
-  //    the canonical "start of caster round" moment.
-  // Stacks are parallel effects but their damage POOLS before DR is charged
-  // once — shared with the legacy turn tick via systems/dot.mjs so the two
-  // paths cannot drift apart again.
-  await tickDotsFor(combat, actor.uuid);
+  // DoTs no longer tick here (tick cadence, ruled 2026-08-30): they pay
+  // round-equivalent INSTALLMENTS on the shared tickCadence in the advance
+  // loop — a full round between payments meant a typical skirmish ended
+  // with roundsAfflicted still 0. The per-round totals are unchanged by
+  // construction (dotInstallment).
 
-  // 2. The actor's own round-start mechanics: regen, sustain upkeep,
+  // The actor's own round-start mechanics: regen, sustain upkeep,
   //    debuff break rolls, effect expiry. Despite the legacy name, this
   //    is now firing at round START (boundary == end of N == start of N+1
   //    — same tick).

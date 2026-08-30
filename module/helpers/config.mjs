@@ -2059,6 +2059,21 @@ ASPECTSOFPOWER.stacks = {
   statCapMax:     10,
 };
 
+/**
+ * THE TICK CADENCE (ruled 2026-08-30: one cadence function governs all tick
+ * rates). Every periodic system — DoT installments, persistent-zone reticks,
+ * resource auras — ticks once per (referenceRoundLength(ownerRL) / N).
+ * N = 4 adopts the zones' shipped quarter-round (design 2026-05-10) as the
+ * table-wide rhythm; auras move 3 -> 4 (their per-round totals are
+ * N-invariant); DoTs move 1 -> 4 paying round-equivalent INSTALLMENTS
+ * (dotInstallment — DR evaluated at round scale, so per-round delivery is
+ * byte-identical to the old full-round tick; sim:
+ * migration/local/tick_cadence_sim.mjs).
+ */
+ASPECTSOFPOWER.tickCadence = {
+  ticksPerReferenceRound: 4,
+};
+
 ASPECTSOFPOWER.auras = {
   perceptionDivisor: 1000,
 
@@ -2075,6 +2090,8 @@ ASPECTSOFPOWER.auras = {
   // ⚠ DAMAGE AURAS STAY AT ONE TICK PER ROUND. Flat armour and DR apply PER
   // HIT, so splitting damage three ways lets the full wall shave each third —
   // often to zero. The split is lossless for healing and lossy for damage.
+  // MOVED (2026-08-30): the cadence knob is tickCadence.ticksPerReferenceRound
+  // — one rhythm for dots, zones and auras. This legacy key is unread.
   ticksPerReferenceRound: 3,
   // Backstop on catch-up work. An aura whose last payout is far behind (a
   // reloaded world, a long manual clock jump) would otherwise loop thousands

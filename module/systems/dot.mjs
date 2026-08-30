@@ -30,7 +30,7 @@
  * eats most of the schedule without clotting it to an absolute zero.
  * `defenseTuning.dotTickModel: 'flat'` restores the legacy subtraction.
  */
-import { dotTickThrough } from '../helpers/formulas.mjs';
+import { dotTickThrough, dotInstallment } from '../helpers/formulas.mjs';
 import { isPlayerCharacter } from '../helpers/gm.mjs';
 
 /**
@@ -61,7 +61,7 @@ export function poolDots(targetActor, applierUuid) {
  * @param {string} applierUuid
  * @returns {Promise<Array<{name:string, damage:number, newHealth:number}>>}
  */
-export async function tickDotsFor(combat, applierUuid) {
+export async function tickDotsFor(combat, applierUuid, k = 1, n = 1) {
   const results = [];
   for (const c of combat.combatants) {
     if (!c.actor) continue;
@@ -73,13 +73,21 @@ export async function tickDotsFor(combat, applierUuid) {
     const lines = [];
     let totalDamage = 0;
     for (const [type, pool] of pools) {
-      const damage = dotTickThrough(pool.total, drValue);
+      // INSTALLMENTS (tick cadence, ruled 2026-08-30): DR is evaluated at
+      // ROUND scale and the through-damage paid in n slices — evaluating DR
+      // per slice collapses delivery under the superlinear ratio model
+      // (sim: tick_cadence_sim.mjs — a 56 Hemorrhage pays 0 at n=4 the
+      // naive way, exactly its full 7/round this way).
+      const roundThrough = dotTickThrough(pool.total, drValue);
+      const damage = dotInstallment(roundThrough, k, n);
       totalDamage += damage;
       lines.push(`<strong>${damage}</strong> ${type} from ${pool.names.join(', ')}`
+        + (n > 1 ? ` (tick ${k}/${n} of ${roundThrough})` : '')
         + (pool.stacks > 1
           ? ` (${pool.stacks} stacks pooled: ${pool.total} vs DR ${drValue})`
           : ` (vs DR ${drValue})`));
     }
+    if (totalDamage <= 0) continue;
 
     // ONE health write for all pools — re-reading system.health between updates
     // returns a stale DataModel (see playbook-live-data-reliability).

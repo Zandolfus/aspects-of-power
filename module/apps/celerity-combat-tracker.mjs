@@ -9,6 +9,7 @@
  */
 
 import { getClockTick, referenceRoundLength, runRoundStart, MOVEMENT_ITEM_ID, BREAK_FREE_ITEM_ID, separateOverlappingTokens, formatTicksAsTime, fastestReferenceRound, realtimeTicksPerMs, safeCombatantUpdate } from '../systems/celerity.mjs';
+import { tickDotsFor } from '../systems/dot.mjs';
 import { jumpMovementsTo, stopDeclaredMove, runAllDeclaredMoves, pauseAllDeclaredMoves, runDeclaredMove } from '../systems/movement.mjs';
 import { isActingGM } from '../helpers/gm.mjs';
 import { isAiDriven } from '../systems/ai.mjs';
@@ -104,6 +105,50 @@ async function _onCelAdvance(event, target) {
     // boundary crossed for this actor."
     _boundaryUpdates.push({ _id: member.id,
       [`flags.${FLAG_NS}.lastRoundEndAt`]: lastBoundary + crossings * roundLen });
+  }
+  // ── DOT INSTALLMENTS on the shared tick cadence (ruled 2026-08-30) ──
+  // Dots pay N times per reference round (CONFIG.tickCadence), each payment
+  // a round-equivalent installment (dotInstallment: DR at round scale, paid
+  // in slices — per-round totals identical to the old full-round tick, sim
+  // in migration/local/tick_cadence_sim.mjs). Sub-tick state rides two
+  // combatant flags: lastDotTickAt (clock of the last installment) and dotK
+  // (installment index cycling 1..N).
+  const N_DOT = CONFIG.ASPECTSOFPOWER.tickCadence?.ticksPerReferenceRound ?? 4;
+  for (const member of combat.combatants) {
+    const actor = member.actor;
+    if (!actor) continue;
+    const rl = actor.system.attributes?.race?.level ?? 1;
+    const roundLen = referenceRoundLength(rl);
+    if (roundLen <= 0 || N_DOT <= 0) continue;
+    const period = roundLen / N_DOT;
+    let last = member.flags?.[FLAG_NS]?.lastDotTickAt;
+    let dotK = member.flags?.[FLAG_NS]?.dotK ?? 0;
+    if (typeof last !== 'number') {
+      // First encounter with this flag (fresh combatant, or a combat that
+      // predates the cadence): owe at most ONE installment, never a
+      // backlog — a mid-fight pull must not dump five rounds of dots.
+      last = Math.max(member.flags?.[FLAG_NS]?.lastRoundEndAt ?? 0, newClock - period);
+    }
+    let paid = 0;
+    const MAXP = MAX_ROUND_BOUNDARIES_PER_ADVANCE * N_DOT;
+    try {
+      while (last + period <= newClock && paid < MAXP) {
+        last += period;
+        dotK = (dotK % N_DOT) + 1;
+        await tickDotsFor(combat, actor.uuid, dotK, N_DOT);
+        paid++;
+      }
+      if (last + period <= newClock) last = newClock;  // capped: resync
+    } catch (e) {
+      console.error(`[celerity] dot installment failed for ${member.name}:`, e);
+    }
+    // Merge with any round-boundary entry for the same combatant — two
+    // update entries sharing an _id is a lottery on which one lands.
+    const prev = _boundaryUpdates.find(u => u._id === member.id);
+    const patch = { [`flags.${FLAG_NS}.lastDotTickAt`]: last,
+                    [`flags.${FLAG_NS}.dotK`]: dotK };
+    if (prev) Object.assign(prev, patch);
+    else _boundaryUpdates.push({ _id: member.id, ...patch });
   }
   if (_boundaryUpdates.length) {
     await combat.updateEmbeddedDocuments('Combatant', _boundaryUpdates);

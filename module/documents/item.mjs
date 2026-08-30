@@ -5144,7 +5144,8 @@ export class AspectsofPowerItem extends Item {
                   try {
                     const rl = this.actor.system?.attributes?.race?.level ?? 1;
                     const refRound = game.aspectsofpower?.celerity?.referenceRoundLength?.(rl) ?? 4702;
-                    return Math.max(1, Math.round(refRound / 4));
+                    const n = CONFIG.ASPECTSOFPOWER.tickCadence?.ticksPerReferenceRound ?? 4;
+                    return Math.max(1, Math.round(refRound / n));
                   } catch (e) { return 1175; }
                 })(),
                 // affectedTokens: tokenId → clockTick of last tick.
@@ -5328,7 +5329,8 @@ export class AspectsofPowerItem extends Item {
               try {
                 const rl = this.actor.system?.attributes?.race?.level ?? 1;
                 const refRound = game.aspectsofpower?.celerity?.referenceRoundLength?.(rl) ?? 4702;
-                return Math.max(1, Math.round(refRound / 4));
+                const n = CONFIG.ASPECTSOFPOWER.tickCadence?.ticksPerReferenceRound ?? 4;
+                return Math.max(1, Math.round(refRound / n));
               } catch (e) { return 1175; }
             })(),
             affectedTokens: {},
