@@ -3194,7 +3194,19 @@ Hooks.on('updateActor', async (actor, changes, _options, userId) => {
           const c = i.system?.tagConfig ?? {};
           if (!c.harvestResource || !(c.harvestPerLevel > 0)) return false;
           // Empty affinity = any DoT of mine counts.
-          return !c.harvestDotAffinity || affinities.includes(c.harvestDotAffinity);
+          if (!c.harvestDotAffinity) return true;
+          if (affinities.includes(c.harvestDotAffinity)) return true;
+          // Complex-affinity dots count when their COMPOSITION carries the
+          // harvested element (2026-08-30, "Mana back from Burnt Offering"):
+          // the complex-affinities pass moved John's kit to `molten`
+          // (fire+metal) and orphaned this fire-only filter - his main burn,
+          // Pyroblast, could never pay out again. A molten wound IS half
+          // fire; the preset dictionary is read here as taxonomy (is this
+          // dot fire-natured at all), NOT as a damage decomposition - the
+          // actor-stored-composition rule guards the damage pipeline and is
+          // untouched by this gate.
+          const _presets = CONFIG.ASPECTSOFPOWER?.complexAffinityPresets ?? {};
+          return affinities.some((a) => (_presets[a]?.[c.harvestDotAffinity] ?? 0) > 0);
         });
         if (!harvester) continue;
         seen.add(applierUuid);
