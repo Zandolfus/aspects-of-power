@@ -1233,6 +1233,17 @@ eq('aura: Mana Attraction on John', auraRadiusFor(20, 463), 29);
 eq('aura: Storm Stride on Gabriel', auraRadiusFor(10, 497), 15);
 eq('aura: a novice gets the authored radius', auraRadiusFor(20, 15), 20);
 eq('aura: the highest perception in the world', auraRadiusFor(20, 1029), 41);
+
+// AI awareness leash (2026-08-30): base 100 x (1 + per/1000), pinned on the
+// live bestiary per.mods the design was grounded on. cfg passed explicitly so
+// the pin cannot drift with CONFIG defaults.
+const _awCfg = { ai: { awarenessBaseFt: 100, awarenessPerDivisor: 1000 } };
+eq('awareness: Steeltusk Boar (per 44)', F2.awarenessRangeFt(44, _awCfg), 104);
+eq('awareness: Spore-Husk Brute (per 125)', F2.awarenessRangeFt(125, _awCfg), 113);
+eq('awareness: Vine-Sprout Skink (per 474)', F2.awarenessRangeFt(474, _awCfg), 147);
+eq('awareness: Rat Warrior (per 702)', F2.awarenessRangeFt(702, _awCfg), 170);
+eq('awareness: perception zero still hears the base', F2.awarenessRangeFt(0, _awCfg), 100);
+eq('awareness: negative per clamps to base', F2.awarenessRangeFt(-50, _awCfg), 100);
 // ⚠ THE AUTHORED RADIUS IS A FLOOR — this is what a pure `per x factor` form
 // gets wrong, handing low-perception characters a useless one-foot aura.
 eq('aura: zero perception still gets the authored radius', auraRadiusFor(20, 0), 20);

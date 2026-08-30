@@ -1302,6 +1302,28 @@ export function auraRadiusFor(authoredRadius, perMod, cfg = null) {
 }
 
 /**
+ * AI awareness (activation) radius — how far a dormant NPC notices trouble
+ * (2026-08-30, "leash + activation with perception range"). Same shape as
+ * the aura envelope directly above: an authored base stretched by the
+ * creature's perception, so awareness rides the SAME stat that already
+ * drives castingRange (40 + per/10) and aura reach. Grounded on the live
+ * bestiary: base 100 puts a Steeltusk Boar (per 44) at ~104 ft and a Rat
+ * Warrior (per 702) at ~170 ft — a pack two hexes over sleeps through a
+ * fight it could never reach, while anything perceptive enough to matter
+ * joins from real distance. The stealth pass will reuse this radius as the
+ * passive-perception envelope, with the rolled hidden state filtering the
+ * candidates before the range test.
+ */
+export function awarenessRangeFt(perMod, cfg = null) {
+  const sc = cfg ?? (globalThis.CONFIG?.ASPECTSOFPOWER ?? {});
+  const base = Math.max(0, Number(sc.ai?.awarenessBaseFt) || 100);
+  const d = Number(sc.ai?.awarenessPerDivisor);
+  const div = Number.isFinite(d) && d > 0 ? d : 1000;
+  const per = Math.max(0, Number(perMod) || 0);
+  return Math.round(base * (1 + per / div));
+}
+
+/**
  * THE tick cadence (ruled 2026-08-30: "a single cadence function that
  * governs all tick rates"). One Nth of the owner's reference round — a
  * fast actor's ticks come more often in absolute time, exactly as their

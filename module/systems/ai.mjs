@@ -24,6 +24,7 @@
 
 import { declareAction, declareMovement, findCombatantForActor, getClockTick } from './celerity.mjs';
 import { isActingGM } from '../helpers/gm.mjs';
+import { awarenessRangeFt } from '../helpers/formulas.mjs';
 
 // Per-combatant re-entrancy guard: an AI acts at most ONCE per celerity clock
 // tick. The legitimate loop (declare → clock advances → fire → decide) always
@@ -319,9 +320,9 @@ const primitiveProfile = {
     }
 
     if (candidates.length === 0) {
-      // No targets — skip this turn. Declare a no-op declaration with a fixed
-      // wait so the AI gets another turn to re-evaluate.
-      await declareAction(actor, skill, { targetIds: [], skipNoTarget: true });
+      // No targets — declare nothing; the aopRoundStart re-trigger re-decides
+      // next round (the old no-op declaration fired later as a targetless
+      // whiff — same dead skipNoTarget option as _idle, removed 2026-08-30).
       ChatMessage.create({
         speaker: ChatMessage.getSpeaker({ actor }),
         content: `<p><em>${actor.name} scans for targets — none in range.</em></p>`,
@@ -478,7 +479,13 @@ async function _pickAttackSkill(actor, rollTypes) {
   const typeSet = new Set(rollTypes);
   const candidates = actor.items.filter(s => {
     if (s.type !== 'skill' || s.system.skillType !== 'Active') return false;
-    if (!(s.system.tags ?? []).includes('attack')) return false;
+    const tags = s.system.tags ?? [];
+    if (!tags.includes('attack')) return false;
+    // AOE skills are EXCLUDED (2026-08-30): the AI has no region-placement
+    // step, so a picked aoe skill declared with aoeRegionId null fires into
+    // nothing. Until an AI aoe-placement pass exists, aoe stays player/GM
+    // content - the Bogcaller shoots Mudspit, not a ghost Choking Silt.
+    if (tags.includes('aoe')) return false;
     if (!typeSet.has(s.system.roll?.type ?? '')) return false;
     const resKey = s.system.roll?.resource;
     const cost = s.system.roll?.cost ?? 0;
@@ -708,13 +715,18 @@ async function _declareStepToward(actor, selfTokenDoc, destPoint, wantFt, mode) 
   return false;
 }
 
-/** Idle declare so the AI loop re-evaluates later. Needs a skill for wait math. */
+/** Idle: declare NOTHING and wait for the aopRoundStart re-trigger.
+ *  The old body declared a real action with `skipNoTarget: true` — a dead
+ *  option nothing reads (2026-08-30 review) — so every "idle" later FIRED as
+ *  a targetless whiff, wasting the swing and a chat card. Since the
+ *  round-start re-trigger (2026-06-19) an inert AI re-decides on its own, so
+ *  the fake declaration buys nothing. `skill` stays in the signature for
+ *  call-site stability; only the whisper uses it now. */
 async function _idle(actor, skill, note) {
-  if (skill) await declareAction(actor, skill, { targetIds: [], skipNoTarget: true });
   ChatMessage.create({
     whisper: ChatMessage.getWhisperRecipients('GM'),
     speaker: ChatMessage.getSpeaker({ actor }),
-    content: `<p><em>[AI] ${actor.name}: ${note}${skill ? '' : ' — no usable skill, AI stalled (GM intervention needed)'}.</em></p>`,
+    content: `<p><em>[AI] ${actor.name}: ${note}${skill ? '' : ' — no usable skill'}; re-evaluates at its round start.</em></p>`,
   });
 }
 
@@ -850,7 +862,10 @@ const skirmisherProfile = {
 
     const ai = CONFIG.ASPECTSOFPOWER.ai ?? {};
     const pxPerFt = canvas.grid.size / canvas.grid.distance;
-    const skillRange = skill.system?.castingRange ?? 0;
+    // Per-skill range lives at tagConfig.channelRange (the field the primitive
+    // reads); system.castingRange exists only on the ACTOR. The old read of
+    // skill.system.castingRange was always undefined (2026-08-30 review).
+    const skillRange = skill.system?.tagConfig?.channelRange ?? 0;
     const rangeFt = skillRange > 0 ? skillRange : (actor.system?.castingRange ?? 60);
     const dangerFt = actor.flags?.aspectsofpower?.aiDangerFt ?? ai.dangerFt ?? 15;
     const hold = aiHoldsPosition(actor);
@@ -915,7 +930,12 @@ async function _pickDebuffSkill(actor) {
   }
   const candidates = actor.items.filter(s => {
     if (s.type !== 'skill' || s.system.skillType !== 'Active') return false;
-    if (!(s.system.tags ?? []).includes('debuff')) return false;
+    const tags = s.system.tags ?? [];
+    if (!tags.includes('debuff')) return false;
+    // Same aoe exclusion as _pickAttackSkill - no region placement means an
+    // aoe debuff (Mass Hypnosis) would fire regionless. Single-target hexes
+    // only until the AI can place zones.
+    if (tags.includes('aoe')) return false;
     const resKey = s.system.roll?.resource;
     const cost = s.system.roll?.cost ?? 0;
     if (resKey && cost > 0 && (actor.system[resKey]?.value ?? 0) < cost) return false;
@@ -973,7 +993,7 @@ const hexerProfile = {
     const selfCenter = _centerOf(selfTokenDoc);
     const ordered = aiOrderTargets(actor, hostiles);
     const inRangeWithLOS = (skill) => {
-      const skillRange = skill?.system?.castingRange ?? 0;
+      const skillRange = skill?.system?.tagConfig?.channelRange ?? 0;
       const rangeFt = skillRange > 0 ? skillRange : (actor.system?.castingRange ?? 60);
       return ordered.filter(h => _edgeDistFt(selfTokenDoc, h.tokenDoc) <= rangeFt && _sightClear(selfCenter, h.tCenter));
     };
@@ -1047,6 +1067,87 @@ export function isAiDriven(actor) {
   return true;
 }
 
+/* ---------------------------------------------------------------------------- */
+/*  Awareness leash (2026-08-30, "leash + activation with perception range")     */
+/* ---------------------------------------------------------------------------- */
+
+/**
+ * A dormant AI joins a fight only when it NOTICES it. Three ways to wake:
+ *   SIGHT - a living enemy inside awarenessRangeFt(per.mod) with a clear
+ *           sight line (awarenessRangeFt = base x (1 + per/1000), the aura
+ *           envelope shape - formulas.mjs);
+ *   HURT  - any health write against it (the updateActor hook below); a MISS
+ *           does not wake it - a failed sneak attack is the sneak's luck;
+ *   PACK  - an already-awake same-side AI packmate within the same radius
+ *           (you hear your packmate roar; no sight line needed).
+ * Until then it declares nothing and burns nothing - the fix for the
+ * nine-round march: a pack two hexes over sleeps through a fight it could
+ * never reach. Wake state is a COMBATANT flag (aiAwake) so it dies with the
+ * combat; kickoff and the round-start re-trigger re-evaluate dormant units
+ * each round as the party moves. Escape hatches: config ai.awarenessLeash
+ * false (everyone activates at combat start, the old behaviour) or actor
+ * flag aiAwarenessOff (this unit never sleeps - guardians, alarm posts).
+ * STEALTH HOOK: when the rolled hidden state ships, it filters the SIGHT
+ * candidates before the range test - a successful sneak walks through the
+ * radius unseen (design-stealth-ambush).
+ */
+export function aiIsAwake(combatantDoc) {
+  return !!combatantDoc?.flags?.aspectsofpower?.aiAwake;
+}
+
+async function _wakeCombatant(combatantDoc, why) {
+  await combatantDoc.update({ 'flags.aspectsofpower.aiAwake': true });
+  ChatMessage.create({
+    whisper: ChatMessage.getWhisperRecipients('GM'),
+    speaker: ChatMessage.getSpeaker({ actor: combatantDoc.actor }),
+    content: `<p><em>[AI] ${combatantDoc.actor?.name ?? combatantDoc.name} wakes — ${why}.</em></p>`,
+  });
+}
+
+/** True when this combatant may act: awake, exempt, or the leash is off.
+ *  Evaluates (and persists) the wake condition when currently dormant. */
+export async function ensureAwake(combatantDoc) {
+  const cfg = CONFIG.ASPECTSOFPOWER?.ai ?? {};
+  if (cfg.awarenessLeash === false) return true;
+  const actor = combatantDoc?.actor;
+  if (!actor) return false;
+  if (actor.flags?.aspectsofpower?.aiAwarenessOff) return true;
+  if (aiIsAwake(combatantDoc)) return true;
+
+  const selfTok = combatantDoc.token ?? _selfTokenDoc(actor);
+  if (!selfTok) return true; // nothing to measure from - fail open, never brick a unit
+  const selfCenter = _centerOf(selfTok);
+  const pxPerFt = canvas.grid.size / canvas.grid.distance;
+  const awarePx = awarenessRangeFt(actor.system?.abilities?.perception?.mod ?? 0) * pxPerFt;
+
+  // SIGHT: nearest-first, so the break prunes the whole tail.
+  for (const h of _aliveHostilesOf(selfTok)) {
+    if (h.distPx > awarePx) break;
+    if (_sightClear(selfCenter, h.tCenter)) {
+      await _wakeCombatant(combatantDoc, `sees ${h.tokenDoc.name} ${Math.round(h.distPx / pxPerFt)} ft away`);
+      return true;
+    }
+  }
+
+  // PACK: an awake same-side AI within earshot rouses this one (no LOS).
+  const combat = combatantDoc.combat;
+  if (combat) {
+    for (const c of combat.combatants) {
+      if (c.id === combatantDoc.id || !aiIsAwake(c)) continue;
+      const t = c.token;
+      if (!t || t.parent !== selfTok.parent) continue;
+      if (t.disposition !== selfTok.disposition) continue;
+      if ((c.actor?.system?.health?.value ?? 0) <= 0) continue;
+      const tc = _centerOf(t);
+      if (Math.hypot(tc.x - selfCenter.x, tc.y - selfCenter.y) <= awarePx) {
+        await _wakeCombatant(combatantDoc, `roused by ${t.name}`);
+        return true;
+      }
+    }
+  }
+  return false;
+}
+
 export function registerAIHooks() {
   Hooks.on('updateCombatant', async (combatantDoc, changes, _options, _userId) => {
     if (!isActingGM()) return;
@@ -1094,12 +1195,13 @@ export function registerAIHooks() {
   // The dispatch hook only fires on declaredAction CLEAR transitions, so a
   // freshly-added AI combatant (or a whole combat at start) sat idle until
   // the GM manually advanced — this kicks each one once. Covers towers too.
-  const _kick = (combatantDoc) => {
+  const _kick = async (combatantDoc) => {
     if (!isActingGM()) return;
     if (combatantDoc.flags?.aspectsofpower?.declaredAction) return;
     if (combatantDoc.flags?.aspectsofpower?.declaredMovement) return;
     const actor = combatantDoc.actor;
     if (!isAiDriven(actor)) return;
+    if (!(await ensureAwake(combatantDoc))) return; // dormant - leash holds it
     const profileName = actor.flags.aspectsofpower.aiProfile;
     const profile = AIProfiles.get(profileName);
     if (!profile?.onActionReady) return;
@@ -1139,12 +1241,15 @@ export function registerAIHooks() {
   // onActionReady for any INERT (null-declaredAction) AI combatant so it gets
   // another chance. Skips combatants that already have a declared action
   // (the firing combatant still holds its action when round-start runs).
-  Hooks.on('aopRoundStart', (combat, combatantDoc) => {
+  Hooks.on('aopRoundStart', async (combat, combatantDoc) => {
     if (!isActingGM()) return;
     if (combatantDoc.flags?.aspectsofpower?.declaredAction) return;   // not inert
     if (combatantDoc.flags?.aspectsofpower?.declaredMovement) return; // still moving
     const actor = combatantDoc.actor;
     if (!isAiDriven(actor)) return;
+    // Doubles as the per-round dormancy re-check: the party may have walked
+    // into this unit's awareness since combat start.
+    if (!(await ensureAwake(combatantDoc))) return;
     const profileName = actor.flags.aspectsofpower.aiProfile;
     const profile = AIProfiles.get(profileName);
     if (!profile?.onActionReady) return;
@@ -1157,5 +1262,24 @@ export function registerAIHooks() {
         console.warn(`[ai] ${profileName} round-start re-trigger failed for ${actor.name}:`, err)
       );
     }, 100);
+  });
+
+  // ── HURT wake: taking damage rouses a dormant unit immediately ──
+  // Any health write against a dormant AI in a started combat wakes it and
+  // kicks a decision on the spot (its packmates follow via the PACK rule at
+  // their next round start - the chain spreads the alarm, not the wound).
+  Hooks.on('updateActor', async (actor, changes, _options, _userId) => {
+    if (!isActingGM()) return;
+    if (changes?.system?.health?.value === undefined) return;
+    const cfg = CONFIG.ASPECTSOFPOWER?.ai ?? {};
+    if (cfg.awarenessLeash === false) return;
+    if (!actor?.flags?.aspectsofpower?.aiProfile) return;
+    for (const combat of game.combats) {
+      if (!combat.started) continue;
+      const c = combat.combatants.find(cb => cb.actor?.uuid === actor.uuid);
+      if (!c || aiIsAwake(c)) continue;
+      await _wakeCombatant(c, 'struck while unaware');
+      _kick(c);
+    }
   });
 }

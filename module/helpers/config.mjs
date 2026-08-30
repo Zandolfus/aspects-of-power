@@ -1002,6 +1002,16 @@ ASPECTSOFPOWER.ai = {
   defaultPathMode: 'direct',
   maxStepFt: 30,   // max movement per AI action
   dangerFt:  15,   // skirmisher kite bubble
+  // Awareness leash (2026-08-30): dormant NPCs join a fight only when they
+  // NOTICE it — a hostile inside awarenessRangeFt(per.mod) with clear sight,
+  // damage taken, or an already-awake packmate within the same radius. Kills
+  // the nine-round march: distant pack members sleep instead of converging.
+  // awarenessRangeFt (formulas.mjs) = awarenessBaseFt x (1 + per/divisor),
+  // the aura-envelope shape. Set awarenessLeash false to restore
+  // everyone-activates-at-combat-start.
+  awarenessLeash: true,
+  awarenessBaseFt: 100,
+  awarenessPerDivisor: 1000,
   retreatHpPct: 0.25,  // self-preservation faculty: flee when HP fraction < this
   // Hostile NPCs at 0 HP auto-mark defeated (skull overlay, tracker strike)
   // without GM action (updateActor death hook). Player-owned actors exempt.
