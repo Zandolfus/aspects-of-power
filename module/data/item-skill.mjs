@@ -928,6 +928,18 @@ export class SkillData extends foundry.abstract.TypeDataModel {
         // it did before this field existed. Honoured by craft and gather.
         craftMinMana: new fields.NumberField({ initial: 0, min: 0, integer: true }),
 
+        // ── WORK PACE (ruled 2026-08-31: "customization options — Will
+        // conjures the gems out of thin air via bloodline so it's relatively
+        // fast"). Multiplies THIS skill's derived base block (craft, refine
+        // or gather) — the METHOD prices the time, while the bar still
+        // scales it, so a bloodline conjurer summons epic stone slower than
+        // common but far faster than a mine crew digs either. Below 1 =
+        // faster method; above 1 = slower, painstaking one; <= 0 reads as 1
+        // (craftTimeScaleOf). Quality invest is untouched — invest counts
+        // multiples of YOUR block, so a fast method also buys time-quality
+        // cheaper. That is the point, and it is WATCHED.
+        craftTimeScale: new fields.NumberField({ initial: 1, min: 0 }),
+
         // Ritual (per design-ritual-subsystem.md Phase 2.5):
         //   ritualChargesProduced — how many charges one successful prep
         //     creates on the resulting Medium. Set per ritual. Default 1

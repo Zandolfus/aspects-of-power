@@ -186,6 +186,8 @@ export class AspectsofPowerItemSheet extends foundry.applications.api.Handlebars
         // `name` in a submitOnChange form means the stale one overwrites the
         // edited one on any skill tagged both.
         manaElement: has('craft') || has('gather'),
+        // Work pace covers every handler that spends the clock.
+        workPace:    has('craft') || has('gather') || has('refine'),
         repair:      has('repair'),
         channel:     has('channel'),
         ritual:      has('ritual'),
@@ -685,6 +687,7 @@ export class AspectsofPowerItemSheet extends foundry.applications.api.Handlebars
         restorationOverhealth: bool('restorationOverhealth', false),
         buffEntries:       collectEntries('buffEntries', 'buff'),
         buffDuration:      numOr('buffDuration', 1),
+        craftTimeScale:    numOr('craftTimeScale', 1),
         buffStackable:     bool('buffStackable', false),
         buffTarget:        str('buffTarget', 'selected'),
         buffFromEquipment:     str('buffFromEquipment', ''),

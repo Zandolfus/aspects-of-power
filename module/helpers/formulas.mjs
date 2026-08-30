@@ -2187,6 +2187,18 @@ export function craftBaseSeconds(bar, cfg = null) {
 }
 
 /**
+ * WORK PACE (ruled 2026-08-31: "Will conjures the gems out of thin air via
+ * bloodline so it's relatively fast"). A skill's authored multiplier on its
+ * own derived base block — the METHOD prices the time. Sanitizes: anything
+ * not a positive number reads as the neutral 1, so unset skills and the
+ * sheet collector's blank-box 0 both behave as standard pace.
+ */
+export function craftTimeScaleOf(sysData) {
+  const v = Number(sysData?.tagConfig?.craftTimeScale);
+  return Number.isFinite(v) && v > 0 ? v : 1;
+}
+
+/**
  * MATERIAL PREP TIME (ruled 2026-08-31: "full invest model" — refine and
  * gather advance the clock like crafts do, closing the leak where the
  * material half of every craft was prepared for free; John capped Fulgurite

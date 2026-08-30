@@ -3242,6 +3242,23 @@ eq('junk situational entries are skipped, not NaN',
        F3.prepBaseSeconds(800, BTCFG), 8640);
     eq('prep time: no cap still costs the flat block, never zero',
        F3.prepBaseSeconds(0, BTCFG), 3600);
+    // ── WORK PACE (ruled 2026-08-31: "Will conjures the gems out of thin
+    // air via bloodline so it's relatively fast" — the METHOD prices time,
+    // per-skill, while the bar still scales it) ──
+    eq('pace: unset skill is standard', F3.craftTimeScaleOf({}), 1);
+    eq('pace: a bloodline conjurer reads its authored scale',
+       F3.craftTimeScaleOf({ tagConfig: { craftTimeScale: 0.25 } }), 0.25);
+    eq('pace: a slow deliberate method can exceed 1',
+       F3.craftTimeScaleOf({ tagConfig: { craftTimeScale: 2 } }), 2);
+    // The sheet catch-all coerces a blank box to 0 — that must read as
+    // standard, never as instant.
+    eq('pace: zero and garbage read as standard, never instant',
+       F3.craftTimeScaleOf({ tagConfig: { craftTimeScale: 0 } })
+       * F3.craftTimeScaleOf({ tagConfig: { craftTimeScale: 'fast' } }), 1);
+    // The Willy case end to end: uncommon crystal conjured at 0.25 pace.
+    eq('pace: uncommon conjure at 0.25 runs 13.5m',
+       Math.round(F3.prepBaseSeconds(300, BTCFG)
+         * F3.craftTimeScaleOf({ tagConfig: { craftTimeScale: 0.25 } })), 810);
 
     // ── THE SUBSTANCE CLAMP (ruled 2026-08-28/29) ─────────────────────
     // Reachable bars + masterwork reopened rare-from-uncommon; the clamp is

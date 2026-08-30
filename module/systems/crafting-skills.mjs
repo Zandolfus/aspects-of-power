@@ -9,7 +9,7 @@
  * byte-identical to its previous class-body form (no object-literal comma
  * surgery); the export collects the prototype methods into a plain mixin.
  */
-import { hybridAbilityMod, itemWeightLb, craftManaQuality, recipeMaterialProgress, recipeVerdict, materialCap, materialCapFor, derivedRecipeThreshold, craftTimeQuality, craftBaseSeconds, prepBaseSeconds, clampQualityToSubstance } from '../helpers/formulas.mjs';
+import { hybridAbilityMod, itemWeightLb, craftManaQuality, recipeMaterialProgress, recipeVerdict, materialCap, materialCapFor, derivedRecipeThreshold, craftTimeQuality, craftBaseSeconds, prepBaseSeconds, craftTimeScaleOf, clampQualityToSubstance } from '../helpers/formulas.mjs';
 import { eligibleRecipes, resolveIngredients, consumeIngredients, craftBar, findMatchingRecipe, recipeLibrary, alreadyKnows, isGenericRecipe, specializationOf } from './recipes.mjs';
 import { spatialCapacityFromCraft } from '../helpers/formulas.mjs';
 
@@ -962,7 +962,8 @@ class CraftingSkills {
     if (opts?.fromActivityCompletion) {
       timeInvest = Math.max(1, Number(opts.craftTimeInvest) || 1);
     } else if (!(item.system.tags ?? []).includes('activity') && !actor.inCombat) {
-      const base = prepBaseSeconds(materialCapFor(materialItem.system));
+      const base = Math.round(prepBaseSeconds(materialCapFor(materialItem.system))
+        * craftTimeScaleOf(item.system));
       const mult = await this._promptTimeInvest(item.name, base);
       if (mult === null) return;
       timeInvest = mult;
@@ -1085,7 +1086,8 @@ class CraftingSkills {
     if (opts?.fromActivityCompletion) {
       timeInvest = Math.max(1, Number(opts.craftTimeInvest) || 1);
     } else if (!tags.includes('activity') && !actor.inCombat) {
-      const base = prepBaseSeconds(materialCap(selectedRarity));
+      const base = Math.round(prepBaseSeconds(materialCap(selectedRarity))
+        * craftTimeScaleOf(item.system));
       const mult = await this._promptTimeInvest(item.name, base);
       if (mult === null) return;
       timeInvest = mult;
@@ -1902,12 +1904,14 @@ class CraftingSkills {
       const authoredBar = Number(recipe?.system?.threshold) || 0;
       const bar = authoredBar > 0 ? authoredBar
         : derivedRecipeThreshold(recipeBill?.units ?? [], typeKey || '');
-      const base = craftBaseSeconds(bar);
+      const base = Math.round(craftBaseSeconds(bar) * craftTimeScaleOf(item.system));
       // An in-craft refine is still a refine (ruled 2026-08-31: prep costs
       // time): its prep block rides the same advance, at x1 — the invest
-      // below buys CRAFT quality, never refine gain.
+      // below buys CRAFT quality, never refine gain. Priced at the REFINE
+      // skill's own pace: it is that skill's method doing the work.
       const prepExtra = (refineId && materialItem)
-        ? prepBaseSeconds(materialCapFor(materialItem.system)) : 0;
+        ? Math.round(prepBaseSeconds(materialCapFor(materialItem.system))
+            * craftTimeScaleOf(actor.items.get(refineId)?.system)) : 0;
       const hint = prepExtra
         ? ` Refining the stock first adds ${fmtCraftTime(prepExtra)}.` : '';
       const mult = await this._promptTimeInvest(item.name, base, hint);

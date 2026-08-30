@@ -1565,6 +1565,30 @@
       </details>
       {{/if}}
 
+      {{#if show.workPace}}
+      <details class='aop-section' data-section='work-pace'>
+        <summary>
+          <span class='aop-section-title'>Work Pace</span>
+          <span class='aop-section-hint'>{{#if system.tagConfig.craftTimeScale}}x{{system.tagConfig.craftTimeScale}}{{else}}standard{{/if}}</span>
+        </summary>
+        <div class='aop-section-body'>
+          <div class='aop-field-grid'>
+            <div class='aop-field'>
+              <label class='resource-label'>Time Scale</label>
+              <input type='number' name='system.tagConfig.craftTimeScale'
+                     value='{{system.tagConfig.craftTimeScale}}' min='0' step='0.05' />
+            </div>
+          </div>
+          <p class='hint'>Multiplies this skill's base time block for craft, refine
+          or gather work. 1 = standard. Below 1 the METHOD is fast — a bloodline
+          that conjures gems from thin air might be 0.25 — while the difficulty of
+          the substance still scales the block, so epic work stays slower than
+          common. Above 1 the method is deliberate and slow. Time invest counts
+          multiples of this skill's own block.</p>
+        </div>
+      </details>
+      {{/if}}
+
       {{#if show.repair}}
       <details class='aop-section' data-section='repair' open>
         <summary>
