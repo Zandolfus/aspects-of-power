@@ -93,10 +93,14 @@ export async function tickDotsFor(combat, applierUuid) {
         : {}),
     });
 
+    // Public card (triage 2026-08-30: players could not see their own burns
+    // ticking). The DAMAGE is public; the exact health line stays for PC
+    // victims only, so NPC pools are not broadcast (isPlayerCharacter is
+    // the standing routing rule for that distinction).
+    const _showHealth = isPlayerCharacter(c.actor);
     ChatMessage.create({
-      whisper: ChatMessage.getWhisperRecipients('GM'),
-      content: `<p><strong>${c.actor.name}</strong> takes ${lines.join('; ')}. `
-             + `Health: ${newHealth} / ${health.max}`
+      content: `<p><strong>${c.actor.name}</strong> takes ${lines.join('; ')}.`
+             + `${_showHealth ? ` Health: ${newHealth} / ${health.max}` : ''}`
              + `${newHealth === 0 ? ' &mdash; <em>Incapacitated!</em>' : ''}</p>`,
     });
     // Cursed bloodline: DoT suffering feeds nearby curse-empaths too.

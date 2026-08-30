@@ -2463,6 +2463,12 @@ Hooks.on('renderChatMessageHTML', (message, html) => {
   const _heldCombatant = (actor) => game.combat?.combatants?.find(c => c.actor === actor
     && c.flags?.aspectsofpower?.heldCast);
   html.querySelectorAll('.held-cast-release, .held-cast-collapse').forEach(btn => {
+    // The click handler already refuses non-owners, but a clickable-looking
+    // button that silently does nothing reads as broken (triage 2026-08-30).
+    // Strip the controls from clients that cannot use them; the flavor line
+    // above stays public.
+    const _held = fromUuidSync(btn.dataset.actorUuid);
+    if (!(game.user.isGM || _held?.isOwner)) { btn.remove(); return; }
     btn.addEventListener('click', async () => {
       const actor = await fromUuid(btn.dataset.actorUuid);
       if (!actor || !(actor.isOwner || game.user.isGM)) return;
