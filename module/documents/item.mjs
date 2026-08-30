@@ -1,6 +1,6 @@
 import { EquipmentSystem } from '../systems/equipment.mjs';
 import { getPositionalTags } from '../helpers/positioning.mjs';
-import { houseHitFormula, hybridAbilityMod, weaponStatBlend, healStatBlend, spellDamageRef, spellInvestDamage, spellWindupMultiplier, spellCastWeight, strikeInvestDamage, coInvestDamage, investSelfDamage as computeInvestSelfDamage, effectiveDodgeValue, splitEvenlyWithRemainder, parryMassMultiplier, bracedParryWeight, bracedMaxUsefulInvest, defenceMarginMultiplier, defenseTimeCost, dodgeShortfallQuality, dotTickDamage, burnDetonatePayload, bulwarkWallBonus, procStaminaCost, crushFlatAmount, riderMaxInvest, auraRadiusFor, barrierStatBlend, hotTickAmount, effectiveDamageMultiplier, clashOutcome, orbDischargePrice, orbChargeAfterBank, affinityAnswer } from '../helpers/formulas.mjs';
+import { houseHitFormula, hybridAbilityMod, weaponStatBlend, healStatBlend, spellDamageRef, spellInvestDamage, spellWindupMultiplier, spellCastWeight, strikeInvestDamage, coInvestDamage, investSelfDamage as computeInvestSelfDamage, effectiveDodgeValue, splitEvenlyWithRemainder, parryMassMultiplier, bracedParryWeight, bracedMaxUsefulInvest, defenceMarginMultiplier, defenseTimeCost, dodgeShortfallQuality, dotTickDamage, burnDetonatePayload, bulwarkWallBonus, procStaminaCost, crushFlatAmount, riderMaxInvest, auraRadiusFor, barrierStatBlend, hotTickAmount, effectiveDamageMultiplier, clashOutcome, orbDischargePrice, orbChargeAfterBank, affinityAnswer, aiInvestSize } from '../helpers/formulas.mjs';
 import { resolveSituationalMods } from '../systems/situational-mods.mjs';
 import { recordActionFired, declareAction, isInActiveCombat, computeActionWait, referenceRoundLength, computeWindupMultiplier, getScrambleStacks, addScrambleStack, applyDodgeCost, findCombatantForActor, perceiveGate, getDefenseBudget, spendDefenseBudget, setLastSwungHand, computeActionHeft, actorRoundLength } from '../systems/celerity.mjs';
 import { getThreatRadiusFt, actorIsDashing } from '../systems/engagement-halts.mjs';
@@ -6838,7 +6838,12 @@ export class AspectsofPowerItem extends Item {
               // unreachable by script and AI too.
               : Math.min(Math.max(baseMana, options.preInvestAmount), maxInvest))
           : options.aiAutoInvest
-          ? Math.min(baseMana, maxInvest)                  // AI: minimum cast, no prompt
+          // AI invest sizing (2026-08-30): pace the pool, let the hard cap
+          // limit — was Math.min(baseMana, maxInvest), the permanent-floor
+          // cast. maxInvest is already min(livePool, wisCap, pushCap).
+          ? aiInvestSize(livePool, baseMana,
+              maxInvest, this.actor?.flags?.aspectsofpower?.aiInvestPacing
+                ?? (CONFIG.ASPECTSOFPOWER.ai?.investPacingActions ?? 5))
           : await this._promptResourceInvest({
               baseCost: baseMana,
               safeInvest: 0,                              // hard cap = no soft zone
@@ -7173,9 +7178,15 @@ export class AspectsofPowerItem extends Item {
             coInvested = Math.min(_preCo, coInvest.maxPool);
           }
         } else if (options.aiAutoInvest) {
-          // AI: minimum swing (base stamina, no over-exertion/self-damage),
-          // and no co-invest — an NPC does not gamble a second pool.
-          invested = Math.min(baseStamina, maxPool);
+          // AI invest sizing (2026-08-30): pace the pool up to the SAFE
+          // ceiling (base + toughness-derived safeInvest — never into the
+          // self-damage excess maxPool allows), no co-invest — an NPC does
+          // not gamble a second pool. Was Math.min(baseStamina, maxPool),
+          // the permanent minimum swing.
+          invested = aiInvestSize(livePool, baseStamina,
+            Math.min(baseStamina + safeInvest, livePool),
+            this.actor?.flags?.aspectsofpower?.aiInvestPacing
+              ?? (CONFIG.ASPECTSOFPOWER.ai?.investPacingActions ?? 5));
         } else if (useCoInvest) {
           // Only a MANA co-invest is channelled, so only that one gets the
           // wisdom rate and the channel-time readout. Pre-compute the strike's

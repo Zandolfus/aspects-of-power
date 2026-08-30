@@ -1244,6 +1244,16 @@ eq('awareness: Vine-Sprout Skink (per 474)', F2.awarenessRangeFt(474, _awCfg), 1
 eq('awareness: Rat Warrior (per 702)', F2.awarenessRangeFt(702, _awCfg), 170);
 eq('awareness: perception zero still hears the base', F2.awarenessRangeFt(0, _awCfg), 100);
 eq('awareness: negative per clamps to base', F2.awarenessRangeFt(-50, _awCfg), 100);
+
+// AI invest sizing (2026-08-30): pace pool/N, clamp [base, ceiling]. Grounded
+// on live bestiary rows (pool/base/ceiling read from the game 2026-08-30).
+eq('ai invest: Skink Vine Snap fresh (217/5 vs safe 9)', F2.aiInvestSize(217, 5, 9, 5), 9);
+eq('ai invest: Brute Crush fresh (414/5 vs safe 27)', F2.aiInvestSize(414, 18, 27, 5), 27);
+eq('ai invest: Stalker Spore Lance fresh (297/5 vs cap 56)', F2.aiInvestSize(297, 14, 56, 5), 56);
+eq('ai invest: drained pool falls to base', F2.aiInvestSize(20, 5, 9, 5), 5);
+eq('ai invest: mid pool paces between (100/5=20 under cap 27)', F2.aiInvestSize(100, 18, 27, 5), 20);
+eq('ai invest: empty pool still bids base', F2.aiInvestSize(0, 5, 9, 5), 5);
+eq('ai invest: ceiling below base clamps up to base', F2.aiInvestSize(500, 10, 4, 5), 10);
 // ⚠ THE AUTHORED RADIUS IS A FLOOR — this is what a pure `per x factor` form
 // gets wrong, handing low-perception characters a useless one-foot aura.
 eq('aura: zero perception still gets the authored radius', auraRadiusFor(20, 0), 20);

@@ -991,6 +991,7 @@ ASPECTSOFPOWER.ai = {
     brawler:    'Brawler (melee)',
     skirmisher: 'Skirmisher (ranged)',
     hexer:      'Hexer (debuff caster)',
+    support:    'Support (heal allies, else skirmish)',
   },
   // Per-NPC `flags.aspectsofpower.aiPathMode` — how the unit routes to its
   // destination. 'direct' charges straight (ignores AOE). 'smart' deviates the
@@ -1012,6 +1013,14 @@ ASPECTSOFPOWER.ai = {
   awarenessLeash: true,
   awarenessBaseFt: 100,
   awarenessPerDivisor: 1000,
+  // AI invest pacing (aiInvestSize, formulas.mjs): an NPC spends ~pool/N per
+  // action, clamped to the lane's own ceiling (weapon: base + tough-derived
+  // safe; spell: the wis/push hard cap). Per-actor override flag
+  // aiInvestPacing. N=5 opens fresh pools at the ceiling and tapers.
+  investPacingActions: 5,
+  // Support profile: heal self/allies whose HP fraction is below this;
+  // above it, nobody "needs tending" and the medic skirmishes instead.
+  supportHealHpPct: 0.6,
   retreatHpPct: 0.25,  // self-preservation faculty: flee when HP fraction < this
   // Hostile NPCs at 0 HP auto-mark defeated (skull overlay, tracker strike)
   // without GM action (updateActor death hook). Player-owned actors exempt.

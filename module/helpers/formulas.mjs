@@ -1314,6 +1314,24 @@ export function auraRadiusFor(authoredRadius, perMod, cfg = null) {
  * passive-perception envelope, with the rolled hidden state filtering the
  * candidates before the range test.
  */
+/**
+ * AI invest sizing (2026-08-30, plays-well arc 2). An NPC paces its pool
+ * over ~investPacingActions actions and lets the system's own ceilings do
+ * the real limiting: the weapon lane caps at base + toughness-derived
+ * safeInvest (never over-exerts into self-damage) and the spell lane at
+ * the wis/push hard cap that already kills alpha strikes by construction.
+ * Fresh pools open at the ceiling and taper as they drain; the floor is
+ * always the base cost (a swing cannot cost less than itself). Replaces
+ * the hard-wired minimum that kept every NPC at floor damage forever.
+ */
+export function aiInvestSize(pool, baseCost, ceiling, pacing) {
+  const base = Math.max(0, Math.round(baseCost) || 0);
+  const cap = Math.max(base, Math.round(ceiling) || 0);
+  const p = Math.max(1, Math.round(pacing) || 1);
+  const paced = Math.round(Math.max(0, Number(pool) || 0) / p);
+  return Math.min(Math.max(base, paced), cap);
+}
+
 export function awarenessRangeFt(perMod, cfg = null) {
   const sc = cfg ?? (globalThis.CONFIG?.ASPECTSOFPOWER ?? {});
   const base = Math.max(0, Number(sc.ai?.awarenessBaseFt) || 100);

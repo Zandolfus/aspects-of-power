@@ -721,8 +721,42 @@ async function _declareStepToward(actor, selfTokenDoc, destPoint, wantFt, mode) 
  *  a targetless whiff, wasting the swing and a chat card. Since the
  *  round-start re-trigger (2026-06-19) an inert AI re-decides on its own, so
  *  the fake declaration buys nothing. `skill` stays in the signature for
- *  call-site stability; only the whisper uses it now. */
+ *  call-site stability; only the whisper uses it now.
+ *
+ *  A WAITING GUARD RAISES ITS SHIELD (2026-08-30, plays-well arc 2): before
+ *  idling, an actor carrying an affordable Active `stance` skill with no
+ *  raised guard declares it — a blocked brawler or holding unit stands
+ *  ready (parries live) instead of doing nothing. The engine already drops
+ *  the stance when it next moves or strikes, so this cannot loop: stance up
+ *  → skip; stance dropped by an action → that action was progress. This is
+ *  the first crack in "reactions are dead content on NPCs": Rat Warriors,
+ *  Rat Knights and Skinks all carry Assume Stance. */
 async function _idle(actor, skill, note) {
+  try {
+    const combat = [...game.combats].find(c =>
+      c.started && c.combatants.some(cb => cb.actor?.uuid === actor.uuid));
+    const cbt = combat?.combatants.find(cb => cb.actor?.uuid === actor.uuid);
+    if (cbt && !cbt.flags?.aspectsofpower?.guardStance) {
+      const stance = actor.items.find(s => {
+        if (s.type !== 'skill' || s.system.skillType !== 'Active') return false;
+        if (!(s.system.tags ?? []).includes('stance')) return false;
+        const resKey = s.system.roll?.resource;
+        const cost = s.system.roll?.cost ?? 0;
+        return !(resKey && cost > 0 && (actor.system[resKey]?.value ?? 0) < cost);
+      });
+      if (stance) {
+        await declareAction(actor, stance, { targetIds: [], aiAutoInvest: true });
+        ChatMessage.create({
+          whisper: ChatMessage.getWhisperRecipients('GM'),
+          speaker: ChatMessage.getSpeaker({ actor }),
+          content: `<p><em>[AI] ${actor.name}: ${note} — raises ${stance.name} while waiting.</em></p>`,
+        });
+        return;
+      }
+    }
+  } catch (err) {
+    console.warn(`[ai] stance-on-idle failed for ${actor.name}:`, err);
+  }
   ChatMessage.create({
     whisper: ChatMessage.getWhisperRecipients('GM'),
     speaker: ChatMessage.getSpeaker({ actor }),
@@ -1023,6 +1057,109 @@ const hexerProfile = {
 };
 
 AIProfiles.register('hexer', hexerProfile);
+
+/* ---------------------------------------------------------------------------- */
+/*  'support' — battlefield medic: heal the wounded, else fight like a          */
+/*  skirmisher (2026-08-30, plays-well arc: "no ally concept" closed)           */
+/* ---------------------------------------------------------------------------- */
+
+/** Alive same-side companions of `selfTokenDoc` on its scene (self excluded),
+ *  with centers + distances. The mirror of _aliveHostilesOf. */
+function _aliveAlliesOf(selfTokenDoc) {
+  const scene = selfTokenDoc.parent;
+  if (!scene) return [];
+  const selfCenter = _centerOf(selfTokenDoc);
+  const out = [];
+  for (const t of scene.tokens.contents) {
+    if (t.id === selfTokenDoc.id) continue;
+    if (t.hidden) continue;
+    if (!t.actor) continue;
+    if ((t.actor.system?.health?.value ?? 0) <= 0) continue;
+    if (t.disposition !== selfTokenDoc.disposition) continue;
+    const tCenter = _centerOf(t);
+    const distPx = Math.hypot(tCenter.x - selfCenter.x, tCenter.y - selfCenter.y);
+    out.push({ tokenDoc: t, tCenter, distPx });
+  }
+  out.sort((a, b) => a.distPx - b.distPx);
+  return out;
+}
+
+/** Most expensive affordable Active restoration skill that heals HEALTH.
+ *  aoe excluded (no region placement); barrier/other resources excluded —
+ *  a support v1 tops up health bars, nothing fancier. */
+function _pickHealSkill(actor) {
+  const candidates = actor.items.filter(s => {
+    if (s.type !== 'skill' || s.system.skillType !== 'Active') return false;
+    const tags = s.system.tags ?? [];
+    if (!tags.includes('restoration') || tags.includes('aoe')) return false;
+    if ((s.system.tagConfig?.restorationResource ?? 'health') !== 'health') return false;
+    const resKey = s.system.roll?.resource;
+    const cost = s.system.roll?.cost ?? 0;
+    if (resKey && cost > 0 && (actor.system[resKey]?.value ?? 0) < cost) return false;
+    return true;
+  });
+  candidates.sort((a, b) => (b.system.roll?.cost ?? 0) - (a.system.roll?.cost ?? 0));
+  return candidates[0] ?? null;
+}
+
+const supportProfile = {
+  async onActionReady(actor, ctx) {
+    const selfTokenDoc = _selfTokenDoc(actor);
+    if (!selfTokenDoc) return;
+    const ai = CONFIG.ASPECTSOFPOWER.ai ?? {};
+    const healPct = ai.supportHealHpPct ?? 0.6;
+
+    const heal = _pickHealSkill(actor);
+    if (heal) {
+      // Wounded = self + allies below the fraction, most wounded first.
+      const frac = (t) => {
+        const hp = t.actor.system?.health;
+        const max = Math.max(1, hp?.max ?? 1);
+        return (hp?.value ?? 0) / max;
+      };
+      const selfCenter = _centerOf(selfTokenDoc);
+      const pxPerFt = canvas.grid.size / canvas.grid.distance;
+      const wounded = [
+        { tokenDoc: selfTokenDoc, tCenter: selfCenter, distPx: 0 },
+        ..._aliveAlliesOf(selfTokenDoc),
+      ].filter(x => frac(x.tokenDoc) < healPct)
+        .sort((a, b) => frac(a.tokenDoc) - frac(b.tokenDoc));
+
+      if (wounded.length) {
+        const skillRange = heal.system?.tagConfig?.channelRange ?? 0;
+        const rangeFt = skillRange > 0 ? skillRange : (actor.system?.castingRange ?? 60);
+        const inReach = wounded.find(x =>
+          (x.distPx / pxPerFt) <= rangeFt && _sightClear(selfCenter, x.tCenter));
+        if (inReach) {
+          await declareAction(actor, heal, {
+            targetIds: [inReach.tokenDoc.id], aiAutoInvest: true });
+          ChatMessage.create({
+            whisper: ChatMessage.getWhisperRecipients('GM'),
+            speaker: ChatMessage.getSpeaker({ actor }),
+            content: `<p><em>[AI] ${actor.name} tends ${inReach.tokenDoc.name} `
+              + `(${Math.round(frac(inReach.tokenDoc) * 100)}% health).</em></p>`,
+          });
+          return;
+        }
+        // Most wounded is out of range — close the distance (walk: a medic
+        // sprinting itself dry helps nobody), unless commanded to hold.
+        if (!aiHoldsPosition(actor)) {
+          const target = wounded[0];
+          const gapFt = target.distPx / pxPerFt;
+          const wantFt = Math.max(5, gapFt - rangeFt + 5);
+          const moved = await _declareStepToward(actor, selfTokenDoc, target.tCenter, wantFt, 'walk');
+          if (moved) return;
+        }
+      }
+    }
+
+    // Nobody needs tending — fight like a skirmisher (kite + shoot). Direct
+    // delegation shares futility, retreat and all command flags.
+    return AIProfiles.get('skirmisher').onActionReady(actor, ctx);
+  },
+};
+
+AIProfiles.register('support', supportProfile);
 
 /**
  * Summoner MOVE order: command a one-step move toward a destination center,
