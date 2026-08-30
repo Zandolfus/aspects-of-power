@@ -120,8 +120,8 @@ export function resolveIngredients(actor, recipe) {
       const take = Math.min(have, left);
       reserved.set(item.id, (reserved.get(item.id) ?? 0) + take);
       picks.push({ item, count: take });
-      units.push({ progress: item.system.progress ?? 0, count: take,
-                   rarity: item.system.rarity || 'common',
+      units.push({ itemId: item.id, progress: item.system.progress ?? 0,
+                   count: take, rarity: item.system.rarity || 'common',
                    cap: materialCapFor(item.system) });
       left -= take;
     }

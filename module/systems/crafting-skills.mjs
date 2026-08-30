@@ -1167,7 +1167,8 @@ class CraftingSkills {
       ? materialType.charAt(0).toUpperCase() + materialType.slice(1)
       : 'Material';
     const rarityLabel = selectedRarity.charAt(0).toUpperCase() + selectedRarity.slice(1);
-    const itemName = `${elPrefix}${matLabel} (${rarityLabel}) - ${gatherProgress}`;
+    const storedProgress = Math.min(gatherProgress, materialCap(selectedRarity));
+    const itemName = `${elPrefix}${matLabel} (${rarityLabel}) - ${storedProgress}`;
 
     // Tag inheritance for gathered materials: free-form (material type) + registry (affinity).
     const matFreeTags = [];
@@ -1193,7 +1194,7 @@ class CraftingSkills {
         // cannot roll past it, and the old roll-derived 1.2x headroom is gone
         // for materials — the cap IS the headroom, so a poorly-gathered piece
         // of a good substance can still be refined to what the substance is.
-        progress: Math.min(gatherProgress, materialCap(selectedRarity)),
+        progress: storedProgress,
         maxProgress: materialCap(selectedRarity),
         // Substance identity (2026-08-30): everything gathered today is
         // E-band; the gathering rework decides where higher grades come
@@ -1221,9 +1222,11 @@ class CraftingSkills {
     const rawProgress = Math.round(skillRoll * d100Pct);
     const gatherManaExpr = manaMult !== 1 ? ` × ${manaMult.toFixed(2)} (mana)` : '';
     const gatherTimeExpr = timeQ !== 1 ? ` × ${timeQ.toFixed(2)} (time)` : '';
+    const gatherCapExpr = storedProgress < gatherProgress
+      ? ` <span style="opacity:0.7;">(substance ceiling ${storedProgress})</span>` : '';
     const progressLine = gatherProgressBonus
-      ? `${skillRoll} × ${d100Pct.toFixed(2)} = ${rawProgress} + ${gatherProgressBonus} (augment)${gatherManaExpr}${gatherTimeExpr} = ${gatherProgress}`
-      : `${skillRoll} × ${d100Pct.toFixed(2)}${gatherManaExpr}${gatherTimeExpr} = ${gatherProgress}`;
+      ? `${skillRoll} × ${d100Pct.toFixed(2)} = ${rawProgress} + ${gatherProgressBonus} (augment)${gatherManaExpr}${gatherTimeExpr} = ${gatherProgress}${gatherCapExpr}`
+      : `${skillRoll} × ${d100Pct.toFixed(2)}${gatherManaExpr}${gatherTimeExpr} = ${gatherProgress}${gatherCapExpr}`;
 
     ChatMessage.create({
       speaker,
@@ -1861,7 +1864,8 @@ class CraftingSkills {
           ? { item: p.item, count: p.count - 1 } : p)).filter(p => p.count > 0);
         // Mean-of-what-went-in, with overpour NEUTRAL by construction: an
         // improviser has no bill to exceed, so required == supplied.
-        const units = chosen.map(p => ({ progress: p.item.system.progress ?? 0, count: p.count,
+        const units = chosen.map(p => ({ itemId: p.item.id,
+                                          progress: p.item.system.progress ?? 0, count: p.count,
                                           rarity: p.item.system.rarity || 'common',
                                           cap: materialCapFor(p.item.system) }));
         const supplied = units.reduce((s, u) => s + u.count, 0);
@@ -1953,6 +1957,16 @@ class CraftingSkills {
           'system.isRefined': true,
         });
         materialItem = actor.items.get(materialItem.id);
+        // The bill snapshotted this item's progress BEFORE the refine — patch
+        // its units or the gain is computed into an item the craft consumes
+        // (live 2026-08-31: Sacred Wood 400->500, material line still 400).
+        // The preview already promises this (effectiveMatProgress adds the
+        // refine gain); the real path must keep that promise.
+        if (recipeBill?.units) {
+          for (const u of recipeBill.units) {
+            if (u.itemId === materialItem.id) u.progress = newProgress;
+          }
+        }
         refineLine = `<p><strong>Refine (${refineSkill.name}):</strong> `
                    + `Skill ${Math.round(refRoll.total)} × d100 (${refineD100.total}) = ${rawGain}`
                    + `${rawGain > headroom ? ` <span style="opacity:0.7;">(capped at +${headroom})</span>` : ''}. `
