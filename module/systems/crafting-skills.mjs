@@ -12,6 +12,7 @@
 import { hybridAbilityMod, itemWeightLb, craftManaQuality, recipeMaterialProgress, recipeVerdict, materialCap, materialCapFor, derivedRecipeThreshold, craftTimeQuality, craftBaseSeconds, prepBaseSeconds, craftTimeScaleOf, clampQualityToSubstance } from '../helpers/formulas.mjs';
 import { eligibleRecipes, resolveIngredients, consumeIngredients, craftBar, findMatchingRecipe, recipeLibrary, alreadyKnows, isGenericRecipe, specializationOf } from './recipes.mjs';
 import { spatialCapacityFromCraft } from '../helpers/formulas.mjs';
+import { dialogWaitNull } from '../helpers/dialogs.mjs';
 
 /** Seconds -> "2h 30m" / "45m" — the one formatter every time-invest surface uses. */
 const fmtCraftTime = (sec) => sec >= 3600
@@ -1389,7 +1390,7 @@ class CraftingSkills {
       const slotsLabel = `combat ${combatFreeOpt}/${t.system.augmentSlots ?? 0}, prof ${profFreeOpt}/${t.system.profAugmentSlots ?? 0}`;
       return `<option value="${t.id}">${t.name} — ${t.system.slot} (${slotsLabel})</option>`;
     }).join('');
-    const targetChoice = await foundry.applications.api.DialogV2.wait({
+    const targetChoice = await dialogWaitNull({
       window: { title: `${item.name} — Select Target Item` },
       content: `<p>Select the equipment item to inscribe <strong>${augmentDoc.name}</strong> onto:</p>
                 <div class="form-group"><label>Target:</label><select name="target">${targetOptions}</select></div>`,

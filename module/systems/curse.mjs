@@ -27,6 +27,7 @@
  * routes through the `gmCurseOp` GM action below.
  */
 import { curseMeterCapacity, curseEatenEnergy, curseFillAmount, curseSpendPrice, resolveCurseFillScale } from '../helpers/formulas.mjs';
+import { dialogWaitNull } from '../helpers/dialogs.mjs';
 
 function _cfg() {
   return CONFIG.ASPECTSOFPOWER?.curse ?? {};
@@ -377,7 +378,7 @@ export async function handleTransfer(skill, targetToken, speaker, rollMode) {
   let chosen = effects[0];
   if (effects.length > 1) {
     const opts = effects.map(e => `<option value="${e.id}">${e.name} (${remainingRounds(e)} rounds left)</option>`).join('');
-    const picked = await foundry.applications.api.DialogV2.wait({
+    const picked = await dialogWaitNull({
       window: { title: 'Transfer Curse — choose the curse' },
       content: `<div class="form-group"><label>Curse to move:</label><select name="curse">${opts}</select></div>`,
       buttons: [
@@ -405,7 +406,7 @@ export async function handleTransfer(skill, targetToken, speaker, rollMode) {
       return;
     }
     const opts = candidates.map(t => `<option value="${t.id}">${t.document.name}</option>`).join('');
-    const picked = await foundry.applications.api.DialogV2.wait({
+    const picked = await dialogWaitNull({
       window: { title: 'Transfer Curse — choose the recipient' },
       content: `<div class="form-group"><label>Curse jumps to:</label><select name="rcpt">${opts}</select></div>`,
       buttons: [

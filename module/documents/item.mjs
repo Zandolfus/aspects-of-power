@@ -15,6 +15,7 @@ import { handleSpread, handleTransfer, handleConsume, handleHarness, onCurseCast
 import { equippedTome, tomeSeizeCapFor, tomeBinding, castAffinities } from '../systems/implements.mjs';
 import { compositionsFor } from '../systems/affinity.mjs';
 import { resolveDamage } from '../systems/damage.mjs';
+import { dialogWaitNull } from '../helpers/dialogs.mjs';
 
 /**
  * Check if an actor is an assigned player character (not just owned).
@@ -115,7 +116,7 @@ export class AspectsofPowerItem extends Item {
     // through the static helper so one stub can drive them all headlessly (a
     // manual `new Promise` + `new DialogV2` cannot be intercepted, and a test
     // walking that path HANGS on a click that never comes).
-    return foundry.applications.api.DialogV2.wait({
+    return dialogWaitNull({
       window: { title: 'Barrier — Mana Cost' },
       content: `<div class="form-group">
           <label>Mana to spend (max ${maxMana}):</label>
@@ -154,7 +155,7 @@ export class AspectsofPowerItem extends Item {
       rows.push(`<option value="${n}"${n === max ? ' selected' : ''}>`
         + `${n} — x${Math.round(m * 100) / 100} effect</option>`);
     }
-    return foundry.applications.api.DialogV2.wait({
+    return dialogWaitNull({
       window: { title: `${this.name} — Spend Stacks` },
       content: `<div class="form-group">
           <label>Stacks to spend (${min}-${max} held):</label>
@@ -202,7 +203,7 @@ export class AspectsofPowerItem extends Item {
     for (let tt = 1; tt <= Math.floor(budget / 2); tt++) {
       ladder.push(`${budget - tt} at ${tt}`);
     }
-    return foundry.applications.api.DialogV2.wait({
+    return dialogWaitNull({
       window: { title: `${this.name} — Throw Fields` },
       content: `<p><strong>${held}</strong> held${payload > 0 ? `, ${Math.round(payload)} damage each` : ''}.</p>
         ${rows}
@@ -648,7 +649,7 @@ export class AspectsofPowerItem extends Item {
     // system goes through it. (This one in particular is why "firing a
     // variable-invest skill headlessly hangs on the invest dialog" was a
     // standing workaround — nothing could intercept it.)
-    return foundry.applications.api.DialogV2.wait({
+    return dialogWaitNull({
       window: { title: `${label} — ${resourceLabel.charAt(0).toUpperCase() + resourceLabel.slice(1)} Investment` },
       content,
       buttons: [
@@ -774,7 +775,7 @@ export class AspectsofPowerItem extends Item {
 
     // Same uniformity rule as the single-resource invest above: static helper
     // + `render` hook, so one stub can drive every dialog in the system.
-    return foundry.applications.api.DialogV2.wait({
+    return dialogWaitNull({
       window: { title: `${label} — ${co.label} (${cap(pLabel)} + ${cap(cLabel)})` },
       content,
       buttons: [
@@ -892,7 +893,7 @@ export class AspectsofPowerItem extends Item {
         <p class="hint" style="font-size:11px;margin-top:8px;">Scales linearly with what you commit. Cancel to let the wound close.</p>
       </div>`;
 
-    return foundry.applications.api.DialogV2.wait({
+    return dialogWaitNull({
       window: { title: `${riderItem.name}` },
       content,
       buttons: [
@@ -4733,7 +4734,7 @@ export class AspectsofPowerItem extends Item {
       const slotOptions = Object.entries(slots)
         .map(([key, def]) => `<option value="${key}">${game.i18n.localize(def.label ?? `ASPECTSOFPOWER.Equip.Slot.${key}`)}</option>`)
         .join('');
-      dismemberedSlot = await foundry.applications.api.DialogV2.wait({
+      dismemberedSlot = await dialogWaitNull({
         window: { title: 'Dismember — Choose Slot' },
         content: `<div class="form-group"><label>Slot to disable:</label><select name="slot">${slotOptions}</select></div>`,
         buttons: [{
