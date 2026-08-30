@@ -31,6 +31,7 @@
  * `defenseTuning.dotTickModel: 'flat'` restores the legacy subtraction.
  */
 import { dotTickThrough } from '../helpers/formulas.mjs';
+import { isPlayerCharacter } from '../helpers/gm.mjs';
 
 /**
  * Group one applier's live DoTs on a target by damage type.
