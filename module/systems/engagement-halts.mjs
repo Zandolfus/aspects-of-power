@@ -68,6 +68,10 @@ export async function checkEngagementHalts(combat, newClock) {
       if (opponent.id === moverEntry.cm.id) continue;
       if (!opponent.token) continue;
       if (!_isOppositeDisposition(moverDisp, opponent.token.disposition)) continue;
+      // A corpse engages nothing and is nothing to halt for (triage
+      // 2026-08-30) — no melee first-touch against the fallen, no
+      // first-sight halt from spotting a body.
+      if ((opponent.actor?.system?.health?.value ?? 1) <= 0) continue;
 
       const evalResult = _evaluatePair(moverEntry, opponent, newClock);
       if (!evalResult) continue;

@@ -1329,6 +1329,11 @@ export function enemyBlocksSegment(tokenDoc, fromPos, toPos) {
   for (const t of scene.tokens) {
     if (t.id === tokenDoc.id || t.hidden) continue;
     if (t.disposition === tokenDoc.disposition) continue;
+    // A corpse blocks nothing (triage 2026-08-30) — same rule the threat
+    // pricing already applies ("a corpse guards nothing"). You step over
+    // the fallen; you still cannot END the move inside them (the
+    // no-stacking clamp checks bodies regardless of pulse).
+    if ((t.actor?.system?.health?.value ?? 1) <= 0) continue;
     enemies.push({ x: t.x, y: t.y, w: (t.width ?? 1) * gs, h: (t.height ?? 1) * gs });
   }
   if (!enemies.length) return false;

@@ -1,4 +1,5 @@
 import { declareMovement, resolveMovementMode, getActiveMovementMode, clampMoveNoOverlap, enemyBlocksSegment, getClockTick } from '../systems/celerity.mjs';
+import { actorIsDashing } from '../systems/engagement-halts.mjs';
 import { isExecutingMove, haltDeclaredMove, repriceRemainder } from '../systems/movement.mjs';
 
 /**
@@ -58,7 +59,13 @@ export class AspectsofPowerToken extends foundry.documents.TokenDocument {
           c => c.tokenId === this.id && c.sceneId === this.parent?.id
         );
         const seg = movement.passed?.waypoints?.at?.(-1) ?? movement.destination;
-        if (cm && seg && enemyBlocksSegment(this, { x: this.x, y: this.y }, { x: seg.x ?? this.x, y: seg.y ?? this.y })) {
+        // Dashing movers pass through bodies (triage 2026-08-30: dashes
+        // were halting on enemy contact despite the engagement-halt skip —
+        // this checkpoint collision was the other gate). The `dash` effect
+        // tag is the authorable move-through-enemies switch: while any
+        // non-disabled effect carries it, only the END overlap is clamped.
+        const _dashing = this.actor && actorIsDashing(this.actor);
+        if (!_dashing && cm && seg && enemyBlocksSegment(this, { x: this.x, y: this.y }, { x: seg.x ?? this.x, y: seg.y ?? this.y })) {
           haltDeclaredMove(this, cm, getClockTick(combatNow))
             .catch(err => console.error('[movement] halt failed:', err));
           return false; // cancel this segment; the halt settles the rest
