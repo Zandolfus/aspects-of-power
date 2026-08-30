@@ -102,6 +102,31 @@ export async function executeGmAction(payload) {
         return;
       }
 
+      case 'gmUpdateRegionFlags': {
+        // The general post-placement stamp seam (2026-08-31, closing the
+        // whole client-region-write class at once: the persistent-zone
+        // rollTotal stamp threw on EVERY player zone cast and aborted the
+        // branch before target detection — tonight's actual table bug —
+        // and detonate's consumedMarkerId stash was the same crash waiting
+        // on the first player detonate). _gmCreateRegion hands the caster's
+        // client a live RegionDocument, so every later `.update()` on it
+        // type-checks, passes the GM-side harness, and throws only for
+        // players — which is why these surfaced one at a time at the table.
+        // SCOPED to the system's own flag namespace: a general region write
+        // reachable by any client must not rewrite geometry or behaviors.
+        const scene = game.scenes.get(payload.sceneId);
+        const doc = scene?.regions.get(payload.regionId);
+        if (!doc) return;
+        const changes = {};
+        for (const [k, v] of Object.entries(payload.changes ?? {})) {
+          if (k.startsWith('flags.aspects-of-power.')) changes[k] = v;
+        }
+        if (!Object.keys(changes).length) return;
+        try { await doc.update(changes); }
+        catch (e) { console.warn('[gmUpdateRegionFlags] failed:', e); }
+        return;
+      }
+
       case 'gmTomeState': {
         // Tome binding write (seize reaction, ruled 2026-08-24). The seize
         // resolves on the ATTACKER's client, which does not own the

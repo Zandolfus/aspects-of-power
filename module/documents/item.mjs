@@ -3851,6 +3851,25 @@ export class AspectsofPowerItem extends Item {
    *
    * GM users skip the round-trip and create directly.
    */
+  /**
+   * Stamp system flags onto a region the current user may not own. The
+   * companion the create/delete seams always needed: _gmCreateRegion hands
+   * back a live RegionDocument, and every direct `.update()` on it since
+   * has been a player-only crash found one at a time at the table. Flags
+   * namespace only — the GM-side op enforces the same scope.
+   * Fire-and-forget for players (the stamp lands a beat later; every
+   * reader tolerates that, same as the zone-tick routing).
+   */
+  async _gmRegionUpdate(regionDoc, changes) {
+    if (game.user.isGM) return regionDoc.update(changes);
+    game.socket.emit('system.aspects-of-power', {
+      type: 'gmUpdateRegionFlags',
+      sceneId: regionDoc.parent.id,
+      regionId: regionDoc.id,
+      changes,
+    });
+  }
+
   async _gmCreateRegion(scene, regionData) {
     if (game.user.isGM) {
       const [region] = await scene.createEmbeddedDocuments('Region', [regionData]);
@@ -7257,7 +7276,7 @@ export class AspectsofPowerItem extends Item {
           // Stash the mine ID + the summon UUID in the AOE region's
           // flags so fire-time resolution can delete the mine AND use
           // the summon's damage formula instead of Detonate's own.
-          await placedRegion.update({
+          await this._gmRegionUpdate(placedRegion, {
             'flags.aspects-of-power.consumedMarkerId': mine.id,
             'flags.aspects-of-power.summonItemUuid': mine.flags?.['aspects-of-power']?.summonItemUuid ?? null,
           });
@@ -7840,7 +7859,9 @@ export class AspectsofPowerItem extends Item {
       // Store roll totals on persistent AOE templates for later trigger.
       const persistFlags = templateDoc.flags?.['aspects-of-power'];
       if (persistFlags?.persistent && persistFlags.persistentData) {
-        await templateDoc.update({
+        // Routed (2026-08-31): this threw for every PLAYER-cast zone and the
+        // uncaught rejection killed the branch before target detection.
+        await this._gmRegionUpdate(templateDoc, {
           'flags.aspects-of-power.persistentData.rollTotal': Math.round(dmgRoll.total),
           'flags.aspects-of-power.persistentData.hitTotal': hitRoll ? Math.round(hitRoll.total) : null,
         });
