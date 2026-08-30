@@ -20,6 +20,7 @@
  */
 
 import { _passesAuraTargetingFilter } from '../documents/actor.mjs';
+import { isActingGM } from '../helpers/gm.mjs';
 
 /**
  * Collect all aura sources on the scene — actors with at least one
