@@ -8016,7 +8016,23 @@ export class AspectsofPowerItem extends Item {
           const tokenId = t.token?.id ?? t.id;
           if (tokenId) affectedMap[tokenId] = currentTick;
         }
-        await templateDoc.update({ 'flags.aspects-of-power.persistentData.affectedTokens': affectedMap });
+        // ROUTED (2026-08-31, the SEVENTH client-write hole, caught live in
+        // session: "User Willy lacks permission to update Region"): this runs
+        // on the CASTING client, and a player casting their own persistent
+        // zone cannot write the region. Same gmUpdateAoeAffected op the
+        // zone-tick path uses — single-writer merge, one entry per emit.
+        if (game.user.isGM) {
+          await templateDoc.update({ 'flags.aspects-of-power.persistentData.affectedTokens': affectedMap });
+        } else {
+          for (const [tokenId, tick] of Object.entries(affectedMap)) {
+            game.socket.emit('system.aspects-of-power', {
+              type: 'gmUpdateAoeAffected',
+              sceneId: templateDoc.parent.id,
+              regionId: templateDoc.id,
+              tokenId, tick,
+            });
+          }
+        }
       }
 
       // Deduct resource cost AFTER effects are applied.
