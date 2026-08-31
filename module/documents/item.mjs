@@ -6370,6 +6370,28 @@ export class AspectsofPowerItem extends Item {
         // creature). Don't swing at the dead.
         const hp = tok.actor?.system?.health?.value;
         if (typeof hp === 'number' && hp <= 0) continue;
+        // Escaped-target guard (2026-08-31, live: a Mind-Veiled Stalker
+        // fired Mind Tendril across 182 ft at Gabriel - its casting range
+        // is ~75). The declare-side gate saw the target in range; the
+        // target then WALKED during the celerity wait, and nothing
+        // re-checked at fire. Same shape and same ruling-precedent as the
+        // dead-target guard above (fizzle, not retarget): skip a stored
+        // target now beyond the skill's range; if nobody remains the
+        // fizzle below reports it, costs uncommitted. Ranged family only
+        // (skillTargetsAtFire) - melee whiffs are the tracker's business.
+        // Edge distance, matching the AI declare gate's convention.
+        if (skillTargetsAtFire(this)) {
+          const _rangeFt = this.system.tagConfig?.channelRange
+            || this.actor?.system?.castingRange || 0;
+          const _selfTok = this.actor?.getActiveTokens?.()?.[0];
+          if (_rangeFt > 0 && _selfTok) {
+            const _pxPerFt = canvas.grid.size / canvas.grid.distance;
+            const _centerDist = Math.hypot(tok.center.x - _selfTok.center.x, tok.center.y - _selfTok.center.y);
+            const _edgePx = _centerDist
+              - ((tok.document.width ?? 1) + (_selfTok.document.width ?? 1)) * canvas.grid.size / 2;
+            if (Math.max(0, _edgePx) / _pxPerFt > _rangeFt) continue;
+          }
+        }
         tok.setTarget(true, { releaseOthers: false, groupSelection: false });
         liveTargets++;
       }
@@ -6388,7 +6410,7 @@ export class AspectsofPowerItem extends Item {
         || this.system.aoe?.enabled === true
         || (this.system.alterations ?? []).some(a => (a.id ?? a) === 'cleave' || (a.id ?? a) === 'aoe');
       if (liveTargets === 0 && !_isAreaSkill) {
-        ui.notifications.info(`${this.name} fizzles — its target is already down.`);
+        ui.notifications.info(`${this.name} fizzles — its target is down or beyond its reach.`);
         return;
       }
     }
