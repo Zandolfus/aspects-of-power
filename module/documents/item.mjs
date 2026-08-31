@@ -3488,6 +3488,32 @@ export class AspectsofPowerItem extends Item {
         note = defend
           ? `defends (turns aside ≈${Math.round(expReduction * 100)}%, full-avoid p≈${Math.round(p * 100)}%)`
           : `takes the hit (would only turn aside ≈${Math.round(expReduction * 100)}%)`;
+        // ── DESIGNATED DEFENSIVE ("when big hits come in, use defensives",
+        // ruled 2026-08-30). The authored aiDefenseSkillId is reached for
+        // when even a dodge would let a big share of the hit through:
+        // defenceMarginMultiplier(aiDv, hitTotal) IS that share, so the
+        // gauge scales with the stat gap, never a flat number. Only
+        // guard-work/dodge reaction types - they resolve INLINE in the
+        // defense path (no roll, no invest dialog); counterstrike types
+        // stay human-driven. reactionSkills is already legality-filtered
+        // (trigger, cooldown, affordability, attack-type, raised stance -
+        // an unraised guard simply is not in the list, so the parry z
+        // quietly waits for stance-on-idle to have done its work).
+        if (aiFlags.aiDefenseSkillId && (reactions?.value ?? 0) > 0) {
+          const _z = reactionSkills.find(s => s.id === aiFlags.aiDefenseSkillId);
+          const _zType = _z?.system?.reactionType ?? 'dodge';
+          const _through = defenceMarginMultiplier(aiDv, hitTotal);
+          if (_z && ['parry', 'block', 'dodge'].includes(_zType)
+              && _through >= (dt.aiReactionBigHitThrough ?? 0.5)) {
+            ChatMessage.create({
+              whisper: ChatMessage.getWhisperRecipients('GM'),
+              speaker: ChatMessage.getSpeaker({ actor: targetActor }),
+              content: `<p><em>[AI] ${targetActor.name} answers the big hit with `
+                + `<strong>${_z.name}</strong> (≈${Math.round(_through * 100)}% would land past a dodge).</em></p>`,
+            });
+            return { defend: false, reactionSkillId: _z.id, perceiveGated: !gate.canReact, perceiveRatio: gate.ratio };
+          }
+        }
       } else if (!isPhysicalLane && pool > 0) {
         defend = true;
         note = 'spends pool';
@@ -6841,9 +6867,10 @@ export class AspectsofPowerItem extends Item {
           // AI invest sizing (2026-08-30): pace the pool, let the hard cap
           // limit — was Math.min(baseMana, maxInvest), the permanent-floor
           // cast. maxInvest is already min(livePool, wisCap, pushCap).
-          ? aiInvestSize(livePool, baseMana,
-              maxInvest, this.actor?.flags?.aspectsofpower?.aiInvestPacing
-                ?? (CONFIG.ASPECTSOFPOWER.ai?.investPacingActions ?? 5))
+          ? aiInvestSize(livePool, baseMana, maxInvest,
+              (Number(this.actor?.flags?.aspectsofpower?.aiInvestPacing) > 0)
+                ? Number(this.actor.flags.aspectsofpower.aiInvestPacing)
+                : (CONFIG.ASPECTSOFPOWER.ai?.investPacingActions ?? 5))
           : await this._promptResourceInvest({
               baseCost: baseMana,
               safeInvest: 0,                              // hard cap = no soft zone
@@ -7185,8 +7212,9 @@ export class AspectsofPowerItem extends Item {
           // the permanent minimum swing.
           invested = aiInvestSize(livePool, baseStamina,
             Math.min(baseStamina + safeInvest, livePool),
-            this.actor?.flags?.aspectsofpower?.aiInvestPacing
-              ?? (CONFIG.ASPECTSOFPOWER.ai?.investPacingActions ?? 5));
+            (Number(this.actor?.flags?.aspectsofpower?.aiInvestPacing) > 0)
+              ? Number(this.actor.flags.aspectsofpower.aiInvestPacing)
+              : (CONFIG.ASPECTSOFPOWER.ai?.investPacingActions ?? 5));
         } else if (useCoInvest) {
           // Only a MANA co-invest is channelled, so only that one gets the
           // wisdom rate and the channel-time readout. Pre-compute the strike's

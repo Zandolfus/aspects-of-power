@@ -253,6 +253,36 @@
             <label class="checkbox" title="Weigh targets rather than attacking the nearest."><input type="checkbox" name="flags.aspectsofpower.aiSmartTarget" {{checked actor.flags.aspectsofpower.aiSmartTarget}} /> Smart</label>
             <label class="checkbox" title="Prefer the lowest-HP-fraction target."><input type="checkbox" name="flags.aspectsofpower.aiFocusWeakest" {{checked actor.flags.aspectsofpower.aiFocusWeakest}} /> Finish</label>
           </div>
+          {{!-- AI LOADOUT (2026-08-30): authored rotation roles. Primary =
+                THE attack; Maintain = a debuff kept up on the current target
+                (re-applied when it drops); Defensive = the reaction reached
+                for on big hits; Pace = actions the pool is spread over
+                (blank = default 5, lower = spends harder). --}}
+          <div class="identity-row ai-row" title="AI loadout — authored skill roles. Primary attack; a debuff to keep up while attacking; the defensive used when big hits come in.">
+            <label>Loadout</label>
+            <select name="flags.aspectsofpower.aiPrimarySkillId" title="Primary attack skill (x): always preferred while affordable.">
+              <option value="">— primary —</option>
+              {{#each aiActiveSkills}}
+              <option value="{{id}}" {{#if (eq id ../actor.flags.aspectsofpower.aiPrimarySkillId)}}selected{{/if}}>{{name}}</option>
+              {{/each}}
+            </select>
+            <select name="flags.aspectsofpower.aiMaintainSkillId" title="Maintained debuff (y): kept up on the current target while attacking with the primary.">
+              <option value="">— maintain —</option>
+              {{#each aiActiveSkills}}
+              <option value="{{id}}" {{#if (eq id ../actor.flags.aspectsofpower.aiMaintainSkillId)}}selected{{/if}}>{{name}}</option>
+              {{/each}}
+            </select>
+          </div>
+          <div class="identity-row ai-row" title="Defensive reaction (z) for big hits, and how many actions the resource pool is paced over.">
+            <label>Defence</label>
+            <select name="flags.aspectsofpower.aiDefenseSkillId" title="Designated defensive: used when a big share of the hit would land even past a dodge. Parry/block types need the guard stance raised (the AI raises it while waiting).">
+              <option value="">— defensive —</option>
+              {{#each aiReactionSkills}}
+              <option value="{{id}}" {{#if (eq id ../actor.flags.aspectsofpower.aiDefenseSkillId)}}selected{{/if}}>{{name}}</option>
+              {{/each}}
+            </select>
+            <input type="number" name="flags.aspectsofpower.aiInvestPacing" value="{{actor.flags.aspectsofpower.aiInvestPacing}}" min="1" step="1" placeholder="pace 5" title="Invest pacing: pool is spent over ~N actions (blank = 5). Lower = harder hits, faster burnout." style="max-width: 64px;" />
+          </div>
           {{/if}}
           <div class="identity-row identity-actions">
             <button type="button" class="level-up-btn">

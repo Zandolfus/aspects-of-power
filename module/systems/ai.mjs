@@ -465,12 +465,59 @@ function _sightClear(fromPoint, toPoint) {
 }
 
 
+/* ---------------------------------------------------------------------------- */
+/*  Loadout — authored rotations (2026-08-30, "x is their primary attack        */
+/*  skill, y is their primary debuff skill, keep up y while doing X")           */
+/* ---------------------------------------------------------------------------- */
+
 /**
- * Pick the attack skill for an AI profile. `aiSkillUuid` flag overrides;
+ * Per-actor authored skill roles, set on the sheet's AI block:
+ *   aiPrimarySkillId  - THE attack; pickers prefer it over cost-sorting.
+ *   aiMaintainSkillId - a debuff to KEEP UP: every profile checks the
+ *                       current target and re-applies when the target does
+ *                       not carry a live copy of it from this actor.
+ *   aiDefenseSkillId  - the designated defensive reaction; the defense
+ *                       policy (item.mjs) reaches for it on BIG hits.
+ * Item ids on the actor, resolved fresh each decision (affordability and
+ * existence re-checked - a drained pool falls back to the auto-pick).
+ */
+function _affordableSkill(actor, s) {
+  const resKey = s.system.roll?.resource;
+  const cost = s.system.roll?.cost ?? 0;
+  return !(resKey && cost > 0 && (actor.system[resKey]?.value ?? 0) < cost);
+}
+
+function _loadoutSkill(actor, flagKey, { requireTag = null } = {}) {
+  const id = actor?.flags?.aspectsofpower?.[flagKey];
+  if (!id) return null;
+  const s = actor.items.get(id);
+  if (!s || s.type !== 'skill' || s.system.skillType !== 'Active') return null;
+  const tags = s.system.tags ?? [];
+  // aoe stays excluded for the same reason as the pickers: no region step.
+  if (tags.includes('aoe')) return null;
+  if (requireTag && !tags.includes(requireTag)) return null;
+  return _affordableSkill(actor, s) ? s : null;
+}
+
+/** The maintain move: a live, affordable maintain skill the current target
+ *  lacks. Returns the skill to cast, or null when maintenance is satisfied
+ *  (or unconfigured). Shared by brawler, skirmisher and hexer. */
+function _maintainDue(actor, targetTokenDoc) {
+  const m = _loadoutSkill(actor, 'aiMaintainSkillId', { requireTag: 'debuff' });
+  if (!m || !targetTokenDoc?.actor) return null;
+  return _targetHasMyDebuff(targetTokenDoc.actor, m, actor.uuid) ? null : m;
+}
+
+/**
+ * Pick the attack skill for an AI profile. Loadout `aiPrimarySkillId` wins
+ * (an authored primary is trusted past the rollTypes filter - the author
+ * knows the kit); legacy `aiSkillUuid` flag next;
  * else the most expensive affordable Active attack skill whose roll.type
  * is in `rollTypes` (cost as a rough power proxy).
  */
 async function _pickAttackSkill(actor, rollTypes) {
+  const primary = _loadoutSkill(actor, 'aiPrimarySkillId');
+  if (primary) return primary;
   const overrideUuid = actor.flags?.aspectsofpower?.aiSkillUuid;
   if (overrideUuid) {
     const s = await fromUuid(overrideUuid);
@@ -853,6 +900,14 @@ const brawlerProfile = {
     }
 
     if (attackNow) {
+      // KEEP UP Y WHILE DOING X (loadout): if the authored maintain debuff
+      // is missing from this target, refresh it before swinging - the
+      // rotation the author wrote, not an opportunistic cost-sort.
+      const maintain = _maintainDue(actor, target.tokenDoc);
+      if (maintain) {
+        await declareAction(actor, maintain, { targetIds: [target.tokenDoc.id], aiAutoInvest: true });
+        return;
+      }
       // Declare-and-wait (paced by the tracker); aiAutoInvest threaded through
       // declaredAction so the deferred fire auto-invests (no dialog).
       _futilityMarkAttack(actor, target.tokenDoc);
@@ -934,6 +989,12 @@ const skirmisherProfile = {
       _edgeDistFt(selfTokenDoc, h.tokenDoc) <= rangeFt && _sightClear(selfCenterShot, h.tCenter)
     );
     if (shootable) {
+      // KEEP UP Y WHILE DOING X (loadout, see brawler note).
+      const maintain = _maintainDue(actor, shootable.tokenDoc);
+      if (maintain) {
+        await declareAction(actor, maintain, { targetIds: [shootable.tokenDoc.id], aiAutoInvest: true });
+        return;
+      }
       // Declare-and-wait with aiAutoInvest threaded (see brawler note).
       _futilityMarkAttack(actor, shootable.tokenDoc);
       await declareAction(actor, skill, { targetIds: [shootable.tokenDoc.id], aiAutoInvest: true });
@@ -957,6 +1018,8 @@ AIProfiles.register('skirmisher', skirmisherProfile);
 /** Pick a debuff skill: aiSkillUuid override (if it's debuff-tagged), else the
  *  most expensive affordable Active debuff-tagged skill. */
 async function _pickDebuffSkill(actor) {
+  const maintain = _loadoutSkill(actor, 'aiMaintainSkillId', { requireTag: 'debuff' });
+  if (maintain) return maintain;
   const overrideUuid = actor.flags?.aspectsofpower?.aiSkillUuid;
   if (overrideUuid) {
     const s = await fromUuid(overrideUuid);

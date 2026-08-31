@@ -223,6 +223,15 @@ export class AspectsofPowerActorSheet extends foundry.applications.api.Handlebar
     }
     context.freePoints = context.system.freePoints ?? 0;
     context.isGM = game.user.isGM;
+    // AI loadout dropdowns (2026-08-30): the actor's own skills, offered as
+    // the authored primary / maintain / defensive roles on the AI rows.
+    if (game.user.isGM) {
+      const _sk = this.actor.items.filter(i => i.type === 'skill');
+      context.aiActiveSkills = _sk.filter(s => s.system.skillType === 'Active')
+        .map(s => ({ id: s.id, name: s.name }));
+      context.aiReactionSkills = _sk.filter(s => s.system.skillType === 'Reaction')
+        .map(s => ({ id: s.id, name: s.name }));
+    }
 
     // Stats view preview — defaults to the actor's active loadout the first time the sheet renders.
     if (this._statsViewMode !== 'combat' && this._statsViewMode !== 'profession') {

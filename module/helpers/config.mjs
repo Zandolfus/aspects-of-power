@@ -863,6 +863,13 @@ ASPECTSOFPOWER.defenseTuning = {
   // still reduces damage. The brake on always-defending is the scramble stack
   // and the tempo cost, not the odds.
   aiDefendMinReduction: 0.20,
+  // Designated-defensive gauge (2026-08-30 loadout ruling "when big hits
+  // come in, use defensives"): the AI reaches for aiDefenseSkillId when
+  // defenceMarginMultiplier(dodgeValue, hitTotal) - the share of the hit
+  // that lands even past a dodge - meets this. Stat-gap-scaled: a giant's
+  // swing against a slow defender reads ~1.0, a peer's ~0.5, an outclassed
+  // attacker's ~0.1. 0.5 = "my dodge only stops half of this - guard up."
+  aiReactionBigHitThrough: 0.5,
   // Dodge basis divisor: the dodge ROLL uses defense.value ÷ this. The ×1.1
   // in the defense value is pool-era inflation — rolled at full value,
   // parity dodge sits at 91% and mirror fights never resolve (sim
