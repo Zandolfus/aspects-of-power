@@ -33,6 +33,30 @@ const ParentTracker = foundry.applications.sidebar.tabs.CombatTracker;
 async function _onCelAdvance(event, target) {
   const combat = this.viewed;
   if (!combat?.started) return;
+  // ── RE-ENTRANCY MUTEX (2026-08-31, the tripling-chat night) ──
+  // This advance is a LONG async, and while one execution is in flight the
+  // realtime declare-hook happily arms a fresh timeout for every new
+  // declare — with a full AI roster declaring constantly, a second (and
+  // third) advance started mid-first and processed the SAME window:
+  // doubled reference-round cards, tripled fires of the same declared
+  // action (identical dice-less damage totals, distinct message ids,
+  // ~20 ms apart — live forensics). The timeout id only guards PENDING
+  // timers, never running executions; this guards the execution. The
+  // skipped duplicate reports 'continue' so the caller reschedules — the
+  // real advance's own completion drives the next one. Module-level, not
+  // per-instance, so a sidebar and a popout can never overlap either.
+  if (_aopAdvanceInFlight) return 'continue';
+  _aopAdvanceInFlight = true;
+  try {
+    return await _onCelAdvanceBody.call(this, combat);
+  } finally {
+    _aopAdvanceInFlight = false;
+  }
+}
+
+let _aopAdvanceInFlight = false;
+
+async function _onCelAdvanceBody(combat) {
   // The COMMITTED clock, not the continuous read: while the realtime loop
   // runs, the continuous clock has already reached the firing entry's tick
   // by the time this executes, and filtering on it would exclude the very
