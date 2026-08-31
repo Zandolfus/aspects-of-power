@@ -1028,6 +1028,11 @@ ASPECTSOFPOWER.ai = {
   // Support profile: heal self/allies whose HP fraction is below this;
   // above it, nobody "needs tending" and the medic skirmishes instead.
   supportHealHpPct: 0.6,
+  // RULED 2026-08-31: "sprinting should be the default up to a certain %
+  // resource" - AI movement is at SPRINT while stamina fraction exceeds
+  // this floor, dropping to a walk below it. Flee and kite stay sprint
+  // ALWAYS (the earlier ruling: a walking kite loses to any pursuer).
+  sprintStaminaFloor: 0.5,
   retreatHpPct: 0.25,  // self-preservation faculty: flee when HP fraction < this
   // Hostile NPCs at 0 HP auto-mark defeated (skull overlay, tracker strike)
   // without GM action (updateActor death hook). Player-owned actors exempt.

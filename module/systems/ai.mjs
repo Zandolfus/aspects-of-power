@@ -776,6 +776,16 @@ async function _declareStepToward(actor, selfTokenDoc, destPoint, wantFt, mode) 
   return false;
 }
 
+/** Travel mode (RULED 2026-08-31: sprint is the DEFAULT while stamina
+ *  holds): sprint above ai.sprintStaminaFloor of max stamina, walk below.
+ *  Flee/kite call sprint directly - always worth the wind. */
+function _travelMode(actor) {
+  const floor = CONFIG.ASPECTSOFPOWER.ai?.sprintStaminaFloor ?? 0.5;
+  const st = actor.system?.stamina;
+  const frac = (st?.max ?? 0) > 0 ? (st.value ?? 0) / st.max : 0;
+  return frac > floor ? 'sprint' : 'walk';
+}
+
 /** Idle: declare NOTHING and wait for the aopRoundStart re-trigger.
  *  The old body declared a real action with `skipNoTarget: true` — a dead
  *  option nothing reads (2026-08-30 review) — so every "idle" later FIRED as
@@ -935,7 +945,7 @@ const brawlerProfile = {
 
     // Close the gap: stop a hair inside reach; sprint when far, walk when close.
     const wantFt = Math.max(5, targetGap - Math.max(0, reach - 2));
-    const mode = targetGap > 2 * (ai.maxStepFt ?? 30) ? 'sprint' : 'walk';
+    const mode = _travelMode(actor); // RULED 2026-08-31: sprint by default
     const moved = await _declareStepToward(actor, selfTokenDoc, target.tCenter, wantFt, mode);
     if (!moved) return _idle(actor, skill, 'path blocked or out of stamina');
   },
@@ -1018,7 +1028,7 @@ const skirmisherProfile = {
     // HOLD POSITION: don't advance for a shot — idle and wait.
     if (hold) return _idle(actor, skill, 'holding position');
     // Nobody shootable — advance toward the nearest hostile to gain range/LOS.
-    const moved = await _declareStepToward(actor, selfTokenDoc, nearest.tCenter, 30, 'walk');
+    const moved = await _declareStepToward(actor, selfTokenDoc, nearest.tCenter, 30, _travelMode(actor));
     if (!moved) return _idle(actor, skill, 'no shot and path blocked');
   },
 };
@@ -1128,7 +1138,7 @@ const hexerProfile = {
     }
     // 3. Nobody reachable — advance (unless holding).
     if (hold) return _idle(actor, hexSkill ?? atkSkill, 'holding position');
-    const moved = await _declareStepToward(actor, selfTokenDoc, nearest.tCenter, 30, 'walk');
+    const moved = await _declareStepToward(actor, selfTokenDoc, nearest.tCenter, 30, _travelMode(actor));
     if (!moved) return _idle(actor, hexSkill ?? atkSkill, 'no target in range and path blocked');
   },
 };
@@ -1235,7 +1245,7 @@ const supportProfile = {
           const target = wounded[0];
           const gapFt = target.distPx / pxPerFt;
           const wantFt = Math.max(5, gapFt - rangeFt + 5);
-          const moved = await _declareStepToward(actor, selfTokenDoc, target.tCenter, wantFt, 'walk');
+          const moved = await _declareStepToward(actor, selfTokenDoc, target.tCenter, wantFt, _travelMode(actor));
           if (moved) return;
         }
       }
