@@ -4681,7 +4681,42 @@ export class AspectsofPowerItem extends Item {
     const baseTotal = attackScaling > 0
       ? Math.round(dmgRoll.total * attackScaling)
       : Math.round(dmgRoll.total);
-    const rollTotal = Math.round(baseTotal * defenseMultiplier);
+    let rollTotal = Math.round(baseTotal * defenseMultiplier);
+
+    // ── THE PASSIVE GAUNTLET (RULED 2026-08-31: "Mind Tendril is a
+    // mind-affecting skill so it routes through veil. No hit, just pure
+    // mind defense and veil"). A debuff-ONLY skill never runs a hit
+    // contest — before this, its full roll landed undefendable (the
+    // "mind tendril bypassing mind defense" table bug). Now a debuff-only
+    // cast on a veil lane (targetDefense mind/soul) is attenuated by the
+    // target's PASSIVE wall exactly as the damage pipeline would price
+    // it: resolveDamage with veil as the mitigation wall and the FLAT
+    // defense value's margin — no d20 on either side, so the stat gap is
+    // absolute per the house rule. Attack+debuff skills skip this: their
+    // hit contest already priced defense into defenseMultiplier.
+    // Non-veil debuff-only lanes are untouched (no ruling yet).
+    const _isAttackDebuff = (this.system.tags ?? []).includes('attack');
+    const _gauntletKey = this.system.roll?.targetDefense || '';
+    if (!_isAttackDebuff && (_gauntletKey === 'mind' || _gauntletKey === 'soul') && rollTotal > 0) {
+      const _veil = targetActor.system.defense.veil?.value ?? 0;
+      const _defVal = targetActor.system.defense[_gauntletKey]?.value ?? 0;
+      const _margin = defenceMarginMultiplier(_defVal, rollTotal);
+      const _res = resolveDamage({ incoming: rollTotal, mitigation: _veil, margin: _margin });
+      const _through = Math.max(0, Math.round(_res.hpLoss));
+      if (_through < rollTotal) {
+        const _pct = Math.round((1 - _through / rollTotal) * 100);
+        ChatMessage.create({
+          speaker, rollMode, ...(whisperGM ? { whisper: whisperGM } : {}),
+          content: _through <= 0
+            ? `<p><em>${targetActor.name}'s ${_gauntletKey === 'mind' ? 'will' : 'spirit'} and veil turn `
+              + `<strong>${this.name}</strong> aside completely.</em></p>`
+            : `<p><em>${targetActor.name}'s ${_gauntletKey === 'mind' ? 'will' : 'spirit'} and veil blunt `
+              + `<strong>${this.name}</strong>: ${rollTotal} → ${_through} (${_pct}% resisted).</em></p>`,
+        });
+      }
+      if (_through <= 0) return;
+      rollTotal = _through;
+    }
 
     // Build stat-reduction changes (roll-based).
     const changes = entries.map(e => ({

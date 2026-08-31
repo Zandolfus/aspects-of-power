@@ -1254,6 +1254,25 @@ eq('ai invest: drained pool falls to base', F2.aiInvestSize(20, 5, 9, 5), 5);
 eq('ai invest: mid pool paces between (100/5=20 under cap 27)', F2.aiInvestSize(100, 18, 27, 5), 20);
 eq('ai invest: empty pool still bids base', F2.aiInvestSize(0, 5, 9, 5), 5);
 eq('ai invest: ceiling below base clamps up to base', F2.aiInvestSize(500, 10, 4, 5), 10);
+
+// The passive gauntlet (RULED 2026-08-31): a debuff-only mind/soul skill is
+// attenuated by veil (wall) + the FLAT defense margin - no dice either side.
+// Pinned on live PCs vs a 460 Mind Tendril roll (values read from the game).
+// Runs under the LIVE ratio wall, not the flat block pinned far above.
+{
+  const _prevDT = globalThis.CONFIG.ASPECTSOFPOWER.defenseTuning;
+  globalThis.CONFIG.ASPECTSOFPOWER.defenseTuning = { armourModel: 'ratio', armourRatioCoef: 3.96 };
+  const _pg = (roll, veil, defVal) => {
+    const margin = defenceMarginMultiplier(defVal, roll);
+    return Math.max(0, Math.round(resolveDamage({ incoming: roll, mitigation: veil, margin }).hpLoss));
+  };
+  eq('gauntlet: George (veil 309, mind 231) blunts 460 to', _pg(460, 309, 231), 63);
+  eq('gauntlet: Gabriel (veil 378, mind 312) blunts 460 to', _pg(460, 378, 312), 35);
+  eq('gauntlet: Felicia (veil 154, mind 268) blunts 460 to', _pg(460, 154, 268), 83);
+  eq('gauntlet: Willy (mind 742 > roll) negates outright', _pg(460, 115, 742), 0);
+  eq('gauntlet: bare mind (no veil, no defense) takes it all', _pg(460, 0, 0), 460);
+  globalThis.CONFIG.ASPECTSOFPOWER.defenseTuning = _prevDT;
+}
 // ⚠ THE AUTHORED RADIUS IS A FLOOR — this is what a pure `per x factor` form
 // gets wrong, handing low-perception characters a useless one-foot aura.
 eq('aura: zero perception still gets the authored radius', auraRadiusFor(20, 0), 20);
