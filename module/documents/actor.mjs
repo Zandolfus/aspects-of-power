@@ -1348,6 +1348,7 @@ export class AspectsofPowerActor extends Actor {
         ChatMessage.create({
           speaker, ...gmWhisper,
           content: `<p><em>${this.name} regenerates ${gained} stamina (${regenPct}% per round).</em></p>`,
+          flags: { aspectsofpower: { logOnly: true } }, // chat diet 2026-08-31
         });
       }
     }

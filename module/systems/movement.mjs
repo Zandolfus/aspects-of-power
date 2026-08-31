@@ -365,6 +365,7 @@ export function repriceRemainder(tokenDoc, combatant) {
     ChatMessage.create({
       speaker: ChatMessage.getSpeaker({ actor: combatant.actor }),
       content: `<p><em>${combatant.name}'s path ${delta > 0 ? 'grows harder' : 'clears'} — arrival now tick ${newSched}.</em></p>`,
+      flags: { aspectsofpower: { logOnly: true } }, // chat diet 2026-08-31
       whisper: combatant.actor?.hasPlayerOwner ? [] : ChatMessage.getWhisperRecipients('GM'),
     });
   }

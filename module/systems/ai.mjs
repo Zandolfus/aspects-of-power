@@ -821,6 +821,7 @@ async function _idle(actor, skill, note) {
           whisper: ChatMessage.getWhisperRecipients('GM'),
           speaker: ChatMessage.getSpeaker({ actor }),
           content: `<p><em>[AI] ${actor.name}: ${note} — raises ${stance.name} while waiting.</em></p>`,
+          flags: { aspectsofpower: { logOnly: true } },
         });
         return;
       }
@@ -832,6 +833,7 @@ async function _idle(actor, skill, note) {
     whisper: ChatMessage.getWhisperRecipients('GM'),
     speaker: ChatMessage.getSpeaker({ actor }),
     content: `<p><em>[AI] ${actor.name}: ${note}${skill ? '' : ' — no usable skill'}; re-evaluates at its round start.</em></p>`,
+    flags: { aspectsofpower: { logOnly: true } },
   });
 }
 
@@ -1234,6 +1236,7 @@ const supportProfile = {
           ChatMessage.create({
             whisper: ChatMessage.getWhisperRecipients('GM'),
             speaker: ChatMessage.getSpeaker({ actor }),
+            flags: { aspectsofpower: { logOnly: true } },
             content: `<p><em>[AI] ${actor.name} tends ${inReach.tokenDoc.name} `
               + `(${Math.round(frac(inReach.tokenDoc) * 100)}% health).</em></p>`,
           });
@@ -1336,6 +1339,7 @@ async function _wakeCombatant(combatantDoc, why) {
     whisper: ChatMessage.getWhisperRecipients('GM'),
     speaker: ChatMessage.getSpeaker({ actor: combatantDoc.actor }),
     content: `<p><em>[AI] ${combatantDoc.actor?.name ?? combatantDoc.name} wakes — ${why}.</em></p>`,
+    flags: { aspectsofpower: { logOnly: true } },
   });
 }
 

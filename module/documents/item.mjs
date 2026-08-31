@@ -3508,6 +3508,7 @@ export class AspectsofPowerItem extends Item {
             ChatMessage.create({
               whisper: ChatMessage.getWhisperRecipients('GM'),
               speaker: ChatMessage.getSpeaker({ actor: targetActor }),
+              flags: { aspectsofpower: { logOnly: true } },
               content: `<p><em>[AI] ${targetActor.name} answers the big hit with `
                 + `<strong>${_z.name}</strong> (≈${Math.round(_through * 100)}% would land past a dodge).</em></p>`,
             });
@@ -3522,6 +3523,7 @@ export class AspectsofPowerItem extends Item {
         whisper: ChatMessage.getWhisperRecipients('GM'),
         speaker: ChatMessage.getSpeaker({ actor: targetActor }),
         content: `<p><em>[AI] ${targetActor.name} ${note} vs ${attackName}.</em></p>`,
+        flags: { aspectsofpower: { logOnly: true } },
       });
       return { defend, reactionSkillId: null, perceiveGated: !gate.canReact, perceiveRatio: gate.ratio };
     }

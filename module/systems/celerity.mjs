@@ -1089,6 +1089,7 @@ export async function runRoundStart(combat, combatant) {
   ChatMessage.create({
     speaker: ChatMessage.getSpeaker({ actor }),
     content: `<p><em>${actor.name}'s reference round begins.</em></p>`,
+    flags: { aspectsofpower: { logOnly: true } }, // chat diet 2026-08-31
     ...(isPC ? {} : { whisper: ChatMessage.getWhisperRecipients('GM') }),
   });
 
@@ -1557,6 +1558,7 @@ export async function declareMovement(actor, startPos, endPos, distanceFt, stami
   ChatMessage.create({
     speaker: ChatMessage.getSpeaker({ actor }),
     content: `<p><em>${actor.name} declares <strong>${label}</strong> — wait ${wait} ticks, arrives at tick ${scheduledTick}${staminaCost ? `, stamina cost ${staminaCost}` : ''}.</em></p>`,
+    flags: { aspectsofpower: { logOnly: true } }, // chat diet 2026-08-31 (movement declares ruled hidden)
   });
 
   // Create the PLANNED core movement (v14 rework): the path is stored and

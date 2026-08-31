@@ -30,6 +30,7 @@ import { AopEffectData } from './data/effect-base.mjs';
 import { preloadHandlebarsTemplates } from './helpers/templates.mjs';
 import { ASPECTSOFPOWER } from './helpers/config.mjs';
 import { isActingGM, patchCoreDesignation } from './helpers/gm.mjs';
+import { exportCombatLog, registerCombatLog } from './systems/combat-log.mjs';
 import { deriveItemStats } from './systems/item-derivation.mjs';
 import { conditionalFor, hasSystemTag } from './helpers/tags.mjs';
 import { getPositionalTags } from './helpers/positioning.mjs';
@@ -116,6 +117,7 @@ Hooks.once('init', function () {
   // Add utility classes to the global game object so that they're more easily
   // accessible in global contexts.
   game.aspectsofpower = {
+    exportCombatLog,
     AspectsofPowerActor,
     AspectsofPowerItem,
     rollItemMacro,
@@ -180,6 +182,7 @@ Hooks.once('init', function () {
   Overworld.registerOverworldSettings();
   Overworld.registerOverworldHooks();
   HexResidency.registerHexResidencyHooks();
+  registerCombatLog();
 
   game.settings.register('aspects-of-power', 'woundedTokenThreshold', {
     name: 'Wounded Token Threshold',
@@ -2479,7 +2482,37 @@ Hooks.on('combatTurnChange', async (combat, _prior, current) => {
  * Bind the "Apply damage" button that appears in GM-whispered combat result messages.
  * Reduces the target actor's health and posts a public notification.
  */
+const _autoApplyInFlight = new Set();
+
 Hooks.on('renderChatMessageHTML', (message, html) => {
+  // ── CHAT DIET (RULED 2026-08-31): log-only classes (path adjustments,
+  // round-begins, regen, movement declares, AI whispers) stay in the DB
+  // for the combat-log export but render hidden for everyone. ──
+  if (message.flags?.aspectsofpower?.logOnly) html.style.display = 'none';
+
+  // ── AUTO-APPLY DAMAGE (RULED 2026-08-31: "Everything") ──
+  // The acting GM's client fires every fresh apply-damage button once.
+  // Deferred a tick so the click listeners attached below exist first.
+  // Guards, in order: acting GM only; 60-second freshness window (a
+  // reload re-renders the whole backlog - history must never mass-apply);
+  // a PERSISTED per-button applied-stamp on the message (re-renders and
+  // reloads can never double); an in-memory in-flight set (the stamp
+  // write itself triggers a re-render that races the stamp landing).
+  if (isActingGM() && (Date.now() - message.timestamp) < 60000
+      && !message.flags?.aspectsofpower?.logOnly) {
+    setTimeout(() => {
+      const appliedMap = message.flags?.aspectsofpower?.autoApplied ?? {};
+      html.querySelectorAll('.apply-damage').forEach((btn, idx) => {
+        const key = `${message.id}:${idx}`;
+        if (appliedMap[idx] || _autoApplyInFlight.has(key)) { btn.disabled = true; return; }
+        _autoApplyInFlight.add(key);
+        message.update({ [`flags.aspectsofpower.autoApplied.${idx}`]: true })
+          .then(() => { btn.click(); btn.disabled = true; })
+          .catch(() => { _autoApplyInFlight.delete(key); });
+      });
+    }, 0);
+  }
+
   // ── Held casts (config.castHolding): release re-rolls the stored fire
   // payload verbatim; collapse forfeits it. Owner or GM only. ──
   const _heldCombatant = (actor) => game.combat?.combatants?.find(c => c.actor === actor
