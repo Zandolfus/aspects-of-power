@@ -17,6 +17,11 @@ export class AopEffectData extends foundry.data.ActiveEffectTypeDataModel {
       // ── Debuff fields ──
       debuffType:       new fields.StringField({ initial: 'none' }),
       debuffDamage:     new fields.NumberField({ initial: 0 }),      // roll total / break threshold
+      // Pre-defense basis (2026-08-31 passive-gauntlet ruling): the raw roll
+      // BEFORE any defense pricing (contest multiplier or veil/mind gauntlet).
+      // Spread/transfer re-prices a landing mind/soul debuff against the NEW
+      // recipient's walls from this, not from the previous victim's residue.
+      debuffRawBasis:   new fields.NumberField({ initial: 0 }),
       breakProgress:    new fields.NumberField({ initial: 0 }),      // cumulative break progress
       roundsAfflicted:  new fields.NumberField({ initial: 0, min: 0, integer: true }), // increments per round; scales break-roll yield; resets on re-apply
 

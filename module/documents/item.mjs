@@ -4868,6 +4868,9 @@ export class AspectsofPowerItem extends Item {
     effectData.type = 'base';
     effectData.system = {
       debuffDamage: rollTotal,
+      // The PRE-defense roll (before the contest multiplier AND the passive
+      // gauntlet) - what spread/transfer re-prices from per recipient.
+      debuffRawBasis: baseTotal,
       debuffType,
       casterActorUuid: this.actor.uuid,
       affinities: this.effectiveAffinities(),

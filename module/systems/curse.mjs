@@ -26,7 +26,8 @@
  * different actor's effects (spread copies, transfer, non-owned consume)
  * routes through the `gmCurseOp` GM action below.
  */
-import { curseMeterCapacity, curseEatenEnergy, curseFillAmount, curseSpendPrice, resolveCurseFillScale } from '../helpers/formulas.mjs';
+import { curseMeterCapacity, curseEatenEnergy, curseFillAmount, curseSpendPrice, resolveCurseFillScale, defenceMarginMultiplier } from '../helpers/formulas.mjs';
+import { resolveDamage } from './damage.mjs';
 import { dialogWaitNull } from '../helpers/dialogs.mjs';
 
 function _cfg() {
@@ -532,6 +533,55 @@ export async function gmCurseOp(payload, executeGmAction) {
   const applyOne = async (eff, victimUuid) => {
     const system = foundry.utils.deepClone(eff.system ?? {});
     system.roundsRemaining = eff.remaining;
+    let changes = foundry.utils.deepClone(eff.changes ?? []);
+
+    // ── THE GAUNTLET FOLLOWS THE CURSE (RULED 2026-08-31: "All the mind
+    // effecting things should go through veil and mind defense. Soul
+    // affecting things should go through veil and soul defense."). A
+    // spread/transferred mind- or soul-lane debuff re-prices against the
+    // NEW recipient's passive walls from its PRE-defense basis
+    // (debuffRawBasis, stamped at first application) - the strength it
+    // landed with on the previous victim is that victim's story, not this
+    // one's. Same math as _handleDebuffTag's gauntlet: veil as the wall,
+    // the FLAT lane defense as the margin, no dice. A full negate WARDS
+    // the landing (the transfer's lift still happens - the curse
+    // dissipates, the ally is still cleansed, per the standing comment
+    // below). Legacy effects without the stamp keep the old copy-as-is
+    // behaviour.
+    const _lane = system.targetDefense ?? '';
+    const _raw = Number(system.debuffRawBasis) || 0;
+    if ((_lane === 'mind' || _lane === 'soul') && _raw > 0) {
+      const _victimDoc = await fromUuid(victimUuid).catch(() => null);
+      const _vActor = _victimDoc?.actor ?? _victimDoc;
+      if (_vActor?.system?.defense) {
+        const _veil = _vActor.system.defense.veil?.value ?? 0;
+        const _defVal = _vActor.system.defense[_lane]?.value ?? 0;
+        const _margin = defenceMarginMultiplier(_defVal, _raw);
+        const _through = Math.max(0, Math.round(
+          resolveDamage({ incoming: _raw, mitigation: _veil, margin: _margin }).hpLoss));
+        if (_through <= 0) {
+          ChatMessage.create({
+            speaker: payload.speaker,
+            ...(payload.whisperGM ? { whisper: payload.whisperGM } : {}),
+            content: `<p><em>${_vActor.name}'s ${_lane === 'mind' ? 'will' : 'spirit'} and veil ward off `
+              + `<strong>${eff.name}</strong> — the curse finds no purchase.</em></p>`,
+          });
+          return;
+        }
+        const _oldBasis = Math.max(1, Number(system.debuffDamage) || _raw);
+        const _ratio = _through / _oldBasis;
+        if (Math.abs(_ratio - 1) > 0.001) {
+          changes = changes.map(c => ({
+            ...c, value: Math.round((Number(c.value) || 0) * _ratio),
+          }));
+          system.debuffDamage = _through;
+          if (system.dot && (system.dotDamage ?? 0) > 0) {
+            system.dotDamage = Math.max(0, Math.round(system.dotDamage * _ratio));
+          }
+        }
+      }
+    }
+
     await executeGmAction({
       type: 'gmApplyDebuff',
       targetActorUuid: victimUuid,
@@ -544,7 +594,7 @@ export async function gmCurseOp(payload, executeGmAction) {
         origin: eff.origin,
         type: 'base',
         disabled: false,
-        changes: foundry.utils.deepClone(eff.changes ?? []),
+        changes,
         description: eff.description,
         duration: { rounds: eff.remaining },
         system,
@@ -552,7 +602,7 @@ export async function gmCurseOp(payload, executeGmAction) {
       dotDamage: system.dot ? (system.dotDamage ?? 0) : 0,
       dotDamageType: system.dotDamageType ?? 'physical',
       duration: eff.remaining,
-      statSummary: (eff.changes ?? [])
+      statSummary: changes
         .map(c => `${String(c.key).replace(/^system\./, '').replace(/\.value$/, '')} ${c.value}`)
         .join(', ') || null,
       targetDefense: payload.targetDefense ?? 'mind',
