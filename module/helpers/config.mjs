@@ -3004,6 +3004,20 @@ ASPECTSOFPOWER.debuffBuildup = {
 /**
  * Zone effects for persistent AOE regions.
  */
+/**
+ * Persistent AOE zones (RULED 2026-08-31, the Defiance damage pass):
+ * a lingering zone's per-retick chip = tickScale x the stamped roll -
+ * "a zone is a dot in space", so standing in one for a full round
+ * (~4 reticks) costs ~60% of the blast, pre-mitigation. Shrapnel zones
+ * are exempt (projectile fiction keeps the full roll). Zones ARM at
+ * FIRE: until the power stamp lands (pd.rollTotal > 0), slippery
+ * checks, damage, and payloads are all inert - no more vs-0 footing
+ * contests from a zone whose cast is still winding up (or cancelled).
+ */
+ASPECTSOFPOWER.aoeZones = {
+  tickScale: 0.15,
+};
+
 ASPECTSOFPOWER.zoneEffects = {
   none:             'ASPECTSOFPOWER.Zone.none',
   slippery:         'ASPECTSOFPOWER.Zone.slippery',

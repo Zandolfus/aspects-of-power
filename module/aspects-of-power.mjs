@@ -2017,6 +2017,10 @@ async function _triggerPersistentAoe(tokenDoc, force = false) {
     if (!flags?.persistent || !flags.persistentData) continue;
 
     const pd = flags.persistentData;
+    // ARMED AT FIRE (RULED 2026-08-31) - same gate as _checkZoneEffects:
+    // no power stamp, no ticks, and crossing an unarmed zone must not
+    // consume the entry-tick cooldown either.
+    if (!(pd.rollTotal > 0)) continue;
 
     // Cadence: tick on entry (force=true bypasses the period check),
     // otherwise re-tick if currentClockTick - lastTickedAt >=
@@ -2089,6 +2093,13 @@ async function _triggerPersistentAoe(tokenDoc, force = false) {
       //   route directly to armor (physical) or veil (magical) → DR → HP.
       const hitBonus = isShrapnel ? (pd.tagConfig?.shrapnelHitBonus ?? 4) : 0;
       const finalHit = (pd.hitTotal ?? rollTotal) + hitBonus;
+      // FRACTION RETICK (RULED 2026-08-31, Defiance damage pass): a
+      // lingering zone chips tickScale x the stamped roll per retick -
+      // the dot-economy grammar (a zone is a dot in space). Shrapnel
+      // keeps the full roll (projectiles, not weather).
+      const zoneTick = isShrapnel
+        ? rollTotal
+        : Math.max(1, Math.round(rollTotal * (CONFIG.ASPECTSOFPOWER.aoeZones?.tickScale ?? 0.15)));
       // Armor-answer routing (2026-07-16): veil only for mind/soul zones;
       // physical AND elemental zone damage face armor. (Was: all `magic` → veil.)
       const zoneMitLane = targetingPool ? 'veil' : 'armor';
@@ -2102,11 +2113,11 @@ async function _triggerPersistentAoe(tokenDoc, force = false) {
       ChatMessage.create({
         whisper: ChatMessage.getWhisperRecipients('GM'),
         content: `<p><strong>${targetActor.name}</strong> caught in AOE zone — `
-               + `<strong>${rollTotal}</strong> ${pd.damageType} damage `
-               + `${isShrapnel ? '(shrapnel)' : '(environmental)'}.</p>`
+               + `<strong>${zoneTick}</strong> ${pd.damageType} damage `
+               + `${isShrapnel ? '(shrapnel)' : '(environmental tick)'}.</p>`
                + `<p><em>${poolLine} ${mitigationLine}</em></p>`
                + `<button class="apply-damage" data-actor-uuid="${targetActor.uuid}" `
-               + `data-damage="${rollTotal}" data-toughness="${targetActor.system.defense?.dr?.value ?? 0}" `
+               + `data-damage="${zoneTick}" data-toughness="${targetActor.system.defense?.dr?.value ?? 0}" `
                + `data-damage-type="${pd.damageType}" data-affinity-dr="0" data-mitigation="${zoneMitLane}" `
                + `data-bypass-pool="${!isShrapnel}">Apply Damage</button>`,
       });
@@ -2352,6 +2363,12 @@ async function _checkZoneEffects(tokenDoc) {
     const pd = flags.persistentData;
     const zoneEffect = pd.zoneEffect ?? 'none';
     if (zoneEffect === 'none') continue;
+    // ARMED AT FIRE (RULED 2026-08-31): the region places at declare (the
+    // telegraph + commit-at-declare intent stand) but its POWER stamps at
+    // fire. Until then the zone is inert - the 08-31 watcher logged eight
+    // "keeps their footing (vs 0)" contests against a zone whose cast was
+    // still winding up.
+    if (!(pd.rollTotal > 0)) continue;
 
     // Containment check.
     if (!doc.testPoint({ x: center.x, y: center.y, elevation: tokenDoc.elevation ?? 0 })) continue;
