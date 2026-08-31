@@ -22,6 +22,11 @@ export class AopEffectData extends foundry.data.ActiveEffectTypeDataModel {
       // Spread/transfer re-prices a landing mind/soul debuff against the NEW
       // recipient's walls from this, not from the previous victim's residue.
       debuffRawBasis:   new fields.NumberField({ initial: 0 }),
+      // The lane the debuff contests ('mind'/'soul' route the gauntlet;
+      // ''/'melee'/'ranged' do not). Found missing 2026-08-31: without a
+      // SCHEMA field the stamp was sanitization-stripped and the spread
+      // re-price gate could never open.
+      targetDefense:    new fields.StringField({ initial: '' }),
       breakProgress:    new fields.NumberField({ initial: 0 }),      // cumulative break progress
       roundsAfflicted:  new fields.NumberField({ initial: 0, min: 0, integer: true }), // increments per round; scales break-roll yield; resets on re-apply
 

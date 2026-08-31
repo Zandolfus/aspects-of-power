@@ -4871,6 +4871,9 @@ export class AspectsofPowerItem extends Item {
       // The PRE-defense roll (before the contest multiplier AND the passive
       // gauntlet) - what spread/transfer re-prices from per recipient.
       debuffRawBasis: baseTotal,
+      // The contested lane - the spread/transfer gauntlet gate reads this
+      // (mind/soul re-price; other lanes copy as-is).
+      targetDefense: this.system.roll?.targetDefense || '',
       debuffType,
       casterActorUuid: this.actor.uuid,
       affinities: this.effectiveAffinities(),
