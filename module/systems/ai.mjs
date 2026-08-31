@@ -724,8 +724,9 @@ async function _declareStepToward(actor, selfTokenDoc, destPoint, wantFt, mode) 
   // left/right offsets and take the smallest that clears (cos(80°)≈0.17 > 0, so
   // every candidate still advances). None clears → keep the heading (moving
   // beats freezing; next decision re-evaluates).
+  const _hazards = wantHazardAvoid ? _hazardRegionsFor(selfTokenDoc) : [];
   if (wantHazardAvoid) {
-    const hazards = _hazardRegionsFor(selfTokenDoc);
+    const hazards = _hazards;
     if (hazards.length) {
       const travelPx = stepFt * pxPerFt;
       const directEnd = { x: selfCenter.x + ux * travelPx, y: selfCenter.y + uy * travelPx };
@@ -743,18 +744,31 @@ async function _declareStepToward(actor, selfTokenDoc, destPoint, wantFt, mode) 
     }
   }
 
-  // Wall check center-to-center; halve twice on collision.
+  // Wall check center-to-center; halve twice on collision. ALLY SIDESTEP
+  // (2026-08-31, live: George stood behind his own party cluster, every
+  // straight step toward the enemy line ended inside an ally and
+  // declareMovement refused it silently - walls are NOT the only blocker,
+  // and the old code only ever tried the one heading before giving up, so
+  // the tank idled into Assume Stance while a fight raged 109 ft away).
+  // When the direct heading fails - wall collision OR declareMovement
+  // refusal - sample the same deviation ladder the hazard code uses
+  // (every candidate still advances, cos 80 ~ 0.17) before halving the
+  // step. Hazard-avoiders skip candidates that would swing into a zone.
+  const _DEG = Math.PI / 180;
+  const _baseAngle = Math.atan2(uy, ux);
   for (let attempt = 0; attempt < 3; attempt++) {
     const travelPx = stepFt * pxPerFt;
-    const endCenter = { x: selfCenter.x + ux * travelPx, y: selfCenter.y + uy * travelPx };
-    const blocked = CONFIG.Canvas.polygonBackends?.move?.testCollision?.(
-      selfCenter, endCenter, { type: 'move', mode: 'any' }
-    );
-    if (!blocked) {
+    for (const off of [0, 20, -20, 40, -40, 60, -60, 80, -80]) {
+      const a = _baseAngle + off * _DEG;
+      const cux = Math.cos(a), cuy = Math.sin(a);
+      const endCenter = { x: selfCenter.x + cux * travelPx, y: selfCenter.y + cuy * travelPx };
+      if (CONFIG.Canvas.polygonBackends?.move?.testCollision?.(
+        selfCenter, endCenter, { type: 'move', mode: 'any' })) continue;
+      if (_hazards.length && _segmentCrossesHazard(selfCenter, endCenter, _hazards)) continue;
       const startPos = { x: selfTokenDoc.x, y: selfTokenDoc.y };
-      const endPos = { x: selfTokenDoc.x + ux * travelPx, y: selfTokenDoc.y + uy * travelPx };
+      const endPos = { x: selfTokenDoc.x + cux * travelPx, y: selfTokenDoc.y + cuy * travelPx };
       const res = await declareMovement(actor, startPos, endPos, stepFt, costOf(stepFt), mode);
-      return !!res;
+      if (res) return true;
     }
     stepFt = Math.floor(stepFt / 2 / 5) * 5;
     if (stepFt < 5) break;
