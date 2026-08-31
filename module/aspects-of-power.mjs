@@ -2115,6 +2115,7 @@ async function _triggerPersistentAoe(tokenDoc, force = false) {
 
       ChatMessage.create({
         whisper: ChatMessage.getWhisperRecipients('GM'),
+        flags: { aspectsofpower: { logOnly: true } }, // debug-to-log 2026-08-31; auto-apply still fires it
         content: `<p><strong>${targetActor.name}</strong> caught in AOE zone — `
                + `<strong>${zoneTick}</strong> ${pd.damageType} damage `
                + `${isShrapnel ? '(shrapnel)' : '(environmental tick)'}.</p>`
@@ -2404,6 +2405,7 @@ async function _checkZoneEffects(tokenDoc) {
           speaker: ChatMessage.getSpeaker({ actor: targetActor }),
           ...whisper,
           content: `<p><strong>${targetActor.name}</strong> ${game.i18n.localize('ASPECTSOFPOWER.Zone.slipped')} (${checkValue} vs ${rollTotal})</p>`,
+          flags: { aspectsofpower: { logOnly: true } }, // debug-to-log 2026-08-31
         });
         const proneData = {
           name: 'Prone',
@@ -2430,6 +2432,7 @@ async function _checkZoneEffects(tokenDoc) {
           speaker: ChatMessage.getSpeaker({ actor: targetActor }),
           ...whisper,
           content: `<p><strong>${targetActor.name}</strong> ${game.i18n.localize('ASPECTSOFPOWER.Zone.keptFooting')} (${checkValue} vs ${rollTotal})</p>`,
+          flags: { aspectsofpower: { logOnly: true } }, // debug-to-log 2026-08-31
         });
       }
     }
@@ -2498,8 +2501,9 @@ Hooks.on('renderChatMessageHTML', (message, html) => {
   // a PERSISTED per-button applied-stamp on the message (re-renders and
   // reloads can never double); an in-memory in-flight set (the stamp
   // write itself triggers a re-render that races the stamp landing).
-  if (isActingGM() && (Date.now() - message.timestamp) < 60000
-      && !message.flags?.aspectsofpower?.logOnly) {
+  // NOTE: logOnly cards are NOT excluded — a hidden zone-tick card with an
+  // apply button is exactly the "bookkeeping applies itself silently" case.
+  if (isActingGM() && (Date.now() - message.timestamp) < 60000) {
     setTimeout(() => {
       const appliedMap = message.flags?.aspectsofpower?.autoApplied ?? {};
       html.querySelectorAll('.apply-damage').forEach((btn, idx) => {
@@ -2931,6 +2935,7 @@ Hooks.on('renderChatMessageHTML', (message, html) => {
         : '';
       ChatMessage.create({
         whisper: ChatMessage.getWhisperRecipients('GM'),
+        flags: { aspectsofpower: { logOnly: true } }, // debug-to-log 2026-08-31 (full pipeline breakdown)
         content: `<p><strong>${target.name}</strong> takes <strong>${actualHpLoss}</strong> health damage.${breakdown ? `<br>${breakdown}` : ''}`
                + `<br>Health: ${newHealth} / ${health.max}${barrierLine}`
                + `${newHealth === 0 ? '<br><em>Incapacitated!</em>' : ''}</p>`,

@@ -7843,6 +7843,7 @@ export class AspectsofPowerItem extends Item {
             speaker, rollMode, ...(whisperGM ? { whisper: whisperGM } : {}),
             flavor: label,
             content: `<p><em>Celerity:</em> wait <strong>${cel.wait}</strong> ticks → next action at tick <strong>${cel.scheduledTick}</strong>.</p>`,
+            flags: { aspectsofpower: { logOnly: true } }, // debug-to-log 2026-08-31
           });
         }
       } else {
