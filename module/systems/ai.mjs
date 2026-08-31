@@ -1196,10 +1196,21 @@ const supportProfile = {
       };
       const selfCenter = _centerOf(selfTokenDoc);
       const pxPerFt = canvas.grid.size / canvas.grid.distance;
+      // COMBATANTS ONLY while a fight is on (2026-08-31, live: Harvey spent
+      // combat actions healing Zekiel, who stood on the scene at 51% but was
+      // never in the combat). The scene-wide ally scan is right for
+      // out-of-combat tending; mid-fight, a medic's actions belong to the
+      // people actually fighting. Self always qualifies.
+      const _cbt = ctx?.combatant?.combat ?? findCombatantForActor(actor)?.combat;
+      const _inFight = !!_cbt?.started;
+      const _fighters = _inFight
+        ? new Set([..._cbt.combatants].map(c => c.tokenId))
+        : null;
       const wounded = [
         { tokenDoc: selfTokenDoc, tCenter: selfCenter, distPx: 0 },
         ..._aliveAlliesOf(selfTokenDoc),
-      ].filter(x => frac(x.tokenDoc) < healPct)
+      ].filter(x => (!_fighters || x.tokenDoc.id === selfTokenDoc.id || _fighters.has(x.tokenDoc.id))
+        && frac(x.tokenDoc) < healPct)
         .sort((a, b) => frac(a.tokenDoc) - frac(b.tokenDoc));
 
       if (wounded.length) {
