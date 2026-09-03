@@ -35,6 +35,18 @@
 
   const skills = a.items.filter((i) => i.type === 'skill').map((i) => {
     const r = i.system.roll || {};
+    /* The GAME resolves these; the UE port cannot (weapon match, proficiency,
+       lunar phase are not in the raw fields). weaponWeight drives the hit blend,
+       base stamina and windup; damageMultiplier is the resolved strike multiplier
+       (authored diceBonus x proficiency, else rarity effectiveMult). Guarded: a
+       non-weapon skill answers 0 weight and multiplier 1. */
+    let weaponWeight = 0;
+    let damageMultiplier = 1;
+    try { weaponWeight = i.constructor.resolveEffectiveWeaponWeight(i, null); } catch (e) { weaponWeight = 0; }
+    try {
+      const db = (r.diceBonus != null) ? r.diceBonus : 1;
+      damageMultiplier = (db !== 1) ? db * i._proficiencyDamageMult() : i._resolveRarityMods().effectiveMult;
+    } catch (e) { damageMultiplier = 1; }
     return {
       name: i.name,
       skillType: i.system.skillType,
@@ -44,6 +56,8 @@
       rarity: i.system.rarity || '',
       requiresSight: !!i.system.requiresSight,
       aoe: i.system.aoe && i.system.aoe.enabled ? i.system.aoe : null,
+      weaponWeight: weaponWeight,
+      damageMultiplier: damageMultiplier,
       roll: {
         dice: r.dice, abilities: r.abilities, secondaryAbility: r.secondaryAbility,
         primaryWeight: r.primaryWeight, secondaryWeight: r.secondaryWeight,
@@ -66,8 +80,8 @@
   }));
 
   return JSON.stringify({
-    schema_version: 1,
-    exporter: 'aop-foundry-actor-export 0.1',
+    schema_version: 2,
+    exporter: 'aop-foundry-actor-export 0.2',
     world: game.world.id,
     actor: {
       name: a.name,
