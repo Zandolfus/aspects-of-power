@@ -147,15 +147,27 @@
     };
   });
 
+  /* FOLDER (schema v7): the actor's Foundry directory path (ancestors joined by '/'),
+     so the client can group the spawn picker by the same folders the GM organizes in
+     Foundry. Empty when the actor is unfiled. */
+  let folderPath = '';
+  if (a.folder) {
+    const parts = [];
+    let f = a.folder;
+    while (f) { parts.unshift(f.name); f = f.folder; }
+    folderPath = parts.join('/');
+  }
+
   return JSON.stringify({
-    schema_version: 6,
-    exporter: 'aop-foundry-actor-export 0.6',
+    schema_version: 7,
+    exporter: 'aop-foundry-actor-export 0.7',
     world: game.world.id,
     actor: {
       name: a.name,
       id: a.id,
       type: a.type,
       sizeTag: s.sizeTag || '',
+      folder: folderPath,
       raceRank: (s.attributes && s.attributes.race && s.attributes.race.rank) ? s.attributes.race.rank : 'E',
       abilities: abilities,
       health: pool(s.health),
