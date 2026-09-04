@@ -58,6 +58,21 @@
        the two-stat aim (hitPrimary x0.9 + hitSecondary x0.3, the tagConfig override) and
        damage is int x mult x spellWindup(tier). We export the tier and the game-resolved
        hit blend (0 = no explicit aim override, client falls back + flags it). */
+    /* AURA authoring (schema v6). A skill that emits an aura declares it on tagConfig:
+       the PRE-perception radius, what it does (damage/heal/stam), its lane, who it
+       hits, and the roll-scale for the per-tick payload. Null when the skill is not an
+       aura. The client stretches the radius by perception and sizes the payload off the
+       skill's roll, matching item.mjs's apply-time snapshot. */
+    const aura = (Number(tc.auraRadius) > 0) ? {
+      radius: tc.auraRadius,
+      effectType: tc.auraEffectType || 'damage',
+      damageType: tc.auraDamageType || 'physical',
+      targeting: tc.auraTargeting || 'enemies',
+      scale: (tc.auraScale == null) ? 0.3 : tc.auraScale,
+      healResource: tc.auraHealResource || 'health',
+      healOverhealth: !!tc.auraHealOverhealth
+    } : null;
+
     const spellTier = r.tier || '';
     let spellHitBlend = 0;
     if (typeof r.type === 'string' && r.type.indexOf('magic') === 0) {
@@ -86,6 +101,7 @@
       dotDuration: dotDuration,
       spellTier: spellTier,
       spellHitBlend: spellHitBlend,
+      aura: aura,
       roll: {
         dice: r.dice, abilities: r.abilities, secondaryAbility: r.secondaryAbility,
         primaryWeight: r.primaryWeight, secondaryWeight: r.secondaryWeight,
@@ -99,17 +115,41 @@
     };
   });
 
-  const gear = a.items.filter((i) => i.type === 'item').map((i) => ({
-    name: i.name,
-    equipped: !!i.system.equipped,
-    weight: i.system.weight || 0,
-    rarity: i.system.rarity || '',
-    tags: i.system.tags || []
-  }));
+  /* INVENTORY (schema v6). Every carried item (type 'item'), equipped or not, with
+     its GAME-RESOLVED per-item contribution read straight off the stored derived fields
+     (statBonuses/armorBonus/veilBonus/damageReduction/damageBonus -- the auto-derive hook
+     has already baked augments/material/rarity into these, which is exactly what
+     equipment.mjs reads when it builds the equip ActiveEffects). The client backs out a
+     base from the actor's loadout-inclusive stats and applies +/- these on equip. */
+  const inventory = a.items.filter((i) => i.type === 'item').map((i) => {
+    const it = i.system || {};
+    const dr = it.damageReduction || {};
+    const sb = (it.statBonuses || []).map((b) => ({ ability: b.ability, value: b.value }));
+    return {
+      id: i.id,
+      name: i.name,
+      slot: it.slot || '',
+      hand: it.hand || '',
+      twoHanded: !!it.twoHanded,
+      equipped: !!it.equipped,
+      weight: it.weight || 0,
+      quantity: (it.quantity == null) ? 1 : it.quantity,
+      rarity: it.rarity || '',
+      material: it.material || '',
+      storedIn: it.storedIn || '',
+      spatialCapacity: it.spatialCapacity || 0,
+      statBonuses: sb,
+      armorBonus: it.armorBonus || 0,
+      veilBonus: it.veilBonus || 0,
+      drPhysical: dr.physical || 0,
+      drMagical: dr.magical || 0,
+      damageBonus: it.damageBonus || 0
+    };
+  });
 
   return JSON.stringify({
-    schema_version: 5,
-    exporter: 'aop-foundry-actor-export 0.5',
+    schema_version: 6,
+    exporter: 'aop-foundry-actor-export 0.6',
     world: game.world.id,
     actor: {
       name: a.name,
@@ -139,7 +179,7 @@
       tags: s.tags || [],
       skillCount: skills.length,
       skills: skills,
-      gear: gear
+      inventory: inventory
     }
   });
 })
