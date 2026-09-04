@@ -80,14 +80,15 @@
   }));
 
   return JSON.stringify({
-    schema_version: 2,
-    exporter: 'aop-foundry-actor-export 0.2',
+    schema_version: 3,
+    exporter: 'aop-foundry-actor-export 0.3',
     world: game.world.id,
     actor: {
       name: a.name,
       id: a.id,
       type: a.type,
       sizeTag: s.sizeTag || '',
+      raceRank: (s.attributes && s.attributes.race && s.attributes.race.rank) ? s.attributes.race.rank : 'E',
       abilities: abilities,
       health: pool(s.health),
       mana: pool(s.mana),
