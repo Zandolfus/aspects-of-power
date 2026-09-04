@@ -47,6 +47,13 @@
       const db = (r.diceBonus != null) ? r.diceBonus : 1;
       damageMultiplier = (db !== 1) ? db * i._proficiencyDamageMult() : i._resolveRarityMods().effectiveMult;
     } catch (e) { damageMultiplier = 1; }
+    /* DoT metadata (schema v4). Whether a skill applies a DAMAGING debuff over time is
+       tagConfig.debuffDealsDamage -- a flag the tags alone do not reveal. dotScale sizes
+       each tick off the parent blow; debuffDuration is the tick count. */
+    const tc = i.system.tagConfig || {};
+    const dotDealsDamage = !!tc.debuffDealsDamage;
+    const dotScale = Number(tc.dotScale) || 0;
+    const dotDuration = Number(tc.debuffDuration) || 0;
     return {
       name: i.name,
       skillType: i.system.skillType,
@@ -58,6 +65,9 @@
       aoe: i.system.aoe && i.system.aoe.enabled ? i.system.aoe : null,
       weaponWeight: weaponWeight,
       damageMultiplier: damageMultiplier,
+      dotDealsDamage: dotDealsDamage,
+      dotScale: dotScale,
+      dotDuration: dotDuration,
       roll: {
         dice: r.dice, abilities: r.abilities, secondaryAbility: r.secondaryAbility,
         primaryWeight: r.primaryWeight, secondaryWeight: r.secondaryWeight,
@@ -80,8 +90,8 @@
   }));
 
   return JSON.stringify({
-    schema_version: 3,
-    exporter: 'aop-foundry-actor-export 0.3',
+    schema_version: 4,
+    exporter: 'aop-foundry-actor-export 0.4',
     world: game.world.id,
     actor: {
       name: a.name,
