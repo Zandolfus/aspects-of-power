@@ -54,6 +54,22 @@
     const dotDealsDamage = !!tc.debuffDealsDamage;
     const dotScale = Number(tc.dotScale) || 0;
     const dotDuration = Number(tc.debuffDuration) || 0;
+    /* MAGIC (schema v5). Spell HIT and DAMAGE deliberately use different stats: hit is
+       the two-stat aim (hitPrimary x0.9 + hitSecondary x0.3, the tagConfig override) and
+       damage is int x mult x spellWindup(tier). We export the tier and the game-resolved
+       hit blend (0 = no explicit aim override, client falls back + flags it). */
+    const spellTier = r.tier || '';
+    let spellHitBlend = 0;
+    if (typeof r.type === 'string' && r.type.indexOf('magic') === 0) {
+      const hp = tc.hitPrimary || '';
+      const hs = tc.hitSecondary || '';
+      const ab = s.abilities || {};
+      if (hp && ab[hp]) {
+        spellHitBlend = (hs && ab[hs])
+          ? Math.round(ab[hp].mod * 0.9 + ab[hs].mod * 0.3)
+          : ab[hp].mod;
+      }
+    }
     return {
       name: i.name,
       skillType: i.system.skillType,
@@ -68,6 +84,8 @@
       dotDealsDamage: dotDealsDamage,
       dotScale: dotScale,
       dotDuration: dotDuration,
+      spellTier: spellTier,
+      spellHitBlend: spellHitBlend,
       roll: {
         dice: r.dice, abilities: r.abilities, secondaryAbility: r.secondaryAbility,
         primaryWeight: r.primaryWeight, secondaryWeight: r.secondaryWeight,
@@ -90,8 +108,8 @@
   }));
 
   return JSON.stringify({
-    schema_version: 4,
-    exporter: 'aop-foundry-actor-export 0.4',
+    schema_version: 5,
+    exporter: 'aop-foundry-actor-export 0.5',
     world: game.world.id,
     actor: {
       name: a.name,
