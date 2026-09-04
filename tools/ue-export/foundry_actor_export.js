@@ -54,6 +54,22 @@
     const dotDealsDamage = !!tc.debuffDealsDamage;
     const dotScale = Number(tc.dotScale) || 0;
     const dotDuration = Number(tc.debuffDuration) || 0;
+    /* TAG EFFECTS (schema v8): the combat tagConfig the UE tag engine needs, so the
+       client reads NUMBERS not re-derives. The flat `tags` array (pierce/shred/crush,
+       rider markers) is exported separately; this carries the parameters those tags
+       are modulated by (rider trigger + gate, DR-strip/crush/melt magnitudes, the
+       debuff kind, and the invest-scaled dot growth). */
+    const tagEffects = {
+      procTrigger: tc.procTrigger || '',
+      procAttackTags: tc.procAttackTags || [],
+      debuffDRStrip: !!tc.debuffDRStrip,
+      debuffArmorCrush: Number(tc.debuffArmorCrush) || 0,
+      crushInvestScale: Number(tc.crushInvestScale) || 0,
+      debuffArmorMelt: Number(tc.debuffArmorMelt) || 0,
+      debuffType: tc.debuffType || '',
+      debuffDamageType: tc.debuffDamageType || '',
+      dotInvestScale: Number(tc.dotInvestScale) || 0
+    };
     /* MAGIC (schema v5). Spell HIT and DAMAGE deliberately use different stats: hit is
        the two-stat aim (hitPrimary x0.9 + hitSecondary x0.3, the tagConfig override) and
        damage is int x mult x spellWindup(tier). We export the tier and the game-resolved
@@ -102,6 +118,7 @@
       spellTier: spellTier,
       spellHitBlend: spellHitBlend,
       aura: aura,
+      tagEffects: tagEffects,
       roll: {
         dice: r.dice, abilities: r.abilities, secondaryAbility: r.secondaryAbility,
         primaryWeight: r.primaryWeight, secondaryWeight: r.secondaryWeight,
@@ -159,8 +176,8 @@
   }
 
   return JSON.stringify({
-    schema_version: 7,
-    exporter: 'aop-foundry-actor-export 0.7',
+    schema_version: 8,
+    exporter: 'aop-foundry-actor-export 0.8',
     world: game.world.id,
     actor: {
       name: a.name,
