@@ -68,7 +68,15 @@
       debuffArmorMelt: Number(tc.debuffArmorMelt) || 0,
       debuffType: tc.debuffType || '',
       debuffDamageType: tc.debuffDamageType || '',
-      dotInvestScale: Number(tc.dotInvestScale) || 0
+      dotInvestScale: Number(tc.dotInvestScale) || 0,
+      /* MINE/SHRAPNEL (schema v9). mineCapacity = max concurrent mines per caster
+         (mine tag, FIFO-evict). shrapnelMultiplier/Bonus size the shrapnel burst:
+         a caught target is hit at rollTotal + shrapnelHitBonus and takes
+         x shrapnelMultiplier damage (config shrapnelDodgePenalty is a global the
+         client ports as a constant, not per-skill). */
+      mineCapacity: (tc.mineCapacity == null) ? 1 : Number(tc.mineCapacity),
+      shrapnelMultiplier: (tc.shrapnelMultiplier == null) ? 1 : Number(tc.shrapnelMultiplier),
+      shrapnelHitBonus: Number(tc.shrapnelHitBonus) || 0
     };
     /* MAGIC (schema v5). Spell HIT and DAMAGE deliberately use different stats: hit is
        the two-stat aim (hitPrimary x0.9 + hitSecondary x0.3, the tagConfig override) and
@@ -109,7 +117,9 @@
       affinities: i.system.affinities || [],
       rarity: i.system.rarity || '',
       requiresSight: !!i.system.requiresSight,
-      aoe: i.system.aoe && i.system.aoe.enabled ? i.system.aoe : null,
+      /* AOE FOOTPRINT (schema v9). Emit the shape even when enabled=false: a mine
+         SNAPSHOTS its (disabled) aoe as the burst footprint Detonate reads back. */
+      aoe: i.system.aoe ? { enabled: !!i.system.aoe.enabled, shape: i.system.aoe.shape || 'circle', diameter: Number(i.system.aoe.diameter) || 0, baseSize: Number(i.system.aoe.baseSize) || 0 } : null,
       weaponWeight: weaponWeight,
       damageMultiplier: damageMultiplier,
       dotDealsDamage: dotDealsDamage,
@@ -176,8 +186,8 @@
   }
 
   return JSON.stringify({
-    schema_version: 8,
-    exporter: 'aop-foundry-actor-export 0.8',
+    schema_version: 9,
+    exporter: 'aop-foundry-actor-export 0.9',
     world: game.world.id,
     actor: {
       name: a.name,
