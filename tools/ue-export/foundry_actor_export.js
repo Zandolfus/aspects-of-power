@@ -171,8 +171,9 @@
       drPhysical: dr.physical || 0,
       drMagical: dr.magical || 0,
       damageBonus: it.damageBonus || 0,
-      // v10: the item's unified tag list (weapon/armor/material tags). A SHIELD is any item
-      // whose tags include 'shield' (buckler/greatshield subtypes come along) -- drives block/bulwark.
+      /* v10: the item's unified tag list (weapon/armor/material tags). A SHIELD is any item
+         whose tags include 'shield' (buckler/greatshield subtypes come along) -- drives block/bulwark.
+         Block comment (not //) so the one-line flatten harness does not eat the rest of the script. */
       tags: Array.isArray(it.tags) ? it.tags.slice() : []
     };
   });
