@@ -2498,6 +2498,20 @@ Hooks.on('renderChatMessageHTML', (message, html) => {
   // for the combat-log export but render hidden for everyone. ──
   if (message.flags?.aspectsofpower?.logOnly) html.style.display = 'none';
 
+  // ── ROLL TOTALS ARE FLOATS; CHAT IS NOT A DEBUGGER (2026-09-06) ──
+  // Hit and damage formulas multiply blends by (1 + d20/100), so a total
+  // lands as 1360.2303000000002 and Foundry prints every digit. The VALUE
+  // must not change — hitRoll.total feeds the hit/defence comparison and
+  // the golden pins — so this rounds the DISPLAY only, at render time,
+  // leaving the stored roll (and the combat-log export's precision) intact.
+  for (const el of html.querySelectorAll('.dice-total, .dice-result .part-total')) {
+    const raw = (el.textContent ?? '').trim();
+    // Only touch a bare number carrying more precision than anyone reads.
+    if (!/^-?\d+\.\d{3,}$/.test(raw)) continue;
+    const rounded = Math.round(Number(raw) * 100) / 100;
+    if (Number.isFinite(rounded)) el.textContent = String(rounded);
+  }
+
   // ── AUTO-APPLY DAMAGE (RULED 2026-08-31: "Everything") ──
   // The acting GM's client fires every fresh apply-damage button once.
   // Deferred a tick so the click listeners attached below exist first.
