@@ -716,7 +716,9 @@ async function _scanPersistentAoeReticks(combat, newClock) {
 async function _onCelRealtimeToggle(event, target) {
   const combat = this.viewed;
   const flagOn = !!combat?.flags?.[FLAG_NS]?.realtimeRunning;
-  if (game.user.isGM) {
+  // Only the designated writer drives the clock; every other client (players
+  // AND a second GM-capable login) sends the toggle as a REQUEST.
+  if (isActingGM()) {
     if (flagOn || this._realtimeRunning) await this._realtimeStop();
     else await this._realtimeStart();
   } else {
@@ -783,7 +785,16 @@ export class CelerityCombatTracker extends ParentTracker {
   }
 
   async _realtimeStart() {
-    if (!game.user.isGM) return;
+    // ── ONE DRIVER, NOT ONE ROLE (2026-09-06, the doubling RCA) ──
+    // `game.user.isGM` is true for role >= 3 (Assistant), so an automation
+    // login sitting alongside the human GM ALSO passed this gate: two
+    // clients, two timeout loops, two _onCelAdvance calls, and the same
+    // declared action dispatched TWICE. The per-client _aopAdvanceInFlight
+    // mutex (301b445) cannot see across clients — it fixed the within-client
+    // overlap only, which is why the tripling survived it as a doubling.
+    // The loop MUTATES (fires actions, applies damage, moves the clock), so
+    // it belongs to the single designated writer. Visibility stays isGM.
+    if (!isActingGM()) return;
     if (this._realtimeRunning) return;
     const combat = this.viewed;
     if (!combat?.started) return;
@@ -847,7 +858,9 @@ export class CelerityCombatTracker extends ParentTracker {
     // the stale stored value), then pause every glide at its next
     // checkpoint. Order matters: clock first so any pause-triggered reads
     // see the committed value.
-    if (game.user.isGM && this.viewed) {
+    // Local teardown above runs on ANY client; the clock commit and flag
+    // clear below are world writes, so they belong to the designated writer.
+    if (isActingGM() && this.viewed) {
       const combat = this.viewed;
       const flagOn = !!combat.flags?.[FLAG_NS]?.realtimeRunning;
       if (wasRunning || flagOn) {

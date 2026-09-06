@@ -1325,6 +1325,11 @@ Hooks.once('ready', async function () {
       // for socket-routed action fires). Toggle our local tracker instance;
       // the start/stop methods write a combat flag so all clients' button
       // icons sync via the document-update broadcast.
+      // ⚠ THIS IS A BROADCAST: every client receives it. Without the
+      // acting-GM gate, EVERY GM-capable client (role >= 3 — an assistant
+      // or automation login included) started its own loop, so one player
+      // clicking play doubled every subsequent fire. 2026-09-06 RCA.
+      if (!isActingGM()) return;
       const tracker = ui.combat;
       if (tracker?.constructor?.name === 'CelerityCombatTracker') {
         const flagOn = !!tracker.viewed?.flags?.aspectsofpower?.realtimeRunning;
