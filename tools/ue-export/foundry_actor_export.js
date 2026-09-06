@@ -170,7 +170,10 @@
       veilBonus: it.veilBonus || 0,
       drPhysical: dr.physical || 0,
       drMagical: dr.magical || 0,
-      damageBonus: it.damageBonus || 0
+      damageBonus: it.damageBonus || 0,
+      // v10: the item's unified tag list (weapon/armor/material tags). A SHIELD is any item
+      // whose tags include 'shield' (buckler/greatshield subtypes come along) -- drives block/bulwark.
+      tags: Array.isArray(it.tags) ? it.tags.slice() : []
     };
   });
 
@@ -186,8 +189,8 @@
   }
 
   return JSON.stringify({
-    schema_version: 9,
-    exporter: 'aop-foundry-actor-export 0.9',
+    schema_version: 10,
+    exporter: 'aop-foundry-actor-export 0.10',
     world: game.world.id,
     actor: {
       name: a.name,
