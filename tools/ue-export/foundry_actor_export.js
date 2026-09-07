@@ -210,7 +210,9 @@
   /* EFFECTS (schema v12): the actor's ActiveEffects with their category -- TITLES (additive
      to base), BLESSINGS (multiply), passives, temporary buffs/debuffs -- and their stat
      changes, so the client sheet shows Titles / Blessings and reads what each one does. */
-  var effects = a.effects.map(function (e) {
+  /* allApplicableEffects, not a.effects: racial passives (Scaled Hide, Eagle Eye) and other
+     item-carried effects transfer from embedded items and never sit on the actor itself. */
+  var effects = Array.from(a.allApplicableEffects()).map(function (e) {
     var es = e.system || {};
     return {
       id: e.id,
@@ -309,6 +311,7 @@
         profession: (s.attributes && s.attributes.profession) ? (s.attributes.profession.level || 0) : 0
       },
       strain: s.strain || 0,
+      freePoints: s.freePoints || 0,
       activeLoadout: s.activeLoadout || 'combat',
       abilities: abilities,
       health: pool(s.health),
