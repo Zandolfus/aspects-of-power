@@ -31,7 +31,7 @@ import {
 } from '../module/helpers/hexgrid.mjs';
 import { moonState, moonNodeAngle, nextSyzygy, eclipseAtSyzygy, planetStates,
          meteorShowersOn, cometStates, julianDay, civilDate, worldTimeForDate } from '../module/systems/calendar.mjs';
-import { resolveDamage, durabilityDamage, applyMarkBonus } from '../module/systems/damage.mjs';
+import { resolveDamage, durabilityDamage, applyMarkBonus, priceDebuffForVictim } from '../module/systems/damage.mjs';
 import { stackDamageMultiplier, spendableRange, clampSpread, maxSingleTargetFields } from '../module/systems/stacks.mjs';
 
 // ⚠ GOLDEN DAMAGE VALUES BELOW WERE MEASURED AT INVEST CURVE 0.2, from live
@@ -1271,6 +1271,59 @@ eq('ai invest: ceiling below base clamps up to base', F2.aiInvestSize(500, 10, 4
   eq('gauntlet: Felicia (veil 154, mind 268) blunts 460 to', _pg(460, 154, 268), 83);
   eq('gauntlet: Willy (mind 742 > roll) negates outright', _pg(460, 115, 742), 0);
   eq('gauntlet: bare mind (no veil, no defense) takes it all', _pg(460, 0, 0), 460);
+
+  // ── THE SHARED SEAM (refactored 2026-09-06) ──
+  // A debuff reaches a body two ways: a fresh cast, and a curse spread. Those
+  // were two implementations and they drifted. Both now call
+  // priceDebuffForVictim, so these pins ARE the contract for both paths.
+  const _prevG = globalThis.CONFIG.ASPECTSOFPOWER.debuffGauntlet;
+  globalThis.CONFIG.ASPECTSOFPOWER.debuffGauntlet =
+    { lanes: ['mind', 'soul', 'melee', 'ranged'], veilLanes: ['mind', 'soul'] };
+
+  // Veil lanes reproduce the hand-rolled pins above, exactly.
+  eq('seam: George mind 460 matches the hand-rolled gauntlet',
+     priceDebuffForVictim({ lane: 'mind', rawBasis: 460 },
+                          { veil: 309, laneDefense: 231, dr: 0 }).through, 63);
+  eq('seam: Willy mind 742 wards',
+     priceDebuffForVictim({ lane: 'mind', rawBasis: 460 },
+                          { veil: 115, laneDefense: 742, dr: 0 }).warded, true);
+
+  // PHYSICAL LANES IGNORE ARMOUR (ruled 2026-09-06: sticky blood is stopped by
+  // raw strength, not plate). Same veil, same roll — veil must not matter.
+  eq('seam: melee lane ignores veil entirely',
+     priceDebuffForVictim({ lane: 'melee', rawBasis: 460 },
+                          { veil: 999, laneDefense: 231, dr: 0 }).through,
+     priceDebuffForVictim({ lane: 'melee', rawBasis: 460 },
+                          { veil: 0, laneDefense: 231, dr: 0 }).through);
+  // An empty lane runs no gauntlet at all — authoring intent, not an oversight.
+  eq('seam: no lane means no gauntlet',
+     priceDebuffForVictim({ lane: '', rawBasis: 460 },
+                          { veil: 999, laneDefense: 999, dr: 999 }).through, 460);
+
+  // ANTI-DRIFT: the seam's dot re-price must equal what dotTickDamage produces
+  // at application for the same body. If these two ever disagree, a spread dot
+  // and a freshly cast one tick differently on the same target.
+  {
+    const base = 800, scale = 0.1, dr = 240;
+    const atApplication = dotTickDamage({ ownDamage: base, dotScale: scale,
+                                          defenseMultiplier: 1, tickDR: dr });
+    const onSpread = priceDebuffForVictim(
+      { lane: 'mind', rawBasis: 460, dotRawBase: base, dotPostMult: scale },
+      { veil: 0, laneDefense: 0, dr }).dotDamage;
+    eq('seam: spread dot equals a freshly applied dot on the same body',
+       onSpread, atApplication);
+    // Negative control: a tougher body must pay LESS, or the DR never entered.
+    const onTougherBody = priceDebuffForVictim(
+      { lane: 'mind', rawBasis: 460, dotRawBase: base, dotPostMult: scale },
+      { veil: 0, laneDefense: 0, dr: dr * 3 }).dotDamage;
+    eq('seam: a tougher body takes less dot', onTougherBody < onSpread, true);
+    // A dot with no stored base is not re-priceable (legacy / invest dots).
+    eq('seam: no stored base means no re-price',
+       priceDebuffForVictim({ lane: 'mind', rawBasis: 460 },
+                            { veil: 0, laneDefense: 0, dr: 240 }).dotDamage, null);
+  }
+
+  globalThis.CONFIG.ASPECTSOFPOWER.debuffGauntlet = _prevG;
   globalThis.CONFIG.ASPECTSOFPOWER.defenseTuning = _prevDT;
 }
 // ⚠ THE AUTHORED RADIUS IS A FLOOR — this is what a pure `per x factor` form

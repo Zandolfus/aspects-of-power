@@ -38,7 +38,7 @@
  * `armourModel: 'flat'` to restore the legacy subtraction chain, which is kept
  * intact in the else branch rather than deleted.
  */
-import { armourRatioApplied } from '../helpers/formulas.mjs';
+import { armourRatioApplied, defenceMarginMultiplier } from '../helpers/formulas.mjs';
 
 /**
  * @typedef {object} DamageInput
@@ -311,4 +311,72 @@ export function durabilityDamage(res, opts = {}) {
     ? Math.max(0, Math.round(Math.min(res.postBarrier, mitigation + res.effectiveDR) * wearRate))
     : 0;
   return { leaked, wear, total: leaked + wear };
+}
+
+/**
+ * Price a debuff for ONE victim.
+ *
+ * WHY THIS EXISTS: a debuff reaches a body two ways — a fresh cast, and a
+ * curse SPREAD/TRANSFER — and those were two different implementations. Spread
+ * did `deepClone(effect.system)` and hand-patched whatever was victim-specific,
+ * so every victim-dependent term had to be re-derived by hand in a second
+ * place: the gauntlet in `1549abf`, the dot's toughness prepay in the
+ * 2026-09-06 sweep, and whatever came next. They had already drifted once.
+ *
+ * So spread does not copy a priced effect any more — it RE-PRICES from the
+ * source inputs stamped at first application, through this one function, the
+ * same one the cast path calls. A dot "just applies normally" on the new body
+ * because the new body's numbers are the only ones that ever enter.
+ *
+ * PURE — plain numbers in, plain numbers out, exactly like resolveDamage, so
+ * both call sites and the golden pins share the arithmetic.
+ *
+ * @param {object} src      Source inputs stamped at first application:
+ *   lane        targetDefense ('mind'|'soul'|'melee'|'ranged'|''), '' = no gauntlet
+ *   rawBasis    pre-defence roll (debuffRawBasis)
+ *   dotRawBase  pre-DR dot base; 0 = not re-priceable (legacy / invest dots)
+ *   dotPostMult dotScale x defenseMultiplier, applied AFTER DR
+ * @param {object} victim   This victim's numbers: veil, laneDefense, dr
+ * @param {object} [cfg]    CONFIG override (tests)
+ * @returns {{through:number, ratio:number, dotDamage:number|null,
+ *            gauntleted:boolean, warded:boolean}}
+ */
+export function priceDebuffForVictim(src = {}, victim = {}, cfg = null) {
+  const sc = cfg ?? (globalThis.CONFIG?.ASPECTSOFPOWER ?? {});
+  const g = sc.debuffGauntlet ?? {};
+  const lanes = g.lanes ?? ['mind', 'soul'];
+  const veilLanes = g.veilLanes ?? ['mind', 'soul'];
+
+  const lane = src.lane ?? '';
+  const rawBasis = Number(src.rawBasis) || 0;
+
+  // The gauntlet: the victim's PASSIVE wall and the flat lane margin, no dice.
+  // Physical lanes run it with no wall at all — armour does not stop an effect,
+  // the stat does (ruled 2026-09-06).
+  let through = rawBasis;
+  const gauntleted = lanes.includes(lane) && rawBasis > 0;
+  if (gauntleted) {
+    const wall = veilLanes.includes(lane) ? (Number(victim.veil) || 0) : 0;
+    const margin = defenceMarginMultiplier(Number(victim.laneDefense) || 0, rawBasis);
+    through = Math.max(0, Math.round(
+      resolveDamage({ incoming: rawBasis, mitigation: wall, margin }).hpLoss));
+  }
+
+  // The dot pays THIS body's toughness. DR lands on the base BEFORE the
+  // dotScale slice — slicing first and applying DR per tick collapses under
+  // the superlinear ratio model, which is the whole reason dots are prepaid.
+  const dotRawBase = Number(src.dotRawBase) || 0;
+  const dotDamage = dotRawBase > 0
+    ? Math.max(0, Math.round(
+        armourRatioApplied(dotRawBase, Math.max(0, Number(victim.dr) || 0))
+        * (Number(src.dotPostMult) || 0)))
+    : null;
+
+  return {
+    through,
+    ratio: rawBasis > 0 ? through / rawBasis : 1,
+    dotDamage,
+    gauntleted,
+    warded: gauntleted && through <= 0,
+  };
 }

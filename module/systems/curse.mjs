@@ -26,8 +26,8 @@
  * different actor's effects (spread copies, transfer, non-owned consume)
  * routes through the `gmCurseOp` GM action below.
  */
-import { curseMeterCapacity, curseEatenEnergy, curseFillAmount, curseSpendPrice, resolveCurseFillScale, defenceMarginMultiplier } from '../helpers/formulas.mjs';
-import { resolveDamage } from './damage.mjs';
+import { curseMeterCapacity, curseEatenEnergy, curseFillAmount, curseSpendPrice, resolveCurseFillScale } from '../helpers/formulas.mjs';
+import { priceDebuffForVictim } from './damage.mjs';
 import { dialogWaitNull } from '../helpers/dialogs.mjs';
 
 function _cfg() {
@@ -548,38 +548,62 @@ export async function gmCurseOp(payload, executeGmAction) {
     // dissipates, the ally is still cleansed, per the standing comment
     // below). Legacy effects without the stamp keep the old copy-as-is
     // behaviour.
+    // ── RE-PRICE, DON'T COPY (refactored 2026-09-06) ──
+    // A spread/transferred debuff answers to the body it lands on, not the
+    // one it came from. Everything victim-specific — the gauntlet AND the
+    // dot's toughness prepay — is derived by the SAME pure function the cast
+    // path uses (priceDebuffForVictim), from the source inputs stamped at
+    // first application. This block used to hand-patch each term separately
+    // and had already drifted from the cast path once.
+    // Legacy effects (no debuffRawBasis) keep the old copy-as-is behaviour.
     const _lane = system.targetDefense ?? '';
     const _raw = Number(system.debuffRawBasis) || 0;
-    // Lanes come from CONFIG so the cast path and this re-price cannot drift
-    // (extended 2026-09-06: melee/ranged run the gauntlet with NO wall).
-    const _gCfg = CONFIG.ASPECTSOFPOWER.debuffGauntlet ?? {};
-    if ((_gCfg.lanes ?? ['mind', 'soul']).includes(_lane) && _raw > 0) {
+    if (_raw > 0) {
       const _victimDoc = await fromUuid(victimUuid).catch(() => null);
       const _vActor = _victimDoc?.actor ?? _victimDoc;
       if (_vActor?.system?.defense) {
-        const _isVeilLane = (_gCfg.veilLanes ?? ['mind', 'soul']).includes(_lane);
-        const _veil = _isVeilLane ? (_vActor.system.defense.veil?.value ?? 0) : 0;
-        const _defVal = _vActor.system.defense[_lane]?.value ?? 0;
-        const _margin = defenceMarginMultiplier(_defVal, _raw);
-        const _through = Math.max(0, Math.round(
-          resolveDamage({ incoming: _raw, mitigation: _veil, margin: _margin }).hpLoss));
-        if (_through <= 0) {
+        const _def = _vActor.system.defense;
+        const _priced = priceDebuffForVictim(
+          {
+            lane: _lane,
+            rawBasis: _raw,
+            dotRawBase: system.dot ? (Number(system.dotRawBase) || 0) : 0,
+            dotPostMult: Number(system.dotPostMult) || 0,
+          },
+          {
+            veil: _def.veil?.value ?? 0,
+            laneDefense: _def[_lane]?.value ?? 0,
+            dr: _def.dr?.value ?? 0,
+          });
+
+        if (_priced.warded) {
+          const _what = { mind: 'will and veil', soul: 'spirit and veil',
+                          melee: 'raw strength', ranged: 'reflexes' }[_lane] ?? 'defences';
           ChatMessage.create({
             speaker: payload.speaker,
             ...(payload.whisperGM ? { whisper: payload.whisperGM } : {}),
-            content: `<p><em>${_vActor.name}'s ${({ mind: 'will and veil', soul: 'spirit and veil', melee: 'raw strength', ranged: 'reflexes' })[_lane]} ward off `
+            content: `<p><em>${_vActor.name}'s ${_what} ward off `
               + `<strong>${eff.name}</strong> — the curse finds no purchase.</em></p>`,
           });
           return;
         }
+
+        // Stat reductions scale with how much of the basis got through.
         const _oldBasis = Math.max(1, Number(system.debuffDamage) || _raw);
-        const _ratio = _through / _oldBasis;
+        const _ratio = _priced.through / _oldBasis;
         if (Math.abs(_ratio - 1) > 0.001) {
           changes = changes.map(c => ({
             ...c, value: Math.round((Number(c.value) || 0) * _ratio),
           }));
-          system.debuffDamage = _through;
-          if (system.dot && (system.dotDamage ?? 0) > 0) {
+          system.debuffDamage = _priced.through;
+        }
+
+        // The dot: re-priced against this body's DR when the source inputs
+        // are present, otherwise the legacy ratio scaling. Never both — the
+        // lane margin and the toughness wall would price defence twice.
+        if (system.dot && (system.dotDamage ?? 0) > 0) {
+          if (_priced.dotDamage !== null) system.dotDamage = _priced.dotDamage;
+          else if (Math.abs(_ratio - 1) > 0.001) {
             system.dotDamage = Math.max(0, Math.round(system.dotDamage * _ratio));
           }
         }

@@ -1,6 +1,6 @@
 import { EquipmentSystem } from '../systems/equipment.mjs';
 import { getPositionalTags } from '../helpers/positioning.mjs';
-import { houseHitFormula, hybridAbilityMod, weaponStatBlend, healStatBlend, spellDamageRef, spellInvestDamage, spellWindupMultiplier, spellCastWeight, strikeInvestDamage, coInvestDamage, investSelfDamage as computeInvestSelfDamage, effectiveDodgeValue, splitEvenlyWithRemainder, parryMassMultiplier, bracedParryWeight, bracedMaxUsefulInvest, defenceMarginMultiplier, defenseTimeCost, dodgeShortfallQuality, dotTickDamage, burnDetonatePayload, bulwarkWallBonus, procStaminaCost, crushFlatAmount, riderMaxInvest, auraRadiusFor, barrierStatBlend, hotTickAmount, effectiveDamageMultiplier, clashOutcome, orbDischargePrice, orbChargeAfterBank, affinityAnswer, aiInvestSize } from '../helpers/formulas.mjs';
+import { houseHitFormula, hybridAbilityMod, weaponStatBlend, healStatBlend, spellDamageRef, spellInvestDamage, spellWindupMultiplier, spellCastWeight, strikeInvestDamage, coInvestDamage, investSelfDamage as computeInvestSelfDamage, effectiveDodgeValue, splitEvenlyWithRemainder, parryMassMultiplier, bracedParryWeight, bracedMaxUsefulInvest, defenceMarginMultiplier, defenseTimeCost, dodgeShortfallQuality, dotTickDamage, riderDamageBase, burnDetonatePayload, bulwarkWallBonus, procStaminaCost, crushFlatAmount, riderMaxInvest, auraRadiusFor, barrierStatBlend, hotTickAmount, effectiveDamageMultiplier, clashOutcome, orbDischargePrice, orbChargeAfterBank, affinityAnswer, aiInvestSize } from '../helpers/formulas.mjs';
 import { resolveSituationalMods } from '../systems/situational-mods.mjs';
 import { recordActionFired, declareAction, isInActiveCombat, computeActionWait, referenceRoundLength, computeWindupMultiplier, getScrambleStacks, addScrambleStack, applyDodgeCost, findCombatantForActor, perceiveGate, getDefenseBudget, spendDefenseBudget, setLastSwungHand, computeActionHeft, actorRoundLength } from '../systems/celerity.mjs';
 import { getThreatRadiusFt, actorIsDashing } from '../systems/engagement-halts.mjs';
@@ -14,7 +14,7 @@ import { resolveCoInvest } from '../systems/co-invest.mjs';
 import { handleSpread, handleTransfer, handleConsume, handleHarness, onCurseCast, ventAllCurse, meterValue as curseMeterValue, spendPriceFor, spendCurse, equippedCursedVessel } from '../systems/curse.mjs';
 import { equippedTome, tomeSeizeCapFor, tomeBinding, castAffinities } from '../systems/implements.mjs';
 import { compositionsFor } from '../systems/affinity.mjs';
-import { resolveDamage } from '../systems/damage.mjs';
+import { resolveDamage, priceDebuffForVictim } from '../systems/damage.mjs';
 import { dialogWaitNull } from '../helpers/dialogs.mjs';
 
 /**
@@ -4713,16 +4713,18 @@ export class AspectsofPowerItem extends Item {
     // raw strength" (Bloodstick). The lane's own defence value still supplies
     // the margin, and the melee lane already blends strength, so the contest
     // is the stat and nothing else. Veil remains the wall for mind/soul.
-    const _gCfg = CONFIG.ASPECTSOFPOWER.debuffGauntlet ?? {};
-    const _gLanes = _gCfg.lanes ?? ['mind', 'soul'];
-    if (!_isAttackDebuff && _gLanes.includes(_gauntletKey) && rollTotal > 0) {
-      const _isVeilLane = (_gCfg.veilLanes ?? ['mind', 'soul']).includes(_gauntletKey);
-      const _veil = _isVeilLane ? (targetActor.system.defense.veil?.value ?? 0) : 0;
-      const _defVal = targetActor.system.defense[_gauntletKey]?.value ?? 0;
-      const _margin = defenceMarginMultiplier(_defVal, rollTotal);
-      const _res = resolveDamage({ incoming: rollTotal, mitigation: _veil, margin: _margin });
-      const _through = Math.max(0, Math.round(_res.hpLoss));
-      if (_through < rollTotal) {
+    // Priced through the SAME pure function the curse spread/transfer path
+    // uses (priceDebuffForVictim), so a fresh cast and a spread onto the same
+    // body can never disagree — they did once, which is why this is shared.
+    if (!_isAttackDebuff && rollTotal > 0) {
+      const _vDef = targetActor.system.defense ?? {};
+      const _priced = priceDebuffForVictim(
+        { lane: _gauntletKey, rawBasis: rollTotal },
+        { veil: _vDef.veil?.value ?? 0,
+          laneDefense: _vDef[_gauntletKey]?.value ?? 0,
+          dr: _vDef.dr?.value ?? 0 });
+      const _through = _priced.through;
+      if (_priced.gauntleted && _through < rollTotal) {
         const _pct = Math.round((1 - _through / rollTotal) * 100);
         const _what = { mind: 'will and veil', soul: 'spirit and veil',
                         melee: 'raw strength', ranged: 'reflexes' }[_gauntletKey];
@@ -4785,6 +4787,18 @@ export class AspectsofPowerItem extends Item {
           tickDR: targetActor.system.defense?.dr?.value ?? 0,
         })
       : 0;
+
+    // Inputs the spread/transfer re-price needs to charge the NEW victim's
+    // DR (ruled 2026-09-06). Store the PRE-DR base and the multiplier that
+    // follows it, never the finished number: DR lands on the base before the
+    // dotScale slice, and re-applying it after the slice gives a different
+    // answer under the superlinear ratio model. Invest-tag dots never pay DR
+    // at all, so they stay 0 and keep the old ratio behaviour.
+    const _dotReprice = dealsDmg && !_hasInvestTag;
+    const _dotRawBase = _dotReprice
+      ? riderDamageBase(rollData.roll?.parentDamage ?? 0, dmgRoll?.total ?? 0)
+      : 0;
+    const _dotPostMult = _dotReprice ? (dotScale * defenseMultiplier) : 0;
 
     // Build effect data with optional DoT flags.
     const effectName = `${item.name} (Debuff)`;
@@ -4906,7 +4920,7 @@ export class AspectsofPowerItem extends Item {
       // it was designed for exactly this dispel-by-tag shape.
       tags: [...(this.system.tags ?? [])],
       ...(dismemberedSlot ? { dismemberedSlot } : {}),
-      ...(dealsDmg ? { dot: true, dotDamage: dotDmg, dotPrepaid: true, dotDamageType: dmgType, applierActorUuid: this.actor.uuid, drStrip: hasShred || !!this.system.tagConfig?.debuffDRStrip } : {}),
+      ...(dealsDmg ? { dot: true, dotDamage: dotDmg, dotPrepaid: true, dotRawBase: _dotRawBase, dotPostMult: _dotPostMult, dotDamageType: dmgType, applierActorUuid: this.actor.uuid, drStrip: hasShred || !!this.system.tagConfig?.debuffDRStrip } : {}),
       ...(armorCrushVal > 0 ? { armorCrush: armorCrushVal, armorCrushFlat } : {}),
       ...(armorMeltRate > 0 ? { armorMeltRate } : {}),
       ...(markActive ? {

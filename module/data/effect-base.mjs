@@ -70,6 +70,17 @@ export class AopEffectData extends foundry.data.ActiveEffectTypeDataModel {
       // dot; ticks still face DR (double jeopardy, kept only so in-flight
       // effects resolve under the rules they were applied under).
       dotPrepaid:       new fields.BooleanField({ initial: false }),
+      // ── SPREAD RE-PRICES AGAINST THE NEW VICTIM'S DR (ruled 2026-09-06) ──
+      // dotDamage bakes in the ORIGINAL victim's toughness (paid once, above),
+      // so copying it onto someone else carried the wrong body's armour. DR is
+      // applied to the BASE, before the dotScale slice — per-slice DR collapses
+      // under the superlinear ratio model — so re-pricing needs the pre-DR base
+      // and the multiplier that followed it, not the finished number.
+      //   dotDamage = round(armourRatioApplied(dotRawBase, DR) * dotPostMult)
+      // dotRawBase 0 means "not re-priceable" (legacy effects, and invest-tag
+      // dots, which never pay DR at all) — those keep the old ratio behaviour.
+      dotRawBase:       new fields.NumberField({ initial: 0 }),
+      dotPostMult:      new fields.NumberField({ initial: 0 }),
       dotDamageType:    new fields.StringField({ initial: 'physical' }),
       applierActorUuid: new fields.StringField({ initial: '' }),
 
