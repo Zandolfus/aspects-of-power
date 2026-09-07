@@ -5329,7 +5329,17 @@ export class AspectsofPowerItem extends Item {
    * @param {RegionDocument} regionDoc
    * @returns {Array<{ token: Token, fraction: number }>}
    */
-  _getAoeTargets(regionDoc) {
+  /**
+   * @param {object} [opts]
+   * @param {boolean} [opts.includeDowned]  Support casts only. A DAMAGING area
+   *   must not include the dead: hitting a corpse posts damage cards for a
+   *   body and can RE-TRIGGER its on-death effects — re-detonating a Death
+   *   Bloom on a creature that already blew up. That is the same hazard the
+   *   deferred-fire dead-target guard exists to prevent, and this path had no
+   *   equivalent (2026-09-06 sweep). A blessing or heal deliberately still
+   *   reaches a downed ally.
+   */
+  _getAoeTargets(regionDoc, { includeDowned = false } = {}) {
     const targetingMode = this.system.aoe.targetingMode ?? 'all';
     const casterToken = this.actor.getActiveTokens()?.[0] ?? null;
     const casterDisp = casterToken?.document?.disposition ?? CONST.TOKEN_DISPOSITIONS.NEUTRAL;
@@ -5353,6 +5363,12 @@ export class AspectsofPowerItem extends Item {
       // See helpers/geometry.mjs for the math.
       const fraction = regionTokenOverlap(regionDoc, token.document);
       if (fraction < INCLUSION_FLOOR) continue;
+
+      // A corpse is not a target for a damaging area (see the doc comment).
+      if (!includeDowned) {
+        const _hp = token.actor?.system?.health?.value;
+        if (typeof _hp === 'number' && _hp <= 0) continue;
+      }
 
       // Disposition filter.
       if (targetingMode === 'enemies') {
@@ -8044,7 +8060,8 @@ export class AspectsofPowerItem extends Item {
       }
 
       // Detect qualifying tokens.
-      const targets = this._getAoeTargets(templateDoc);
+      // Support areas still reach the downed; damaging ones stop at the dead.
+      const targets = this._getAoeTargets(templateDoc, { includeDowned: !!this._supportCardKind() });
       if (targets.length === 0) {
         ui.notifications.warn(game.i18n.localize('ASPECTSOFPOWER.AOE.noTokensInArea'));
       }
