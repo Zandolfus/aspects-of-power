@@ -47,6 +47,22 @@ function _actorSpeedFor(actor, skill) {
   const type = skill?.system?.roll?.type ?? '';
   const ability = skill?.system?.roll?.abilities ?? '';
 
+  // ── A GUARD IS A WEAPON (2026-09-06) ──
+  // Stance skills carry no roll.type and no abilities, so they fell through
+  // to the switch default and were priced on DEXTERITY ALONE. That charged a
+  // strength shield-tank in finesse: John's 120-weight shield cost 71.5% of
+  // his round on dex 222 while his strength 307 counted for nothing. Price
+  // the entry with the same weight-driven str/dex blend every other melee
+  // weapon uses, off the GUARD's weight (not the halved entry weight — the
+  // blend describes the item's class, the fraction describes the motion).
+  // Buckler 60 -> 38% str, shield 120 -> 61%, greatshield 190 -> 88%.
+  if ((skill?.system?.tags ?? []).includes('stance')) {
+    const guard = skill?._proficiencyWeapon?.() ?? null;
+    const gw = AspectsofPowerItem.resolveWeaponWeight(guard);
+    const w = gw > 0 ? gw : (CONFIG.ASPECTSOFPOWER.celerity?.BASELINE_WEIGHT ?? 100);
+    return weaponStatBlend(w, { str: a.strength?.mod ?? 0, dex: a.dexterity?.mod ?? 0 }, false).blend;
+  }
+
   if (_MAGIC_TYPES_FOR_SPEED.has(type)) {
     // CURSES ARE INT-INDEPENDENT (ruled 2026-08-24: "Curses are int
     // independent. They are purely wis/will."). Read the curse family from

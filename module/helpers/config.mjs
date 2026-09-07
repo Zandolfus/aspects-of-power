@@ -1401,13 +1401,19 @@ ASPECTSOFPOWER.weaponTagGrants = {
 
 ASPECTSOFPOWER.guardStance = {
   enabled: true,
-  // Raising a guard is HALF the motion of swinging it (ruled 2026-08-21:
-  // "64% of a round seems a bit much") — no wind-up committed into a
-  // target, no follow-through. Entry weight = guardWeight x this fraction,
-  // so the ladder keeps its proportions: Phil greatshield 64% -> 32% of
-  // his round, shield 20%, buckler 10%. Stance skills' own
-  // actionWeightMultiplier still stacks on top (Lightning Guard etc.).
-  entryWeightFraction: 0.5,
+  // Raising a guard is a QUARTER of the motion of swinging it (ruled
+  // 2026-09-06: "raising a shield should be relatively fast"; was 0.5 from
+  // 2026-08-21) — no wind-up committed into a target, no follow-through.
+  // Entry weight = guardWeight x this fraction, so the ladder keeps its
+  // proportions while every guard roughly halves. Measured against live
+  // actors at 0.25, as a share of each one's own round: John's shield 29%,
+  // George's greataxe brace 18%, Aiden's 20%, Gabriel's buckler 6%.
+  // ⚠ The old comment quoted a fixed ladder (shield 20%, buckler 10%) as if
+  // it were universal. It is NOT: the share depends on the actor's own
+  // str/dex blend, so the same shield costs different fractions of
+  // different characters' rounds. Quote a NAMED actor or nothing.
+  // Stance skills' own actionWeightMultiplier still stacks on top.
+  entryWeightFraction: 0.25,
   // Where a shield's armorBonus lives (ruled 2026-08-21): 'block' = no
   // passive armor; the FULL armorBonus joins the wall of any hit the
   // shield-bearer answers with a shield parry (attempt is enough — the
@@ -2376,10 +2382,12 @@ ASPECTSOFPOWER.weaponWeights = {
   // any combination. Weights sit against their striking analogues: a buckler
   // punches about like a fist, a shield bash like an axe, a greatshield like a
   // polearm you shove rather than swing.
-  buckler:    50,
+  // ⚠ `buckler` was declared TWICE here (50, then 60). The later key silently
+  // won, so the file documented 50 while the game used 60 — deleted 2026-09-06,
+  // keeping the guard-stances ladder value.
+  buckler:    60,   // guard-stances ladder (design-guard-stances): quick weak guard
   shield:    120,
   greatshield: 190,
-  buckler:    60,   // guard-stances ladder (design-guard-stances): quick weak guard
   // Gauntlets — armoured fists. Heavier than bare hands, lighter than a
   // dagger, because the weight is the armour and not a blade.
   gauntlet:   50,

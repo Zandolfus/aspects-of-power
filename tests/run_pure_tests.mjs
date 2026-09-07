@@ -2616,8 +2616,22 @@ eq('junk situational entries are skipped, not NaN',
   // Entry is priced by guard WEIGHT through the swing formula — the ladder
   // IS the weight table, so these pins are the ladder.
   eq('guardStance: shipped enabled', /guardStance = \{\s*\n?\s*enabled:\s*true/.test(src), true);
-  eq('guardStance: raise is half a swing (0.5)', Number(/entryWeightFraction:\s*([\d.]+)/.exec(src)?.[1]), 0.5);
+  // Re-ruled 2026-09-06 ("raising a shield should be relatively fast"): a
+  // quarter of a swing, not half. Every guard roughly halves.
+  eq('guardStance: raise is a quarter of a swing (0.25)', Number(/entryWeightFraction:\s*([\d.]+)/.exec(src)?.[1]), 0.25);
   eq('guardStance: shield armor lives in the block', /shieldArmorModel:\s*'block'/.test(src), true);
+
+  // A GUARD IS A WEAPON (2026-09-06): stance entry is priced with the same
+  // weight-driven str/dex blend as any melee swing, off the GUARD's weight.
+  // Before this, stance skills had no roll.type and fell to a dex-only
+  // default, charging a strength shield-tank in finesse. The tiers are the
+  // point: a buckler stays finesse, a greatshield is a strength item.
+  eq('guard blend: buckler 60 leans dex', weaponStatBlend(60, { str: 307, dex: 222 }, false, CFG).blend, 254);
+  eq('guard blend: shield 120 leans str', weaponStatBlend(120, { str: 307, dex: 222 }, false, CFG).blend, 274);
+  eq('guard blend: greatshield 190 is str-dominant', weaponStatBlend(190, { str: 307, dex: 222 }, false, CFG).blend, 297);
+  // Negative control: the same shield on a finesse build resolves DIFFERENTLY
+  // — proof the blend reads both stats, not just the heavier one.
+  eq('guard blend: shield 120 on a dex build', weaponStatBlend(120, { str: 475, dex: 870 }, false, CFG).blend, 629);
 
   // ── Bulwark (braced block, phase 2 ruled 2026-08-21) ──
   // Anchors: Phil's greatshield 185 vs a 1000 hit at the shipped 0.05 frac:
