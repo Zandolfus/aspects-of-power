@@ -16,7 +16,10 @@
   const abilities = {};
   for (const k of Object.keys(s.abilities || {})) {
     const ab = s.abilities[k];
-    abilities[k] = { value: ab.value, mod: ab.mod };
+    /* value = the DERIVED final (titles, blessings, capped equipment, effects); base = the
+       stored source value the derivation starts from (v12.1, for the UE derivation port). */
+    const src = (a._source && a._source.system && a._source.system.abilities && a._source.system.abilities[k]) ? a._source.system.abilities[k] : null;
+    abilities[k] = { value: ab.value, mod: ab.mod, base: src ? Math.round(src.value || 0) : ab.value };
   }
 
   const pool = (p) => (p ? { value: p.value, max: p.max } : null);
@@ -215,9 +218,10 @@
       img: e.img || '',
       category: es.effectCategory || '',
       effectType: es.effectType || '',
+      itemSource: es.itemSource || '',
       disabled: !!e.disabled,
       roundsRemaining: (es.roundsRemaining == null) ? -1 : es.roundsRemaining,
-      changes: (e.changes || []).map(function (c) { return { key: c.key, mode: c.mode, value: String(c.value) }; })
+      changes: (e.changes || []).map(function (c) { return { key: c.key, mode: c.mode, type: c.type || '', value: String(c.value) }; })
     };
   });
 
@@ -296,6 +300,16 @@
       aiProfile: aiProfile,
       aiBehaviors: aiBehaviors,
       raceRank: (s.attributes && s.attributes.race && s.attributes.race.rank) ? s.attributes.race.rank : 'E',
+      raceName: (s.attributes && s.attributes.race) ? (s.attributes.race.name || '') : '',
+      className: (s.attributes && s.attributes['class']) ? (s.attributes['class'].name || '') : '',
+      professionName: (s.attributes && s.attributes.profession) ? (s.attributes.profession.name || '') : '',
+      levels: {
+        race: (s.attributes && s.attributes.race) ? (s.attributes.race.level || 0) : 0,
+        'class': (s.attributes && s.attributes['class']) ? (s.attributes['class'].level || 0) : 0,
+        profession: (s.attributes && s.attributes.profession) ? (s.attributes.profession.level || 0) : 0
+      },
+      strain: s.strain || 0,
+      activeLoadout: s.activeLoadout || 'combat',
       abilities: abilities,
       health: pool(s.health),
       mana: pool(s.mana),
