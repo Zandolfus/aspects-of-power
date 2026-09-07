@@ -130,6 +130,13 @@ export async function sweepAuraTicks(combat, newClock) {
           const targetActor = otherCm.actor;
           if (!otherDoc || !targetActor) continue;
           if (otherDoc.parent?.id !== canvas.scene.id) continue;
+          // Same corpse rule as dots (2026-09-06): a DAMAGING aura stops at
+          // the dead rather than grinding a body every tick. Heal and stamina
+          // auras are deliberately left alone — whether a downed ally inside a
+          // healer's hymn should be lifted is a design ruling, not something
+          // to decide silently inside a tick loop.
+          if ((sys.auraEffectType ?? 'damage') === 'damage'
+              && (targetActor.system?.health?.value ?? 0) <= 0) continue;
           const isSelf = otherDoc.id === casterDoc.id;
           // A supportive aura includes its carrier (user ruled 2026-08-03) —
           // a chanter in their own hymn is sustained by it, not a battery.

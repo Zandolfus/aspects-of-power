@@ -70,6 +70,12 @@ export async function tickDotsFor(combat, applierUuid, k = 1, n = 1) {
   const results = [];
   for (const c of combat.combatants) {
     if (!c.actor) continue;
+    // A CORPSE TAKES NO MORE DAMAGE (2026-09-06, watcher finding). There was
+    // no death check here at all: every dot pool on a 0-hp combatant kept
+    // ticking, writing max(0, 0 - damage) = 0 and posting a fresh damage card
+    // every cadence slice for the rest of the fight. Mirrors the movement
+    // rule that a corpse guards nothing (`3beeae6`).
+    if ((c.actor.system?.health?.value ?? 0) <= 0) continue;
     const pools = poolDots(c.actor, applierUuid);
     if (!pools.size) continue;
 
