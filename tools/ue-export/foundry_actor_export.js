@@ -112,6 +112,7 @@
     return {
       name: i.name,
       skillType: i.system.skillType,
+      img: i.img || '',
       reactionType: i.system.reactionType || '',
       tags: i.system.tags || [],
       affinities: i.system.affinities || [],
@@ -161,6 +162,7 @@
     return {
       id: i.id,
       name: i.name,
+      img: i.img || '',
       slot: it.slot || '',
       hand: it.hand || '',
       twoHanded: !!it.twoHanded,
@@ -202,9 +204,88 @@
   var aiProfile = aiFlags.aiProfile || '';
   var aiBehaviors = Array.isArray(aiFlags.aiBehaviors) ? aiFlags.aiBehaviors.slice() : [];
 
+  /* EFFECTS (schema v12): the actor's ActiveEffects with their category -- TITLES (additive
+     to base), BLESSINGS (multiply), passives, temporary buffs/debuffs -- and their stat
+     changes, so the client sheet shows Titles / Blessings and reads what each one does. */
+  var effects = a.effects.map(function (e) {
+    var es = e.system || {};
+    return {
+      id: e.id,
+      name: e.name,
+      img: e.img || '',
+      category: es.effectCategory || '',
+      effectType: es.effectType || '',
+      disabled: !!e.disabled,
+      roundsRemaining: (es.roundsRemaining == null) ? -1 : es.roundsRemaining,
+      changes: (e.changes || []).map(function (c) { return { key: c.key, mode: c.mode, value: String(c.value) }; })
+    };
+  });
+
+  /* CONSUMABLES (schema v12): items of type 'consumable' with the effect block that matters
+     for their consumableType (restoration / buff / poison / barrier / bomb / repair). */
+  var consumables = a.items.filter(function (i) { return i.type === 'consumable'; }).map(function (i) {
+    var c = i.system || {};
+    var ch = c.charges || {};
+    var rs = c.restoration || {};
+    var bf = c.buff || {};
+    var po = c.poison || {};
+    var ba = c.barrier || {};
+    var bo = c.bomb || {};
+    return {
+      id: i.id,
+      name: i.name,
+      img: i.img || '',
+      consumableType: c.consumableType || '',
+      effectType: c.effectType || '',
+      quantity: (c.quantity == null) ? 1 : c.quantity,
+      weight: c.weight || 0,
+      rarity: c.rarity || '',
+      chargesValue: (ch.value == null) ? 1 : ch.value,
+      chargesMax: (ch.max == null) ? 1 : ch.max,
+      restoreResource: rs.resource || '',
+      restoreAmount: rs.amount || 0,
+      restoreOverhealth: !!rs.overhealth,
+      buffEntries: (bf.entries || []).map(function (b) { return { attribute: b.attribute, value: b.value }; }),
+      buffDuration: bf.duration || 0,
+      poisonDamage: po.damage || 0,
+      poisonDamageType: po.damageType || '',
+      poisonDuration: po.duration || 0,
+      barrierValue: ba.value || 0,
+      bombDamage: bo.damage || 0,
+      bombDamageType: bo.damageType || '',
+      bombShape: bo.shape || '',
+      bombDiameter: bo.diameter || 0,
+      repairAmount: c.repairAmount || 0
+    };
+  });
+
+  /* RECIPES (schema v12): known recipes -- the bill of materials, threshold, product. */
+  var recipes = a.items.filter(function (i) { return i.type === 'recipe'; }).map(function (i) {
+    var r = i.system || {};
+    var out = r.output || {};
+    return {
+      id: i.id,
+      name: i.name,
+      img: i.img || '',
+      profession: r.profession || '',
+      rarity: r.rarity || '',
+      threshold: r.threshold || 0,
+      minMana: r.minMana || 0,
+      source: r.source || '',
+      discoveredBy: r.discoveredBy || '',
+      requiresSkillTags: Array.isArray(r.requiresSkillTags) ? r.requiresSkillTags.slice() : [],
+      inputs: (r.inputs || []).map(function (n) { return { material: n.material || '', itemName: n.itemName || '', element: n.element || '', quantity: n.quantity || 1 }; }),
+      outputName: out.name || '',
+      outputTypeKey: out.typeKey || '',
+      outputMaterial: out.material || '',
+      outputElement: out.element || '',
+      outputQuantity: out.quantity || 1
+    };
+  });
+
   return JSON.stringify({
-    schema_version: 11,
-    exporter: 'aop-foundry-actor-export 0.11',
+    schema_version: 12,
+    exporter: 'aop-foundry-actor-export 0.12',
     world: game.world.id,
     actor: {
       name: a.name,
@@ -237,7 +318,10 @@
       tags: s.tags || [],
       skillCount: skills.length,
       skills: skills,
-      inventory: inventory
+      inventory: inventory,
+      effects: effects,
+      consumables: consumables,
+      recipes: recipes
     }
   });
 })
