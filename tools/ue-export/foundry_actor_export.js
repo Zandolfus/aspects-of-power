@@ -117,9 +117,15 @@
       affinities: i.system.affinities || [],
       rarity: i.system.rarity || '',
       requiresSight: !!i.system.requiresSight,
-      /* AOE FOOTPRINT (schema v9). Emit the shape even when enabled=false: a mine
-         SNAPSHOTS its (disabled) aoe as the burst footprint Detonate reads back. */
-      aoe: i.system.aoe ? { enabled: !!i.system.aoe.enabled, shape: i.system.aoe.shape || 'circle', diameter: Number(i.system.aoe.diameter) || 0, baseSize: Number(i.system.aoe.baseSize) || 0 } : null,
+      /* AOE FOOTPRINT (schema v9; v11 adds angle/width/targetingMode for cone/ray + friendly-fire).
+         Emit the shape even when enabled=false: a mine SNAPSHOTS its (disabled) aoe as the burst
+         footprint Detonate reads back. */
+      aoe: i.system.aoe ? { enabled: !!i.system.aoe.enabled, shape: i.system.aoe.shape || 'circle', diameter: Number(i.system.aoe.diameter) || 0, baseSize: Number(i.system.aoe.baseSize) || 0, angle: Number(i.system.aoe.angle) || 0, width: Number(i.system.aoe.width) || 0, targetingMode: i.system.aoe.targetingMode || 'all' } : null,
+      /* TAG CONFIG passthrough (schema v11): the skill's flat tagConfig map, pruned to SET (truthy)
+         entries, into the client's generic TagConfigRaw -- the same store UE-authored skills use.
+         Unlocks guardianMode/redirectPct, reaction*, summon*, ... without a per-field schema each time.
+         Objects/arrays are JSON-stringified; the client reads the keys it needs. */
+      tagConfig: (function () { var o = {}; var keys = Object.keys(tc); for (var ki = 0; ki < keys.length; ki++) { var k = keys[ki]; var v = tc[k]; if (v === 0 || v === '' || v === false || v === null || v === undefined) { continue; } if (Array.isArray(v) && v.length === 0) { continue; } o[k] = (typeof v === 'object') ? JSON.stringify(v) : v; } return o; })(),
       weaponWeight: weaponWeight,
       damageMultiplier: damageMultiplier,
       dotDealsDamage: dotDealsDamage,
@@ -189,9 +195,16 @@
     folderPath = parts.join('/');
   }
 
+  /* AI FLAGS (schema v11): the authored brain + faculties (flags.aspectsofpower.aiProfile /
+     aiBehaviors), so the client drives an AI actor by its authored profile instead of a loadout
+     heuristic. Empty when unset (the client then derives). */
+  var aiFlags = (a.flags && a.flags.aspectsofpower) ? a.flags.aspectsofpower : {};
+  var aiProfile = aiFlags.aiProfile || '';
+  var aiBehaviors = Array.isArray(aiFlags.aiBehaviors) ? aiFlags.aiBehaviors.slice() : [];
+
   return JSON.stringify({
-    schema_version: 10,
-    exporter: 'aop-foundry-actor-export 0.10',
+    schema_version: 11,
+    exporter: 'aop-foundry-actor-export 0.11',
     world: game.world.id,
     actor: {
       name: a.name,
@@ -199,6 +212,8 @@
       type: a.type,
       sizeTag: s.sizeTag || '',
       folder: folderPath,
+      aiProfile: aiProfile,
+      aiBehaviors: aiBehaviors,
       raceRank: (s.attributes && s.attributes.race && s.attributes.race.rank) ? s.attributes.race.rank : 'E',
       abilities: abilities,
       health: pool(s.health),
