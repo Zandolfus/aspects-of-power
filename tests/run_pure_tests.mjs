@@ -1323,6 +1323,21 @@ eq('ai invest: ceiling below base clamps up to base', F2.aiInvestSize(500, 10, 4
                             { veil: 0, laneDefense: 0, dr: 240 }).dotDamage, null);
   }
 
+  // A BUFFED CAST POPS OFF WHEN SPREAD (ruled 2026-09-06). The spread carries
+  // the SOURCE cast's raw power to every new victim, so tripling the basis
+  // must land materially harder on the same body -- if this ever clamps, the
+  // reward for committing to one huge cast has quietly gone.
+  {
+    const body = { veil: 309, laneDefense: 231, dr: 240 };
+    const small = priceDebuffForVictim({ lane: 'mind', rawBasis: 460 }, body).through;
+    const big = priceDebuffForVictim({ lane: 'mind', rawBasis: 1380 }, body).through;
+    eq('seam: 3x the cast spreads far harder onto the same body', big > small * 3, true);
+    // And the dot rides the same basis, not the previous victim's number.
+    const dSmall = priceDebuffForVictim({ lane: 'mind', rawBasis: 460, dotRawBase: 400, dotPostMult: 0.1 }, body).dotDamage;
+    const dBig = priceDebuffForVictim({ lane: 'mind', rawBasis: 460, dotRawBase: 1200, dotPostMult: 0.1 }, body).dotDamage;
+    eq('seam: a bigger seed spreads a bigger dot', dBig > dSmall, true);
+  }
+
   globalThis.CONFIG.ASPECTSOFPOWER.debuffGauntlet = _prevG;
   globalThis.CONFIG.ASPECTSOFPOWER.defenseTuning = _prevDT;
 }

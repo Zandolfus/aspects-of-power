@@ -548,7 +548,17 @@ export async function gmCurseOp(payload, executeGmAction) {
     // dissipates, the ally is still cleansed, per the standing comment
     // below). Legacy effects without the stamp keep the old copy-as-is
     // behaviour.
-    // ── RE-PRICE, DON'T COPY (refactored 2026-09-06) ──
+    // ── A SPREAD IS A COPY, DELIBERATELY (RULED 2026-09-06) ──
+    // "It should be spreading as a copy. So if they buff up a cast real high
+    // and spread it, it pops off." The curse moves AS IT IS: the new victims
+    // inherit the SHAPE — the source cast'''s raw power (debuffRawBasis, buffs
+    // and invest included), its remaining duration, its stat list, no
+    // stacking. That is the payoff for committing to one huge cast.
+    // What does NOT copy is anything about the previous BODY: the magnitude
+    // is re-priced below against each new victim'''s own defences. Shape from
+    // the source, numbers from the target.
+    //
+    // ── RE-PRICE, DON'''T COPY THE NUMBERS (refactored 2026-09-06) ──
     // A spread/transferred debuff answers to the body it lands on, not the
     // one it came from. Everything victim-specific — the gauntlet AND the
     // dot's toughness prepay — is derived by the SAME pure function the cast
