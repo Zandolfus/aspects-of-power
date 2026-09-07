@@ -3645,15 +3645,23 @@ export class AspectsofPowerItem extends Item {
   /**
    * Resolve the effective reach of a melee skill in feet.
    *
-   *   skill.system.reach > 0  →  use that (skill explicitly overrides weapon)
-   *   else                    →  use the wielded weapon's reach
-   *   else                    →  5 (default melee reach)
+   *   skill.system.roll.reach > 0  →  use that (skill overrides the weapon)
+   *   else                         →  use the wielded weapon's reach
+   *   else                         →  5 (default melee reach)
+   *
+   * ⚠ ORPHANED READER, FIXED 2026-09-06. This read `this.system.reach`, which
+   * is NOT a field on the skill schema — `reach` lives inside the `roll` block
+   * (item-skill.mjs, beside targetDefense). So every authored skill reach
+   * resolved to 0 and silently fell through to weapon-or-5: the Brute's Crush
+   * and the Saurian's Vine Maul are both authored at 10 ft and both fought at
+   * 5. The weapon fallback below is a DIFFERENT document — an item genuinely
+   * does carry system.reach — so only the skill lookup was wrong.
    *
    * @param {Item|null} weapon  Optional pre-resolved weapon (avoids re-lookup).
    * @returns {number}  Reach in feet.
    */
   _resolveSkillReach(weapon = null) {
-    const skillReach = this.system?.reach ?? 0;
+    const skillReach = this.system?.roll?.reach ?? 0;
     let reach = skillReach > 0
       ? skillReach
       : ((weapon ?? this._resolveWeaponForSkill?.())?.system?.reach ?? 5);
