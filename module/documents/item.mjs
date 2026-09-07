@@ -4707,20 +4707,31 @@ export class AspectsofPowerItem extends Item {
     // Non-veil debuff-only lanes are untouched (no ruling yet).
     const _isAttackDebuff = (this.system.tags ?? []).includes('attack');
     const _gauntletKey = this.system.roll?.targetDefense || '';
-    if (!_isAttackDebuff && (_gauntletKey === 'mind' || _gauntletKey === 'soul') && rollTotal > 0) {
-      const _veil = targetActor.system.defense.veil?.value ?? 0;
+    // PHYSICAL LANES RESIST WITHOUT ARMOUR (ruled 2026-09-06). A debuff-only
+    // cast on melee/ranged now runs the same gauntlet, but with NO mitigation
+    // wall: "a pool of sticky blood — no armour is going to stop that, just
+    // raw strength" (Bloodstick). The lane's own defence value still supplies
+    // the margin, and the melee lane already blends strength, so the contest
+    // is the stat and nothing else. Veil remains the wall for mind/soul.
+    const _gCfg = CONFIG.ASPECTSOFPOWER.debuffGauntlet ?? {};
+    const _gLanes = _gCfg.lanes ?? ['mind', 'soul'];
+    if (!_isAttackDebuff && _gLanes.includes(_gauntletKey) && rollTotal > 0) {
+      const _isVeilLane = (_gCfg.veilLanes ?? ['mind', 'soul']).includes(_gauntletKey);
+      const _veil = _isVeilLane ? (targetActor.system.defense.veil?.value ?? 0) : 0;
       const _defVal = targetActor.system.defense[_gauntletKey]?.value ?? 0;
       const _margin = defenceMarginMultiplier(_defVal, rollTotal);
       const _res = resolveDamage({ incoming: rollTotal, mitigation: _veil, margin: _margin });
       const _through = Math.max(0, Math.round(_res.hpLoss));
       if (_through < rollTotal) {
         const _pct = Math.round((1 - _through / rollTotal) * 100);
+        const _what = { mind: 'will and veil', soul: 'spirit and veil',
+                        melee: 'raw strength', ranged: 'reflexes' }[_gauntletKey];
         ChatMessage.create({
           speaker, rollMode, ...(whisperGM ? { whisper: whisperGM } : {}),
           content: _through <= 0
-            ? `<p><em>${targetActor.name}'s ${_gauntletKey === 'mind' ? 'will' : 'spirit'} and veil turn `
+            ? `<p><em>${targetActor.name}'s ${_what} turn `
               + `<strong>${this.name}</strong> aside completely.</em></p>`
-            : `<p><em>${targetActor.name}'s ${_gauntletKey === 'mind' ? 'will' : 'spirit'} and veil blunt `
+            : `<p><em>${targetActor.name}'s ${_what} blunt `
               + `<strong>${this.name}</strong>: ${rollTotal} → ${_through} (${_pct}% resisted).</em></p>`,
         });
       }

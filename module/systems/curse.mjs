@@ -550,11 +550,15 @@ export async function gmCurseOp(payload, executeGmAction) {
     // behaviour.
     const _lane = system.targetDefense ?? '';
     const _raw = Number(system.debuffRawBasis) || 0;
-    if ((_lane === 'mind' || _lane === 'soul') && _raw > 0) {
+    // Lanes come from CONFIG so the cast path and this re-price cannot drift
+    // (extended 2026-09-06: melee/ranged run the gauntlet with NO wall).
+    const _gCfg = CONFIG.ASPECTSOFPOWER.debuffGauntlet ?? {};
+    if ((_gCfg.lanes ?? ['mind', 'soul']).includes(_lane) && _raw > 0) {
       const _victimDoc = await fromUuid(victimUuid).catch(() => null);
       const _vActor = _victimDoc?.actor ?? _victimDoc;
       if (_vActor?.system?.defense) {
-        const _veil = _vActor.system.defense.veil?.value ?? 0;
+        const _isVeilLane = (_gCfg.veilLanes ?? ['mind', 'soul']).includes(_lane);
+        const _veil = _isVeilLane ? (_vActor.system.defense.veil?.value ?? 0) : 0;
         const _defVal = _vActor.system.defense[_lane]?.value ?? 0;
         const _margin = defenceMarginMultiplier(_defVal, _raw);
         const _through = Math.max(0, Math.round(
@@ -563,7 +567,7 @@ export async function gmCurseOp(payload, executeGmAction) {
           ChatMessage.create({
             speaker: payload.speaker,
             ...(payload.whisperGM ? { whisper: payload.whisperGM } : {}),
-            content: `<p><em>${_vActor.name}'s ${_lane === 'mind' ? 'will' : 'spirit'} and veil ward off `
+            content: `<p><em>${_vActor.name}'s ${({ mind: 'will and veil', soul: 'spirit and veil', melee: 'raw strength', ranged: 'reflexes' })[_lane]} ward off `
               + `<strong>${eff.name}</strong> — the curse finds no purchase.</em></p>`,
           });
           return;

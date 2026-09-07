@@ -1399,6 +1399,28 @@ ASPECTSOFPOWER.weaponTagGrants = {
   tome:        ['Seize Spell', 'Release Binding'],
 };
 
+/**
+ * PASSIVE DEBUFF GAUNTLET (ruled 2026-08-31, extended 2026-09-06).
+ *
+ * A debuff-only cast (no `attack` tag) is attenuated by the target's PASSIVE
+ * defence before it lands — no dice on either side, so the stat gap is
+ * absolute. `lanes` is which targetDefense values run the gauntlet at all;
+ * `veilLanes` is which of those put VEIL up as the mitigation wall.
+ *
+ * The physical lanes deliberately have NO wall: "a pool of sticky blood — no
+ * armour is going to stop that, just raw strength". They still pay the lane's
+ * defence margin, and the melee lane already blends strength, so the contest
+ * is the stat alone. A skill with an EMPTY targetDefense runs no gauntlet and
+ * lands unconditionally — that is authoring intent, not an oversight.
+ *
+ * ⚠ Read by BOTH the cast path (item.mjs) and the spread/transfer re-price
+ * (curse.mjs). They priced debuffs differently once already; keep one source.
+ */
+ASPECTSOFPOWER.debuffGauntlet = {
+  lanes: ['mind', 'soul', 'melee', 'ranged'],
+  veilLanes: ['mind', 'soul'],
+};
+
 ASPECTSOFPOWER.guardStance = {
   enabled: true,
   // Raising a guard is a QUARTER of the motion of swinging it (ruled
