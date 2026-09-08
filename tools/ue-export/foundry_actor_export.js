@@ -124,7 +124,7 @@
       /* AOE FOOTPRINT (schema v9; v11 adds angle/width/targetingMode for cone/ray + friendly-fire).
          Emit the shape even when enabled=false: a mine SNAPSHOTS its (disabled) aoe as the burst
          footprint Detonate reads back. */
-      aoe: i.system.aoe ? { enabled: !!i.system.aoe.enabled, shape: i.system.aoe.shape || 'circle', diameter: Number(i.system.aoe.diameter) || 0, baseSize: Number(i.system.aoe.baseSize) || 0, angle: Number(i.system.aoe.angle) || 0, width: Number(i.system.aoe.width) || 0, targetingMode: i.system.aoe.targetingMode || 'all' } : null,
+      aoe: i.system.aoe ? { enabled: !!i.system.aoe.enabled, shape: i.system.aoe.shape || 'circle', diameter: Number(i.system.aoe.diameter) || 0, baseSize: Number(i.system.aoe.baseSize) || 0, angle: Number(i.system.aoe.angle) || 0, width: Number(i.system.aoe.width) || 0, targetingMode: i.system.aoe.targetingMode || 'all', templateDuration: Number(i.system.aoe.templateDuration) || 0, zoneEffect: i.system.aoe.zoneEffect || 'none' } : null,
       /* TAG CONFIG passthrough (schema v11): the skill's flat tagConfig map, pruned to SET (truthy)
          entries, into the client's generic TagConfigRaw -- the same store UE-authored skills use.
          Unlocks guardianMode/redirectPct, reaction*, summon*, ... without a per-field schema each time.
