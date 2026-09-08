@@ -127,6 +127,7 @@
       name: i.name,
       skillType: i.system.skillType,
       ritualGrade: i.system.ritualGrade || 'E',
+      craftBonuses: (i.system.craftBonuses || []).map(function (b) { return { type: b.type || '', value: b.value == null ? 0 : b.value, affinity: b.affinity || '' }; }),
       craftAllowedTypes: Array.isArray(i.system.craftAllowedTypes) ? i.system.craftAllowedTypes.slice() : [],
       /* v12.6: which AUGMENT document an `augment` skill applies (flags), or the engrave dispatch. */
       appliesAugmentId: (i.flags && i.flags.aspectsofpower && i.flags.aspectsofpower.appliesAugmentId) || '',
@@ -220,6 +221,7 @@
       spatialCapacity: it.spatialCapacity || 0,
       wovenAffinities: Array.isArray(it.wovenAffinities) ? it.wovenAffinities : [],
       weaveAttuned: it.weaveAttuned || '',
+      onKillGained: (i.flags && i.flags.aspectsofpower && i.flags.aspectsofpower.onKillProgressGained) || 0,
       statBonuses: sb,
       armorBonus: it.armorBonus || 0,
       veilBonus: it.veilBonus || 0,
