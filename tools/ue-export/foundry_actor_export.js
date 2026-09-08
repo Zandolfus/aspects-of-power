@@ -127,6 +127,9 @@
       name: i.name,
       skillType: i.system.skillType,
       craftAllowedTypes: Array.isArray(i.system.craftAllowedTypes) ? i.system.craftAllowedTypes.slice() : [],
+      /* v12.6: which AUGMENT document an `augment` skill applies (flags), or the engrave dispatch. */
+      appliesAugmentId: (i.flags && i.flags.aspectsofpower && i.flags.aspectsofpower.appliesAugmentId) || '',
+      engraveDispatch: !!(i.flags && i.flags.aspectsofpower && i.flags.aspectsofpower.engraveDispatch),
       img: i.img || '',
       reactionType: i.system.reactionType || '',
       tags: i.system.tags || [],
@@ -210,6 +213,12 @@
       /* v12.5 (additive): durability -- max 0 = untracked (conjured / legacy gear never wears). */
       durability: (it.durability && it.durability.value) || 0,
       durabilityMax: (it.durability && it.durability.max) || 0,
+      /* v12.6 (additive): augment sockets -- combat and profession slot totals and how many are
+         filled (the fills' bonuses are already baked into the derived fields above). */
+      augmentSlots: it.augmentSlots || 0,
+      profAugmentSlots: it.profAugmentSlots || 0,
+      augmentsUsed: (it.augments || []).filter(function (e) { return e && e.augmentId; }).length,
+      profAugmentsUsed: (it.profAugments || []).filter(function (e) { return e && e.augmentId; }).length,
       /* v10: the item's unified tag list (weapon/armor/material tags). A SHIELD is any item
          whose tags include 'shield' (buckler/greatshield subtypes come along) -- drives block/bulwark.
          Block comment (not //) so the one-line flatten harness does not eat the rest of the script. */
@@ -342,6 +351,8 @@
       strain: s.strain || 0,
       freePoints: s.freePoints || 0,
       activeLoadout: s.activeLoadout || 'combat',
+      /* v12.6: the engravings this actor has learned (engraveDispatch augment skills pick among them). */
+      knownEngraves: (a.flags && a.flags.aspectsofpower && Array.isArray(a.flags.aspectsofpower.knownEngraves)) ? a.flags.aspectsofpower.knownEngraves.slice() : [],
       abilities: abilities,
       health: pool(s.health),
       mana: pool(s.mana),
