@@ -161,6 +161,7 @@
         dice: r.dice, abilities: r.abilities, secondaryAbility: r.secondaryAbility,
         primaryWeight: r.primaryWeight, secondaryWeight: r.secondaryWeight,
         resource: r.resource, cost: r.cost,
+        secondaryResource: r.secondaryResource || '', secondaryCost: r.secondaryCost || 0,
         secondaryResource: r.secondaryResource, secondaryCost: r.secondaryCost,
         type: r.type, statType: r.statType, damageType: r.damageType,
         targetDefense: r.targetDefense, secondaryTargetDefense: r.secondaryTargetDefense,
@@ -372,7 +373,14 @@
         capacity: s.carryCapacity, weight: s.carryWeight,
         ratio: s.carryRatio, encumbered: !!s.encumbered
       },
-      tags: s.tags || [],
+      /* v12.7: the COLLECTED tag set (actor._collectTags: race/class/profession cachedTags +
+         system.tags + equipped item tags + implied tags) -- what hasTag() actually answers. The
+         bare system.tags missed every template-conferred gate (ki, healer, no-magic ...). */
+      tags: (s.collectedTags && typeof s.collectedTags.keys === 'function') ? Array.from(s.collectedTags.keys()) : (s.tags || []),
+      systemTags: s.tags || [],
+      /* v12.7: the KI pool (kiMaxFor(endurance) when the ki tag is held; earned on a pierce, spent
+         by ki-resource skills, a quarter back per hour of meditation). */
+      ki: { value: (s.ki && s.ki.value) || 0, max: (s.ki && s.ki.max) || 0 },
       skillCount: skills.length,
       skills: skills,
       inventory: inventory,
