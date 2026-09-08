@@ -128,6 +128,7 @@
       skillType: i.system.skillType,
       ritualGrade: i.system.ritualGrade || 'E',
       favorite: !!i.system.favorite,
+      lifestealPct: (i.flags && i.flags.aspectsofpower && Number(i.flags.aspectsofpower.lifestealPct)) || 0,
       craftBonuses: (i.system.craftBonuses || []).map(function (b) { return { type: b.type || '', value: b.value == null ? 0 : b.value, affinity: b.affinity || '' }; }),
       craftAllowedTypes: Array.isArray(i.system.craftAllowedTypes) ? i.system.craftAllowedTypes.slice() : [],
       /* v12.6: which AUGMENT document an `augment` skill applies (flags), or the engrave dispatch. */
@@ -286,6 +287,7 @@
       name: e.name,
       img: e.img || '',
       category: es.effectCategory || '',
+      overhealthDecayReduction: es.overhealthDecayReduction || 0,
       effectType: es.effectType || '',
       itemSource: es.itemSource || '',
       disabled: !!e.disabled,
