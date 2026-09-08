@@ -50,6 +50,17 @@
       const db = (r.diceBonus != null) ? r.diceBonus : 1;
       damageMultiplier = (db !== 1) ? db * i._proficiencyDamageMult() : i._resolveRarityMods().effectiveMult;
     } catch (e) { damageMultiplier = 1; }
+    /* v12.4 (additive): the PROFICIENCY halves baked into damageMultiplier, and the weapon the
+       game resolved for this skill on export day, so the UE client can re-resolve them LIVE
+       when the hands change (AoPStyles): live = exported / profDamageMult x liveProf. */
+    let profDamageMult = 1, profHitMult = 1, weaponType = '';
+    try {
+      const WS = game.aspectsofpower && game.aspectsofpower.weaponStyles;
+      const held = i._proficiencyWeapon ? i._proficiencyWeapon() : null;
+      profDamageMult = i._proficiencyDamageMult ? (i._proficiencyDamageMult() || 1) : 1;
+      if (WS && WS.proficiencyHitMult && (CONFIG.ASPECTSOFPOWER.weaponProficiency.rollTypes || []).indexOf(r.type) >= 0) { profHitMult = WS.proficiencyHitMult(a, held) || 1; }
+      if (WS && WS.weaponTypesOfItem && held) { const wt = WS.weaponTypesOfItem(held); weaponType = wt && wt.length ? wt[0] : ''; }
+    } catch (e) { profDamageMult = 1; profHitMult = 1; weaponType = ''; }
     /* DoT metadata (schema v4). Whether a skill applies a DAMAGING debuff over time is
        tagConfig.debuffDealsDamage -- a flag the tags alone do not reveal. dotScale sizes
        each tick off the parent blow; debuffDuration is the tick count. */
@@ -133,6 +144,9 @@
       tagConfig: (function () { var o = {}; var keys = Object.keys(tc); for (var ki = 0; ki < keys.length; ki++) { var k = keys[ki]; var v = tc[k]; if (v === 0 || v === '' || v === false || v === null || v === undefined) { continue; } if (Array.isArray(v) && v.length === 0) { continue; } o[k] = (typeof v === 'object') ? JSON.stringify(v) : v; } return o; })(),
       weaponWeight: weaponWeight,
       damageMultiplier: damageMultiplier,
+      profDamageMult: profDamageMult,
+      profHitMult: profHitMult,
+      weaponType: weaponType,
       dotDealsDamage: dotDealsDamage,
       dotScale: dotScale,
       dotDuration: dotDuration,
