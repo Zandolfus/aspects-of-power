@@ -115,6 +115,7 @@
     return {
       name: i.name,
       skillType: i.system.skillType,
+      craftAllowedTypes: Array.isArray(i.system.craftAllowedTypes) ? i.system.craftAllowedTypes.slice() : [],
       img: i.img || '',
       reactionType: i.system.reactionType || '',
       tags: i.system.tags || [],
@@ -182,6 +183,16 @@
       drPhysical: dr.physical || 0,
       drMagical: dr.magical || 0,
       damageBonus: it.damageBonus || 0,
+      /* v12.3 (additive): the CRAFTING fields -- a material's progress/cap/element/grade and a
+         crafted piece's progress ceiling + rework count, so the UE craft port can consume
+         materials and derive products exactly as crafting-skills.mjs does. */
+      isMaterial: !!it.isMaterial,
+      progress: it.progress || 0,
+      maxProgress: it.maxProgress || 0,
+      materialElement: it.materialElement || '',
+      materialGrade: it.materialGrade || 'E',
+      materialCap: it.materialCap || 0,
+      reworkCount: it.reworkCount || 0,
       /* v10: the item's unified tag list (weapon/armor/material tags). A SHIELD is any item
          whose tags include 'shield' (buckler/greatshield subtypes come along) -- drives block/bulwark.
          Block comment (not //) so the one-line flatten harness does not eat the rest of the script. */
@@ -280,8 +291,9 @@
       source: r.source || '',
       discoveredBy: r.discoveredBy || '',
       requiresSkillTags: Array.isArray(r.requiresSkillTags) ? r.requiresSkillTags.slice() : [],
-      inputs: (r.inputs || []).map(function (n) { return { material: n.material || '', itemName: n.itemName || '', element: n.element || '', quantity: n.quantity || 1 }; }),
+      inputs: (r.inputs || []).map(function (n) { return { material: n.material || '', itemName: n.itemName || '', element: n.element || '', quantity: n.quantity || 1, minProgress: n.minProgress || 0 }; }),
       outputName: out.name || '',
+      outputTags: Array.isArray(out.tags) ? out.tags.slice() : [],
       outputTypeKey: out.typeKey || '',
       outputMaterial: out.material || '',
       outputElement: out.element || '',
