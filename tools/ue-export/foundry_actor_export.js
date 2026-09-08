@@ -383,6 +383,9 @@
         'class': (s.attributes && s.attributes['class']) ? (s.attributes['class'].level || 0) : 0,
         profession: (s.attributes && s.attributes.profession) ? (s.attributes.profession.level || 0) : 0
       },
+      /* v12.13: per-track template HISTORY (mass-leveler applyTrackLevelsByHistory): which template covered
+         which levels; templateId -> the template's NAME so the client can find it in its packs. */
+      history: (function () { var out = {}; var tracks = ['class', 'race', 'profession']; for (var ti = 0; ti < tracks.length; ti++) { var tk = tracks[ti]; var h = (s.attributes && s.attributes[tk] && Array.isArray(s.attributes[tk].history)) ? s.attributes[tk].history : []; out[tk] = h.map(function (e) { var nm = ''; try { var d = e.templateId ? fromUuidSync(e.templateId) : null; nm = (d && d.name) ? d.name : ''; } catch (err) { nm = ''; } return { fromLevel: e.fromLevel || 0, template: nm }; }); } return out; })(),
       strain: s.strain || 0,
       freePoints: s.freePoints || 0,
       credits: s.credits || 0,
