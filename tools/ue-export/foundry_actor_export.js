@@ -218,6 +218,8 @@
       material: it.material || '',
       storedIn: it.storedIn || '',
       spatialCapacity: it.spatialCapacity || 0,
+      wovenAffinities: Array.isArray(it.wovenAffinities) ? it.wovenAffinities : [],
+      weaveAttuned: it.weaveAttuned || '',
       statBonuses: sb,
       armorBonus: it.armorBonus || 0,
       veilBonus: it.veilBonus || 0,
