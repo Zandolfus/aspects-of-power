@@ -207,6 +207,9 @@
       materialGrade: it.materialGrade || 'E',
       materialCap: it.materialCap || 0,
       reworkCount: it.reworkCount || 0,
+      /* v12.5 (additive): durability -- max 0 = untracked (conjured / legacy gear never wears). */
+      durability: (it.durability && it.durability.value) || 0,
+      durabilityMax: (it.durability && it.durability.max) || 0,
       /* v10: the item's unified tag list (weapon/armor/material tags). A SHIELD is any item
          whose tags include 'shield' (buckler/greatshield subtypes come along) -- drives block/bulwark.
          Block comment (not //) so the one-line flatten harness does not eat the rest of the script. */
