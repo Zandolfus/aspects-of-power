@@ -127,6 +127,7 @@
       name: i.name,
       skillType: i.system.skillType,
       ritualGrade: i.system.ritualGrade || 'E',
+      favorite: !!i.system.favorite,
       craftBonuses: (i.system.craftBonuses || []).map(function (b) { return { type: b.type || '', value: b.value == null ? 0 : b.value, affinity: b.affinity || '' }; }),
       craftAllowedTypes: Array.isArray(i.system.craftAllowedTypes) ? i.system.craftAllowedTypes.slice() : [],
       /* v12.6: which AUGMENT document an `augment` skill applies (flags), or the engrave dispatch. */
@@ -221,6 +222,7 @@
       spatialCapacity: it.spatialCapacity || 0,
       wovenAffinities: Array.isArray(it.wovenAffinities) ? it.wovenAffinities : [],
       weaveAttuned: it.weaveAttuned || '',
+      deployStub: (function () { if (!it.deployStubActorUuid) { return ''; } var st = null; try { st = fromUuidSync(it.deployStubActorUuid); } catch (e) { st = null; } return (st && st.name) ? st.name : ''; })(),
       onKillGained: (i.flags && i.flags.aspectsofpower && i.flags.aspectsofpower.onKillProgressGained) || 0,
       statBonuses: sb,
       armorBonus: it.armorBonus || 0,
@@ -381,6 +383,7 @@
       },
       strain: s.strain || 0,
       freePoints: s.freePoints || 0,
+      credits: s.credits || 0,
       activeLoadout: s.activeLoadout || 'combat',
       /* v12.6: the engravings this actor has learned (engraveDispatch augment skills pick among them). */
       knownEngraves: (a.flags && a.flags.aspectsofpower && Array.isArray(a.flags.aspectsofpower.knownEngraves)) ? a.flags.aspectsofpower.knownEngraves.slice() : [],
