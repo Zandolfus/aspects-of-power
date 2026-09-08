@@ -36,7 +36,7 @@
     soul: def.soul ? { value: def.soul.value, pool: def.soul.pool, poolMax: def.soul.poolMax } : null
   };
 
-  const skills = a.items.filter((i) => i.type === 'skill').map((i) => {
+  const mapSkill = (i) => {
     const r = i.system.roll || {};
     /* The GAME resolves these; the UE port cannot (weapon match, proficiency,
        lunar phase are not in the raw fields). weaponWeight drives the hit blend,
@@ -126,6 +126,7 @@
     return {
       name: i.name,
       skillType: i.system.skillType,
+      ritualGrade: i.system.ritualGrade || 'E',
       craftAllowedTypes: Array.isArray(i.system.craftAllowedTypes) ? i.system.craftAllowedTypes.slice() : [],
       /* v12.6: which AUGMENT document an `augment` skill applies (flags), or the engrave dispatch. */
       appliesAugmentId: (i.flags && i.flags.aspectsofpower && i.flags.aspectsofpower.appliesAugmentId) || '',
@@ -144,6 +145,7 @@
          entries, into the client's generic TagConfigRaw -- the same store UE-authored skills use.
          Unlocks guardianMode/redirectPct, reaction*, summon*, ... without a per-field schema each time.
          Objects/arrays are JSON-stringified; the client reads the keys it needs. */
+      id: i.id,
       tagConfig: (function () { var o = {}; var keys = Object.keys(tc); for (var ki = 0; ki < keys.length; ki++) { var k = keys[ki]; var v = tc[k]; if (v === 0 || v === '' || v === false || v === null || v === undefined) { continue; } if (Array.isArray(v) && v.length === 0) { continue; } o[k] = (typeof v === 'object') ? JSON.stringify(v) : v; } return o; })(),
       weaponWeight: weaponWeight,
       damageMultiplier: damageMultiplier,
@@ -169,7 +171,28 @@
         actionWeightMultiplier: r.actionWeightMultiplier
       }
     };
-  });
+  };
+  const skills = a.items.filter((i) => i.type === 'skill').map(mapSkill);
+  /* v12.8: RITUAL ACTIVATION SKILLS. A ritual's tagConfig.ritualActivationSkillId may name a
+     compendium skill the actor does not own (Place Lightstream Prism); an inscribed gem fires it.
+     Export those alongside the actor's skills, marked activationOnly so the client keeps them off
+     the hotbar and out of the AI pick. fromUuidSync needs the pack loaded (the batch harness
+     preloads every skills compendium). */
+  for (const rs of a.items.filter((i) => i.type === 'skill' && (i.system.tags || []).includes('ritual'))) {
+    const actId = rs.system.tagConfig && rs.system.tagConfig.ritualActivationSkillId;
+    if (!actId) { continue; }
+    let act = null;
+    try { act = fromUuidSync(actId); } catch (e) { act = null; }
+    if (!act || act.type !== 'skill') { continue; }
+    /* The actor already OWNS the activation (a lunar ritual's activation is the granted skill
+       itself): stamp the owned copy with the uuid so an inscribed gem can find it. */
+    if (a.items.getName(act.name)) { const own = skills.find((k) => !k.activationOnly && k.name === act.name); if (own && !own.activationUuid) { own.activationUuid = actId; } continue; }
+    if (skills.some((k) => k.activationOnly && k.name === act.name)) { continue; }
+    const mapped = mapSkill(act);
+    mapped.activationOnly = true;
+    mapped.activationUuid = actId;
+    skills.push(mapped);
+  }
 
   /* INVENTORY (schema v6). Every carried item (type 'item'), equipped or not, with
      its GAME-RESOLVED per-item contribution read straight off the stored derived fields
@@ -299,7 +322,10 @@
       bombDamageType: bo.damageType || '',
       bombShape: bo.shape || '',
       bombDiameter: bo.diameter || 0,
-      repairAmount: c.repairAmount || 0
+      repairAmount: c.repairAmount || 0,
+      ritualSkillId: c.ritualSkillId || '',
+      ritualPower: c.ritualPower || 0,
+      mediumType: c.mediumType || ''
     };
   });
 
