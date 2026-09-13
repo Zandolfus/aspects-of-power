@@ -171,17 +171,20 @@ ASPECTSOFPOWER.alterationTags = {
   // so the three skills keep their damage to the digit while rarity goes back
   // to meaning proficiency — and they can still grow, which divine could not.
   //
-  // costMod 0.30 is the PLACEHOLDER FOR THE STEALTH PRECONDITION. An ambush
-  // should be paid for by setup (being unseen), but no stealth STATE exists
-  // yet — engagement-halts.mjs says so explicitly and the only thing available
-  // is Foundry's `token.hidden`, a GM VISIBILITY toggle that means something
-  // else. Until stealth lands, the resource cost stands in for the setup.
-  // ⚠ When stealth ships, revisit: the cost should probably drop and the
-  // damage should become CONDITIONAL rather than always-on.
+  // costMod 0 since 2026-09-13: THE PLACEHOLDER IS RETIRED. It was 0.30, a
+  // resource price standing in for a stealth precondition that did not exist —
+  // an ambush is supposed to be paid for by SETUP (being unseen), and there was
+  // no stealth state to check. UE now has one (AoPStealth: a per-observer
+  // detection meter), the dmgMod is CONDITIONAL on the target being unable to
+  // perceive the attacker, and charging both would price the ambush twice.
+  // ⚠ The damage is unchanged: 0.50 still makes `rare` x ambush reproduce
+  // `divine` EXACTLY — it simply only applies when the ambush is real.
+  // ⚠ FOUNDRY-SIDE ONLY. The UE export writes the RAW authored `cost`, so the
+  // client never applied this multiplier at all; the two now agree.
   //
   // weightMod 0 deliberately: weightMod feeds computeWindupMultiplier, so any
   // value would ALSO change per-hit damage and break the exact-divine match.
-  ambush:      { label: 'ASPECTSOFPOWER.Alteration.ambush',      dmgMod:  0.50, costMod:  0.30, weightMod: 0.00, category: 'conditional',  stacking: 'max_one'  },
+  ambush:      { label: 'ASPECTSOFPOWER.Alteration.ambush',      dmgMod:  0.50, costMod:  0.00, weightMod: 0.00, category: 'conditional',  stacking: 'max_one'  },
 };
 
 /**
