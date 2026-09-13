@@ -61,6 +61,24 @@
       if (WS && WS.proficiencyHitMult && (CONFIG.ASPECTSOFPOWER.weaponProficiency.rollTypes || []).indexOf(r.type) >= 0) { profHitMult = WS.proficiencyHitMult(a, held) || 1; }
       if (WS && WS.weaponTypesOfItem && held) { const wt = WS.weaponTypesOfItem(held); weaponType = wt && wt.length ? wt[0] : ''; }
     } catch (e) { profDamageMult = 1; profHitMult = 1; weaponType = ''; }
+    /* v12.14 (additive): the AMBUSH alteration baked into damageMultiplier. Ambush is
+       `category: 'conditional'` and its bonus was only ever meant to apply against a target
+       unaware of the attacker -- but no stealth STATE existed when it shipped, so the bonus is
+       ALWAYS-ON inside the exported number and `costMod 0.30` stood in as the price of setup.
+       UE has that state now, so it divides this back out and re-applies it only on a true
+       ambush: live = exported / ambushDamageMult x (unaware ? ambushDamageMult : 1).
+       Exactly the v12.4 profDamageMult trick, for exactly the same reason. */
+    let ambushDamageMult = 1;
+    try {
+      const alts = i.system.alterations || [];
+      for (let ai = 0; ai < alts.length; ai++) {
+        if (alts[ai] && alts[ai].id === 'ambush') {
+          const at = CONFIG.ASPECTSOFPOWER.alterationTags && CONFIG.ASPECTSOFPOWER.alterationTags.ambush;
+          ambushDamageMult = 1 + (Number(at && at.dmgMod) || 0);
+          break;
+        }
+      }
+    } catch (e) { ambushDamageMult = 1; }
     /* DoT metadata (schema v4). Whether a skill applies a DAMAGING debuff over time is
        tagConfig.debuffDealsDamage -- a flag the tags alone do not reveal. dotScale sizes
        each tick off the parent blow; debuffDuration is the tick count. */
@@ -154,6 +172,7 @@
       damageMultiplier: damageMultiplier,
       profDamageMult: profDamageMult,
       profHitMult: profHitMult,
+      ambushDamageMult: ambushDamageMult,
       weaponType: weaponType,
       dotDealsDamage: dotDealsDamage,
       dotScale: dotScale,
