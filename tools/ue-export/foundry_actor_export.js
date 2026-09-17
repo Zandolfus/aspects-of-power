@@ -167,7 +167,12 @@
          Unlocks guardianMode/redirectPct, reaction*, summon*, ... without a per-field schema each time.
          Objects/arrays are JSON-stringified; the client reads the keys it needs. */
       id: i.id,
-      tagConfig: (function () { var o = {}; var keys = Object.keys(tc); for (var ki = 0; ki < keys.length; ki++) { var k = keys[ki]; var v = tc[k]; if (v === 0 || v === '' || v === false || v === null || v === undefined) { continue; } if (Array.isArray(v) && v.length === 0) { continue; } o[k] = (typeof v === 'object') ? JSON.stringify(v) : v; } return o; })(),
+      /* v12.15: RESOLVE summonStubActorUuid -> summonStubActorName. UE's roster is keyed by NAME,
+         so a Foundry UUID is unreadable there: CastSummon looked up a key nothing authored, always
+         missed, and cloned the CASTER instead -- every summon in the game was a copy of its
+         summoner (Place Lightstream Prism summoned a second Willy). The uuid stays beside the name
+         so the provenance survives. Block comments only: the one-line flatten eats //. */
+      tagConfig: (function () { var o = {}; var keys = Object.keys(tc); for (var ki = 0; ki < keys.length; ki++) { var k = keys[ki]; var v = tc[k]; if (v === 0 || v === '' || v === false || v === null || v === undefined) { continue; } if (Array.isArray(v) && v.length === 0) { continue; } o[k] = (typeof v === 'object') ? JSON.stringify(v) : v; } if (o.summonStubActorUuid) { try { var _stub = fromUuidSync(o.summonStubActorUuid); if (_stub && _stub.name) { o.summonStubActorName = _stub.name; } } catch (e) { } } return o; })(),
       weaponWeight: weaponWeight,
       damageMultiplier: damageMultiplier,
       profDamageMult: profDamageMult,
