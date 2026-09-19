@@ -190,8 +190,10 @@
         dice: r.dice, abilities: r.abilities, secondaryAbility: r.secondaryAbility,
         primaryWeight: r.primaryWeight, secondaryWeight: r.secondaryWeight,
         resource: r.resource, cost: r.cost,
+        /* One declaration each. These keys were written TWICE in this object literal and the
+           second pair won, so the `|| ''` and `|| 0` defaults above them had never once applied
+           and an unset secondaryCost reached the client as undefined rather than 0. */
         secondaryResource: r.secondaryResource || '', secondaryCost: r.secondaryCost || 0,
-        secondaryResource: r.secondaryResource, secondaryCost: r.secondaryCost,
         type: r.type, statType: r.statType, damageType: r.damageType,
         targetDefense: r.targetDefense, secondaryTargetDefense: r.secondaryTargetDefense,
         reach: r.reach, diceBonus: r.diceBonus,
@@ -211,6 +213,14 @@
     let act = null;
     try { act = fromUuidSync(actId); } catch (e) { act = null; }
     if (!act || act.type !== 'skill') { continue; }
+    /* An UNLOADED compendium gives fromUuidSync a lightweight INDEX ENTRY: it has a name and a
+       type and NO system, so mapSkill below died on `i.system.roll` and took the whole actor
+       export with it. That is how Willy -- a party member -- silently failed to export on
+       2026-09-19 while the other 250 succeeded, and the error surfaced only as a TypeError with
+       no actor named in it. The harness is supposed to preload every pack first; this is the
+       guard for when it has not, because losing one activation skill is a great deal better
+       than losing the actor. */
+    if (!act.system) { continue; }
     /* The actor already OWNS the activation (a lunar ritual's activation is the granted skill
        itself): stamp the owned copy with the uuid so an inscribed gem can find it. */
     if (a.items.getName(act.name)) { const own = skills.find((k) => !k.activationOnly && k.name === act.name); if (own && !own.activationUuid) { own.activationUuid = actId; } continue; }
