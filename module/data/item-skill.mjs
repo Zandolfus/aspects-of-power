@@ -534,6 +534,15 @@ export class SkillData extends foundry.abstract.TypeDataModel {
         hitPrimary:   new fields.StringField({ initial: '' }),
         hitSecondary: new fields.StringField({ initial: '' }),
 
+        // The DAMAGE-side counterpart of hitPrimary, and deliberately a
+        // separate field: intelligence is the universal spell-power stat, so
+        // `roll.abilities` steering the aim must never quietly steer damage
+        // too (the hit/damage split rule above). This is the opt-in exception
+        // for a creature whose magic is a bodily function rather than a
+        // studied art — a hydra's venom scales on vitality, not scholarship.
+        // Empty = intelligence, so every existing spell is untouched.
+        damageAbility: new fields.StringField({ initial: '' }),
+
         // ── STACKS (design-stacks-subsystem.md, RULED 2026-08-02) ─────────
         // A self-held charge pool on the CASTER. One skill produces into a
         // named pool; others spend from it. Both sides carry `stackPool`;

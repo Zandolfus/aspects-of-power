@@ -9,7 +9,7 @@
  * update BOTH together in one commit.
  */
 import {
-  houseHitFormula, hybridAbilityMod, weaponStatBlend, spellDamageRef,
+  houseHitFormula, hybridAbilityMod, spellDamagePotency, weaponStatBlend, spellDamageRef,
   spellInvestDamage, strikeInvestDamage, infusionDamage, investSelfDamage,
   spellCastWeight, spellWindupMultiplier, investCurve, healStatBlend, convertResources,
   effectiveDodgeValue, splitEvenlyWithRemainder, perceiveGateDecision, activityTicks, nextCompletionDelta,
@@ -60,6 +60,19 @@ function eq(name, got, want) {
 
 // House hit grammar â€” string must match the golden fixture formulas verbatim.
 eq('houseHitFormula(321)', houseHitFormula(321), '((((d20/100)*(321))+(321)))');
+
+// SPELL DAMAGE POTENCY -- golden values read off the live Blighted Hydra
+// 2026-09-19: intelligence mod 46, vitality mod 1102. Intelligence is the
+// default spell-power stat; `damageAbility` is the authored exception.
+const _hydraAb = { intelligence: { mod: 46 }, vitality: { mod: 1102 }, willpower: { mod: 429 } };
+eq('spell potency default int', spellDamagePotency(_hydraAb, {}).mod, 46);
+eq('spell potency default label', spellDamagePotency(_hydraAb, {}).label, 'Int');
+eq('spell potency vitality override', spellDamagePotency(_hydraAb, { damageAbility: 'vitality' }).mod, 1102);
+eq('spell potency vitality label', spellDamagePotency(_hydraAb, { damageAbility: 'vitality' }).label, 'Vit');
+// Negative controls: an absent tagConfig and a key no ability answers to must
+// BOTH fall back to intelligence rather than silently scoring 0 damage.
+eq('spell potency null cfg', spellDamagePotency(_hydraAb, null).mod, 46);
+eq('spell potency bogus key', spellDamagePotency(_hydraAb, { damageAbility: 'charisma' }).mod, 46);
 
 // Weapon blends â€” live-verified spellstrike hit blends (2026-07-03 fires):
 // Aiden longsword wt100 str149 dex518 â†’ 321; John wt100 str288 dex218 â†’ 255.

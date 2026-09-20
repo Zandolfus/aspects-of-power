@@ -37,6 +37,30 @@ export function hybridAbilityMod(abilities, rollCfg) {
 }
 
 /**
+ * SPELL DAMAGE POTENCY — the stat a magic cast multiplies its damage by.
+ *
+ * Intelligence is the universal spell-power stat; a magic skill's
+ * `roll.abilities` steers its AIM alone (see hitPrimary in the skill schema).
+ * `tagConfig.damageAbility` is the authored exception, for magic that is a
+ * bodily function rather than a studied art. Inert unless authored.
+ *
+ * ⚠ Both the invest dialog's preview and the real damage path MUST call this
+ * — a preview computed by a different expression is the preview-drift bug
+ * (2026-07-30), where the dialog promised one number and the swing dealt
+ * another.
+ *
+ * @param {object} abilities  actor.system.abilities
+ * @param {object} [tagConfig]  skill.system.tagConfig
+ * @returns {{mod: number, label: string}}
+ */
+export function spellDamagePotency(abilities, tagConfig = null) {
+  const key = tagConfig?.damageAbility ?? '';
+  const chosen = (key && abilities?.[key]) ? key : 'intelligence';
+  const mod = Math.round(abilities?.[chosen]?.mod ?? 0);
+  return { mod, label: chosen.charAt(0).toUpperCase() + chosen.slice(1, 3) };
+}
+
+/**
  * Weight-normalized weapon stat blend — THE one implementation of the
  * meleeBlend/rangedBlend curves (design-melee/ranged-system.md).
  *   melee : strWeight = strFloor + slope×norm  → blend = str×w + dex×(1−w)

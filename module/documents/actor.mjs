@@ -1266,6 +1266,24 @@ export class AspectsofPowerActor extends Actor {
       if (fx.disabled || !fx.system?.hot) continue;
       const amt = Math.round(fx.system.hotAmount ?? 0);
       if (amt <= 0) continue;
+      // ── CAUTERISED REGENERATION ──
+      // ⚠ Asks whether the wound is burning RIGHT NOW, not what last hit us:
+      // the same reasoning as the cast-time check in _handleRestorationTag.
+      // Reported once per suppressed tick, because a regen that silently
+      // does nothing is indistinguishable from a regen that is broken.
+      const suppressType = fx.system.hotSuppressedByDot ?? '';
+      if (suppressType) {
+        const burning = this.effects.some(e => !e.disabled && e.system?.dot
+          && e.system?.dotDamageType === suppressType);
+        if (burning) {
+          ChatMessage.create({
+            speaker, ...gmWhisper,
+            content: `<p><em><strong>${this.name}</strong> cannot regenerate — the `
+                   + `${suppressType} is still in the wound.</em></p>`,
+          });
+          continue;
+        }
+      }
       const resKey = fx.system.hotResource || 'health';
       const pool = systemData[resKey];
       if (!pool) continue;

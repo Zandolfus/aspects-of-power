@@ -60,6 +60,13 @@ export class AopEffectData extends foundry.data.ActiveEffectTypeDataModel {
       hot:              new fields.BooleanField({ initial: false }),
       hotAmount:        new fields.NumberField({ initial: 0, min: 0 }),
       hotResource:      new fields.StringField({ initial: 'health' }),
+      // CAUTERISED REGENERATION. A DoT of this damage type on the bearer
+      // switches the tick off while it burns — "burn the stumps or the heads
+      // grow back". The cast-time twin of this lives on the restoration skill
+      // (`tagConfig.regenSuppressedByDot`), which could only ever gate a heal
+      // at the moment it was cast; a PERMANENT regen is never cast, so the
+      // check has to live where the ticking does. Empty = nothing suppresses.
+      hotSuppressedByDot: new fields.StringField({ initial: '' }),
 
       dot:              new fields.BooleanField({ initial: false }),
       dotDamage:        new fields.NumberField({ initial: 0 }),

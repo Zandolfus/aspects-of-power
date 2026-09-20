@@ -1,6 +1,6 @@
 import { EquipmentSystem } from '../systems/equipment.mjs';
 import { getPositionalTags } from '../helpers/positioning.mjs';
-import { houseHitFormula, hybridAbilityMod, weaponStatBlend, healStatBlend, spellDamageRef, spellInvestDamage, spellWindupMultiplier, spellCastWeight, strikeInvestDamage, coInvestDamage, investSelfDamage as computeInvestSelfDamage, effectiveDodgeValue, splitEvenlyWithRemainder, parryMassMultiplier, bracedParryWeight, bracedMaxUsefulInvest, defenceMarginMultiplier, defenseTimeCost, dodgeShortfallQuality, dotTickDamage, riderDamageBase, burnDetonatePayload, bulwarkWallBonus, procStaminaCost, crushFlatAmount, riderMaxInvest, auraRadiusFor, barrierStatBlend, hotTickAmount, effectiveDamageMultiplier, clashOutcome, orbDischargePrice, orbChargeAfterBank, affinityAnswer, aiInvestSize } from '../helpers/formulas.mjs';
+import { houseHitFormula, hybridAbilityMod, spellDamagePotency, weaponStatBlend, healStatBlend, spellDamageRef, spellInvestDamage, spellWindupMultiplier, spellCastWeight, strikeInvestDamage, coInvestDamage, investSelfDamage as computeInvestSelfDamage, effectiveDodgeValue, splitEvenlyWithRemainder, parryMassMultiplier, bracedParryWeight, bracedMaxUsefulInvest, defenceMarginMultiplier, defenseTimeCost, dodgeShortfallQuality, dotTickDamage, riderDamageBase, burnDetonatePayload, bulwarkWallBonus, procStaminaCost, crushFlatAmount, riderMaxInvest, auraRadiusFor, barrierStatBlend, hotTickAmount, effectiveDamageMultiplier, clashOutcome, orbDischargePrice, orbChargeAfterBank, affinityAnswer, aiInvestSize } from '../helpers/formulas.mjs';
 import { resolveSituationalMods } from '../systems/situational-mods.mjs';
 import { recordActionFired, declareAction, isInActiveCombat, computeActionWait, referenceRoundLength, computeWindupMultiplier, getScrambleStacks, addScrambleStack, applyDodgeCost, findCombatantForActor, perceiveGate, getDefenseBudget, spendDefenseBudget, setLastSwungHand, computeActionHeft, actorRoundLength } from '../systems/celerity.mjs';
 import { getThreatRadiusFt, actorIsDashing } from '../systems/engagement-halts.mjs';
@@ -6736,7 +6736,11 @@ export class AspectsofPowerItem extends Item {
         : 0;
       const livePool    = Math.max(0,
         Math.round(this.actor.system[_resKey]?.value ?? 0) - _healthFloor);
-      const intMod      = this.actor.system.abilities?.intelligence?.mod ?? 0;
+      // Intelligence unless the skill authors `tagConfig.damageAbility`. ONE
+      // resolution for the invest dialog below AND the damage formula, so the
+      // preview cannot promise a number the cast does not deal.
+      const { mod: _spellPotency, label: _spellPotencyLabel } =
+        spellDamagePotency(this.actor.system.abilities, this.system.tagConfig);
       // Multiplier resolution: prefer hand-tuned `diceBonus` (designer-set,
       // non-default value) so existing spells don't drift before migration.
       // Otherwise use the rarity-based effective mult — same ladder as
@@ -6900,7 +6904,7 @@ export class AspectsofPowerItem extends Item {
             // On a cast, the attack's own potency IS int — so straining
             // physically to push a spell harder makes a bigger SPELL, which is
             // the same "the effort goes where the attack goes" rule.
-            hostPotency: intMod,
+            hostPotency: _spellPotency,
           })
         : null;
       const useCoInvest = !!coInvest?.affordable;
@@ -6933,12 +6937,12 @@ export class AspectsofPowerItem extends Item {
         // model nothing has switched on.
         const result = await this._promptCoInvest({
           primary: {
-            baseCost: baseMana, safeInvest: 0, maxPool: maxInvest, potency: intMod,
+            baseCost: baseMana, safeInvest: 0, maxPool: maxInvest, potency: _spellPotency,
             damageRef: baseManaAt5ft, investDamageOffset: baseMana - baseManaAt5ft, resourceLabel: _resKey,
             damageLabel: 'Spell',
           },
           co: coInvest,
-          multiplier, label, potencyLabel: 'Int',
+          multiplier, label, potencyLabel: _spellPotencyLabel,
           channelStat: coInvest.channelled ? wisMod : null,
           channelFactor: coInvest.channelled ? (sc.celerity?.CHANNEL_FACTOR ?? 3000) : null,
           baseWait: computeActionWait(this.actor, this, null, null, null),
@@ -6989,11 +6993,11 @@ export class AspectsofPowerItem extends Item {
               baseCost: baseMana,
               safeInvest: 0,                              // hard cap = no soft zone
               maxPool: maxInvest,
-              potency: intMod, multiplier,
+              potency: _spellPotency, multiplier,
               // NOT hardcoded 'mana' — health is a casting resource as of
               // 2026-07-31, and a blood mage being told she is spending mana
               // while the dialog drains her HP is a lie the player acts on.
-              resourceLabel: _resKey, potencyLabel: 'Int', label,
+              resourceLabel: _resKey, potencyLabel: _spellPotencyLabel, label,
               channelStat: wisMod,
               channelFactor: sc.celerity?.CHANNEL_FACTOR ?? null,
               hardCap: true,                              // hide safe-ceiling/self-damage rows
@@ -7144,7 +7148,7 @@ export class AspectsofPowerItem extends Item {
           ? healStatBlend(this.actor.system.abilities, rollData.roll.resource)
           : (_isBarrier
               ? barrierStatBlend(this.actor.system.abilities)
-              : intMod);
+              : _spellPotency);
         // The healing coefficient rides the RARITY multiplier rather than the
         // blend: the blend answers "who heals well", the coefficient answers
         // "how much is a heal worth". Keeping them separate means retuning heal
