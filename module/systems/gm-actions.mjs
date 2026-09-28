@@ -778,14 +778,16 @@ export async function executeGmAction(payload) {
             }
 
             // Blind: apply Foundry blind status to disable token vision.
+            // ⚠ v13 REMOVED `TokenDocument#toggleActiveEffect`. It was still
+            // called here, so every blind in the world threw
+            // "toggleActiveEffect is not a function" AFTER the effect row was
+            // written — the debuff never survived the unwind, and the chat card
+            // still said HIT. Found 2026-09-27 by firing a spore rider.
+            // `Actor#toggleStatusEffect` is the replacement and fans out to the
+            // actor's tokens itself, so there is no token loop any more.
             const dType = payload.effectData.system?.debuffType;
-            if (dType === 'blind') {
-              const tokens = target.getActiveTokens();
-              for (const t of tokens) {
-                if (!t.document.hasStatusEffect('blind')) {
-                  await t.document.toggleActiveEffect({ id: 'blind', name: 'Blind', img: 'icons/svg/blind.svg' }, { active: true });
-                }
-              }
+            if (dType === 'blind' && !target.statuses?.has('blind')) {
+              await target.toggleStatusEffect('blind', { active: true });
             }
 
             // Dismembered: force-unequip items in the disabled slot.

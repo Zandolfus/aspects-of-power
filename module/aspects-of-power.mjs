@@ -1518,12 +1518,13 @@ Hooks.on('deleteActiveEffect', async (effect, _options, _userId) => {
   if (!actor || !(actor instanceof Actor)) return;
 
   // Remove Foundry blind status if a blind debuff was deleted.
-  if (effect.system?.debuffType === 'blind') {
-    for (const t of actor.getActiveTokens()) {
-      if (t.document.hasStatusEffect('blind')) {
-        await t.document.toggleActiveEffect({ id: 'blind', name: 'Blind', img: 'icons/svg/blind.svg' }, { active: false });
-      }
-    }
+  // ⚠ The mirror of the apply site in gm-actions.mjs: `toggleActiveEffect` was
+  // removed from TokenDocument in v13, so this threw on every blind expiry and
+  // the status icon could never be cleared. `Actor#toggleStatusEffect` covers
+  // every token of the actor, including ones on scenes that are not viewed —
+  // `getActiveTokens()` only ever saw the viewed canvas.
+  if (effect.system?.debuffType === 'blind' && actor.statuses?.has('blind')) {
+    await actor.toggleStatusEffect('blind', { active: false });
   }
 
   // Post expiry notification for effects that had a duration.
